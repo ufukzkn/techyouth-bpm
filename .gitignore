@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+.next/
+out/
+dist/
+
+# dotnet
+bin/
+obj/
+TestResults/
+*.db
+*.db-shm
+*.db-wal
+
+# local env
+.env
+.env.*
+!.env.example
+
+# editor/os
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# logs
+*.log
+npm-debug.log*
+
+# local source copy; tracked copy lives in docs/
+TechYouth School 2. Dönem Proje Dokümanı.pdf
