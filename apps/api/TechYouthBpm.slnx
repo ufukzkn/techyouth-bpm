@@ -5,4 +5,7 @@
     <Project Path="src/TechYouthBpm.Domain/TechYouthBpm.Domain.csproj" />
     <Project Path="src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj" />
+  </Folder>
 </Solution>

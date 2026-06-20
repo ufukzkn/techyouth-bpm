@@ -22,6 +22,15 @@ Use this file for the final code review presentation.
 7. Review API service boundaries.
 8. Review tests and commit history.
 
+## Current Test Story
+
+- `ProcessStateMachineTests` proves the allowed BPM transitions:
+  - `Pending -> Start -> InProgress`
+  - `InProgress -> Approve -> Completed`
+  - `InProgress -> Reject -> Rejected`
+- Invalid transitions are rejected with an explicit error.
+- Available actions are derived from the current process status instead of being hardcoded in the UI.
+
 ## Review Questions To Be Ready For
 
 - Why use a state machine instead of directly changing statuses?
