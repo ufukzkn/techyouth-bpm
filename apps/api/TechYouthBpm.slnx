@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TechYouthBpm.Api/TechYouthBpm.Api.csproj" />
+    <Project Path="src/TechYouthBpm.Application/TechYouthBpm.Application.csproj" />
+    <Project Path="src/TechYouthBpm.Domain/TechYouthBpm.Domain.csproj" />
+    <Project Path="src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj" />
+  </Folder>
+</Solution>

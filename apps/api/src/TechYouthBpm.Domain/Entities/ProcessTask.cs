@@ -1,0 +1,17 @@
+using TechYouthBpm.Domain.Enums;
+
+namespace TechYouthBpm.Domain.Entities;
+
+public class ProcessTask
+{
+    public Guid Id { get; set; }
+    public Guid ProcessInstanceId { get; set; }
+    public ProcessInstance? ProcessInstance { get; set; }
+    public Role AssignedRole { get; set; }
+    public ProcessTaskStatus Status { get; set; }
+    public string AvailableActionsJson { get; set; } = "[]";
+    public DateTime CreatedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public Guid? CompletedByUserId { get; set; }
+    public User? CompletedByUser { get; set; }
+}

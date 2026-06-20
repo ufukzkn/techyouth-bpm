@@ -48,3 +48,12 @@ Controllers should stay thin. Services own decisions:
 - `ProcessService`: process start, detail and listing.
 - `TaskService`: task listing and action execution.
 - `ProcessStateMachine`: allowed transitions.
+
+## Implemented Backend Structure
+
+- `TechYouthBpm.Domain`: entities and enums.
+- `TechYouthBpm.Application`: DTOs, service interfaces and `ProcessStateMachine`.
+- `TechYouthBpm.Infrastructure`: EF Core `AppDbContext`, SQLite setup, seed data and service implementations.
+- `TechYouthBpm.Api`: controllers, Swagger, CORS and startup database seeding.
+
+The API accepts the session token as `Authorization: Bearer <token>`.

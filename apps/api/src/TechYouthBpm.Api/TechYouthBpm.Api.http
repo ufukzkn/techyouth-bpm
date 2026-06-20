@@ -1,0 +1,6 @@
+@TechYouthBpm.Api_HostAddress = http://localhost:5291
+
+GET {{TechYouthBpm.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

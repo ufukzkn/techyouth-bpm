@@ -37,3 +37,6 @@ These notes are the project memory. Update this file whenever an implementation 
 ## Current Implementation Log
 
 - Documentation baseline started from the PDF requirements.
+- Backend scaffold created as a .NET 8 solution with Domain, Application, Infrastructure and Api projects.
+- NuGet source is stored in repo-local `NuGet.config` because the machine initially only had offline Visual Studio package sources.
+- Backend build is warning-free after adding domain entities, DTOs, EF Core DbContext, seed users, services and controllers.
