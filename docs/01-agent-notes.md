@@ -41,3 +41,5 @@ These notes are the project memory. Update this file whenever an implementation 
 - NuGet source is stored in repo-local `NuGet.config` because the machine initially only had offline Visual Studio package sources.
 - Backend build is warning-free after adding domain entities, DTOs, EF Core DbContext, seed users, services and controllers.
 - Backend test project added for workflow/state machine behavior.
+- Frontend scaffold added with Next.js 16, TypeScript, Zustand, lucide-react and dnd-kit packages.
+- Frontend app shell includes login, role-aware navigation, dashboard preview, theme toggle and demo-user fallback when API is offline.

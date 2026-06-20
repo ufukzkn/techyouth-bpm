@@ -31,6 +31,12 @@ Use this file for the final code review presentation.
 - Invalid transitions are rejected with an explicit error.
 - Available actions are derived from the current process status instead of being hardcoded in the UI.
 
+## Current Frontend Story
+
+- `LoginView` submits to the backend API first and falls back to demo users for UI-only development.
+- `sessionStore` keeps the active user, token and theme in Zustand.
+- `AppShell` filters navigation items by user role, which demonstrates role-based UI without scattering role checks across pages.
+
 ## Review Questions To Be Ready For
 
 - Why use a state machine instead of directly changing statuses?

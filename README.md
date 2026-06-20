@@ -21,6 +21,16 @@ cd apps/web
 npm run dev
 ```
 
+## Validation Commands
+
+```bash
+dotnet test apps/api/TechYouthBpm.slnx
+
+cd apps/web
+npm run lint
+npm run build
+```
+
 ## Demo Users
 
 | Username | Password | Role |
@@ -28,6 +38,8 @@ npm run dev
 | `admin` | `admin123` | Admin |
 | `user` | `user123` | User |
 | `approver` | `approver123` | Approver |
+
+The frontend tries the real API first. If the API is not running, the same demo users are available through a local fallback so UI work can continue.
 
 ## Documentation
 

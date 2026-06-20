@@ -33,6 +33,13 @@ The frontend is organized by domain features:
 
 Pages compose feature components. API calls are made through service modules. Zustand stores only app-wide state such as the active session and theme.
 
+Implemented frontend folders:
+
+- `src/lib`: shared API client and types.
+- `src/features/session`: Zustand session/theme store.
+- `src/features/auth`: login view and demo-user fallback.
+- `src/features/app-shell`: role-aware navigation and authenticated layout.
+
 ## Extensibility Strategy
 
 - Adding a new field type should require a field renderer, validation rule and designer option, without rewriting the wizard.
