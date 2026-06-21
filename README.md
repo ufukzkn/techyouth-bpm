@@ -14,7 +14,7 @@ Dokumantasyon `docs/` altindadir. Proje ilerledikce mimari kararlar, servis isle
 ```bash
 # backend
 cd apps/api
-dotnet run
+dotnet run --project src/TechYouthBpm.Api
 
 # frontend
 cd apps/web
