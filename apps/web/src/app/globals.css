@@ -25,6 +25,18 @@
   --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
 }
 
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 html {
   height: 100%;
 }
@@ -44,12 +56,25 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color 220ms ease,
+    color 220ms ease;
 }
 
 * {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+}
+
+*,
+*::before,
+*::after {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease;
 }
 
 a {
@@ -65,6 +90,27 @@ select {
 
 button {
   cursor: pointer;
+}
+
+button,
+a,
+input,
+select {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent);
+  outline-offset: 2px;
 }
 
 .login-page {
@@ -83,6 +129,7 @@ button {
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+  animation: content-enter 260ms ease both;
 }
 
 .login-mark,
@@ -152,6 +199,8 @@ button {
 
 .primary-button:hover {
   background: var(--primary-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .primary-button:disabled {
@@ -184,6 +233,7 @@ button {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px 1fr;
+  animation: content-enter 260ms ease both;
 }
 
 .sidebar {
@@ -229,6 +279,7 @@ button {
 .side-nav a:hover {
   color: var(--foreground);
   background: var(--surface-muted);
+  transform: translateX(2px);
 }
 
 .main-area {
@@ -275,6 +326,11 @@ button {
   background: var(--surface-muted);
 }
 
+.icon-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(23, 32, 51, 0.1);
+}
+
 .content {
   width: min(1120px, 100%);
   display: grid;
@@ -312,6 +368,15 @@ button {
   background: var(--surface);
 }
 
+.metric-card:hover,
+.field-card:hover,
+.process-card:hover,
+.tool-panel:hover,
+.runner-form:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.1);
+}
+
 .metric-card strong {
   font-size: 32px;
 }
@@ -332,6 +397,11 @@ button {
   text-align: center;
   font-weight: 700;
   background: var(--surface);
+}
+
+.flow-step:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  transform: translateY(-2px);
 }
 
 .designer-section {
@@ -536,6 +606,12 @@ button {
 .success-button {
   color: #ffffff;
   background: #16835f;
+}
+
+.success-button:hover,
+.danger-button:hover,
+.secondary-button:hover {
+  transform: translateY(-1px);
 }
 
 .danger-button {
