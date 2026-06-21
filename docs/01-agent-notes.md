@@ -43,3 +43,4 @@ These notes are the project memory. Update this file whenever an implementation 
 - Frontend app shell includes login, role-aware navigation, dashboard preview, theme toggle and demo-user fallback when API is offline.
 - Form designer draft added with local field editing and JSON model preview.
 - Process board draft added with local task actions, status transitions and audit preview.
+- Form runner draft added with dynamic field rendering, required/type/dependent validation and JSON submit preview.

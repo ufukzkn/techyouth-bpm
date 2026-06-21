@@ -122,7 +122,9 @@ button {
 
 .login-form input,
 .tool-panel input,
-.tool-panel select {
+.tool-panel select,
+.runner-form input,
+.runner-form select {
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -344,6 +346,12 @@ button {
   padding-top: 8px;
 }
 
+.runner-section {
+  display: grid;
+  gap: 18px;
+  padding-top: 8px;
+}
+
 .section-heading {
   display: flex;
   align-items: end;
@@ -545,6 +553,71 @@ button {
   padding-left: 20px;
 }
 
+.runner-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 14px;
+}
+
+.runner-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.runner-form label:not(.checkbox-row) {
+  display: grid;
+  gap: 7px;
+  font-weight: 650;
+}
+
+.runner-checkbox {
+  min-height: 44px;
+  padding: 0 2px;
+  font-weight: 650;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.form-success {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: 7px;
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.runner-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.secondary-button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--foreground);
+  background: var(--surface-muted);
+  font-weight: 700;
+}
+
+.runner-output {
+  grid-column: auto;
+  max-height: none;
+}
+
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -560,6 +633,7 @@ button {
   .flow-preview,
   .designer-grid,
   .process-grid,
+  .runner-grid,
   .detail-list {
     grid-template-columns: 1fr;
   }

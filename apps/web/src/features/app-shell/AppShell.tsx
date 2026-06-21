@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { navItems } from "@/features/app-shell/navigation";
 import { LoginView } from "@/features/auth/LoginView";
 import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
+import { FormRunnerDraft } from "@/features/form-runner/FormRunnerDraft";
 import { ProcessBoardDraft } from "@/features/processes/ProcessBoardDraft";
 import { useSessionStore } from "@/features/session/sessionStore";
 
@@ -92,6 +93,8 @@ export function AppShell() {
           </section>
 
           {user.role === "Admin" ? <FormDesignerDraft /> : null}
+
+          <FormRunnerDraft />
 
           <ProcessBoardDraft role={user.role} />
         </main>
