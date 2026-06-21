@@ -36,6 +36,7 @@ Use this file for the final code review presentation.
 - `LoginView` submits to the backend API first and falls back to demo users for UI-only development.
 - `sessionStore` keeps the active user, token and theme in Zustand.
 - `AppShell` filters navigation items by user role, which demonstrates role-based UI without scattering role checks across pages.
+- `FormDesignerDraft` shows the form as a backend-ready definition model instead of hardcoded form markup.
 
 ## Review Questions To Be Ready For
 

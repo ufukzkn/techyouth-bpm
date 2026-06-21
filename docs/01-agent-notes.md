@@ -41,3 +41,4 @@ These notes are the project memory. Update this file whenever an implementation 
 - Backend test project added for workflow/state machine behavior.
 - Frontend scaffold added with Next.js 16, TypeScript, Zustand, lucide-react and dnd-kit packages.
 - Frontend app shell includes login, role-aware navigation, dashboard preview, theme toggle and demo-user fallback when API is offline.
+- Form designer draft added with local field editing and JSON model preview.

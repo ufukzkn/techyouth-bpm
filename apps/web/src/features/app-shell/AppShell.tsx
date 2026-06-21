@@ -4,6 +4,7 @@ import { LogOut, Moon, Sun } from "lucide-react";
 import { useEffect } from "react";
 import { navItems } from "@/features/app-shell/navigation";
 import { LoginView } from "@/features/auth/LoginView";
+import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
 import { useSessionStore } from "@/features/session/sessionStore";
 
 export function AppShell() {
@@ -88,6 +89,8 @@ export function AppShell() {
             <div className="flow-step">Onayla / Reddet</div>
             <div className="flow-step">Detay Goruntule</div>
           </section>
+
+          {user.role === "Admin" ? <FormDesignerDraft /> : null}
         </main>
       </div>
     </div>

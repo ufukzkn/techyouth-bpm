@@ -58,7 +58,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -119,7 +120,9 @@ button {
   font-weight: 650;
 }
 
-.login-form input {
+.login-form input,
+.tool-panel input,
+.tool-panel select {
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -329,6 +332,94 @@ button {
   background: var(--surface);
 }
 
+.designer-section {
+  display: grid;
+  gap: 18px;
+  padding-top: 8px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.section-heading h2 {
+  font-size: 24px;
+}
+
+.section-heading p {
+  max-width: 520px;
+  color: var(--muted);
+}
+
+.designer-grid {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.tool-panel,
+.field-card,
+.json-preview {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.tool-panel {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+}
+
+.tool-panel label {
+  display: grid;
+  gap: 7px;
+  font-weight: 650;
+}
+
+.checkbox-row,
+.compact-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-list {
+  display: grid;
+  gap: 10px;
+}
+
+.field-card {
+  min-height: 70px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.field-card span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.json-preview {
+  grid-column: 1 / -1;
+  max-height: 280px;
+  overflow: auto;
+  padding: 16px;
+  color: var(--foreground);
+  font-family: var(--font-geist-mono), Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -341,11 +432,13 @@ button {
 
   .side-nav,
   .metric-grid,
-  .flow-preview {
+  .flow-preview,
+  .designer-grid {
     grid-template-columns: 1fr;
   }
 
-  .workspace-header {
+  .workspace-header,
+  .section-heading {
     flex-direction: column;
     align-items: flex-start;
   }
