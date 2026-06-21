@@ -17,6 +17,18 @@ TestResults/
 .env.*
 !.env.example
 
+# local-only agent/operator notes and credentials
+.codex-notes/
+.agent-notes/
+AGENT_LOCAL.md
+agent.local.md
+*.local.md
+credentials.*
+secrets.*
+*.pem
+*.key
+*.pfx
+
 # editor/os
 .DS_Store
 Thumbs.db
