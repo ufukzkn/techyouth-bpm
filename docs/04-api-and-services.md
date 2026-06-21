@@ -68,3 +68,5 @@ Feature components should call these client methods through feature-level orches
 - `TechYouthBpm.Api`: controllers, Swagger, CORS and startup database seeding.
 
 The API accepts the session token as `Authorization: Bearer <token>`.
+
+Enum values are returned as readable strings, for example `Admin`, `InProgress` and `Approve`. This keeps the frontend role checks and status displays explicit.
