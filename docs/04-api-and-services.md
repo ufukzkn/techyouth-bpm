@@ -49,6 +49,17 @@ Controllers should stay thin. Services own decisions:
 - `TaskService`: task listing and action execution.
 - `ProcessStateMachine`: allowed transitions.
 
+## Frontend Client Coverage
+
+The frontend API client now exposes one method for each planned endpoint:
+
+- Auth: `login`, `me`
+- Forms: `listForms`, `createForm`, `getForm`
+- Processes: `startProcess`, `listProcesses`, `getProcess`
+- Tasks: `listMyTasks`, `executeTaskAction`
+
+Feature components should call these client methods through feature-level orchestration instead of calling `fetch` directly.
+
 ## Implemented Backend Structure
 
 - `TechYouthBpm.Domain`: entities and enums.

@@ -1,4 +1,14 @@
-import type { LoginResponse } from "@/lib/types";
+import type {
+  CreateFormRequest,
+  FormDefinition,
+  LoginResponse,
+  ProcessDetail,
+  ProcessSummary,
+  ProcessTask,
+  StartProcessRequest,
+  TaskActionRequest,
+  User,
+} from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5291";
 
@@ -38,6 +48,45 @@ export const api = {
     return request<LoginResponse>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ username, password }),
+    });
+  },
+  me(token: string) {
+    return request<User>("/api/auth/me", { token });
+  },
+  listForms(token: string) {
+    return request<FormDefinition[]>("/api/forms", { token });
+  },
+  createForm(token: string, payload: CreateFormRequest) {
+    return request<FormDefinition>("/api/forms", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  getForm(token: string, id: string) {
+    return request<FormDefinition>(`/api/forms/${id}`, { token });
+  },
+  startProcess(token: string, payload: StartProcessRequest) {
+    return request<ProcessDetail>("/api/processes/start", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  listProcesses(token: string) {
+    return request<ProcessSummary[]>("/api/processes", { token });
+  },
+  getProcess(token: string, id: string) {
+    return request<ProcessDetail>(`/api/processes/${id}`, { token });
+  },
+  listMyTasks(token: string) {
+    return request<ProcessTask[]>("/api/tasks/my", { token });
+  },
+  executeTaskAction(token: string, taskId: string, payload: TaskActionRequest) {
+    return request<ProcessDetail>(`/api/tasks/${taskId}/actions`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
     });
   },
 };

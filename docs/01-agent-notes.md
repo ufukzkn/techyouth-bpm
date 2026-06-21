@@ -44,3 +44,4 @@ These notes are the project memory. Update this file whenever an implementation 
 - Form designer draft added with local field editing and JSON model preview.
 - Process board draft added with local task actions, status transitions and audit preview.
 - Form runner draft added with dynamic field rendering, required/type/dependent validation and JSON submit preview.
+- Frontend API client expanded with form, process and task methods so feature components can be wired without scattering fetch calls.
