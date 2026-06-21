@@ -6,7 +6,6 @@ These notes are the project memory. Update this file whenever an implementation 
 
 - Scope: full-stack.
 - Repository target: private `ufukzkn/techyouth-bpm`.
-- Local repository path: `C:\Users\ufuk_\OneDrive\Documents\eczacibasi`.
 - Frontend: Next.js App Router, TypeScript, Zustand.
 - Backend: .NET 8 Web API, EF Core, SQLite.
 - Documentation must be kept current as code changes.
@@ -16,9 +15,8 @@ These notes are the project memory. Update this file whenever an implementation 
 
 - Node and npm are installed.
 - .NET SDK 10 is installed and can target `net8.0`.
-- Git is initialized locally with no starting commits.
-- GitHub App is connected to `ufukzkn`, but GitHub CLI is not installed.
-- If repo creation/push is blocked, explain that `gh` or a pre-created remote is needed.
+- Git history should stay progressive and easy to review.
+- Repository documentation should avoid machine-specific paths, credentials, tokens, or private workflow details.
 
 ## Architecture Principles
 
