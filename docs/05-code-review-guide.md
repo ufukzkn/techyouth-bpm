@@ -37,6 +37,7 @@ Use this file for the final code review presentation.
 - `sessionStore` keeps the active user, token and theme in Zustand.
 - `AppShell` filters navigation items by user role, which demonstrates role-based UI without scattering role checks across pages.
 - `FormDesignerDraft` shows the form as a backend-ready definition model instead of hardcoded form markup.
+- `ProcessBoardDraft` gives a UI-level draft of task action handling before the real API integration is wired in.
 
 ## Review Questions To Be Ready For
 

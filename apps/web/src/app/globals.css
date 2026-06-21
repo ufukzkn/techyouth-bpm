@@ -338,6 +338,12 @@ button {
   padding-top: 8px;
 }
 
+.process-section {
+  display: grid;
+  gap: 18px;
+  padding-top: 8px;
+}
+
 .section-heading {
   display: flex;
   align-items: end;
@@ -420,6 +426,125 @@ button {
   line-height: 1.5;
 }
 
+.process-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 14px;
+}
+
+.process-card {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.process-card-header,
+.task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.status-badge {
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.status-inprogress {
+  color: #9a5b00;
+  background: #fff1d6;
+}
+
+.status-completed {
+  color: #0f6b43;
+  background: #dff7ea;
+}
+
+.status-rejected {
+  color: #a52820;
+  background: #ffe1df;
+}
+
+.detail-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.detail-list dt,
+.task-item span,
+.empty-state {
+  color: var(--muted);
+}
+
+.detail-list dd {
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.compact-json {
+  grid-column: auto;
+  max-height: 220px;
+}
+
+.task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.task-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.success-button,
+.danger-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  font-weight: 800;
+}
+
+.success-button {
+  color: #ffffff;
+  background: #16835f;
+}
+
+.danger-button {
+  color: #ffffff;
+  background: #b42318;
+}
+
+.audit-card {
+  grid-column: 1 / -1;
+}
+
+.audit-card ol {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+}
+
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -433,12 +558,16 @@ button {
   .side-nav,
   .metric-grid,
   .flow-preview,
-  .designer-grid {
+  .designer-grid,
+  .process-grid,
+  .detail-list {
     grid-template-columns: 1fr;
   }
 
   .workspace-header,
-  .section-heading {
+  .section-heading,
+  .process-card-header,
+  .task-item {
     flex-direction: column;
     align-items: flex-start;
   }
