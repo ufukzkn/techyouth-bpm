@@ -4,13 +4,13 @@ The team split is flow-based. Each person owns one user journey end to end, incl
 
 ## Ownership Summary
 
-| Person | Flow | Main Outcome |
+| Owner | Flow | Main Outcome |
 | --- | --- | --- |
-| Person 1 | Access, shell and dashboard | User can enter the app, see role-aware navigation and understand the workspace. |
-| Person 2 | Form design and form run | Admin can design a form model; user can fill it with validation. |
-| Person 3 | Process, tasks and review | A submitted form becomes a process with tasks, actions, status and audit history. |
+| Ufuk | Access, shell and dashboard | User can enter the app, see role-aware navigation and understand the workspace. |
+| Ozgun Saz | Form design and form run | Admin can design a form model; user can fill it with validation. |
+| Cagdas Kaplan | Process, tasks and review | A submitted form becomes a process with tasks, actions, status and audit history. |
 
-## Person 1: Access, Shell And Dashboard Flow
+## Ufuk: Access, Shell And Dashboard Flow
 
 Production tasks:
 
@@ -45,7 +45,7 @@ Presentation angle:
 
 How users enter the system and how role information shapes the interface.
 
-## Person 2: Form Design And Form Run Flow
+## Ozgun Saz: Form Design And Form Run Flow
 
 Production tasks:
 
@@ -82,7 +82,7 @@ Presentation angle:
 
 How a form is represented as data and rendered dynamically instead of being hardcoded.
 
-## Person 3: Process, Tasks And Review Flow
+## Cagdas Kaplan: Process, Tasks And Review Flow
 
 Production tasks:
 
@@ -129,8 +129,8 @@ How BPM is modeled with statuses, tasks, actions and traceable transitions.
 
 ## Suggested Next Commits
 
-- `feat(web): form runner taslagi eklendi`
-- `feat(api): form baslatma validasyonlari tamamlandi`
-- `feat(web): task aksiyonlari api ile baglandi`
+- `feature(web): form runner taslagi eklendi`
+- `feature(api): form baslatma validasyonlari tamamlandi`
+- `feature(web): task aksiyonlari api ile baglandi`
 - `test(api): yetki kontrol senaryolari test edildi`
 - `docs: code review anlatimi detaylandirildi`
