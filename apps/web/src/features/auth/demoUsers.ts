@@ -1,6 +1,6 @@
 import type { LoginResponse, Role } from "@/lib/types";
 
-const demoUsers: Array<{ username: string; password: string; displayName: string; role: Role }> = [
+export const demoUsers: Array<{ username: string; password: string; displayName: string; role: Role }> = [
   { username: "admin", password: "admin123", displayName: "Admin User", role: "Admin" },
   { username: "user", password: "user123", displayName: "Process Starter", role: "User" },
   { username: "approver", password: "approver123", displayName: "Process Approver", role: "Approver" },

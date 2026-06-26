@@ -1,27 +1,120 @@
 "use client";
 
 import { LogOut, Moon, Sun } from "lucide-react";
-import { useEffect } from "react";
-import { navItems } from "@/features/app-shell/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { navItems, type ViewId } from "@/features/app-shell/navigation";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { LoginView } from "@/features/auth/LoginView";
 import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
 import { FormRunnerDraft } from "@/features/form-runner/FormRunnerDraft";
 import { ProcessBoardDraft } from "@/features/processes/ProcessBoardDraft";
 import { useSessionStore } from "@/features/session/sessionStore";
+import { api, ApiError } from "@/lib/api";
+import type { ProcessSummary, ProcessTask, User } from "@/lib/types";
 
 export function AppShell() {
-  const { user, theme, logout, toggleTheme } = useSessionStore();
+  const { user, token, expiresAt, theme, hasHydrated, expireSession, logout, toggleTheme } = useSessionStore();
+  const [activeView, setActiveView] = useState<ViewId>("dashboard");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  useEffect(() => {
+    if (!hasHydrated || !token || !user || token.startsWith("demo-")) {
+      return;
+    }
+
+    let ignore = false;
+    let expiryTimer: number | undefined;
+    const sessionToken = token;
+    const expiresAtTime = expiresAt ? Date.parse(expiresAt) : null;
+
+    if (expiresAtTime && expiresAtTime <= Date.now()) {
+      expireSession("Oturum suresi doldu. Devam etmek icin tekrar giris yap.");
+      return;
+    }
+
+    if (expiresAtTime) {
+      expiryTimer = window.setTimeout(() => {
+        expireSession("Oturum suresi doldu. Devam etmek icin tekrar giris yap.");
+      }, expiresAtTime - Date.now());
+    }
+
+    async function verifySession() {
+      try {
+        await api.me(sessionToken);
+      } catch (error) {
+        if (ignore) {
+          return;
+        }
+
+        if (error instanceof ApiError && error.statusCode === 401) {
+          expireSession("Oturum dogrulanamadi. Lutfen tekrar giris yap.");
+        }
+      }
+    }
+
+    void verifySession();
+
+    return () => {
+      ignore = true;
+      if (expiryTimer) {
+        window.clearTimeout(expiryTimer);
+      }
+    };
+  }, [expiresAt, expireSession, hasHydrated, token, user]);
+
+  useEffect(() => {
+    function syncViewFromUrl() {
+      const requestedView = new URLSearchParams(window.location.search).get("view");
+      setActiveView(isViewId(requestedView) ? requestedView : "dashboard");
+    }
+
+    syncViewFromUrl();
+    window.addEventListener("popstate", syncViewFromUrl);
+
+    return () => window.removeEventListener("popstate", syncViewFromUrl);
+  }, []);
+
+  const changeView = useCallback((viewId: ViewId) => {
+    setActiveView(viewId);
+
+    const nextUrl = new URL(window.location.href);
+    if (viewId === "dashboard") {
+      nextUrl.searchParams.delete("view");
+    } else {
+      nextUrl.searchParams.set("view", viewId);
+    }
+
+    window.history.pushState(null, "", `${nextUrl.pathname}${nextUrl.search}`);
+  }, []);
+
+  const visibleNavItems = useMemo(
+    () => navItems.filter((item) => (user ? item.roles.includes(user.role) : false)),
+    [user],
+  );
+
+  if (!hasHydrated) {
+    return (
+      <main className="login-page">
+        <section className="login-panel session-loading" aria-live="polite">
+          <PrototypeLogo size={44} />
+          <span className="eyebrow">Oturum</span>
+          <h1>Hazirlaniyor</h1>
+          <p>Kayitli oturum bilgisi kontrol ediliyor.</p>
+        </section>
+      </main>
+    );
+  }
+
   if (!user) {
     return <LoginView />;
   }
 
-  const visibleNavItems = navItems.filter((item) => item.roles.includes(user.role));
+  const currentView = visibleNavItems.some((item) => item.viewId === activeView)
+    ? activeView
+    : visibleNavItems[0]?.viewId ?? "dashboard";
 
   return (
     <div className="app-shell">
@@ -39,10 +132,16 @@ export function AppShell() {
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
-              <a key={item.href} href={item.href}>
+              <button
+                aria-current={currentView === item.viewId ? "page" : undefined}
+                className={currentView === item.viewId ? "active" : undefined}
+                key={item.viewId}
+                onClick={() => changeView(item.viewId)}
+                type="button"
+              >
                 <Icon size={18} />
                 {item.label}
-              </a>
+              </button>
             );
           })}
         </nav>
@@ -64,44 +163,113 @@ export function AppShell() {
         </header>
 
         <main className="content">
-          <section className="workspace-header" id="dashboard">
-            <div>
-              <span className="eyebrow">Dashboard</span>
-              <h1>Surec yonetimi paneli</h1>
-            </div>
-            <p>Form tasarimi, baslatilan surecler ve bekleyen isler tek uygulama akisi icinde izlenecek.</p>
-          </section>
-
-          <section className="metric-grid" aria-label="Process summary">
-            <article className="metric-card">
-              <span>Bekleyen isler</span>
-              <strong>3</strong>
-            </article>
-            <article className="metric-card">
-              <span>Devam eden surecler</span>
-              <strong>5</strong>
-            </article>
-            <article className="metric-card">
-              <span>Tamamlanan surecler</span>
-              <strong>12</strong>
-            </article>
-          </section>
-
-          <section className="flow-preview">
-            <div className="flow-step">Login</div>
-            <div className="flow-step">Form Tasarla</div>
-            <div className="flow-step">Surec Baslat</div>
-            <div className="flow-step">Onayla / Reddet</div>
-            <div className="flow-step">Detay Goruntule</div>
-          </section>
-
-          {user.role === "Admin" ? <FormDesignerDraft /> : null}
-
-          <FormRunnerDraft />
-
-          <ProcessBoardDraft role={user.role} />
+          {currentView === "dashboard" ? <DashboardView token={token} user={user} /> : null}
+          {currentView === "forms" && user.role === "Admin" ? <FormDesignerDraft /> : null}
+          {currentView === "runner" ? <FormRunnerDraft /> : null}
+          {currentView === "processes" ? <ProcessBoardDraft mode="processes" role={user.role} /> : null}
+          {currentView === "tasks" ? <ProcessBoardDraft mode="tasks" role={user.role} /> : null}
+          {currentView === "settings" ? <SettingsView /> : null}
         </main>
       </div>
     </div>
+  );
+}
+
+function isViewId(value: string | null): value is ViewId {
+  return navItems.some((item) => item.viewId === value);
+}
+
+function DashboardView({ token, user }: { token: string | null; user: User }) {
+  const [processes, setProcesses] = useState<ProcessSummary[]>([]);
+  const [tasks, setTasks] = useState<ProcessTask[]>([]);
+  const [status, setStatus] = useState<"loading" | "idle" | "error">("loading");
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadMetrics() {
+      if (!token || token.startsWith("demo-")) {
+        setStatus("idle");
+        return;
+      }
+
+      try {
+        setStatus("loading");
+        const [processResult, taskResult] = await Promise.all([api.listProcesses(token), api.listMyTasks(token)]);
+        if (!ignore) {
+          setProcesses(processResult);
+          setTasks(taskResult);
+          setStatus("idle");
+        }
+      } catch {
+        if (!ignore) {
+          setStatus("error");
+        }
+      }
+    }
+
+    void loadMetrics();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
+
+  const openTaskCount = tasks.filter((task) => task.status === "Open").length;
+  const inProgressCount = processes.filter((process) => process.status === "InProgress").length;
+  const completedCount = processes.filter((process) => process.status === "Completed").length;
+
+  return (
+    <div className="view-panel">
+      <section className="workspace-header">
+        <div>
+          <span className="eyebrow">Dashboard</span>
+          <h1>Surec yonetimi paneli</h1>
+        </div>
+        <p>
+          {status === "error"
+            ? "Dashboard metrikleri yuklenemedi; API oturumunu kontrol et."
+            : `${user.role} rolune gore surec ve is ozeti SQLite veritabanindan okunur.`}
+        </p>
+      </section>
+
+      <section className="metric-grid" aria-label="Process summary">
+        <article className="metric-card">
+          <span>Bekleyen isler</span>
+          <strong>{status === "loading" ? "-" : openTaskCount}</strong>
+        </article>
+        <article className="metric-card">
+          <span>Devam eden surecler</span>
+          <strong>{status === "loading" ? "-" : inProgressCount}</strong>
+        </article>
+        <article className="metric-card">
+          <span>Tamamlanan surecler</span>
+          <strong>{status === "loading" ? "-" : completedCount}</strong>
+        </article>
+      </section>
+
+      <section className="flow-preview">
+        <div className="flow-step">Oturum</div>
+        <div className="flow-step">Form Definition</div>
+        <div className="flow-step">Process Instance</div>
+        <div className="flow-step">Task Action</div>
+        <div className="flow-step">Audit Log</div>
+      </section>
+    </div>
+  );
+}
+
+function SettingsView() {
+  return (
+    <section className="settings-panel">
+      <div className="section-heading">
+        <div>
+          <span className="eyebrow">Ayarlar</span>
+          <h2>Uygulama ayarlari</h2>
+        </div>
+        <p>Bu alan sonraki adimda bildirim, tema ve surec varsayilanlari icin genisletilecek.</p>
+      </div>
+      <p className="empty-state">Simdilik tema degistirme ve oturum aksiyonlari ust bardan yonetiliyor.</p>
+    </section>
   );
 }

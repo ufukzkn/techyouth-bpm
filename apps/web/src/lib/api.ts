@@ -17,7 +17,10 @@ type ApiErrorPayload = {
 };
 
 export class ApiError extends Error {
-  constructor(public readonly errors: string[]) {
+  constructor(
+    public readonly errors: string[],
+    public readonly statusCode?: number,
+  ) {
     super(errors.join(" "));
   }
 }
@@ -37,7 +40,7 @@ async function request<T>(path: string, init?: RequestInit & { token?: string })
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
-    throw new ApiError(payload.errors ?? ["Request failed."]);
+    throw new ApiError(payload.errors ?? ["Request failed."], response.status);
   }
 
   return response.json() as Promise<T>;

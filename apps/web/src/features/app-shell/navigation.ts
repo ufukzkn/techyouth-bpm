@@ -1,9 +1,11 @@
 import { ClipboardList, FilePlus2, LayoutDashboard, Settings, Workflow } from "lucide-react";
 import type { Role } from "@/lib/types";
 
+export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "settings";
+
 export type NavItem = {
   label: string;
-  href: string;
+  viewId: ViewId;
   icon: typeof LayoutDashboard;
   roles: Role[];
 };
@@ -11,31 +13,37 @@ export type NavItem = {
 export const navItems: NavItem[] = [
   {
     label: "Dashboard",
-    href: "#dashboard",
+    viewId: "dashboard",
     icon: LayoutDashboard,
     roles: ["Admin", "User", "Approver"],
   },
   {
     label: "Form Tasarimi",
-    href: "#forms",
+    viewId: "forms",
     icon: FilePlus2,
     roles: ["Admin"],
   },
   {
+    label: "Form Baslat",
+    viewId: "runner",
+    icon: FilePlus2,
+    roles: ["Admin", "User"],
+  },
+  {
     label: "Surecler",
-    href: "#processes",
+    viewId: "processes",
     icon: Workflow,
     roles: ["Admin", "User", "Approver"],
   },
   {
     label: "Islerim",
-    href: "#tasks",
+    viewId: "tasks",
     icon: ClipboardList,
     roles: ["Admin", "Approver"],
   },
   {
     label: "Ayarlar",
-    href: "#settings",
+    viewId: "settings",
     icon: Settings,
     roles: ["Admin", "User", "Approver"],
   },

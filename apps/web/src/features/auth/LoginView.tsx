@@ -4,18 +4,19 @@ import { FormEvent, useState } from "react";
 import { LogIn } from "lucide-react";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { api, ApiError } from "@/lib/api";
-import { loginWithDemoUser } from "@/features/auth/demoUsers";
+import { demoUsers, loginWithDemoUser } from "@/features/auth/demoUsers";
 import { useSessionStore } from "@/features/session/sessionStore";
 
 export function LoginView() {
-  const setSession = useSessionStore((state) => state.setSession);
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const { clearSessionNotice, sessionNotice, setSession } = useSessionStore();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    clearSessionNotice();
     setError(null);
     setIsLoading(true);
 
@@ -66,11 +67,24 @@ export function LoginView() {
           </button>
         </form>
 
+        {sessionNotice ? <p className="session-notice">{sessionNotice}</p> : null}
+
         <div className="demo-users">
-          <span>Demo:</span>
-          <code>admin/admin123</code>
-          <code>user/user123</code>
-          <code>approver/approver123</code>
+          <span>Demo hesaplar:</span>
+          {demoUsers.map((demoUser) => (
+            <button
+              key={demoUser.username}
+              type="button"
+              onClick={() => {
+                setUsername(demoUser.username);
+                setPassword(demoUser.password);
+                setError(null);
+                clearSessionNotice();
+              }}
+            >
+              {demoUser.username}
+            </button>
+          ))}
         </div>
       </section>
     </main>

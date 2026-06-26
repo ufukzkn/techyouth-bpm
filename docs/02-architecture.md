@@ -40,6 +40,8 @@ The frontend is organized by domain features:
 
 Pages compose feature components. API calls are made through service modules. Zustand stores only app-wide state such as the active session and theme.
 
+Navigation behaves as a multi-screen app inside the authenticated shell. The current implementation uses a route-like `?view=` query parameter for the active screen, so refresh and browser back/forward keep the user in the expected workspace area without returning to hash-scroll anchors.
+
 Implemented frontend folders:
 
 - `src/lib`: shared API client and types.
@@ -53,3 +55,4 @@ Implemented frontend folders:
 - Adding a new process action should be handled in the backend state machine and exposed to the frontend as available task actions.
 - Adding a new role should be centralized in auth/authorization rules and menu visibility logic.
 - Changing persistence provider should stay inside Infrastructure configuration and EF Core package setup.
+- Adding a new screen should update the navigation model, route/screen ownership and team presentation notes.
