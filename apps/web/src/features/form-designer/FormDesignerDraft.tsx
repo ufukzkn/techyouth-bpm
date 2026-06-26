@@ -1,18 +1,13 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useSessionStore } from "@/features/session/sessionStore";
+import { api, ApiError } from "@/lib/api";
+import type { CreateFormRequest, FieldType, FormFieldDefinition } from "@/lib/types";
 
-type FieldType = "Text" | "Number" | "Email" | "Select" | "Checkbox" | "Date";
-
-type DesignerField = {
+type DesignerField = Omit<FormFieldDefinition, "id"> & {
   id: string;
-  key: string;
-  label: string;
-  type: FieldType;
-  required: boolean;
-  sortOrder: number;
-  options: string[];
 };
 
 const initialFields: DesignerField[] = [
@@ -24,6 +19,7 @@ const initialFields: DesignerField[] = [
     required: true,
     sortOrder: 1,
     options: [],
+    validationRules: [],
   },
   {
     id: "requestType",
@@ -33,19 +29,42 @@ const initialFields: DesignerField[] = [
     required: true,
     sortOrder: 2,
     options: ["Izin", "Masraf", "Satinalma"],
+    validationRules: [],
+  },
+  {
+    id: "approvalNote",
+    key: "approvalNote",
+    label: "Onay aciklamasi",
+    type: "Text",
+    required: false,
+    sortOrder: 3,
+    options: [],
+    validationRules: [
+      {
+        ruleType: "RequiredWhen",
+        dependsOnFieldKey: "requestType",
+        expectedValue: "Satinalma",
+        message: "Satinalma taleplerinde onay aciklamasi zorunludur.",
+      },
+    ],
   },
 ];
 
 export function FormDesignerDraft() {
+  const token = useSessionStore((state) => state.token);
   const [fields, setFields] = useState<DesignerField[]>(initialFields);
-  const [label, setLabel] = useState("Onay aciklamasi");
+  const [formName, setFormName] = useState("Demo Surec Formu");
+  const [description, setDescription] = useState("Frontend tarafinda tasarlanan form modeli");
+  const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
+  const [message, setMessage] = useState("Form henuz kaydedilmedi.");
 
-  const formModel = useMemo(
+  const formModel = useMemo<CreateFormRequest>(
     () => ({
-      name: "Demo Surec Formu",
-      description: "Frontend tarafinda tasarlanan form modeli",
+      name: formName,
+      description,
       fields: fields.map((field, index) => ({
         key: field.key,
         label: field.label,
@@ -53,20 +72,10 @@ export function FormDesignerDraft() {
         required: field.required,
         sortOrder: index + 1,
         options: field.options,
-        validationRules:
-          field.key === "approvalNote"
-            ? [
-                {
-                  ruleType: "RequiredWhen",
-                  dependsOnFieldKey: "requestType",
-                  expectedValue: "Satinalma",
-                  message: "Satinalma taleplerinde onay aciklamasi zorunludur.",
-                },
-              ]
-            : [],
+        validationRules: field.validationRules,
       })),
     }),
-    [fields],
+    [description, fields, formName],
   );
 
   function addField() {
@@ -86,37 +95,79 @@ export function FormDesignerDraft() {
       required,
       sortOrder: fields.length + 1,
       options: type === "Select" ? ["Secenek A", "Secenek B"] : [],
+      validationRules: [],
     };
 
     setFields((current) => [...current, nextField]);
     setLabel("");
     setType("Text");
     setRequired(false);
+    setSaveState("idle");
+    setMessage("Formda kaydedilmemis degisiklikler var.");
   }
 
   function removeField(id: string) {
     setFields((current) =>
       current.filter((field) => field.id !== id).map((field, index) => ({ ...field, sortOrder: index + 1 })),
     );
+    setSaveState("idle");
+    setMessage("Formda kaydedilmemis degisiklikler var.");
   }
 
   function toggleRequired(id: string) {
     setFields((current) =>
       current.map((field) => (field.id === id ? { ...field, required: !field.required } : field)),
     );
+    setSaveState("idle");
+    setMessage("Formda kaydedilmemis degisiklikler var.");
+  }
+
+  async function saveForm() {
+    if (!token) {
+      setSaveState("error");
+      setMessage("Form kaydetmek icin API oturumu gerekli.");
+      return;
+    }
+
+    try {
+      setSaveState("saving");
+      const saved = await api.createForm(token, formModel);
+      setSaveState("success");
+      setMessage(`Form SQLite veritabanina kaydedildi: ${saved.name}`);
+    } catch (error) {
+      setSaveState("error");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Form kaydedilemedi.");
+    }
   }
 
   return (
-    <section className="designer-section" id="forms">
+    <section className="designer-section">
       <div className="section-heading">
         <div>
           <span className="eyebrow">Form Tasarimi</span>
           <h2>Dinamik form modeli</h2>
         </div>
-        <p>Alanlar UI tarafinda tasarlanir, backend tarafina form definition modeli olarak gonderilir.</p>
+        <p>Alanlar UI tarafinda tasarlanir ve backend tarafinda form definition olarak saklanir.</p>
       </div>
 
       <div className="designer-grid">
+        <div className="tool-panel">
+          <h3>Form bilgisi</h3>
+          <label>
+            Form adi
+            <input value={formName} onChange={(event) => setFormName(event.target.value)} />
+          </label>
+          <label>
+            Aciklama
+            <input value={description} onChange={(event) => setDescription(event.target.value)} />
+          </label>
+          <button className="primary-button" disabled={saveState === "saving"} type="button" onClick={saveForm}>
+            <Save size={18} />
+            {saveState === "saving" ? "Kaydediliyor" : "Formu kaydet"}
+          </button>
+          <p className={`status-line status-line-${saveState}`}>{message}</p>
+        </div>
+
         <div className="tool-panel">
           <h3>Alan ekle</h3>
           <label>
@@ -138,7 +189,7 @@ export function FormDesignerDraft() {
             <input checked={required} onChange={(event) => setRequired(event.target.checked)} type="checkbox" />
             Zorunlu alan
           </label>
-          <button className="primary-button" type="button" onClick={addField}>
+          <button className="secondary-button" type="button" onClick={addField}>
             <Plus size={18} />
             Alan ekle
           </button>
@@ -150,7 +201,7 @@ export function FormDesignerDraft() {
               <div>
                 <strong>{field.label}</strong>
                 <span>
-                  {field.key} · {field.type} · Sira {field.sortOrder}
+                  {field.key} - {field.type} - Sira {field.sortOrder}
                 </span>
               </div>
               <label className="compact-toggle">

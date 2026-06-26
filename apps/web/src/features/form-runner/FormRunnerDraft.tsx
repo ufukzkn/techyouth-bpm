@@ -1,110 +1,178 @@
 "use client";
 
 import { Play, RotateCcw } from "lucide-react";
-import { ChangeEvent, FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { useSessionStore } from "@/features/session/sessionStore";
+import { api, ApiError } from "@/lib/api";
+import type { FieldType, FormDefinition } from "@/lib/types";
 
-type FieldType = "Text" | "Number" | "Email" | "Select" | "Checkbox" | "Date";
 type FormValues = Record<string, string | boolean>;
 
-type RunnerField = {
-  key: string;
-  label: string;
-  type: FieldType;
-  required: boolean;
-  options?: string[];
-};
-
-const fields: RunnerField[] = [
-  { key: "customerName", label: "Musteri adi", type: "Text", required: true },
-  { key: "requestType", label: "Talep tipi", type: "Select", required: true, options: ["Izin", "Masraf", "Satinalma"] },
-  { key: "requestAmount", label: "Tutar", type: "Number", required: false },
-  { key: "contactEmail", label: "E-posta", type: "Email", required: true },
-  { key: "approvalNote", label: "Onay aciklamasi", type: "Text", required: false },
-  { key: "acceptedTerms", label: "Bilgiler dogru", type: "Checkbox", required: true },
-];
-
-const initialValues: FormValues = {
-  customerName: "Eczacibasi Demo",
-  requestType: "Satinalma",
-  requestAmount: "12000",
-  contactEmail: "demo@eczacibasi.com",
-  approvalNote: "",
-  acceptedTerms: false,
-};
-
 export function FormRunnerDraft() {
-  const [values, setValues] = useState<FormValues>(initialValues);
+  const token = useSessionStore((state) => state.token);
+  const [forms, setForms] = useState<FormDefinition[]>([]);
+  const [selectedFormId, setSelectedFormId] = useState("");
+  const [values, setValues] = useState<FormValues>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [submitState, setSubmitState] = useState<"idle" | "success">("idle");
+  const [status, setStatus] = useState<"loading" | "idle" | "submitting" | "success" | "error">("loading");
+  const [message, setMessage] = useState("Formlar yukleniyor.");
+
+  const selectedForm = forms.find((form) => form.id === selectedFormId);
 
   const output = useMemo(
     () => ({
-      formDefinitionId: "demo-form-definition",
+      formDefinitionId: selectedFormId,
       formData: values,
     }),
-    [values],
+    [selectedFormId, values],
   );
 
-  function handleChange(field: RunnerField, event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const value = field.type === "Checkbox" ? (event.target as HTMLInputElement).checked : event.target.value;
-    setValues((current) => ({ ...current, [field.key]: value }));
-    setSubmitState("idle");
+  useEffect(() => {
+    async function loadForms() {
+      if (!token) {
+        setStatus("error");
+        setMessage("Formlari listelemek icin API oturumu gerekli.");
+        return;
+      }
+
+      try {
+        setStatus("loading");
+        const result = await api.listForms(token);
+        const nextSelectedForm = result[0];
+        setForms(result);
+        setSelectedFormId(nextSelectedForm?.id ?? "");
+        setValues(nextSelectedForm ? buildInitialValues(nextSelectedForm) : {});
+        setErrors({});
+        setStatus("idle");
+        setMessage(result.length > 0 ? "Kayitli formlar yuklendi." : "Once bir form tasarimi kaydedilmeli.");
+      } catch (error) {
+        setStatus("error");
+        setMessage(error instanceof ApiError ? error.errors.join(" ") : "Formlar yuklenemedi.");
+      }
+    }
+
+    void loadForms();
+  }, [token]);
+
+  function handleChange(fieldKey: string, fieldType: FieldType, event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
+    const value = fieldType === "Checkbox" ? (event.target as HTMLInputElement).checked : event.target.value;
+    setValues((current) => ({ ...current, [fieldKey]: value }));
+    setStatus("idle");
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors = validate(values);
+
+    if (!selectedForm || !token) {
+      return;
+    }
+
+    const nextErrors = validate(selectedForm, values);
     setErrors(nextErrors);
-    setSubmitState(Object.keys(nextErrors).length === 0 ? "success" : "idle");
+    if (Object.keys(nextErrors).length > 0) {
+      setStatus("idle");
+      setMessage("Formda duzeltilmesi gereken alanlar var.");
+      return;
+    }
+
+    try {
+      setStatus("submitting");
+      const process = await api.startProcess(token, {
+        formDefinitionId: selectedForm.id,
+        formData: values,
+      });
+      setStatus("success");
+      setMessage(`Surec baslatildi ve SQLite'a kaydedildi: ${process.id}`);
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Surec baslatilamadi.");
+    }
   }
 
   function resetForm() {
-    setValues(initialValues);
+    if (!selectedForm) {
+      return;
+    }
+
+    setValues(buildInitialValues(selectedForm));
     setErrors({});
-    setSubmitState("idle");
+    setStatus("idle");
+    setMessage("Form temizlendi.");
   }
 
   return (
-    <section className="runner-section" id="runner">
+    <section className="runner-section">
       <div className="section-heading">
         <div>
           <span className="eyebrow">Formu Baslat</span>
           <h2>Dinamik veri girisi</h2>
         </div>
-        <p>Bu taslak, tasarlanan formun kullanici tarafinda nasil doldurulacagini ve valide edilecegini gosterir.</p>
+        <p>Kayitli form definition secilir, veriler backend validasyonundan gecerek surec instance olusturur.</p>
       </div>
 
       <div className="runner-grid">
         <form className="runner-form" onSubmit={handleSubmit}>
-          {fields.map((field) => (
-            <label className={field.type === "Checkbox" ? "checkbox-row runner-checkbox" : undefined} key={field.key}>
-              {field.type === "Checkbox" ? (
-                <>
-                  <input
-                    checked={Boolean(values[field.key])}
-                    onChange={(event) => handleChange(field, event)}
-                    type="checkbox"
-                  />
-                  {field.label}
-                </>
-              ) : (
-                <>
-                  {field.label}
-                  <FieldInput field={field} value={values[field.key]} onChange={handleChange} />
-                </>
-              )}
-              {errors[field.key] ? <span className="field-error">{errors[field.key]}</span> : null}
-            </label>
-          ))}
+          <label>
+            Kayitli form
+            <select
+              value={selectedFormId}
+              onChange={(event) => {
+                const nextForm = forms.find((form) => form.id === event.target.value);
+                setSelectedFormId(event.target.value);
+                setValues(nextForm ? buildInitialValues(nextForm) : {});
+                setErrors({});
+                setStatus("idle");
+              }}
+            >
+              {forms.length === 0 ? <option value="">Kayitli form yok</option> : null}
+              {forms.map((form) => (
+                <option key={form.id} value={form.id}>
+                  {form.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          {submitState === "success" ? <div className="form-success">Form verisi surec baslatmaya hazir.</div> : null}
+          {!selectedForm ? <p className="empty-state">Surec baslatmak icin once Form Tasarimi ekraninda form kaydet.</p> : null}
+
+          {selectedForm?.fields
+            .slice()
+            .sort((first, second) => first.sortOrder - second.sortOrder)
+            .map((field) => (
+              <label className={field.type === "Checkbox" ? "checkbox-row runner-checkbox" : undefined} key={field.key}>
+                {field.type === "Checkbox" ? (
+                  <>
+                    <input
+                      checked={Boolean(values[field.key])}
+                      onChange={(event) => handleChange(field.key, field.type, event)}
+                      type="checkbox"
+                    />
+                    {field.label}
+                  </>
+                ) : (
+                  <>
+                    {field.label}
+                    <FieldInput
+                      fieldKey={field.key}
+                      fieldType={field.type}
+                      options={field.options}
+                      value={values[field.key]}
+                      onChange={handleChange}
+                    />
+                  </>
+                )}
+                {errors[field.key] ? <span className="field-error">{errors[field.key]}</span> : null}
+              </label>
+            ))}
+
+          <p className={`status-line status-line-${status}`}>{message}</p>
 
           <div className="runner-actions">
-            <button className="primary-button" type="submit">
+            <button className="primary-button" disabled={!selectedForm || status === "submitting"} type="submit">
               <Play size={18} />
-              Surec baslat
+              {status === "submitting" ? "Baslatiliyor" : "Surec baslat"}
             </button>
-            <button className="secondary-button" type="button" onClick={resetForm}>
+            <button className="secondary-button" disabled={!selectedForm} type="button" onClick={resetForm}>
               <RotateCcw size={18} />
               Temizle
             </button>
@@ -118,19 +186,23 @@ export function FormRunnerDraft() {
 }
 
 function FieldInput({
-  field,
+  fieldKey,
+  fieldType,
+  options,
   value,
   onChange,
 }: {
-  field: RunnerField;
+  fieldKey: string;
+  fieldType: FieldType;
+  options: string[];
   value: string | boolean;
-  onChange: (field: RunnerField, event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  onChange: (fieldKey: string, fieldType: FieldType, event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
 }) {
-  if (field.type === "Select") {
+  if (fieldType === "Select") {
     return (
-      <select value={String(value ?? "")} onChange={(event) => onChange(field, event)}>
+      <select value={String(value ?? "")} onChange={(event) => onChange(fieldKey, fieldType, event)}>
         <option value="">Seciniz</option>
-        {field.options?.map((option) => (
+        {options.map((option) => (
           <option key={option} value={option}>
             {option}
           </option>
@@ -140,29 +212,42 @@ function FieldInput({
   }
 
   const inputType =
-    field.type === "Number" ? "number" : field.type === "Email" ? "email" : field.type === "Date" ? "date" : "text";
+    fieldType === "Number" ? "number" : fieldType === "Email" ? "email" : fieldType === "Date" ? "date" : "text";
 
-  return <input value={String(value ?? "")} onChange={(event) => onChange(field, event)} type={inputType} />;
+  return <input value={String(value ?? "")} onChange={(event) => onChange(fieldKey, fieldType, event)} type={inputType} />;
 }
 
-function validate(values: FormValues) {
+function buildInitialValues(form: FormDefinition) {
+  return form.fields.reduce<FormValues>((current, field) => {
+    current[field.key] = field.type === "Checkbox" ? false : "";
+    return current;
+  }, {});
+}
+
+function validate(form: FormDefinition, values: FormValues) {
   const nextErrors: Record<string, string> = {};
 
-  for (const field of fields) {
+  for (const field of form.fields) {
     const value = values[field.key];
     const isEmpty = value === "" || value === false || value === undefined;
 
     if (field.required && isEmpty) {
       nextErrors[field.key] = `${field.label} zorunludur.`;
     }
-  }
 
-  if (String(values.contactEmail ?? "").length > 0 && !String(values.contactEmail).includes("@")) {
-    nextErrors.contactEmail = "Gecerli bir e-posta girilmelidir.";
-  }
+    if (field.type === "Email" && String(value ?? "").length > 0 && !String(value).includes("@")) {
+      nextErrors[field.key] = "Gecerli bir e-posta girilmelidir.";
+    }
 
-  if (values.requestType === "Satinalma" && String(values.approvalNote ?? "").trim().length === 0) {
-    nextErrors.approvalNote = "Satinalma taleplerinde onay aciklamasi zorunludur.";
+    for (const rule of field.validationRules) {
+      if (
+        rule.ruleType === "RequiredWhen" &&
+        values[rule.dependsOnFieldKey] === rule.expectedValue &&
+        String(value ?? "").trim().length === 0
+      ) {
+        nextErrors[field.key] = rule.message;
+      }
+    }
   }
 
   return nextErrors;
