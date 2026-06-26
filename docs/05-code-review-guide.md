@@ -33,12 +33,14 @@ Use this file for the final code review presentation.
 
 ## Current Frontend Story
 
-- `LoginView` submits to the backend API first and falls back to demo users for UI-only development.
-- `sessionStore` keeps the active user, token and theme in Zustand.
-- `AppShell` filters navigation items by user role, which demonstrates role-based UI without scattering role checks across pages.
-- `FormDesignerDraft` shows the form as a backend-ready definition model instead of hardcoded form markup.
-- `ProcessBoardDraft` gives a UI-level draft of task action handling before the real API integration is wired in.
-- `FormRunnerDraft` demonstrates required, type-based and dependent validation before submit data is sent to process start.
+- `LoginView` starts empty and uses demo-account buttons only to fill credentials for testing.
+- `sessionStore` keeps the active user, token, expiry and theme in Zustand so refresh does not reset the demo flow.
+- `AppShell` verifies restored API sessions once on load, schedules local expiry, and sends expired/unauthorized sessions back to login with a clear notice.
+- `AppShell` filters navigation items by user role and keeps the active screen in the URL query, which demonstrates role-based UI without scattering role checks across pages.
+- `DashboardView` reads process/task metrics from the API instead of showing fixed numbers.
+- `FormDesignerDraft` saves the form as a backend-ready definition model instead of only previewing hardcoded markup.
+- `FormRunnerDraft` loads saved form definitions and starts a process through the API after client-side validation.
+- `ProcessBoardDraft` lists persisted processes/tasks and executes approve/reject actions through the backend state machine.
 
 ## Review Questions To Be Ready For
 

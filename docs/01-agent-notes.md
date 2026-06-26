@@ -11,6 +11,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Active database mode for now: SQLite. PostgreSQL/Neon setup is deferred to a later session.
 - Documentation must be kept current as code changes.
 - Team split: flow-based, not layer-based.
+- Frontend target is multi-screen navigation. Hash-scroll sections were only an early scaffold and should not be treated as final UX.
 
 ## Tooling Notes
 
@@ -19,6 +20,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Git history should stay progressive and easy to review.
 - Repository documentation should avoid machine-specific paths, credentials, tokens, or private workflow details.
 - Database connection strings must stay in environment variables or .NET user secrets, not tracked files.
+- When database schema, seed data or local startup changes, update `docs/08-local-database.md` and `scripts/run-api-local.ps1`.
 
 ## Architecture Principles
 
@@ -48,3 +50,9 @@ These notes are the project memory. Update this file whenever an implementation 
 - Form runner draft added with dynamic field rendering, required/type/dependent validation and JSON submit preview.
 - Frontend API client expanded with form, process and task methods so feature components can be wired without scattering fetch calls.
 - Backend database provider selection added so local SQLite and shared PostgreSQL/Neon can use the same service/domain code.
+- Local SQLite database guide and reset/start helper script added for teammate onboarding.
+- Local SQLite startup now seeds optional mock workflow data by default: football-themed forms, processes, tasks and audit logs. Use `-SkipMockData` for a nearly empty DB.
+- Login no longer pre-fills credentials; demo buttons only fill credentials for testing.
+- Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a visible notice instead of flickering or polling.
+- Authenticated shell navigation stores the active workspace screen in the `?view=` query parameter so refresh and browser history do not collapse back to the dashboard.
+- Form designer/runner and process/task views are being moved from local draft state toward real API-backed flows.

@@ -39,6 +39,12 @@
   - Updates process status through the state machine.
   - Writes an audit log entry.
 
+## Swagger Usage
+
+Swagger is available in development at `/swagger`.
+
+Most endpoints require `Authorization: Bearer <token>`. Use `POST /api/auth/login` first, copy the returned token, then click `Authorize` in Swagger and paste the token. Swagger adds the bearer header to protected requests after authorization.
+
 ## Service Responsibility
 
 Controllers should stay thin. Services own decisions:
@@ -48,6 +54,7 @@ Controllers should stay thin. Services own decisions:
 - `ProcessService`: process start, detail and listing.
 - `TaskService`: task listing and action execution.
 - `ProcessStateMachine`: allowed transitions.
+- `DatabaseSeeder`: local demo users and optional mock workflow data.
 
 ## Frontend Client Coverage
 
@@ -71,6 +78,8 @@ The API accepts the session token as `Authorization: Bearer <token>`.
 
 Enum values are returned as readable strings, for example `Admin`, `InProgress` and `Approve`. This keeps the frontend role checks and status displays explicit.
 
+Task actions load the task and parent process, validate role/action, update process status through `ProcessStateMachine`, and then write a separate `AuditLog` row. The detail response is reloaded from the database after save so UI state reflects persisted data, not a temporary in-memory object graph.
+
 ## Database Configuration
 
 The API reads `Database:Provider` from configuration:
@@ -79,3 +88,7 @@ The API reads `Database:Provider` from configuration:
 - `PostgreSql`: shared database mode, intended for Neon or another PostgreSQL host.
 
 The connection string is read from `ConnectionStrings:DefaultConnection`. Real PostgreSQL credentials must be supplied through environment variables or .NET user secrets. Tracked documentation and config files only contain examples.
+
+Local SQLite setup, current schema summary and reset/start commands are documented in `docs/08-local-database.md`. Any schema, seed data or local startup change should update that document and `scripts/run-api-local.ps1`.
+
+The local startup script enables `Seed__MockData=true` by default. This adds two form definitions, football-themed process submissions, open approver tasks and completed/rejected audit examples. Use `-SkipMockData` when a teammate needs a nearly empty local database.

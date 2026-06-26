@@ -96,9 +96,8 @@ Iki ayri terminal kullanmak en temiz yoldur.
 
 Terminal 1 - API:
 
-```bash
-cd apps/api
-dotnet run --project src/TechYouthBpm.Api --urls http://localhost:5291
+```powershell
+./scripts/run-api-local.ps1
 ```
 
 API ayaga kalkinca Swagger acilir:
@@ -107,19 +106,32 @@ API ayaga kalkinca Swagger acilir:
 http://localhost:5291/swagger
 ```
 
-Ilk calistirmada API, secili veritabani uzerinde demo kullanicilari seed eder. SQLite dosyasi localde olusur; PostgreSQL/Neon modunda tablolar secili uzak veritabaninda olusturulur.
+Ilk calistirmada API, secili veritabani uzerinde demo kullanicilari ve mock BPM verisini seed eder. SQLite dosyasi localde olusur; PostgreSQL/Neon modunda tablolar secili uzak veritabaninda olusturulur.
+
+SQLite ile local demo veritabanini sifirlamak icin:
+
+```powershell
+./scripts/run-api-local.ps1 -ResetDb
+```
+
+Sadece kullanicilarla baslamak ve mock surec/form verisini kapatmak icin:
+
+```powershell
+./scripts/run-api-local.ps1 -ResetDb -Force -SkipMockData
+```
+
+Local veritabani akisi ve sema ozeti icin `docs/08-local-database.md` dosyasina bak.
 
 Terminal 2 - Web:
 
-```bash
-cd apps/web
-npm run dev -- --hostname 127.0.0.1 --port 3000
+```powershell
+./scripts/run-web-local.ps1
 ```
 
 Web uygulamasi:
 
 ```bash
-http://127.0.0.1:3000
+http://localhost:3000
 ```
 
 ## Stop Local Servers
@@ -160,13 +172,15 @@ npm run build
 
 Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullanicilarla local fallback devreye girer; boylece UI gelistirmesi backend olmadan da devam edebilir.
 
+Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari ve audit log ornekleriyle gelir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
+
 ## Current Demo Flow
 
 1. Login ol.
 2. Role gore menu ve dashboard'u gor.
-3. Admin kullanicisiyle form designer taslagini incele.
-4. Form runner taslaginda validation davranisini dene.
-5. Process board uzerinden task approve/reject akisini gor.
+3. Admin kullanicisiyle seeded formlari ve dashboard metriklerini incele.
+4. Form runner ekraninda seeded bir form secip yeni surec baslat.
+5. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
 6. Surec detayinda JSON veri ve audit log mantigini incele.
 
 ## Troubleshooting
@@ -186,3 +200,4 @@ Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullan
 - `docs/05-code-review-guide.md`
 - `docs/06-team-presentation-split.md`
 - `docs/07-product-todo.md`
+- `docs/08-local-database.md`
