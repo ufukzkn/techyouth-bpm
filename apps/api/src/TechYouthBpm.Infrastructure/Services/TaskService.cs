@@ -27,11 +27,6 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine) : IT
         var task = await db.ProcessTasks
             .Include(item => item.ProcessInstance)
             .ThenInclude(process => process!.FormDefinition)
-            .Include(item => item.ProcessInstance)
-            .ThenInclude(process => process!.Tasks)
-            .Include(item => item.ProcessInstance)
-            .ThenInclude(process => process!.AuditLogs)
-            .ThenInclude(log => log.User)
             .SingleOrDefaultAsync(item => item.Id == taskId, cancellationToken);
 
         if (task is null || task.ProcessInstance is null)
@@ -72,9 +67,10 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine) : IT
             task.ProcessInstance.CompletedAt = DateTime.UtcNow;
         }
 
-        task.ProcessInstance.AuditLogs.Add(new AuditLog
+        db.AuditLogs.Add(new AuditLog
         {
             Id = Guid.NewGuid(),
+            ProcessInstanceId = task.ProcessInstance.Id,
             UserId = user.Id,
             Action = request.Action,
             FromStatus = previousStatus,
@@ -85,6 +81,13 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine) : IT
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return Result<ProcessDetailDto>.Success(task.ProcessInstance.ToDetailDto());
+        var process = await db.ProcessInstances
+            .Include(item => item.FormDefinition)
+            .Include(item => item.Tasks)
+            .Include(item => item.AuditLogs)
+            .ThenInclude(log => log.User)
+            .SingleAsync(item => item.Id == task.ProcessInstanceId, cancellationToken);
+
+        return Result<ProcessDetailDto>.Success(process.ToDetailDto());
     }
 }

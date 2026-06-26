@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TechYouthBpm.Domain.Entities;
 
 namespace TechYouthBpm.Infrastructure.Data;
@@ -16,6 +17,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ConfigureSqliteGuidConversion(modelBuilder);
+
         modelBuilder.Entity<User>().HasIndex(user => user.Username).IsUnique();
         modelBuilder.Entity<UserSession>().HasKey(session => session.Token);
 
@@ -42,5 +45,36 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithOne(log => log.ProcessInstance)
             .HasForeignKey(log => log.ProcessInstanceId)
             .OnDelete(DeleteBehavior.Cascade);
+    }
+
+    private void ConfigureSqliteGuidConversion(ModelBuilder modelBuilder)
+    {
+        if (Database.ProviderName != "Microsoft.EntityFrameworkCore.Sqlite")
+        {
+            return;
+        }
+
+        var guidConverter = new ValueConverter<Guid, string>(
+            value => value.ToString("D"),
+            value => Guid.Parse(value));
+
+        var nullableGuidConverter = new ValueConverter<Guid?, string?>(
+            value => value.HasValue ? value.Value.ToString("D") : null,
+            value => string.IsNullOrWhiteSpace(value) ? null : Guid.Parse(value));
+
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(Guid))
+                {
+                    property.SetValueConverter(guidConverter);
+                }
+                else if (property.ClrType == typeof(Guid?))
+                {
+                    property.SetValueConverter(nullableGuidConverter);
+                }
+            }
+        }
     }
 }
