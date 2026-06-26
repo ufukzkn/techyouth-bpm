@@ -6,6 +6,7 @@ This file tracks lightweight product and presentation ideas that are not ready t
 
 - Find a stronger product name than `TechYouth BPM Wizard`.
 - Explore a simple logo direction that combines form, workflow and approval concepts.
+- Current temporary logo is an original SVG prototype and should be replaced before final presentation if the team chooses a better brand direction.
 - Keep the visual identity professional and operational, not marketing-heavy.
 
 ## UI Polish

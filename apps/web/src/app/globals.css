@@ -1,27 +1,35 @@
 :root,
 :root[data-theme="light"] {
-  --background: #f5f7fb;
+  --background: #f6f7fb;
   --surface: #ffffff;
-  --surface-muted: #eef2f7;
-  --foreground: #172033;
-  --muted: #667085;
-  --border: #d9e0ea;
-  --primary: #146c5f;
-  --primary-strong: #0f4f47;
+  --surface-muted: #f0f3f8;
+  --foreground: #18243a;
+  --muted: #647187;
+  --border: #d8deea;
+  --primary: #f47b20;
+  --primary-strong: #d95f05;
+  --primary-soft: #fff0e3;
+  --navy: #18243a;
+  --navy-soft: #24324d;
+  --teal: #2c8c82;
   --danger: #b42318;
-  --shadow: 0 16px 48px rgba(23, 32, 51, 0.12);
+  --shadow: 0 16px 48px rgba(24, 36, 58, 0.12);
 }
 
 :root[data-theme="dark"] {
-  --background: #111827;
-  --surface: #1f2937;
-  --surface-muted: #263244;
-  --foreground: #f9fafb;
-  --muted: #b8c0cc;
-  --border: #39465a;
-  --primary: #4db6a7;
-  --primary-strong: #76d3c7;
-  --danger: #ff9b91;
+  --background: #101827;
+  --surface: #172033;
+  --surface-muted: #202c44;
+  --foreground: #f7f8fb;
+  --muted: #aeb8c9;
+  --border: #334159;
+  --primary: #ff9138;
+  --primary-strong: #ffad6b;
+  --primary-soft: #3a281f;
+  --navy: #0d1422;
+  --navy-soft: #202c44;
+  --teal: #5ac0b3;
+  --danger: #ff9389;
   --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
 }
 
@@ -70,6 +78,7 @@ body {
 *,
 *::before,
 *::after {
+  min-width: 0;
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
@@ -80,6 +89,11 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 button,
@@ -118,6 +132,9 @@ select:focus-visible {
   display: grid;
   place-items: center;
   padding: 24px;
+  background:
+    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 28%),
+    linear-gradient(135deg, var(--background), color-mix(in srgb, var(--navy) 8%, var(--background)));
 }
 
 .login-panel {
@@ -140,7 +157,24 @@ select:focus-visible {
   place-items: center;
   border-radius: 8px;
   color: #fff;
-  background: var(--primary);
+  background: transparent;
+}
+
+.login-mark {
+  width: 52px;
+  height: 52px;
+}
+
+.prototype-logo-bg {
+  fill: var(--navy);
+}
+
+.prototype-logo-flow {
+  stroke: var(--primary);
+}
+
+.prototype-logo-check {
+  stroke: #ffffff;
 }
 
 .login-panel h1 {
@@ -178,6 +212,7 @@ select:focus-visible {
   border-radius: 7px;
   color: var(--foreground);
   background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
 
 .primary-button,
@@ -232,7 +267,7 @@ select:focus-visible {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
   animation: content-enter 260ms ease both;
 }
 
@@ -241,8 +276,9 @@ select:focus-visible {
   flex-direction: column;
   gap: 28px;
   padding: 20px;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
+  border-right: 1px solid color-mix(in srgb, var(--navy) 18%, var(--border));
+  background: linear-gradient(180deg, var(--navy), var(--navy-soft));
+  color: #ffffff;
 }
 
 .brand {
@@ -257,7 +293,7 @@ select:focus-visible {
 }
 
 .brand span:not(.brand-symbol) {
-  color: var(--muted);
+  color: color-mix(in srgb, #ffffff 72%, var(--primary));
   font-size: 13px;
 }
 
@@ -273,12 +309,12 @@ select:focus-visible {
   gap: 10px;
   padding: 0 10px;
   border-radius: 7px;
-  color: var(--muted);
+  color: color-mix(in srgb, #ffffff 72%, var(--primary));
 }
 
 .side-nav a:hover {
-  color: var(--foreground);
-  background: var(--surface-muted);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
   transform: translateX(2px);
 }
 
@@ -286,6 +322,7 @@ select:focus-visible {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .topbar {
@@ -313,10 +350,11 @@ select:focus-visible {
 
 .role-pill {
   padding: 7px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
   border-radius: 999px;
+  color: var(--primary-strong);
   font-weight: 700;
-  background: var(--surface-muted);
+  background: var(--primary-soft);
 }
 
 .icon-button {
@@ -332,10 +370,12 @@ select:focus-visible {
 }
 
 .content {
-  width: min(1120px, 100%);
+  width: min(1180px, 100%);
   display: grid;
   gap: 22px;
   padding: 28px;
+  justify-self: center;
+  overflow: hidden;
 }
 
 .workspace-header {
@@ -364,6 +404,7 @@ select:focus-visible {
   gap: 8px;
   padding: 18px;
   border: 1px solid var(--border);
+  border-top: 3px solid var(--primary);
   border-radius: 8px;
   background: var(--surface);
 }
@@ -374,7 +415,7 @@ select:focus-visible {
 .tool-panel:hover,
 .runner-form:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.1);
+  box-shadow: 0 12px 28px rgba(24, 36, 58, 0.1);
 }
 
 .metric-card strong {
@@ -397,6 +438,7 @@ select:focus-visible {
   text-align: center;
   font-weight: 700;
   background: var(--surface);
+  color: var(--navy);
 }
 
 .flow-step:hover {
@@ -447,6 +489,7 @@ select:focus-visible {
 .tool-panel,
 .field-card,
 .json-preview {
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -480,7 +523,7 @@ select:focus-visible {
 .field-card {
   min-height: 70px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, auto) auto;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -491,10 +534,13 @@ select:focus-visible {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .json-preview {
   grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
   max-height: 280px;
   overflow: auto;
   padding: 16px;
@@ -502,6 +548,8 @@ select:focus-visible {
   font-family: var(--font-geist-mono), Consolas, monospace;
   font-size: 13px;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .process-grid {
@@ -514,6 +562,7 @@ select:focus-visible {
   display: grid;
   gap: 14px;
   align-content: start;
+  min-width: 0;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -526,6 +575,7 @@ select:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
 }
 
 .status-badge {
@@ -536,8 +586,8 @@ select:focus-visible {
 }
 
 .status-inprogress {
-  color: #9a5b00;
-  background: #fff1d6;
+  color: #9a4f00;
+  background: #fff0df;
 }
 
 .status-completed {
@@ -560,6 +610,7 @@ select:focus-visible {
 .task-item span,
 .empty-state {
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .detail-list dd {
@@ -578,6 +629,7 @@ select:focus-visible {
 }
 
 .task-item {
+  min-width: 0;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -589,6 +641,7 @@ select:focus-visible {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .success-button,
@@ -605,7 +658,7 @@ select:focus-visible {
 
 .success-button {
   color: #ffffff;
-  background: #16835f;
+  background: var(--teal);
 }
 
 .success-button:hover,
@@ -687,6 +740,14 @@ select:focus-visible {
   color: var(--foreground);
   background: var(--surface-muted);
   font-weight: 700;
+}
+
+.primary-button,
+.secondary-button,
+.success-button,
+.danger-button {
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .runner-output {

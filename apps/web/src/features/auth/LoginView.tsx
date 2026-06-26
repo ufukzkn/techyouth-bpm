@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { LockKeyhole, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
+import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { api, ApiError } from "@/lib/api";
 import { loginWithDemoUser } from "@/features/auth/demoUsers";
 import { useSessionStore } from "@/features/session/sessionStore";
@@ -39,7 +40,7 @@ export function LoginView() {
     <main className="login-page">
       <section className="login-panel" aria-label="Login">
         <div className="login-mark">
-          <LockKeyhole size={24} />
+          <PrototypeLogo size={34} />
         </div>
         <h1>TechYouth BPM Wizard</h1>
         <p>Form tasarimi ve surec yonetimi calisma alani</p>

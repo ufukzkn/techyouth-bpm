@@ -3,6 +3,7 @@
 import { LogOut, Moon, Sun } from "lucide-react";
 import { useEffect } from "react";
 import { navItems } from "@/features/app-shell/navigation";
+import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { LoginView } from "@/features/auth/LoginView";
 import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
 import { FormRunnerDraft } from "@/features/form-runner/FormRunnerDraft";
@@ -26,7 +27,9 @@ export function AppShell() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span className="brand-symbol">T</span>
+          <span className="brand-symbol">
+            <PrototypeLogo size={34} />
+          </span>
           <div>
             <strong>TechYouth BPM</strong>
             <span>Wizard workspace</span>
