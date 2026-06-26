@@ -64,9 +64,18 @@ Feature components should call these client methods through feature-level orches
 
 - `TechYouthBpm.Domain`: entities and enums.
 - `TechYouthBpm.Application`: DTOs, service interfaces and `ProcessStateMachine`.
-- `TechYouthBpm.Infrastructure`: EF Core `AppDbContext`, SQLite setup, seed data and service implementations.
+- `TechYouthBpm.Infrastructure`: EF Core `AppDbContext`, SQLite/PostgreSQL provider setup, seed data and service implementations.
 - `TechYouthBpm.Api`: controllers, Swagger, CORS and startup database seeding.
 
 The API accepts the session token as `Authorization: Bearer <token>`.
 
 Enum values are returned as readable strings, for example `Admin`, `InProgress` and `Approve`. This keeps the frontend role checks and status displays explicit.
+
+## Database Configuration
+
+The API reads `Database:Provider` from configuration:
+
+- `Sqlite`: default local mode, using `Data Source=techyouth-bpm.db`.
+- `PostgreSql`: shared database mode, intended for Neon or another PostgreSQL host.
+
+The connection string is read from `ConnectionStrings:DefaultConnection`. Real PostgreSQL credentials must be supplied through environment variables or .NET user secrets. Tracked documentation and config files only contain examples.

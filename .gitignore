@@ -16,6 +16,8 @@ TestResults/
 .env
 .env.*
 !.env.example
+appsettings.Local.json
+appsettings.*.Local.json
 
 # local-only agent/operator notes and credentials
 .codex-notes/

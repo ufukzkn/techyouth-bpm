@@ -7,7 +7,8 @@ These notes are the project memory. Update this file whenever an implementation 
 - Scope: full-stack.
 - Repository target: private `ufukzkn/techyouth-bpm`.
 - Frontend: Next.js App Router, TypeScript, Zustand.
-- Backend: .NET 8 Web API, EF Core, SQLite.
+- Backend: .NET 8 Web API, EF Core, selectable SQLite/PostgreSQL provider.
+- Active database mode for now: SQLite. PostgreSQL/Neon setup is deferred to a later session.
 - Documentation must be kept current as code changes.
 - Team split: flow-based, not layer-based.
 
@@ -17,6 +18,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - .NET SDK 10 is installed and can target `net8.0`.
 - Git history should stay progressive and easy to review.
 - Repository documentation should avoid machine-specific paths, credentials, tokens, or private workflow details.
+- Database connection strings must stay in environment variables or .NET user secrets, not tracked files.
 
 ## Architecture Principles
 
@@ -45,3 +47,4 @@ These notes are the project memory. Update this file whenever an implementation 
 - Process board draft added with local task actions, status transitions and audit preview.
 - Form runner draft added with dynamic field rendering, required/type/dependent validation and JSON submit preview.
 - Frontend API client expanded with form, process and task methods so feature components can be wired without scattering fetch calls.
+- Backend database provider selection added so local SQLite and shared PostgreSQL/Neon can use the same service/domain code.

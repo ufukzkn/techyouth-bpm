@@ -15,6 +15,7 @@ Dokumantasyon `docs/` altindadir. Proje ilerledikce mimari kararlar, servis isle
 - Node.js 20 veya ustu
 - npm 10 veya ustu
 - .NET SDK 8 veya ustu
+- PostgreSQL opsiyoneldir; ortak takim veritabani icin Neon gibi hosted PostgreSQL kullanilabilir.
 
 Kontrol komutlari:
 
@@ -57,6 +58,38 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:5291
 
 `.env.local` dosyalari git'e eklenmez.
 
+Backend varsayilan olarak SQLite kullanir:
+
+```json
+{
+  "Database": {
+    "Provider": "Sqlite"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=techyouth-bpm.db"
+  }
+}
+```
+
+Takimla ortak PostgreSQL/Neon veritabani kullanmak icin provider ve connection string gizli olarak verilmelidir. Gercek connection string repo'ya commit edilmez.
+
+PowerShell ile gecici environment variable:
+
+```powershell
+$env:Database__Provider="PostgreSql"
+$env:ConnectionStrings__DefaultConnection="Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true"
+```
+
+.NET user secrets ile kalici lokal ayar:
+
+```bash
+cd apps/api/src/TechYouthBpm.Api
+dotnet user-secrets set "Database:Provider" "PostgreSql"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true"
+```
+
+Ornek format icin `apps/api/src/TechYouthBpm.Api/appsettings.example.json` dosyasi incelenebilir.
+
 ## Run Locally
 
 Iki ayri terminal kullanmak en temiz yoldur.
@@ -73,6 +106,8 @@ API ayaga kalkinca Swagger acilir:
 ```bash
 http://localhost:5291/swagger
 ```
+
+Ilk calistirmada API, secili veritabani uzerinde demo kullanicilari seed eder. SQLite dosyasi localde olusur; PostgreSQL/Neon modunda tablolar secili uzak veritabaninda olusturulur.
 
 Terminal 2 - Web:
 

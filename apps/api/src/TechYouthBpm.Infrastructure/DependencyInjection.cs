@@ -12,10 +12,27 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        var provider = configuration["Database:Provider"] ?? "Sqlite";
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=techyouth-bpm.db";
 
-        services.AddDbContext<AppDbContext>(options => options.UseSqlite(connectionString));
+        services.AddDbContext<AppDbContext>(options =>
+        {
+            switch (provider.Trim().ToLowerInvariant())
+            {
+                case "postgresql":
+                case "postgres":
+                    options.UseNpgsql(connectionString);
+                    break;
+                case "sqlite":
+                    options.UseSqlite(connectionString);
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Unsupported database provider '{provider}'. Use 'Sqlite' or 'PostgreSql'.");
+            }
+        });
+
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFormService, FormService>();
         services.AddScoped<IProcessService, ProcessService>();

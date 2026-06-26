@@ -20,6 +20,13 @@ The API follows a lightweight layered architecture:
 
 This keeps process logic independent from HTTP so it can be tested and extended.
 
+Persistence is selected in the Infrastructure layer through configuration:
+
+- `Sqlite` for fast local demos and offline development.
+- `PostgreSql` for shared team development through a hosted PostgreSQL service such as Neon.
+
+The rest of the application depends on EF Core and service interfaces, so changing the database provider does not change controllers, workflow rules or frontend API contracts.
+
 ## Frontend Architecture
 
 The frontend is organized by domain features:
@@ -45,3 +52,4 @@ Implemented frontend folders:
 - Adding a new field type should require a field renderer, validation rule and designer option, without rewriting the wizard.
 - Adding a new process action should be handled in the backend state machine and exposed to the frontend as available task actions.
 - Adding a new role should be centralized in auth/authorization rules and menu visibility logic.
+- Changing persistence provider should stay inside Infrastructure configuration and EF Core package setup.
