@@ -1,12 +1,13 @@
 "use client";
 
 import { Play, RotateCcw } from "lucide-react";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FieldRenderer } from "@/features/forms/fieldRenderer";
+import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
+import { validateFormValues } from "@/features/forms/formValidation";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
-import type { FieldType, FormDefinition } from "@/lib/types";
-
-type FormValues = Record<string, string | boolean>;
+import type { FormDefinition } from "@/lib/types";
 
 export function FormRunnerDraft() {
   const token = useSessionStore((state) => state.token);
@@ -19,13 +20,14 @@ export function FormRunnerDraft() {
 
   const selectedForm = forms.find((form) => form.id === selectedFormId);
 
-  const output = useMemo(
-    () => ({
+  const output = useMemo(() => {
+    const formData = selectedForm ? prepareFormData(selectedForm, values) : values;
+
+    return {
       formDefinitionId: selectedFormId,
-      formData: values,
-    }),
-    [selectedFormId, values],
-  );
+      formData,
+    };
+  }, [selectedForm, selectedFormId, values]);
 
   useEffect(() => {
     async function loadForms() {
@@ -54,8 +56,7 @@ export function FormRunnerDraft() {
     void loadForms();
   }, [token]);
 
-  function handleChange(fieldKey: string, fieldType: FieldType, event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
-    const value = fieldType === "Checkbox" ? (event.target as HTMLInputElement).checked : event.target.value;
+  function handleChange(fieldKey: string, value: FormValue) {
     setValues((current) => ({ ...current, [fieldKey]: value }));
     setStatus("idle");
   }
@@ -67,7 +68,7 @@ export function FormRunnerDraft() {
       return;
     }
 
-    const nextErrors = validate(selectedForm, values);
+    const nextErrors = validateFormValues(selectedForm, values);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setStatus("idle");
@@ -79,7 +80,7 @@ export function FormRunnerDraft() {
       setStatus("submitting");
       const process = await api.startProcess(token, {
         formDefinitionId: selectedForm.id,
-        formData: values,
+        formData: prepareFormData(selectedForm, values),
       });
       setStatus("success");
       setMessage(`Surec baslatildi ve SQLite'a kaydedildi: ${process.id}`);
@@ -139,30 +140,13 @@ export function FormRunnerDraft() {
             .slice()
             .sort((first, second) => first.sortOrder - second.sortOrder)
             .map((field) => (
-              <label className={field.type === "Checkbox" ? "checkbox-row runner-checkbox" : undefined} key={field.key}>
-                {field.type === "Checkbox" ? (
-                  <>
-                    <input
-                      checked={Boolean(values[field.key])}
-                      onChange={(event) => handleChange(field.key, field.type, event)}
-                      type="checkbox"
-                    />
-                    {field.label}
-                  </>
-                ) : (
-                  <>
-                    {field.label}
-                    <FieldInput
-                      fieldKey={field.key}
-                      fieldType={field.type}
-                      options={field.options}
-                      value={values[field.key]}
-                      onChange={handleChange}
-                    />
-                  </>
-                )}
-                {errors[field.key] ? <span className="field-error">{errors[field.key]}</span> : null}
-              </label>
+              <FieldRenderer
+                key={field.key}
+                field={field}
+                value={values[field.key]}
+                error={errors[field.key]}
+                onChange={handleChange}
+              />
             ))}
 
           <p className={`status-line status-line-${status}`}>{message}</p>
@@ -183,72 +167,4 @@ export function FormRunnerDraft() {
       </div>
     </section>
   );
-}
-
-function FieldInput({
-  fieldKey,
-  fieldType,
-  options,
-  value,
-  onChange,
-}: {
-  fieldKey: string;
-  fieldType: FieldType;
-  options: string[];
-  value: string | boolean;
-  onChange: (fieldKey: string, fieldType: FieldType, event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
-}) {
-  if (fieldType === "Select") {
-    return (
-      <select value={String(value ?? "")} onChange={(event) => onChange(fieldKey, fieldType, event)}>
-        <option value="">Seciniz</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    );
-  }
-
-  const inputType =
-    fieldType === "Number" ? "number" : fieldType === "Email" ? "email" : fieldType === "Date" ? "date" : "text";
-
-  return <input value={String(value ?? "")} onChange={(event) => onChange(fieldKey, fieldType, event)} type={inputType} />;
-}
-
-function buildInitialValues(form: FormDefinition) {
-  return form.fields.reduce<FormValues>((current, field) => {
-    current[field.key] = field.type === "Checkbox" ? false : "";
-    return current;
-  }, {});
-}
-
-function validate(form: FormDefinition, values: FormValues) {
-  const nextErrors: Record<string, string> = {};
-
-  for (const field of form.fields) {
-    const value = values[field.key];
-    const isEmpty = value === "" || value === false || value === undefined;
-
-    if (field.required && isEmpty) {
-      nextErrors[field.key] = `${field.label} zorunludur.`;
-    }
-
-    if (field.type === "Email" && String(value ?? "").length > 0 && !String(value).includes("@")) {
-      nextErrors[field.key] = "Gecerli bir e-posta girilmelidir.";
-    }
-
-    for (const rule of field.validationRules) {
-      if (
-        rule.ruleType === "RequiredWhen" &&
-        values[rule.dependsOnFieldKey] === rule.expectedValue &&
-        String(value ?? "").trim().length === 0
-      ) {
-        nextErrors[field.key] = rule.message;
-      }
-    }
-  }
-
-  return nextErrors;
 }

@@ -56,3 +56,10 @@ These notes are the project memory. Update this file whenever an implementation 
 - Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a visible notice instead of flickering or polling.
 - Authenticated shell navigation stores the active workspace screen in the `?view=` query parameter so refresh and browser history do not collapse back to the dashboard.
 - Form designer/runner and process/task views are being moved from local draft state toward real API-backed flows.
+- Ozgun's form foundation work continued on `feature/ozgun-form-foundation`.
+- Shared frontend form helpers were added for supported field types, default field creation, reusable field rendering, form value handling and reusable validation.
+- Form runner now uses the shared renderer/validation/value helpers, including stronger number conversion before process-start submit.
+- Form designer now supports field editing, select/checkbox option management, move up/down field ordering and JSON preview updates from the same model that is saved.
+- Dependent `RequiredWhen` validation can now be configured in the form designer and is included in the saved form definition model.
+- Backend, login/session, dashboard, app shell, process/task and audit behavior were intentionally left unchanged during Ozgun's form-flow frontend work.
+- Frontend `npm run lint` and `npm run build` passed after the form foundation, designer editing and dependent validation updates.
