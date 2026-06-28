@@ -204,6 +204,10 @@ select:focus-visible {
 .login-form input,
 .tool-panel input,
 .tool-panel select,
+.field-editor input,
+.field-editor select,
+.rule-editor input,
+.rule-editor select,
 .runner-form input,
 .runner-form select {
   min-height: 44px;
@@ -241,6 +245,15 @@ select:focus-visible {
 .primary-button:disabled {
   opacity: 0.68;
   cursor: wait;
+}
+
+.field-editor .icon-button:disabled,
+.option-editor .secondary-button:disabled,
+.rule-editor .secondary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .form-error {
@@ -597,6 +610,95 @@ select:focus-visible {
   padding: 12px;
 }
 
+.field-editor {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+}
+
+.field-editor-header,
+.option-editor-header,
+.option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.field-editor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.field-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field-editor-grid label,
+.option-row label {
+  display: grid;
+  gap: 7px;
+  font-weight: 650;
+}
+
+.field-required-toggle {
+  align-self: end;
+  min-height: 44px;
+}
+
+.option-editor,
+.rule-editor {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.rule-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rule-editor-header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.option-list,
+.rule-list {
+  display: grid;
+  gap: 8px;
+}
+
+.option-row label {
+  flex: 1;
+}
+
+.rule-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.rule-row label {
+  display: grid;
+  gap: 7px;
+  font-weight: 650;
+}
+
+.rule-error {
+  grid-column: 1 / -1;
+}
+
 .field-card span {
   display: block;
   margin-top: 4px;
@@ -883,9 +985,11 @@ select:focus-visible {
   .metric-grid,
   .flow-preview,
   .designer-grid,
+  .field-editor-grid,
   .process-grid,
   .runner-grid,
-  .detail-list {
+  .detail-list,
+  .rule-row {
     grid-template-columns: 1fr;
   }
 
