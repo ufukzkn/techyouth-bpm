@@ -1,7 +1,10 @@
 "use client";
 
-import { CheckCircle2, CircleDot, RefreshCw, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MyTasksView } from "@/features/processes/MyTasksView";
+import { ProcessDetailPanel } from "@/features/processes/ProcessDetailPanel";
+import { ProcessListView } from "@/features/processes/ProcessListView";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
 import type { ProcessDetail, ProcessSummary, ProcessTask, Role, WorkflowAction } from "@/lib/types";
@@ -19,8 +22,6 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
   const [detail, setDetail] = useState<ProcessDetail | null>(null);
   const [status, setStatus] = useState<"loading" | "idle" | "acting" | "error">("loading");
   const [message, setMessage] = useState("Surec verileri yukleniyor.");
-
-  const openTasks = useMemo(() => tasks.filter((task) => task.status === "Open"), [tasks]);
 
   async function refreshData(nextSelectedProcessId = selectedProcessId) {
     if (!token) {
@@ -46,7 +47,7 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
       }
 
       setStatus("idle");
-      setMessage(processResult.length > 0 ? "Surecler SQLite veritabanindan yuklendi." : "Henuz surec yok.");
+      setMessage(processResult.length > 0 ? "Surecler veritabanindan yuklendi." : "Henuz surec yok.");
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : "Surecler yuklenemedi.");
@@ -75,17 +76,14 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
     }
   }
 
-  async function executeTask(taskId: string, action: Exclude<WorkflowAction, "Start">) {
+  async function executeTask(taskId: string, action: Exclude<WorkflowAction, "Start">, note: string) {
     if (!token) {
       return;
     }
 
     try {
       setStatus("acting");
-      const updated = await api.executeTaskAction(token, taskId, {
-        action,
-        note: action === "Approve" ? "UI uzerinden onaylandi." : "UI uzerinden reddedildi.",
-      });
+      const updated = await api.executeTaskAction(token, taskId, { action, note });
       setDetail(updated);
       await refreshData(updated.id);
       setMessage(`${action === "Approve" ? "Onay" : "Red"} aksiyonu kaydedildi.`);
@@ -102,7 +100,7 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
           <span className="eyebrow">{mode === "tasks" ? "Islerim" : "Surecler"}</span>
           <h2>{mode === "tasks" ? "Bekleyen task aksiyonlari" : "Surec takibi"}</h2>
         </div>
-        <p>Surecler, tasklar ve audit log backend state machine uzerinden SQLite veritabanina kaydedilir.</p>
+        <p>Surecler, tasklar ve audit log backend state machine uzerinden veritabanina kaydedilir.</p>
       </div>
 
       <div className="section-toolbar">
@@ -115,131 +113,24 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
 
       <div className="process-grid">
         {mode === "processes" ? (
-          <article className="process-card">
-            <div className="process-card-header">
-              <div>
-                <span className="eyebrow">Surec listesi</span>
-                <strong>{processes.length} kayit</strong>
-              </div>
-              <CircleDot size={22} />
-            </div>
-
-            {processes.length === 0 ? (
-              <p className="empty-state">Henuz baslatilmis surec yok.</p>
-            ) : (
-              <div className="process-list">
-                {processes.map((process) => (
-                  <button
-                    className={process.id === selectedProcessId ? "process-list-item active" : "process-list-item"}
-                    key={process.id}
-                    onClick={() => selectProcess(process.id)}
-                    type="button"
-                  >
-                    <span>
-                      <strong>{process.formName}</strong>
-                      <small>{new Date(process.startedAt).toLocaleString("tr-TR")}</small>
-                    </span>
-                    <StatusBadge status={process.status} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </article>
+          <ProcessListView
+            processes={processes}
+            selectedProcessId={selectedProcessId}
+            onSelectProcess={selectProcess}
+          />
         ) : null}
 
-        <article className="process-card">
-          <div className="process-card-header">
-            <div>
-              <span className="eyebrow">Islerim</span>
-              <strong>{openTasks.length} acik is</strong>
-            </div>
-            <CircleDot size={22} />
-          </div>
+        {mode === "tasks" ? (
+          <MyTasksView
+            tasks={tasks}
+            role={role}
+            status={status}
+            onExecuteTask={executeTask}
+          />
+        ) : null}
 
-          {openTasks.length > 0 ? (
-            <div className="task-list">
-              {openTasks.map((task) => (
-                <div className="task-item" key={task.id}>
-                  <div>
-                    <strong>Surec onayi</strong>
-                    <span>
-                      {task.id.slice(0, 8)} - {task.assignedRole}
-                    </span>
-                  </div>
-                  <div className="task-actions">
-                    <button
-                      className="success-button"
-                      disabled={status === "acting"}
-                      onClick={() => executeTask(task.id, "Approve")}
-                      type="button"
-                    >
-                      <CheckCircle2 size={17} />
-                      Onayla
-                    </button>
-                    <button
-                      className="danger-button"
-                      disabled={status === "acting"}
-                      onClick={() => executeTask(task.id, "Reject")}
-                      type="button"
-                    >
-                      <XCircle size={17} />
-                      Reddet
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-state">{role} rolu icin acik is bulunmuyor.</p>
-          )}
-        </article>
-
-        <article className="process-card">
-          <div className="process-card-header">
-            <div>
-              <span className="eyebrow">Surec detayi</span>
-              <strong>{detail?.formName ?? "Secili surec yok"}</strong>
-            </div>
-            {detail ? <StatusBadge status={detail.status} /> : null}
-          </div>
-          {detail ? (
-            <>
-              <dl className="detail-list">
-                <div>
-                  <dt>Baslangic</dt>
-                  <dd>{new Date(detail.startedAt).toLocaleString("tr-TR")}</dd>
-                </div>
-                <div>
-                  <dt>Durum</dt>
-                  <dd>{detail.status}</dd>
-                </div>
-              </dl>
-              <pre className="json-preview compact-json">{JSON.stringify(detail.formData, null, 2)}</pre>
-            </>
-          ) : (
-            <p className="empty-state">Detay goruntulemek icin bir surec sec.</p>
-          )}
-        </article>
-
-        <article className="process-card audit-card">
-          <span className="eyebrow">Audit Log</span>
-          {detail && detail.auditLogs.length > 0 ? (
-            <ol>
-              {detail.auditLogs.map((item) => (
-                <li key={item.id}>
-                  {item.action}: {item.fromStatus} - {item.toStatus}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="empty-state">Audit kaydi yok.</p>
-          )}
-        </article>
+        <ProcessDetailPanel detail={detail} />
       </div>
     </section>
   );
-}
-
-function StatusBadge({ status }: { status: ProcessSummary["status"] }) {
-  return <span className={`status-badge status-${status.toLowerCase()}`}>{status}</span>;
 }
