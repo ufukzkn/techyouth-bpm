@@ -52,6 +52,8 @@ The scope includes:
 - Designer validation prevents empty field keys, empty labels, duplicate keys and empty option sets for option-based fields.
 - The JSON preview reflects the same form model that is sent to the API.
 - When a saved form is selected, save calls `PUT /api/forms/{id}`; otherwise save calls `POST /api/forms`.
+- The designer layout uses two control panels at the top, then a full-width field list on desktop. Field editors spread key, label, type and required controls across the available width, then collapse to fewer columns on smaller screens.
+- Checkbox controls are styled separately from text inputs so required toggles stay compact while still using the app accent color.
 
 ## Current Form Runner Capabilities
 

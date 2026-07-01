@@ -201,14 +201,14 @@ select:focus-visible {
   font-weight: 650;
 }
 
-.login-form input,
-.tool-panel input,
+.login-form input:not([type="checkbox"]),
+.tool-panel input:not([type="checkbox"]),
 .tool-panel select,
-.field-editor input,
+.field-editor input:not([type="checkbox"]),
 .field-editor select,
-.rule-editor input,
+.rule-editor input:not([type="checkbox"]),
 .rule-editor select,
-.runner-form input,
+.runner-form input:not([type="checkbox"]),
 .runner-form select {
   min-height: 44px;
   padding: 0 12px;
@@ -217,6 +217,13 @@ select:focus-visible {
   color: var(--foreground);
   background: var(--surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
 }
 
 .primary-button,
@@ -394,8 +401,7 @@ select:focus-visible {
   text-transform: uppercase;
 }
 
-.role-pill,
-.session-pill {
+.role-pill {
   padding: 7px 10px;
   border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
   border-radius: 999px;
@@ -404,10 +410,58 @@ select:focus-visible {
   background: var(--primary-soft);
 }
 
-.session-pill {
-  border-color: var(--border);
+.session-menu {
+  position: relative;
+}
+
+.session-icon-button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 30%, var(--border));
+  border-radius: 999px;
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+}
+
+.session-icon-button:hover,
+.session-icon-button[aria-expanded="true"] {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+.session-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  width: min(280px, calc(100vw - 32px));
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow);
+}
+
+.session-popover div {
+  display: grid;
+  gap: 3px;
+}
+
+.session-popover span {
   color: var(--muted);
-  background: var(--surface-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.session-popover strong {
+  overflow-wrap: anywhere;
 }
 
 .icon-button {
@@ -504,7 +558,7 @@ select:focus-visible {
   text-align: center;
   font-weight: 700;
   background: var(--surface);
-  color: var(--navy);
+  color: var(--foreground);
 }
 
 .flow-step span {
@@ -622,7 +676,7 @@ select:focus-visible {
 
 .designer-grid {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -657,6 +711,7 @@ select:focus-visible {
 
 .field-list {
   display: grid;
+  grid-column: 1 / -1;
   gap: 10px;
 }
 
@@ -693,7 +748,7 @@ select:focus-visible {
 
 .field-editor-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(150px, 1fr) minmax(190px, 1.25fr) minmax(150px, 0.85fr) minmax(120px, auto);
   gap: 12px;
 }
 
@@ -1236,6 +1291,12 @@ select:focus-visible {
   margin-top: 2px;
   font-size: 12px;
   color: var(--muted);
+}
+
+@media (max-width: 1100px) {
+  .field-editor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 

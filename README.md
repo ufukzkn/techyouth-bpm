@@ -65,11 +65,16 @@ Backend varsayilan olarak SQLite kullanir:
   "Database": {
     "Provider": "Sqlite"
   },
+  "Auth": {
+    "SessionDurationMinutes": 1
+  },
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=techyouth-bpm.db"
   }
 }
 ```
+
+`Auth:SessionDurationMinutes` local timeout testleri icin su anda 1 dakikadir. Gercek demo veya production benzeri kullanimda bu deger 60-120 dakika araligina alinabilir; uzun sureli oturum icin ayrica "beni hatirla" akisi tasarlanmalidir.
 
 Takimla ortak PostgreSQL/Neon veritabani kullanmak icin provider ve connection string gizli olarak verilmelidir. Gercek connection string repo'ya commit edilmez.
 

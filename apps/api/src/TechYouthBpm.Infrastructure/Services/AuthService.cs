@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
@@ -7,8 +8,10 @@ using TechYouthBpm.Infrastructure.Data;
 
 namespace TechYouthBpm.Infrastructure.Services;
 
-public class AuthService(AppDbContext db) : IAuthService
+public class AuthService(AppDbContext db, IConfiguration configuration) : IAuthService
 {
+    private const int FallbackSessionDurationMinutes = 1;
+
     public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
         var user = await db.Users
@@ -24,7 +27,7 @@ public class AuthService(AppDbContext db) : IAuthService
             Token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("/", string.Empty).Replace("+", string.Empty),
             UserId = user.Id,
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddHours(8)
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes())
         };
 
         db.UserSessions.Add(session);
@@ -45,5 +48,13 @@ public class AuthService(AppDbContext db) : IAuthService
             .SingleOrDefaultAsync(item => item.Token == token && item.ExpiresAt > DateTime.UtcNow, cancellationToken);
 
         return session?.User?.ToDto();
+    }
+
+    private int GetSessionDurationMinutes()
+    {
+        var configuredDuration = configuration["Auth:SessionDurationMinutes"];
+        return int.TryParse(configuredDuration, out var minutes) && minutes > 0
+            ? minutes
+            : FallbackSessionDurationMinutes;
     }
 }

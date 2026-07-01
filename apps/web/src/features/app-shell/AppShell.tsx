@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Moon, Sun } from "lucide-react";
+import { LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { navItems, type ViewId } from "@/features/app-shell/navigation";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
@@ -15,13 +15,14 @@ import type { ProcessSummary, ProcessTask, User } from "@/lib/types";
 export function AppShell() {
   const { user, token, expiresAt, theme, hasHydrated, expireSession, logout, toggleTheme } = useSessionStore();
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
+  const [isSessionDetailsOpen, setIsSessionDetailsOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
   useEffect(() => {
-    if (!hasHydrated || !token || !user || token.startsWith("demo-")) {
+    if (!hasHydrated || !token || !user) {
       return;
     }
 
@@ -42,6 +43,10 @@ export function AppShell() {
     }
 
     async function verifySession() {
+      if (sessionToken.startsWith("demo-")) {
+        return;
+      }
+
       try {
         await api.me(sessionToken);
       } catch (error) {
@@ -154,7 +159,38 @@ export function AppShell() {
             <strong>{user.displayName}</strong>
           </div>
           <span className="role-pill">{user.role}</span>
-          <span className="session-pill">{formatSessionExpiry(expiresAt)}</span>
+          <div className="session-menu">
+            <button
+              className="session-icon-button"
+              type="button"
+              aria-expanded={isSessionDetailsOpen}
+              aria-label="Oturum detaylari"
+              title="Oturum detaylari"
+              onClick={() => setIsSessionDetailsOpen((isOpen) => !isOpen)}
+            >
+              <ShieldCheck size={18} />
+            </button>
+            {isSessionDetailsOpen ? (
+              <div className="session-popover" role="dialog" aria-label="Oturum detaylari">
+                <div>
+                  <span>Kullanici</span>
+                  <strong>{user.displayName}</strong>
+                </div>
+                <div>
+                  <span>Kullanici adi</span>
+                  <strong>{user.username}</strong>
+                </div>
+                <div>
+                  <span>Rol</span>
+                  <strong>{user.role}</strong>
+                </div>
+                <div>
+                  <span>Aktiflik</span>
+                  <strong>{formatSessionExpiry(expiresAt)}</strong>
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button className="icon-button" onClick={toggleTheme} aria-label="Tema degistir" title="Tema degistir">
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -339,5 +375,11 @@ function formatSessionExpiry(expiresAt: string | null) {
     return "Oturum suresi bilinmiyor";
   }
 
-  return `${expiryDate.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} kadar acik`;
+  return expiryDate.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

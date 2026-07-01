@@ -1,5 +1,7 @@
 import type { LoginResponse, Role } from "@/lib/types";
 
+const demoSessionDurationMinutes = 1;
+
 export const demoUsers: Array<{ username: string; password: string; displayName: string; role: Role }> = [
   { username: "admin", password: "admin123", displayName: "Admin User", role: "Admin" },
   { username: "user", password: "user123", displayName: "Process Starter", role: "User" },
@@ -15,7 +17,7 @@ export function loginWithDemoUser(username: string, password: string): LoginResp
 
   return {
     token: `demo-${user.username}`,
-    expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + demoSessionDurationMinutes * 60 * 1000).toISOString(),
     user: {
       id: user.username,
       username: user.username,

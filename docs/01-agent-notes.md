@@ -54,6 +54,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Local SQLite startup now seeds optional mock workflow data by default: football-themed forms, processes, tasks and audit logs. Use `-SkipMockData` for a nearly empty DB.
 - Login no longer pre-fills credentials; demo buttons only fill credentials for testing.
 - Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a visible notice instead of flickering or polling.
+- Session duration is configuration-driven through `Auth:SessionDurationMinutes`. It is temporarily set to 1 minute for timeout UX testing; later demo/production-like runs should use a longer normal session and a separate remember-me design if needed.
 - Authenticated shell navigation stores the active workspace screen in the `?view=` query parameter so refresh and browser history do not collapse back to the dashboard.
 - Form designer/runner and process/task views are now wired to real API-backed flows.
 - Ozgun's form foundation work continued on `feature/ozgun-form-foundation`.
@@ -70,4 +71,4 @@ These notes are the project memory. Update this file whenever an implementation 
 - Latest verification after the form-update work: frontend lint/build passed and backend test suite passed with 20 tests.
 - Ufuk's access/workspace flow now has its own tracking document in `docs/10-ufuk-access-shell-flow.md`.
 - Dashboard metric cards and BPM flow steps now act as role-aware shortcuts into the workspace.
-- Top bar and settings screen expose session expiry information so the access flow is visible after login.
+- Top bar session details moved behind a compact session icon so the shell keeps expiry/user/role information without permanently showing a long timestamp.
