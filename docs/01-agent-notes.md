@@ -44,10 +44,10 @@ These notes are the project memory. Update this file whenever an implementation 
 - Backend build is warning-free after adding domain entities, DTOs, EF Core DbContext, seed users, services and controllers.
 - Backend test project added for workflow/state machine behavior.
 - Frontend scaffold added with Next.js 16, TypeScript, Zustand, lucide-react and dnd-kit packages.
-- Frontend app shell includes login, role-aware navigation, dashboard preview, theme toggle and demo-user fallback when API is offline.
-- Form designer draft added with local field editing and JSON model preview.
-- Process board draft added with local task actions, status transitions and audit preview.
-- Form runner draft added with dynamic field rendering, required/type/dependent validation and JSON submit preview.
+- Frontend app shell includes login, role-aware navigation, API-backed dashboard metrics, theme toggle and demo-user fallback when API is offline.
+- Form designer is API-backed and now supports field editing, option management, move up/down ordering, dependent validation rules and JSON model preview.
+- Process/task screens are API-backed and split into list, detail, task action dialog, status badge and audit timeline components.
+- Form runner loads saved form definitions, renders fields through shared helpers, validates submitted values and starts process instances through the API.
 - Frontend API client expanded with form, process and task methods so feature components can be wired without scattering fetch calls.
 - Backend database provider selection added so local SQLite and shared PostgreSQL/Neon can use the same service/domain code.
 - Local SQLite database guide and reset/start helper script added for teammate onboarding.
@@ -55,7 +55,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Login no longer pre-fills credentials; demo buttons only fill credentials for testing.
 - Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a visible notice instead of flickering or polling.
 - Authenticated shell navigation stores the active workspace screen in the `?view=` query parameter so refresh and browser history do not collapse back to the dashboard.
-- Form designer/runner and process/task views are being moved from local draft state toward real API-backed flows.
+- Form designer/runner and process/task views are now wired to real API-backed flows.
 - Ozgun's form foundation work continued on `feature/ozgun-form-foundation`.
 - Shared frontend form helpers were added for supported field types, default field creation, reusable field rendering, form value handling and reusable validation.
 - Form runner now uses the shared renderer/validation/value helpers, including stronger number conversion before process-start submit.
@@ -63,3 +63,10 @@ These notes are the project memory. Update this file whenever an implementation 
 - Dependent `RequiredWhen` validation can now be configured in the form designer and is included in the saved form definition model.
 - Backend, login/session, dashboard, app shell, process/task and audit behavior were intentionally left unchanged during Ozgun's form-flow frontend work.
 - Frontend `npm run lint` and `npm run build` passed after the form foundation, designer editing and dependent validation updates.
+- Cagdas's process-flow work split the process UI into `ProcessListView`, `ProcessDetailPanel`, `MyTasksView`, `TaskActionDialog`, `AuditTimeline` and `StatusBadge`.
+- Task actions now collect an action note in a dialog before calling the backend approve/reject endpoint.
+- Backend tests now cover task authorization and audit log creation in addition to the state machine transition tests.
+- Latest verification: frontend lint/build passed and backend test suite passed with 17 tests.
+- Ufuk's access/workspace flow now has its own tracking document in `docs/10-ufuk-access-shell-flow.md`.
+- Dashboard metric cards and BPM flow steps now act as role-aware shortcuts into the workspace.
+- Top bar and settings screen expose session expiry information so the access flow is visible after login.

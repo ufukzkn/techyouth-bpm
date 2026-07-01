@@ -394,13 +394,20 @@ select:focus-visible {
   text-transform: uppercase;
 }
 
-.role-pill {
+.role-pill,
+.session-pill {
   padding: 7px 10px;
   border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--border));
   border-radius: 999px;
   color: var(--primary-strong);
   font-weight: 700;
   background: var(--primary-soft);
+}
+
+.session-pill {
+  border-color: var(--border);
+  color: var(--muted);
+  background: var(--surface-muted);
 }
 
 .icon-button {
@@ -458,9 +465,16 @@ select:focus-visible {
   border-top: 3px solid var(--primary);
   border-radius: 8px;
   background: var(--surface);
+  color: var(--foreground);
+  text-align: left;
+}
+
+.metric-action {
+  cursor: pointer;
 }
 
 .metric-card:hover,
+.metric-action:focus-visible,
 .field-card:hover,
 .process-card:hover,
 .tool-panel:hover,
@@ -483,6 +497,7 @@ select:focus-visible {
   min-height: 72px;
   display: grid;
   place-items: center;
+  gap: 4px;
   padding: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -490,6 +505,12 @@ select:focus-visible {
   font-weight: 700;
   background: var(--surface);
   color: var(--navy);
+}
+
+.flow-step span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .flow-step:hover {
@@ -529,6 +550,37 @@ select:focus-visible {
 .section-heading p {
   max-width: 520px;
   color: var(--muted);
+}
+
+.settings-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.settings-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.settings-row span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.settings-row strong {
+  overflow-wrap: anywhere;
 }
 
 .section-toolbar {
@@ -1198,6 +1250,7 @@ select:focus-visible {
   .process-grid,
   .runner-grid,
   .detail-list,
+  .settings-grid,
   .rule-row {
     grid-template-columns: 1fr;
   }

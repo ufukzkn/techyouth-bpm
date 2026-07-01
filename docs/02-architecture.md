@@ -48,6 +48,10 @@ Implemented frontend folders:
 - `src/features/session`: Zustand session/theme store.
 - `src/features/auth`: login view and demo-user fallback.
 - `src/features/app-shell`: role-aware navigation and authenticated layout.
+- `src/features/forms`: shared field metadata, field renderer, form value helpers and frontend validation.
+- `src/features/form-designer`: admin-facing dynamic form definition editor.
+- `src/features/form-runner`: saved-form runner that starts process instances.
+- `src/features/processes`: process list, task list, task action dialog, process detail, audit timeline and status badge components.
 
 ## Extensibility Strategy
 

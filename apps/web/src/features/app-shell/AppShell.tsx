@@ -154,6 +154,7 @@ export function AppShell() {
             <strong>{user.displayName}</strong>
           </div>
           <span className="role-pill">{user.role}</span>
+          <span className="session-pill">{formatSessionExpiry(expiresAt)}</span>
           <button className="icon-button" onClick={toggleTheme} aria-label="Tema degistir" title="Tema degistir">
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -163,12 +164,19 @@ export function AppShell() {
         </header>
 
         <main className="content">
-          {currentView === "dashboard" ? <DashboardView token={token} user={user} /> : null}
+          {currentView === "dashboard" ? (
+            <DashboardView
+              token={token}
+              user={user}
+              visibleViewIds={visibleNavItems.map((item) => item.viewId)}
+              onNavigate={changeView}
+            />
+          ) : null}
           {currentView === "forms" && user.role === "Admin" ? <FormDesignerDraft /> : null}
           {currentView === "runner" ? <FormRunnerDraft /> : null}
           {currentView === "processes" ? <ProcessBoardDraft mode="processes" role={user.role} /> : null}
           {currentView === "tasks" ? <ProcessBoardDraft mode="tasks" role={user.role} /> : null}
-          {currentView === "settings" ? <SettingsView /> : null}
+          {currentView === "settings" ? <SettingsView expiresAt={expiresAt} /> : null}
         </main>
       </div>
     </div>
@@ -179,7 +187,17 @@ function isViewId(value: string | null): value is ViewId {
   return navItems.some((item) => item.viewId === value);
 }
 
-function DashboardView({ token, user }: { token: string | null; user: User }) {
+function DashboardView({
+  token,
+  user,
+  visibleViewIds,
+  onNavigate,
+}: {
+  token: string | null;
+  user: User;
+  visibleViewIds: ViewId[];
+  onNavigate: (viewId: ViewId) => void;
+}) {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [tasks, setTasks] = useState<ProcessTask[]>([]);
   const [status, setStatus] = useState<"loading" | "idle" | "error">("loading");
@@ -218,6 +236,21 @@ function DashboardView({ token, user }: { token: string | null; user: User }) {
   const openTaskCount = tasks.filter((task) => task.status === "Open").length;
   const inProgressCount = processes.filter((process) => process.status === "InProgress").length;
   const completedCount = processes.filter((process) => process.status === "Completed").length;
+  const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
+
+  const metricCards: Array<{ label: string; value: number; viewId?: ViewId }> = [
+    { label: "Bekleyen isler", value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined },
+    { label: "Devam eden surecler", value: inProgressCount, viewId: canOpen("processes") ? "processes" : undefined },
+    { label: "Tamamlanan surecler", value: completedCount, viewId: canOpen("processes") ? "processes" : undefined },
+  ];
+
+  const flowSteps: Array<{ label: string; caption: string; viewId: ViewId }> = [
+    { label: "Oturum", caption: "Kimlik ve rol", viewId: "settings" },
+    { label: "Form Definition", caption: "Model tasarimi", viewId: "forms" },
+    { label: "Process Instance", caption: "Surec baslatma", viewId: "runner" },
+    { label: "Task Action", caption: "Onay / red", viewId: "tasks" },
+    { label: "Audit Log", caption: "Karar izi", viewId: "processes" },
+  ];
 
   return (
     <div className="view-panel">
@@ -234,32 +267,41 @@ function DashboardView({ token, user }: { token: string | null; user: User }) {
       </section>
 
       <section className="metric-grid" aria-label="Process summary">
-        <article className="metric-card">
-          <span>Bekleyen isler</span>
-          <strong>{status === "loading" ? "-" : openTaskCount}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Devam eden surecler</span>
-          <strong>{status === "loading" ? "-" : inProgressCount}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Tamamlanan surecler</span>
-          <strong>{status === "loading" ? "-" : completedCount}</strong>
-        </article>
+        {metricCards.map((card) =>
+          card.viewId ? (
+            <button
+              className="metric-card metric-action"
+              key={card.label}
+              onClick={() => onNavigate(card.viewId!)}
+              type="button"
+            >
+              <span>{card.label}</span>
+              <strong>{status === "loading" ? "-" : card.value}</strong>
+            </button>
+          ) : (
+            <article className="metric-card" key={card.label}>
+              <span>{card.label}</span>
+              <strong>{status === "loading" ? "-" : card.value}</strong>
+            </article>
+          ),
+        )}
       </section>
 
       <section className="flow-preview">
-        <div className="flow-step">Oturum</div>
-        <div className="flow-step">Form Definition</div>
-        <div className="flow-step">Process Instance</div>
-        <div className="flow-step">Task Action</div>
-        <div className="flow-step">Audit Log</div>
+        {flowSteps
+          .filter((step) => canOpen(step.viewId))
+          .map((step) => (
+            <button className="flow-step" key={step.label} onClick={() => onNavigate(step.viewId)} type="button">
+              <strong>{step.label}</strong>
+              <span>{step.caption}</span>
+            </button>
+          ))}
       </section>
     </div>
   );
 }
 
-function SettingsView() {
+function SettingsView({ expiresAt }: { expiresAt: string | null }) {
   return (
     <section className="settings-panel">
       <div className="section-heading">
@@ -269,7 +311,33 @@ function SettingsView() {
         </div>
         <p>Bu alan sonraki adimda bildirim, tema ve surec varsayilanlari icin genisletilecek.</p>
       </div>
-      <p className="empty-state">Simdilik tema degistirme ve oturum aksiyonlari ust bardan yonetiliyor.</p>
+      <div className="settings-grid">
+        <article className="settings-row">
+          <span>Tema</span>
+          <strong>Ust bardan degistirilir</strong>
+        </article>
+        <article className="settings-row">
+          <span>Oturum</span>
+          <strong>{formatSessionExpiry(expiresAt)}</strong>
+        </article>
+        <article className="settings-row">
+          <span>Dogrulama</span>
+          <strong>API oturumu acilista kontrol edilir</strong>
+        </article>
+      </div>
     </section>
   );
+}
+
+function formatSessionExpiry(expiresAt: string | null) {
+  if (!expiresAt) {
+    return "Oturum suresi yok";
+  }
+
+  const expiryDate = new Date(expiresAt);
+  if (Number.isNaN(expiryDate.getTime())) {
+    return "Oturum suresi bilinmiyor";
+  }
+
+  return `${expiryDate.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })} kadar acik`;
 }

@@ -30,6 +30,13 @@ Use this file for the final code review presentation.
   - `InProgress -> Reject -> Rejected`
 - Invalid transitions are rejected with an explicit error.
 - Available actions are derived from the current process status instead of being hardcoded in the UI.
+- `TaskAuthorizationTests` covers who can execute assigned tasks:
+  - normal users cannot execute approver tasks.
+  - approvers can execute approver tasks.
+  - admins can execute any task.
+  - closed or missing tasks return explicit errors.
+- `AuditLogTests` proves approve/reject actions create audit entries with correct status transitions, user ids and notes.
+- The backend test suite currently passes with 17 tests.
 
 ## Current Frontend Story
 
@@ -37,10 +44,12 @@ Use this file for the final code review presentation.
 - `sessionStore` keeps the active user, token, expiry and theme in Zustand so refresh does not reset the demo flow.
 - `AppShell` verifies restored API sessions once on load, schedules local expiry, and sends expired/unauthorized sessions back to login with a clear notice.
 - `AppShell` filters navigation items by user role and keeps the active screen in the URL query, which demonstrates role-based UI without scattering role checks across pages.
-- `DashboardView` reads process/task metrics from the API instead of showing fixed numbers.
-- `FormDesignerDraft` saves the form as a backend-ready definition model instead of only previewing hardcoded markup.
-- `FormRunnerDraft` loads saved form definitions and starts a process through the API after client-side validation.
-- `ProcessBoardDraft` lists persisted processes/tasks and executes approve/reject actions through the backend state machine.
+- `DashboardView` reads process/task metrics from the API, then turns metric cards and BPM flow steps into role-aware workspace shortcuts.
+- The top bar and settings screen show session expiry information so session state is visible after login.
+- `FormDesignerDraft` edits a backend-ready definition model, including field keys, labels, field types, options, ordering and dependent validation rules.
+- `FormRunnerDraft` loads saved form definitions, renders fields through the shared `FieldRenderer`, validates with shared helpers and starts a process through the API.
+- `ProcessBoardDraft` coordinates persisted process/task data and delegates UI to `ProcessListView`, `MyTasksView`, `ProcessDetailPanel`, `TaskActionDialog`, `AuditTimeline` and `StatusBadge`.
+- Task approve/reject actions collect an action note before calling the backend state machine endpoint.
 
 ## Review Questions To Be Ready For
 
@@ -49,3 +58,5 @@ Use this file for the final code review presentation.
 - How would a new field type be added?
 - What happens if an invalid action is sent to the backend?
 - Why store form submissions as JSON?
+- Why is backend validation still needed when frontend validation exists?
+- How does the audit log help reviewers trace process decisions?
