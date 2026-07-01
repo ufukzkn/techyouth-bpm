@@ -3,11 +3,15 @@
 ## Auth
 
 - `POST /api/auth/login`
-  - Validates username/password.
-  - Returns a token-like session value and user profile.
+  - Validates username/password against the stored password hash.
+  - Returns an opaque session token value, user profile and expiry time.
+  - Stores only the SHA-256 hash of the session token in `UserSessions`.
+  - Accepts `rememberMe` to use the longer remember-me session duration.
 - `GET /api/auth/me`
-  - Reads the current session.
+  - Hashes the incoming bearer token and reads the current unexpired session.
   - Returns active user information.
+
+The project does not currently use JWT. It uses opaque bearer session tokens backed by the database. This is intentional for the current BPM scope because sessions can be expired centrally from the database. Future JWT support should be paired with refresh-token/remember-me design instead of replacing the current flow blindly.
 
 ## Forms
 
@@ -53,7 +57,7 @@ Most endpoints require `Authorization: Bearer <token>`. Use `POST /api/auth/logi
 
 Controllers should stay thin. Services own decisions:
 
-- `AuthService`: login/session/user lookup.
+- `AuthService`: password hash verification, session-token hashing, login/session/user lookup.
 - `FormService`: form definition CRUD and field validation.
 - `ProcessService`: process start, detail and listing.
 - `TaskService`: task listing and action execution.

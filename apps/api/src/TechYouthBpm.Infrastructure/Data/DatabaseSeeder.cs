@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
+using TechYouthBpm.Infrastructure.Security;
 
 namespace TechYouthBpm.Infrastructure.Data;
 
@@ -28,6 +29,7 @@ public static class DatabaseSeeder
     {
         if (await db.Users.AnyAsync(cancellationToken))
         {
+            await UpgradePlainTextPasswordsAsync(db, cancellationToken);
             return;
         }
 
@@ -37,7 +39,7 @@ public static class DatabaseSeeder
                 Id = AdminId,
                 Username = "admin",
                 DisplayName = "Admin User",
-                Password = "admin123",
+                Password = PasswordHasher.Hash("admin123"),
                 Role = Role.Admin
             },
             new User
@@ -45,7 +47,7 @@ public static class DatabaseSeeder
                 Id = UserId,
                 Username = "user",
                 DisplayName = "Process Starter",
-                Password = "user123",
+                Password = PasswordHasher.Hash("user123"),
                 Role = Role.User
             },
             new User
@@ -53,11 +55,28 @@ public static class DatabaseSeeder
                 Id = ApproverId,
                 Username = "approver",
                 DisplayName = "Process Approver",
-                Password = "approver123",
+                Password = PasswordHasher.Hash("approver123"),
                 Role = Role.Approver
             });
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task UpgradePlainTextPasswordsAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var users = await db.Users.ToListAsync(cancellationToken);
+        var changed = false;
+
+        foreach (var user in users.Where(user => !PasswordHasher.IsHashed(user.Password)))
+        {
+            user.Password = PasswordHasher.Hash(user.Password);
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static async Task SeedMockWorkflowDataAsync(AppDbContext db, CancellationToken cancellationToken)

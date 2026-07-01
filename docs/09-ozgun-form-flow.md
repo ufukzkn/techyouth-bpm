@@ -63,6 +63,7 @@ The scope includes:
 - Submit keeps the existing loading, success and error states.
 - Validated form data is sent to `POST /api/processes/start` through the existing API client.
 - Number values are converted before submit so they do not stay as plain strings when sent to the backend.
+- The form runner keeps the latest loaded form definitions in a lightweight client cache and uses skeleton rows on first load, preventing form fields from flashing empty during quick navigation.
 
 ## Validation Coverage
 

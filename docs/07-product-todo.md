@@ -22,6 +22,15 @@ This file tracks lightweight product and presentation ideas that are not ready t
 - Keep Swagger protected with the same Bearer token flow as the app instead of adding a separate bypass key.
 - If Swagger demos feel slow later, consider a development-only helper note or demo-login shortcut, but keep it out of production-style auth paths.
 
+## Access And Identity
+
+- Decide whether the final BPM product should allow self-registration. For a corporate BPM flow, admin-created users or admin-approved registrations are more realistic than open public signup.
+- Add email + OTP verification for registration.
+- Keep newly registered users in a `PendingApproval` state until an Admin approves access.
+- Add an Admin user-management panel for creating users, assigning roles, deactivating users and approving pending registrations.
+- Add profile settings for updating display name, email and password.
+- Consider JWT access tokens only together with a refresh-token or remember-me design; do not replace opaque sessions just for the label.
+
 ## Workflow
 
 - Decide later whether GitHub issues are needed.

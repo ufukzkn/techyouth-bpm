@@ -1,7 +1,7 @@
 "use client";
 
 import { Play, RotateCcw } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
 import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
 import { validateFormValues } from "@/features/forms/formValidation";
@@ -9,14 +9,21 @@ import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
 import type { FormDefinition } from "@/lib/types";
 
+let formRunnerFormsCache: FormDefinition[] | null = null;
+
 export function FormRunnerDraft() {
   const token = useSessionStore((state) => state.token);
-  const [forms, setForms] = useState<FormDefinition[]>([]);
-  const [selectedFormId, setSelectedFormId] = useState("");
-  const [values, setValues] = useState<FormValues>({});
+  const [forms, setForms] = useState<FormDefinition[]>(() => formRunnerFormsCache ?? []);
+  const [selectedFormId, setSelectedFormId] = useState(() => formRunnerFormsCache?.[0]?.id ?? "");
+  const [values, setValues] = useState<FormValues>(() =>
+    formRunnerFormsCache?.[0] ? buildInitialValues(formRunnerFormsCache[0]) : {},
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState<"loading" | "idle" | "submitting" | "success" | "error">("loading");
-  const [message, setMessage] = useState("Formlar yukleniyor.");
+  const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "submitting" | "success" | "error">(
+    formRunnerFormsCache ? "refreshing" : "loading",
+  );
+  const [message, setMessage] = useState(formRunnerFormsCache ? "Kayitli formlar guncelleniyor." : "Formlar yukleniyor.");
+  const selectedFormIdRef = useRef(selectedFormId);
 
   const selectedForm = forms.find((form) => form.id === selectedFormId);
 
@@ -30,6 +37,10 @@ export function FormRunnerDraft() {
   }, [selectedForm, selectedFormId, values]);
 
   useEffect(() => {
+    selectedFormIdRef.current = selectedFormId;
+  }, [selectedFormId]);
+
+  useEffect(() => {
     async function loadForms() {
       if (!token) {
         setStatus("error");
@@ -38,12 +49,16 @@ export function FormRunnerDraft() {
       }
 
       try {
-        setStatus("loading");
+        setStatus(formRunnerFormsCache ? "refreshing" : "loading");
         const result = await api.listForms(token);
-        const nextSelectedForm = result[0];
+        formRunnerFormsCache = result;
+        const currentSelection = result.find((form) => form.id === selectedFormIdRef.current);
+        const nextSelectedForm = currentSelection ?? result[0];
         setForms(result);
         setSelectedFormId(nextSelectedForm?.id ?? "");
-        setValues(nextSelectedForm ? buildInitialValues(nextSelectedForm) : {});
+        setValues((current) =>
+          currentSelection && Object.keys(current).length > 0 ? current : nextSelectedForm ? buildInitialValues(nextSelectedForm) : {},
+        );
         setErrors({});
         setStatus("idle");
         setMessage(result.length > 0 ? "Kayitli formlar yuklendi." : "Once bir form tasarimi kaydedilmeli.");
@@ -134,9 +149,13 @@ export function FormRunnerDraft() {
             </select>
           </label>
 
-          {!selectedForm ? <p className="empty-state">Surec baslatmak icin once Form Tasarimi ekraninda form kaydet.</p> : null}
+          {status === "loading" ? <FormRunnerSkeleton /> : null}
 
-          {selectedForm?.fields
+          {!selectedForm && status !== "loading" ? (
+            <p className="empty-state">Surec baslatmak icin once Form Tasarimi ekraninda form kaydet.</p>
+          ) : null}
+
+          {status !== "loading" && selectedForm?.fields
             .slice()
             .sort((first, second) => first.sortOrder - second.sortOrder)
             .map((field) => (
@@ -166,5 +185,15 @@ export function FormRunnerDraft() {
         <pre className="json-preview runner-output">{JSON.stringify(output, null, 2)}</pre>
       </div>
     </section>
+  );
+}
+
+function FormRunnerSkeleton() {
+  return (
+    <div className="form-skeleton" aria-label="Form alanlari yukleniyor">
+      <span />
+      <span />
+      <span />
+    </div>
   );
 }

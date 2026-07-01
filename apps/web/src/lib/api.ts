@@ -47,10 +47,10 @@ async function request<T>(path: string, init?: RequestInit & { token?: string })
 }
 
 export const api = {
-  login(username: string, password: string) {
+  login(username: string, password: string, rememberMe = false) {
     return request<LoginResponse>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, rememberMe }),
     });
   },
   me(token: string) {

@@ -2,7 +2,7 @@
 
 import { LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { navItems, type ViewId } from "@/features/app-shell/navigation";
+import { getNavItemByPath, getNavItemByView, navItems, type ViewId } from "@/features/app-shell/navigation";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { LoginView } from "@/features/auth/LoginView";
 import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
@@ -11,6 +11,8 @@ import { ProcessBoardDraft } from "@/features/processes/ProcessBoardDraft";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
 import type { ProcessSummary, ProcessTask, User } from "@/lib/types";
+
+let dashboardMetricsCache: { processes: ProcessSummary[]; tasks: ProcessTask[] } | null = null;
 
 export function AppShell() {
   const { user, token, expiresAt, theme, hasHydrated, expireSession, logout, toggleTheme } = useSessionStore();
@@ -72,8 +74,9 @@ export function AppShell() {
 
   useEffect(() => {
     function syncViewFromUrl() {
+      const viewFromPath = getNavItemByPath(window.location.pathname)?.viewId;
       const requestedView = new URLSearchParams(window.location.search).get("view");
-      setActiveView(isViewId(requestedView) ? requestedView : "dashboard");
+      setActiveView(viewFromPath ?? (isViewId(requestedView) ? requestedView : "dashboard"));
     }
 
     syncViewFromUrl();
@@ -84,15 +87,7 @@ export function AppShell() {
 
   const changeView = useCallback((viewId: ViewId) => {
     setActiveView(viewId);
-
-    const nextUrl = new URL(window.location.href);
-    if (viewId === "dashboard") {
-      nextUrl.searchParams.delete("view");
-    } else {
-      nextUrl.searchParams.set("view", viewId);
-    }
-
-    window.history.pushState(null, "", `${nextUrl.pathname}${nextUrl.search}`);
+    window.history.pushState(null, "", getNavItemByView(viewId)?.path ?? "/dashboard");
   }, []);
 
   const visibleNavItems = useMemo(
@@ -154,7 +149,7 @@ export function AppShell() {
 
       <div className="main-area">
         <header className="topbar">
-          <div>
+          <div className="topbar-identity">
             <span className="eyebrow">Aktif kullanici</span>
             <strong>{user.displayName}</strong>
           </div>
@@ -234,9 +229,11 @@ function DashboardView({
   visibleViewIds: ViewId[];
   onNavigate: (viewId: ViewId) => void;
 }) {
-  const [processes, setProcesses] = useState<ProcessSummary[]>([]);
-  const [tasks, setTasks] = useState<ProcessTask[]>([]);
-  const [status, setStatus] = useState<"loading" | "idle" | "error">("loading");
+  const [processes, setProcesses] = useState<ProcessSummary[]>(() => dashboardMetricsCache?.processes ?? []);
+  const [tasks, setTasks] = useState<ProcessTask[]>(() => dashboardMetricsCache?.tasks ?? []);
+  const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "error">(
+    dashboardMetricsCache ? "refreshing" : "loading",
+  );
 
   useEffect(() => {
     let ignore = false;
@@ -248,9 +245,10 @@ function DashboardView({
       }
 
       try {
-        setStatus("loading");
+        setStatus(dashboardMetricsCache ? "refreshing" : "loading");
         const [processResult, taskResult] = await Promise.all([api.listProcesses(token), api.listMyTasks(token)]);
         if (!ignore) {
+          dashboardMetricsCache = { processes: processResult, tasks: taskResult };
           setProcesses(processResult);
           setTasks(taskResult);
           setStatus("idle");
@@ -298,6 +296,8 @@ function DashboardView({
         <p>
           {status === "error"
             ? "Dashboard metrikleri yuklenemedi; API oturumunu kontrol et."
+            : status === "loading"
+              ? "Surec ve is ozeti yukleniyor."
             : `${user.role} rolune gore surec ve is ozeti SQLite veritabanindan okunur.`}
         </p>
       </section>
@@ -312,12 +312,12 @@ function DashboardView({
               type="button"
             >
               <span>{card.label}</span>
-              <strong>{status === "loading" ? "-" : card.value}</strong>
+              <strong>{card.value}</strong>
             </button>
           ) : (
             <article className="metric-card" key={card.label}>
               <span>{card.label}</span>
-              <strong>{status === "loading" ? "-" : card.value}</strong>
+              <strong>{card.value}</strong>
             </article>
           ),
         )}

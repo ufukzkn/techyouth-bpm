@@ -24,6 +24,12 @@ Recommended helper script from the repo root:
 ./scripts/run-api-local.ps1
 ```
 
+The local script uses a 120-minute normal session by default. To test timeout UX quickly:
+
+```powershell
+./scripts/run-api-local.ps1 -SessionDurationMinutes 1
+```
+
 To reset the local SQLite demo database and start from seed data:
 
 ```powershell
@@ -47,6 +53,8 @@ The script sets:
 ```text
 ASPNETCORE_ENVIRONMENT=Development
 Database__Provider=Sqlite
+Auth__SessionDurationMinutes=120
+Auth__RememberMeDurationMinutes=43200
 Seed__MockData=true
 ```
 
@@ -66,8 +74,8 @@ The schema is created from EF Core entities in `TechYouthBpm.Domain` through `Ap
 
 Current tables:
 
-- `Users`: demo users and roles.
-- `UserSessions`: token-like local sessions.
+- `Users`: demo users, roles and PBKDF2 password hashes.
+- `UserSessions`: hashed opaque bearer session tokens and expiry times.
 - `FormDefinitions`: saved dynamic form definitions.
 - `FormFieldDefinitions`: fields belonging to a form definition.
 - `FieldValidationRules`: dependent validation rules such as required-when.
@@ -86,6 +94,10 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 | `admin` | `admin123` | Admin |
 | `user` | `user123` | User |
 | `approver` | `approver123` | Approver |
+
+Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
+
+Session tokens are stored as SHA-256 hashes. Existing local session rows from the earlier raw-token phase will no longer validate after this change; logging in again creates a new hashed session row. Resetting the SQLite database is optional, not required.
 
 When mock data is enabled, the seeder also creates:
 

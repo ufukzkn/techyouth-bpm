@@ -5,6 +5,7 @@ using TechYouthBpm.Application.Common;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Infrastructure.Data;
+using TechYouthBpm.Infrastructure.Security;
 
 namespace TechYouthBpm.Infrastructure.Services;
 
@@ -17,23 +18,29 @@ public class AuthService(AppDbContext db, IConfiguration configuration) : IAuthS
         var user = await db.Users
             .SingleOrDefaultAsync(item => item.Username == request.Username, cancellationToken);
 
-        if (user is null || user.Password != request.Password)
+        if (user is null || !PasswordMatches(request.Password, user.Password))
         {
             return Result<LoginResponse>.Failure("Username or password is incorrect.");
         }
 
+        if (!PasswordHasher.IsHashed(user.Password))
+        {
+            user.Password = PasswordHasher.Hash(request.Password);
+        }
+
+        var rawToken = SessionTokenHasher.CreateToken();
         var session = new UserSession
         {
-            Token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("/", string.Empty).Replace("+", string.Empty),
+            Token = SessionTokenHasher.Hash(rawToken),
             UserId = user.Id,
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes())
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes(request.RememberMe))
         };
 
         db.UserSessions.Add(session);
         await db.SaveChangesAsync(cancellationToken);
 
-        return Result<LoginResponse>.Success(new LoginResponse(session.Token, user.ToDto(), session.ExpiresAt));
+        return Result<LoginResponse>.Success(new LoginResponse(rawToken, user.ToDto(), session.ExpiresAt));
     }
 
     public async Task<UserDto?> GetUserByTokenAsync(string token, CancellationToken cancellationToken = default)
@@ -43,16 +50,24 @@ public class AuthService(AppDbContext db, IConfiguration configuration) : IAuthS
             return null;
         }
 
+        var tokenHash = SessionTokenHasher.Hash(token);
         var session = await db.UserSessions
             .Include(item => item.User)
-            .SingleOrDefaultAsync(item => item.Token == token && item.ExpiresAt > DateTime.UtcNow, cancellationToken);
+            .SingleOrDefaultAsync(item => item.Token == tokenHash && item.ExpiresAt > DateTime.UtcNow, cancellationToken);
 
         return session?.User?.ToDto();
     }
 
-    private int GetSessionDurationMinutes()
+    private static bool PasswordMatches(string password, string storedPassword) =>
+        PasswordHasher.IsHashed(storedPassword)
+            ? PasswordHasher.Verify(password, storedPassword)
+            : string.Equals(password, storedPassword, StringComparison.Ordinal);
+
+    private int GetSessionDurationMinutes(bool rememberMe)
     {
-        var configuredDuration = configuration["Auth:SessionDurationMinutes"];
+        var configuredDuration = rememberMe
+            ? configuration["Auth:RememberMeDurationMinutes"]
+            : configuration["Auth:SessionDurationMinutes"];
         return int.TryParse(configuredDuration, out var minutes) && minutes > 0
             ? minutes
             : FallbackSessionDurationMinutes;

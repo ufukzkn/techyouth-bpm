@@ -74,7 +74,9 @@ Backend varsayilan olarak SQLite kullanir:
 }
 ```
 
-`Auth:SessionDurationMinutes` local timeout testleri icin su anda 1 dakikadir. Gercek demo veya production benzeri kullanimda bu deger 60-120 dakika araligina alinabilir; uzun sureli oturum icin ayrica "beni hatirla" akisi tasarlanmalidir.
+`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` beni-hatirla secenegi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. Daha guclu production tasariminda bu akisin refresh-token mantigiyla ayrica sertlestirilmesi gerekir.
+
+Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Kullanici sifreleri PBKDF2 hash olarak tutulur; eski local SQLite dosyalarindaki plaintext demo sifreleri API startup sirasinda hash formatina yukseltir.
 
 Takimla ortak PostgreSQL/Neon veritabani kullanmak icin provider ve connection string gizli olarak verilmelidir. Gercek connection string repo'ya commit edilmez.
 
@@ -103,6 +105,12 @@ Terminal 1 - API:
 
 ```powershell
 ./scripts/run-api-local.ps1
+```
+
+Script varsayilan olarak 120 dakikalik normal session kullanir. Timeout testini hizlandirmak icin:
+
+```powershell
+./scripts/run-api-local.ps1 -SessionDurationMinutes 1
 ```
 
 API ayaga kalkinca Swagger acilir:
@@ -138,6 +146,15 @@ Web uygulamasi:
 ```bash
 http://localhost:3000
 ```
+
+Ana workspace route'lari:
+
+- `http://localhost:3000/dashboard`
+- `http://localhost:3000/forms`
+- `http://localhost:3000/runner`
+- `http://localhost:3000/processes`
+- `http://localhost:3000/tasks`
+- `http://localhost:3000/settings`
 
 ## Stop Local Servers
 

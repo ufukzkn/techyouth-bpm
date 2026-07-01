@@ -53,9 +53,10 @@ These notes are the project memory. Update this file whenever an implementation 
 - Local SQLite database guide and reset/start helper script added for teammate onboarding.
 - Local SQLite startup now seeds optional mock workflow data by default: football-themed forms, processes, tasks and audit logs. Use `-SkipMockData` for a nearly empty DB.
 - Login no longer pre-fills credentials; demo buttons only fill credentials for testing.
-- Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a visible notice instead of flickering or polling.
-- Session duration is configuration-driven through `Auth:SessionDurationMinutes`. It is temporarily set to 1 minute for timeout UX testing; later demo/production-like runs should use a longer normal session and a separate remember-me design if needed.
-- Authenticated shell navigation stores the active workspace screen in the `?view=` query parameter so refresh and browser history do not collapse back to the dashboard.
+- Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a confirmable alert dialog instead of flickering or polling.
+- Session duration is configuration-driven through `Auth:SessionDurationMinutes` and is currently 120 minutes. `Auth:RememberMeDurationMinutes` backs the basic remember-me option; a future production version can harden this with refresh-token rotation.
+- Authenticated shell navigation now uses real route paths (`/dashboard`, `/forms`, `/runner`, `/processes`, `/tasks`, `/settings`) so refresh, browser history and direct links behave closer to a production app.
+- Auth hardening now stores PBKDF2 password hashes and SHA-256 session-token hashes instead of plaintext passwords or raw session tokens.
 - Form designer/runner and process/task views are now wired to real API-backed flows.
 - Ozgun's form foundation work continued on `feature/ozgun-form-foundation`.
 - Shared frontend form helpers were added for supported field types, default field creation, reusable field rendering, form value handling and reusable validation.
@@ -68,7 +69,8 @@ These notes are the project memory. Update this file whenever an implementation 
 - Task actions now collect an action note in a dialog before calling the backend approve/reject endpoint.
 - Backend tests now cover task authorization and audit log creation in addition to the state machine transition tests.
 - Saved form definitions can now be loaded into the designer and updated through `PUT /api/forms/{id}`; the backend update path replaces the editable field/rule model and keeps Admin-only authorization.
-- Latest verification after the form-update work: frontend lint/build passed and backend test suite passed with 20 tests.
+- Latest verification after remember-me and UX polish work: frontend lint/build passed and backend test suite passed with 24 tests.
 - Ufuk's access/workspace flow now has its own tracking document in `docs/10-ufuk-access-shell-flow.md`.
 - Dashboard metric cards and BPM flow steps now act as role-aware shortcuts into the workspace.
 - Top bar session details moved behind a compact session icon so the shell keeps expiry/user/role information without permanently showing a long timestamp.
+- Dashboard metrics keep the last loaded values while refreshing to avoid flashing placeholder values during fast navigation.

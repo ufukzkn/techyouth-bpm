@@ -2,7 +2,7 @@ using TechYouthBpm.Domain.Enums;
 
 namespace TechYouthBpm.Application.Auth;
 
-public record LoginRequest(string Username, string Password);
+public record LoginRequest(string Username, string Password, bool RememberMe = false);
 
 public record UserDto(Guid Id, string Username, string DisplayName, Role Role);
 

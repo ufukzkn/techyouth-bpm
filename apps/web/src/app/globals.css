@@ -137,6 +137,24 @@ select:focus-visible {
     linear-gradient(135deg, var(--background), color-mix(in srgb, var(--navy) 8%, var(--background)));
 }
 
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.58;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.login-theme-toggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 5;
+}
+
 .login-panel {
   width: min(440px, 100%);
   display: grid;
@@ -199,6 +217,20 @@ select:focus-visible {
   display: grid;
   gap: 7px;
   font-weight: 650;
+}
+
+.login-form label.checkbox-row,
+.tool-panel label.checkbox-row,
+.field-editor-grid label.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.remember-row {
+  justify-self: start;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .login-form input:not([type="checkbox"]),
@@ -277,6 +309,36 @@ input[type="checkbox"] {
   border-radius: 7px;
   color: var(--foreground);
   background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.session-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 16, 28, 0.42);
+}
+
+.session-dialog {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.session-dialog h2 {
+  font-size: 22px;
+}
+
+.session-dialog p {
+  color: var(--muted);
 }
 
 .session-loading {
@@ -389,8 +451,18 @@ input[type="checkbox"] {
   background: var(--surface);
 }
 
-.topbar > div {
-  margin-right: auto;
+.topbar-identity {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  text-align: right;
+}
+
+.topbar-identity strong {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .eyebrow {
@@ -1061,6 +1133,23 @@ input[type="checkbox"] {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.form-skeleton {
+  display: grid;
+  gap: 12px;
+}
+
+.form-skeleton span {
+  height: 44px;
+  border-radius: 7px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-muted),
+    color-mix(in srgb, var(--primary) 12%, var(--surface-muted)),
+    var(--surface-muted)
+  );
+  animation: skeleton-pulse 900ms ease-in-out infinite;
 }
 
 .secondary-button {

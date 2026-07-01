@@ -1,16 +1,17 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { LogIn } from "lucide-react";
+import { LogIn, Moon, Sun } from "lucide-react";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { api, ApiError } from "@/lib/api";
 import { demoUsers, loginWithDemoUser } from "@/features/auth/demoUsers";
 import { useSessionStore } from "@/features/session/sessionStore";
 
 export function LoginView() {
-  const { clearSessionNotice, sessionNotice, setSession } = useSessionStore();
+  const { clearSessionNotice, sessionNotice, setSession, theme, toggleTheme } = useSessionStore();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,10 +22,10 @@ export function LoginView() {
     setIsLoading(true);
 
     try {
-      const session = await api.login(username, password);
+      const session = await api.login(username, password, rememberMe);
       setSession(session);
     } catch (apiError) {
-      const demoSession = loginWithDemoUser(username, password);
+      const demoSession = loginWithDemoUser(username, password, rememberMe);
 
       if (demoSession) {
         setSession(demoSession);
@@ -39,6 +40,9 @@ export function LoginView() {
 
   return (
     <main className="login-page">
+      <button className="login-theme-toggle icon-button" onClick={toggleTheme} aria-label="Tema degistir" title="Tema degistir">
+        {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+      </button>
       <section className="login-panel" aria-label="Login">
         <div className="login-mark">
           <PrototypeLogo size={34} />
@@ -60,6 +64,10 @@ export function LoginView() {
               autoComplete="current-password"
             />
           </label>
+          <label className="checkbox-row remember-row">
+            <input checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} type="checkbox" />
+            Beni hatirla
+          </label>
           {error ? <div className="form-error">{error}</div> : null}
           <button className="primary-button" type="submit" disabled={isLoading}>
             <LogIn size={18} />
@@ -67,7 +75,18 @@ export function LoginView() {
           </button>
         </form>
 
-        {sessionNotice ? <p className="session-notice">{sessionNotice}</p> : null}
+        {sessionNotice ? (
+          <div className="session-dialog-backdrop" role="presentation">
+            <section className="session-dialog" role="alertdialog" aria-modal="true" aria-labelledby="session-dialog-title">
+              <span className="eyebrow">Oturum</span>
+              <h2 id="session-dialog-title">Oturum sona erdi</h2>
+              <p>{sessionNotice}</p>
+              <button className="primary-button" type="button" onClick={clearSessionNotice}>
+                Tamam
+              </button>
+            </section>
+          </div>
+        ) : null}
 
         <div className="demo-users">
           <span>Demo hesaplar:</span>
