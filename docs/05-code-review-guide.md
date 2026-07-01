@@ -36,7 +36,11 @@ Use this file for the final code review presentation.
   - admins can execute any task.
   - closed or missing tasks return explicit errors.
 - `AuditLogTests` proves approve/reject actions create audit entries with correct status transitions, user ids and notes.
-- The backend test suite currently passes with 17 tests.
+- `FormServiceTests` covers form definition updates:
+  - admin users can update a saved form.
+  - non-admin users cannot update form definitions.
+  - update replaces the editable field and validation-rule model.
+- The backend test suite currently passes with 20 tests across form, workflow, task authorization and audit coverage.
 
 ## Current Frontend Story
 
@@ -47,6 +51,7 @@ Use this file for the final code review presentation.
 - `DashboardView` reads process/task metrics from the API, then turns metric cards and BPM flow steps into role-aware workspace shortcuts.
 - The top bar and settings screen show session expiry information so session state is visible after login.
 - `FormDesignerDraft` edits a backend-ready definition model, including field keys, labels, field types, options, ordering and dependent validation rules.
+- Saved form definitions can be loaded back into the designer and updated through the API instead of being create-only drafts.
 - `FormRunnerDraft` loads saved form definitions, renders fields through the shared `FieldRenderer`, validates with shared helpers and starts a process through the API.
 - `ProcessBoardDraft` coordinates persisted process/task data and delegates UI to `ProcessListView`, `MyTasksView`, `ProcessDetailPanel`, `TaskActionDialog`, `AuditTimeline` and `StatusBadge`.
 - Task approve/reject actions collect an action note before calling the backend state machine endpoint.

@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createDefaultField,
   createDefaultOptions,
@@ -11,7 +11,7 @@ import {
 } from "@/features/forms/fieldTypes";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
-import type { CreateFormRequest, FieldType, FormFieldDefinition, ValidationRule } from "@/lib/types";
+import type { CreateFormRequest, FieldType, FormDefinition, FormFieldDefinition, ValidationRule } from "@/lib/types";
 
 type DesignerField = Omit<FormFieldDefinition, "id"> & {
   id: string;
@@ -62,6 +62,9 @@ export function FormDesignerDraft() {
   const [fields, setFields] = useState<DesignerField[]>(initialFields);
   const [formName, setFormName] = useState("Demo Surec Formu");
   const [description, setDescription] = useState("Frontend tarafinda tasarlanan form modeli");
+  const [savedForms, setSavedForms] = useState<FormDefinition[]>([]);
+  const [selectedFormId, setSelectedFormId] = useState("");
+  const [isLoadingForms, setIsLoadingForms] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
@@ -69,6 +72,7 @@ export function FormDesignerDraft() {
   const [message, setMessage] = useState("Form henuz kaydedilmedi.");
   const fieldErrors = useMemo(() => validateDesignerFields(fields), [fields]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
 
   const formModel = useMemo<CreateFormRequest>(
     () => ({
@@ -91,6 +95,39 @@ export function FormDesignerDraft() {
     }),
     [description, fields, formName],
   );
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    let ignore = false;
+    const activeToken = token;
+
+    async function loadForms() {
+      try {
+        setIsLoadingForms(true);
+        const result = await api.listForms(activeToken);
+        if (!ignore) {
+          setSavedForms(result);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setMessage(error instanceof ApiError ? error.errors.join(" ") : "Kayitli formlar alinamadi.");
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoadingForms(false);
+        }
+      }
+    }
+
+    loadForms();
+
+    return () => {
+      ignore = true;
+    };
+  }, [token]);
 
   function addField() {
     const field = createDefaultField({
@@ -285,6 +322,46 @@ export function FormDesignerDraft() {
     setMessage("Formda kaydedilmemis degisiklikler var.");
   }
 
+  async function loadSavedForm(id: string) {
+    setSelectedFormId(id);
+
+    if (!id) {
+      resetDesigner();
+      return;
+    }
+
+    if (!token) {
+      setSaveState("error");
+      setMessage("Kayitli form yuklemek icin API oturumu gerekli.");
+      return;
+    }
+
+    try {
+      setIsLoadingForms(true);
+      const form = await api.getForm(token, id);
+      setSelectedFormId(form.id);
+      setFormName(form.name);
+      setDescription(form.description);
+      setFields(toDesignerFields(form));
+      setSaveState("idle");
+      setMessage(`${form.name} duzenleme icin yuklendi.`);
+    } catch (error) {
+      setSaveState("error");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Form yuklenemedi.");
+    } finally {
+      setIsLoadingForms(false);
+    }
+  }
+
+  function resetDesigner() {
+    setSelectedFormId("");
+    setFormName("Demo Surec Formu");
+    setDescription("Frontend tarafinda tasarlanan form modeli");
+    setFields(initialFields);
+    setSaveState("idle");
+    setMessage("Yeni form taslagi hazir.");
+  }
+
   async function saveForm() {
     if (!token) {
       setSaveState("error");
@@ -300,9 +377,13 @@ export function FormDesignerDraft() {
 
     try {
       setSaveState("saving");
-      const saved = await api.createForm(token, formModel);
+      const isUpdate = selectedFormId.length > 0;
+      const saved = isUpdate ? await api.updateForm(token, selectedFormId, formModel) : await api.createForm(token, formModel);
+      setSelectedFormId(saved.id);
+      setSavedForms((current) => upsertForm(current, saved));
+      setFields(toDesignerFields(saved));
       setSaveState("success");
-      setMessage(`Form SQLite veritabanina kaydedildi: ${saved.name}`);
+      setMessage(`Form SQLite veritabaninda ${isUpdate ? "guncellendi" : "kaydedildi"}: ${saved.name}`);
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : "Form kaydedilemedi.");
@@ -323,16 +404,46 @@ export function FormDesignerDraft() {
         <div className="tool-panel">
           <h3>Form bilgisi</h3>
           <label>
+            Kayitli form
+            <select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}>
+              <option value="">{isLoadingForms ? "Formlar yukleniyor" : "Yeni form taslagi"}</option>
+              {savedForms.map((form) => (
+                <option key={form.id} value={form.id}>
+                  {form.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             Form adi
-            <input value={formName} onChange={(event) => setFormName(event.target.value)} />
+            <input
+              value={formName}
+              onChange={(event) => {
+                setFormName(event.target.value);
+                markUnsaved();
+              }}
+            />
           </label>
           <label>
             Aciklama
-            <input value={description} onChange={(event) => setDescription(event.target.value)} />
+            <input
+              value={description}
+              onChange={(event) => {
+                setDescription(event.target.value);
+                markUnsaved();
+              }}
+            />
           </label>
+          <p className="helper-copy">
+            {selectedFormId ? `${selectedFormName ?? "Secili form"} uzerinde guncelleme yapiliyor.` : "Kaydetmek yeni form olusturur."}
+          </p>
+          <button className="secondary-button" disabled={saveState === "saving"} type="button" onClick={resetDesigner}>
+            <Plus size={18} />
+            Yeni form
+          </button>
           <button className="primary-button" disabled={saveState === "saving"} type="button" onClick={saveForm}>
             <Save size={18} />
-            {saveState === "saving" ? "Kaydediliyor" : "Formu kaydet"}
+            {saveState === "saving" ? "Kaydediliyor" : selectedFormId ? "Formu guncelle" : "Formu kaydet"}
           </button>
           {hasFieldErrors ? <p className="field-error">Alanlarda kaydetmeyi engelleyen hatalar var.</p> : null}
           <p className={`status-line status-line-${saveState}`}>{message}</p>
@@ -551,6 +662,27 @@ export function FormDesignerDraft() {
 
 function normalizeSortOrder(fields: DesignerField[]) {
   return fields.map((field, index) => ({ ...field, sortOrder: index + 1 }));
+}
+
+function toDesignerFields(form: FormDefinition) {
+  return normalizeSortOrder(
+    form.fields.map((field, index) => ({
+      ...field,
+      id: field.id ?? `${field.key}-${index}`,
+      options: field.options ?? [],
+      validationRules: field.validationRules ?? [],
+      sortOrder: index + 1,
+    })),
+  );
+}
+
+function upsertForm(forms: FormDefinition[], form: FormDefinition) {
+  const exists = forms.some((item) => item.id === form.id);
+  if (!exists) {
+    return [form, ...forms];
+  }
+
+  return forms.map((item) => (item.id === form.id ? form : item));
 }
 
 type DesignerFieldErrors = Record<string, { key?: string; label?: string; options?: string; rules?: Record<number, string> }>;

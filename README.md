@@ -179,9 +179,10 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 1. Login ol.
 2. Role gore menu ve dashboard'u gor.
 3. Admin kullanicisiyle seeded formlari ve dashboard metriklerini incele.
-4. Form runner ekraninda seeded bir form secip yeni surec baslat.
-5. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
-6. Surec detayinda JSON veri ve audit log mantigini incele.
+4. Form tasarimi ekraninda kayitli bir formu sec, alan modelini duzenle ve guncelle.
+5. Form runner ekraninda seeded veya guncellenmis bir form secip yeni surec baslat.
+6. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
+7. Surec detayinda JSON veri ve audit log mantigini incele.
 
 ## Troubleshooting
 

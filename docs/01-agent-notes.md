@@ -61,12 +61,13 @@ These notes are the project memory. Update this file whenever an implementation 
 - Form runner now uses the shared renderer/validation/value helpers, including stronger number conversion before process-start submit.
 - Form designer now supports field editing, select/checkbox option management, move up/down field ordering and JSON preview updates from the same model that is saved.
 - Dependent `RequiredWhen` validation can now be configured in the form designer and is included in the saved form definition model.
-- Backend, login/session, dashboard, app shell, process/task and audit behavior were intentionally left unchanged during Ozgun's form-flow frontend work.
+- Login/session, dashboard, app shell, process/task and audit behavior were intentionally left unchanged during Ozgun's form-flow work.
 - Frontend `npm run lint` and `npm run build` passed after the form foundation, designer editing and dependent validation updates.
 - Cagdas's process-flow work split the process UI into `ProcessListView`, `ProcessDetailPanel`, `MyTasksView`, `TaskActionDialog`, `AuditTimeline` and `StatusBadge`.
 - Task actions now collect an action note in a dialog before calling the backend approve/reject endpoint.
 - Backend tests now cover task authorization and audit log creation in addition to the state machine transition tests.
-- Latest verification: frontend lint/build passed and backend test suite passed with 17 tests.
+- Saved form definitions can now be loaded into the designer and updated through `PUT /api/forms/{id}`; the backend update path replaces the editable field/rule model and keeps Admin-only authorization.
+- Latest verification after the form-update work: frontend lint/build passed and backend test suite passed with 20 tests.
 - Ufuk's access/workspace flow now has its own tracking document in `docs/10-ufuk-access-shell-flow.md`.
 - Dashboard metric cards and BPM flow steps now act as role-aware shortcuts into the workspace.
 - Top bar and settings screen expose session expiry information so the access flow is visible after login.

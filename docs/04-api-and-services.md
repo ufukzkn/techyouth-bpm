@@ -17,6 +17,10 @@
   - Creates a form definition with fields and validation rules.
 - `GET /api/forms/{id}`
   - Returns a single form definition.
+- `PUT /api/forms/{id}`
+  - Updates an existing form definition.
+  - Replaces the editable field list and validation rules with the submitted model.
+  - Requires an Admin session, like form creation.
 
 ## Processes
 
@@ -61,7 +65,7 @@ Controllers should stay thin. Services own decisions:
 The frontend API client now exposes one method for each planned endpoint:
 
 - Auth: `login`, `me`
-- Forms: `listForms`, `createForm`, `getForm`
+- Forms: `listForms`, `createForm`, `updateForm`, `getForm`
 - Processes: `startProcess`, `listProcesses`, `getProcess`
 - Tasks: `listMyTasks`, `executeTaskAction`
 

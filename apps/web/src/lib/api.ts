@@ -66,6 +66,13 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+  updateForm(token: string, id: string, payload: CreateFormRequest) {
+    return request<FormDefinition>(`/api/forms/${id}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
   getForm(token: string, id: string) {
     return request<FormDefinition>(`/api/forms/${id}`, { token });
   },

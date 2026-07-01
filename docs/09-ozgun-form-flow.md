@@ -6,12 +6,13 @@ This document tracks Ozgun Saz's ownership area: Form Design and Form Run Flow. 
 
 ## Scope Boundary
 
-This work is frontend-focused. It uses the existing backend form definition and `RequiredWhen` validation model without changing backend process rules.
+This work is mostly form-flow focused. It uses the existing backend form definition and `RequiredWhen` validation model without changing backend process rules.
 
 The scope includes:
 
 - Form designer behavior.
 - Form definition JSON shape.
+- Form definition create/update API behavior.
 - Field type metadata.
 - Shared field rendering.
 - Frontend validation helpers.
@@ -29,11 +30,14 @@ The scope includes:
 - Added select/checkbox option management in the form designer.
 - Added move up/down ordering for form fields.
 - Added designer-side dependent `RequiredWhen` validation UI.
-- Kept backend, login/session, dashboard, app shell, process/task and audit behavior out of scope.
+- Added `PUT /api/forms/{id}` so saved form definitions can be edited after creation.
+- Added form designer loading for saved forms, with create/update behavior behind the same save control.
+- Kept login/session, dashboard, app shell, process/task and audit behavior out of scope.
 
 ## Current Form Designer Capabilities
 
 - Admin users can create a form definition model.
+- Admin users can load and update an existing form definition from the saved form selector.
 - Form name and description are editable.
 - Fields can be added, removed and reordered with move up/down controls.
 - Existing field `key`, `label`, `type` and `required` values can be edited.
@@ -47,6 +51,7 @@ The scope includes:
 - Select and checkbox fields support option add, remove and edit behavior.
 - Designer validation prevents empty field keys, empty labels, duplicate keys and empty option sets for option-based fields.
 - The JSON preview reflects the same form model that is sent to the API.
+- When a saved form is selected, save calls `PUT /api/forms/{id}`; otherwise save calls `POST /api/forms`.
 
 ## Current Form Runner Capabilities
 
@@ -69,7 +74,7 @@ Frontend validation currently covers:
 - Checkbox boolean values.
 - Dependent `RequiredWhen` rules.
 
-Backend validation remains the final source of truth when a process is started.
+Backend validation remains the final source of truth when a process is started. Backend form definition validation also protects create/update requests by requiring a name, at least one field, unique field keys and option values for option-based fields.
 
 ## Dependent Validation Behavior
 
@@ -102,6 +107,13 @@ Frontend form-flow files:
 - `apps/web/src/features/forms/formValues.ts`
 - `apps/web/src/app/globals.css`
 
+Backend form-flow files:
+
+- `apps/api/src/TechYouthBpm.Api/Controllers/FormsController.cs`
+- `apps/api/src/TechYouthBpm.Application/Services/IFormService.cs`
+- `apps/api/src/TechYouthBpm.Infrastructure/Services/FormService.cs`
+- `apps/api/tests/TechYouthBpm.Tests/Forms/FormServiceTests.cs`
+
 Documentation files:
 
 - `docs/01-agent-notes.md`
@@ -111,7 +123,6 @@ Documentation files:
 
 These areas were intentionally not changed:
 
-- Backend code.
 - Login/session flow.
 - Dashboard.
 - App shell behavior.
@@ -125,16 +136,23 @@ These areas were intentionally not changed:
 ## Remaining Work
 
 - Strengthen the Form Runner experience and submit/payload flow.
+- Decide whether form definitions should become immutable once processes are started. The current demo behavior updates the form definition in place so form editing is easy to demonstrate.
 - Add UI/UX polish after the main behavior is stable.
 - Prepare a demo scenario if needed, for example: if request type is purchase, approval note becomes required.
 - Do final documentation and final test verification.
 
 ## Verification
 
-The frontend checks passed after the form foundation, designer editing and dependent validation work:
+The frontend checks passed after the form foundation, designer editing, dependent validation and saved-form update work:
 
 ```bash
 cd apps/web
 npm run lint
 npm run build
+```
+
+The backend checks also passed after adding form update tests:
+
+```bash
+dotnet test apps/api/TechYouthBpm.slnx
 ```
