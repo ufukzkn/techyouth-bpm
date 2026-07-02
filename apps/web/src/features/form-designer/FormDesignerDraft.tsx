@@ -1,17 +1,18 @@
 "use client";
 
 import { ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createDefaultField,
   createDefaultOptions,
-  fieldTypeLabels,
+  fieldTypeLabel,
   fieldTypeUsesOptions,
   supportedFieldTypes,
 } from "@/features/forms/fieldTypes";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
-import type { CreateFormRequest, FieldType, FormDefinition, FormFieldDefinition, ValidationRule } from "@/lib/types";
+import type { CreateFormRequest, FieldType, FormDefinition, FormFieldDefinition, Language, ValidationRule } from "@/lib/types";
 
 type DesignerField = Omit<FormFieldDefinition, "id"> & {
   id: string;
@@ -59,6 +60,11 @@ const initialFields: DesignerField[] = [
 
 export function FormDesignerDraft() {
   const token = useSessionStore((state) => state.token);
+  const language = useSessionStore((state) => state.language);
+  const t = useCallback(
+    (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
+    [language],
+  );
   const [fields, setFields] = useState<DesignerField[]>(initialFields);
   const [formName, setFormName] = useState("Demo Surec Formu");
   const [description, setDescription] = useState("Frontend tarafinda tasarlanan form modeli");
@@ -69,8 +75,8 @@ export function FormDesignerDraft() {
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
-  const [message, setMessage] = useState("Form henuz kaydedilmedi.");
-  const fieldErrors = useMemo(() => validateDesignerFields(fields), [fields]);
+  const [message, setMessage] = useState(() => t("form.designer.notSaved"));
+  const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
 
@@ -113,7 +119,7 @@ export function FormDesignerDraft() {
         }
       } catch (error) {
         if (!ignore) {
-          setMessage(error instanceof ApiError ? error.errors.join(" ") : "Kayitli formlar alinamadi.");
+          setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.loadFailed"));
         }
       } finally {
         if (!ignore) {
@@ -127,7 +133,7 @@ export function FormDesignerDraft() {
     return () => {
       ignore = true;
     };
-  }, [token]);
+  }, [token, language, t]);
 
   function addField() {
     const field = createDefaultField({
@@ -135,6 +141,7 @@ export function FormDesignerDraft() {
       type,
       required,
       sortOrder: fields.length + 1,
+      language,
     });
     const nextField: DesignerField = {
       ...field,
@@ -146,7 +153,7 @@ export function FormDesignerDraft() {
     setType("Text");
     setRequired(false);
     setSaveState("idle");
-    setMessage("Formda kaydedilmemis degisiklikler var.");
+    setMessage(t("form.designer.unsaved"));
   }
 
   function updateField(id: string, patch: Partial<Omit<DesignerField, "id">>) {
@@ -167,7 +174,7 @@ export function FormDesignerDraft() {
           options: fieldTypeUsesOptions(nextType)
             ? field.options.length > 0
               ? field.options
-              : createDefaultOptions(nextType)
+              : createDefaultOptions(nextType, language)
             : [],
         };
       }),
@@ -253,7 +260,7 @@ export function FormDesignerDraft() {
           ruleType: "RequiredWhen",
           dependsOnFieldKey: dependency?.key.trim() ?? "",
           expectedValue: dependency ? getDefaultExpectedValue(dependency) : "",
-          message: `${field.label || field.key} bu kosulda zorunludur.`,
+          message: t("form.validation.requiredWhenDefault", { label: field.label || field.key }),
         };
 
         return { ...field, validationRules: [...field.validationRules, rule] };
@@ -319,7 +326,7 @@ export function FormDesignerDraft() {
 
   function markUnsaved() {
     setSaveState("idle");
-    setMessage("Formda kaydedilmemis degisiklikler var.");
+    setMessage(t("form.designer.unsaved"));
   }
 
   async function loadSavedForm(id: string) {
@@ -332,7 +339,7 @@ export function FormDesignerDraft() {
 
     if (!token) {
       setSaveState("error");
-      setMessage("Kayitli form yuklemek icin API oturumu gerekli.");
+      setMessage(t("form.designer.sessionRequiredLoad"));
       return;
     }
 
@@ -344,10 +351,10 @@ export function FormDesignerDraft() {
       setDescription(form.description);
       setFields(toDesignerFields(form));
       setSaveState("idle");
-      setMessage(`${form.name} duzenleme icin yuklendi.`);
+      setMessage(t("form.designer.loadedForEdit", { name: form.name }));
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Form yuklenemedi.");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.formLoadFailed"));
     } finally {
       setIsLoadingForms(false);
     }
@@ -359,19 +366,19 @@ export function FormDesignerDraft() {
     setDescription("Frontend tarafinda tasarlanan form modeli");
     setFields(initialFields);
     setSaveState("idle");
-    setMessage("Yeni form taslagi hazir.");
+    setMessage(t("form.designer.draftReady"));
   }
 
   async function saveForm() {
     if (!token) {
       setSaveState("error");
-      setMessage("Form kaydetmek icin API oturumu gerekli.");
+      setMessage(t("form.designer.sessionRequiredSave"));
       return;
     }
 
     if (hasFieldErrors) {
       setSaveState("error");
-      setMessage("Form kaydedilmeden once alan hatalari duzeltilmeli.");
+      setMessage(t("form.designer.fixErrorsBeforeSave"));
       return;
     }
 
@@ -383,10 +390,15 @@ export function FormDesignerDraft() {
       setSavedForms((current) => upsertForm(current, saved));
       setFields(toDesignerFields(saved));
       setSaveState("success");
-      setMessage(`Form SQLite veritabaninda ${isUpdate ? "guncellendi" : "kaydedildi"}: ${saved.name}`);
+      setMessage(
+        t("form.designer.savedMessage", {
+          action: isUpdate ? t("form.designer.savedActionUpdated") : t("form.designer.savedActionCreated"),
+          name: saved.name,
+        }),
+      );
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Form kaydedilemedi.");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.saveFailed"));
     }
   }
 
@@ -394,19 +406,19 @@ export function FormDesignerDraft() {
     <section className="designer-section">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Form Tasarimi</span>
-          <h2>Dinamik form modeli</h2>
+          <span className="eyebrow">{t("form.designer.eyebrow")}</span>
+          <h2>{t("form.designer.title")}</h2>
         </div>
-        <p>Alanlar UI tarafinda tasarlanir ve backend tarafinda form definition olarak saklanir.</p>
+        <p>{t("form.designer.description")}</p>
       </div>
 
       <div className="designer-grid">
         <div className="tool-panel">
-          <h3>Form bilgisi</h3>
+          <h3>{t("form.designer.formInfo")}</h3>
           <label>
-            Kayitli form
+            {t("form.designer.savedForm")}
             <select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}>
-              <option value="">{isLoadingForms ? "Formlar yukleniyor" : "Yeni form taslagi"}</option>
+              <option value="">{isLoadingForms ? t("form.designer.loadingForms") : t("form.designer.newDraft")}</option>
               {savedForms.map((form) => (
                 <option key={form.id} value={form.id}>
                   {form.name}
@@ -415,7 +427,7 @@ export function FormDesignerDraft() {
             </select>
           </label>
           <label>
-            Form adi
+            {t("form.designer.formName")}
             <input
               value={formName}
               onChange={(event) => {
@@ -425,7 +437,7 @@ export function FormDesignerDraft() {
             />
           </label>
           <label>
-            Aciklama
+            {t("form.designer.descriptionLabel")}
             <input
               value={description}
               onChange={(event) => {
@@ -435,43 +447,49 @@ export function FormDesignerDraft() {
             />
           </label>
           <p className="helper-copy">
-            {selectedFormId ? `${selectedFormName ?? "Secili form"} uzerinde guncelleme yapiliyor.` : "Kaydetmek yeni form olusturur."}
+            {selectedFormId
+              ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
+              : t("form.designer.createOnSave")}
           </p>
           <button className="secondary-button" disabled={saveState === "saving"} type="button" onClick={resetDesigner}>
             <Plus size={18} />
-            Yeni form
+            {t("form.designer.newForm")}
           </button>
           <button className="primary-button" disabled={saveState === "saving"} type="button" onClick={saveForm}>
             <Save size={18} />
-            {saveState === "saving" ? "Kaydediliyor" : selectedFormId ? "Formu guncelle" : "Formu kaydet"}
+            {saveState === "saving"
+              ? t("form.designer.saving")
+              : selectedFormId
+                ? t("form.designer.updateForm")
+                : t("form.designer.saveForm")}
           </button>
-          {hasFieldErrors ? <p className="field-error">Alanlarda kaydetmeyi engelleyen hatalar var.</p> : null}
+          {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
           <p className={`status-line status-line-${saveState}`}>{message}</p>
         </div>
 
         <div className="tool-panel">
-          <h3>Alan ekle</h3>
+          <h3>{t("form.designer.addFieldTitle")}</h3>
           <label>
-            Etiket
-            <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Alan etiketi" />
+            {t("form.designer.label")}
+            <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("form.designer.labelPlaceholder")} />
           </label>
           <label>
-            Tip
+            {t("form.designer.type")}
             <select value={type} onChange={(event) => setType(event.target.value as FieldType)}>
               {supportedFieldTypes.map((fieldType) => (
                 <option key={fieldType} value={fieldType}>
-                  {fieldTypeLabels[fieldType]}
+                  {fieldTypeLabel(language, fieldType)}
                 </option>
               ))}
             </select>
           </label>
           <label className="checkbox-row">
             <input checked={required} onChange={(event) => setRequired(event.target.checked)} type="checkbox" />
-            Zorunlu alan
+            {t("form.designer.requiredField")}
           </label>
           <button className="secondary-button" type="button" onClick={addField}>
             <Plus size={18} />
-            Alan ekle
+            {t("form.designer.addField")}
           </button>
         </div>
 
@@ -480,9 +498,10 @@ export function FormDesignerDraft() {
             <article className="field-card field-editor" key={field.id}>
               <div className="field-editor-header">
                 <div>
-                  <strong>{field.label || "Etiketsiz alan"}</strong>
+                  <strong>{field.label || t("form.designer.untitledField")}</strong>
                   <span>
-                    {field.key || "key yok"} - {field.type} - Sira {field.sortOrder}
+                    {field.key || t("form.designer.noKey")} - {fieldTypeLabel(language, field.type)} -{" "}
+                    {t("form.designer.order", { sortOrder: field.sortOrder })}
                   </span>
                 </div>
                 <div className="field-editor-actions">
@@ -491,7 +510,7 @@ export function FormDesignerDraft() {
                     disabled={index === 0}
                     onClick={() => moveField(field.id, -1)}
                     type="button"
-                    aria-label={`${field.label || field.key} yukari tasi`}
+                    aria-label={t("form.designer.moveUp", { label: field.label || field.key })}
                   >
                     <ChevronUp size={17} />
                   </button>
@@ -500,7 +519,7 @@ export function FormDesignerDraft() {
                     disabled={index === fields.length - 1}
                     onClick={() => moveField(field.id, 1)}
                     type="button"
-                    aria-label={`${field.label || field.key} asagi tasi`}
+                    aria-label={t("form.designer.moveDown", { label: field.label || field.key })}
                   >
                     <ChevronDown size={17} />
                   </button>
@@ -508,7 +527,7 @@ export function FormDesignerDraft() {
                     className="icon-button"
                     onClick={() => removeField(field.id)}
                     type="button"
-                    aria-label={`${field.label || field.key} sil`}
+                    aria-label={t("form.designer.deleteField", { label: field.label || field.key })}
                   >
                     <Trash2 size={17} />
                   </button>
@@ -522,35 +541,35 @@ export function FormDesignerDraft() {
                   {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
                 </label>
                 <label>
-                  Etiket
+                  {t("form.designer.label")}
                   <input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />
                   {fieldErrors[field.id]?.label ? (
                     <span className="field-error">{fieldErrors[field.id]?.label}</span>
                   ) : null}
                 </label>
                 <label>
-                  Tip
+                  {t("form.designer.type")}
                   <select value={field.type} onChange={(event) => updateFieldType(field.id, event.target.value as FieldType)}>
                     {supportedFieldTypes.map((fieldType) => (
                       <option key={fieldType} value={fieldType}>
-                        {fieldTypeLabels[fieldType]}
+                        {fieldTypeLabel(language, fieldType)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="checkbox-row field-required-toggle">
                   <input checked={field.required} onChange={() => toggleRequired(field.id)} type="checkbox" />
-                  Zorunlu
+                  {t("form.designer.required")}
                 </label>
               </div>
 
               {fieldTypeUsesOptions(field.type) ? (
                 <div className="option-editor">
                   <div className="option-editor-header">
-                    <strong>Options</strong>
+                    <strong>{t("form.designer.options")}</strong>
                     <button className="secondary-button" type="button" onClick={() => addOption(field.id)}>
                       <Plus size={16} />
-                      Option ekle
+                      {t("form.designer.addOption")}
                     </button>
                   </div>
                   {fieldErrors[field.id]?.options ? (
@@ -560,14 +579,14 @@ export function FormDesignerDraft() {
                     {field.options.map((option, optionIndex) => (
                       <div className="option-row" key={`${field.id}-${optionIndex}`}>
                         <label>
-                          Label / value
+                          {t("form.designer.optionLabel")}
                           <input value={option} onChange={(event) => updateOption(field.id, optionIndex, event.target.value)} />
                         </label>
                         <button
                           className="icon-button"
                           type="button"
                           onClick={() => removeOption(field.id, optionIndex)}
-                          aria-label={`${option || "option"} sil`}
+                          aria-label={t("form.designer.deleteOption", { label: option || t("form.designer.options") })}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -580,8 +599,8 @@ export function FormDesignerDraft() {
               <div className="rule-editor">
                 <div className="rule-editor-header">
                   <div>
-                    <strong>Dependent validation</strong>
-                    <span>RequiredWhen: baska bir alan belirli degeri alinca bu alan zorunlu olur.</span>
+                    <strong>{t("form.designer.dependentValidation")}</strong>
+                    <span>{t("form.designer.requiredWhenDescription")}</span>
                   </div>
                   <button
                     className="secondary-button"
@@ -590,12 +609,12 @@ export function FormDesignerDraft() {
                     onClick={() => addRequiredWhenRule(field.id)}
                   >
                     <Plus size={16} />
-                    Rule ekle
+                    {t("form.designer.addRule")}
                   </button>
                 </div>
 
                 {field.validationRules.length === 0 ? (
-                  <p className="empty-state">Bu alan icin dependent rule tanimli degil.</p>
+                  <p className="empty-state">{t("form.designer.noDependentRule")}</p>
                 ) : null}
 
                 <div className="rule-list">
@@ -607,12 +626,12 @@ export function FormDesignerDraft() {
                     return (
                       <div className="rule-row" key={`${field.id}-rule-${ruleIndex}`}>
                         <label>
-                          Bagli alan
+                          {t("form.designer.dependencyField")}
                           <select
                             value={rule.dependsOnFieldKey}
                             onChange={(event) => updateRuleDependency(field.id, ruleIndex, event.target.value)}
                           >
-                            <option value="">Alan seciniz</option>
+                            <option value="">{t("form.designer.selectField")}</option>
                             {candidates.map((candidate) => (
                               <option key={candidate.id} value={candidate.key.trim()}>
                                 {candidate.label || candidate.key}
@@ -624,11 +643,12 @@ export function FormDesignerDraft() {
                         <ExpectedValueInput
                           dependency={dependency}
                           expectedValue={rule.expectedValue}
+                          language={language}
                           onChange={(expectedValue) => updateRequiredWhenRule(field.id, ruleIndex, { expectedValue })}
                         />
 
                         <label>
-                          Mesaj
+                          {t("form.designer.message")}
                           <input
                             value={rule.message}
                             onChange={(event) => updateRequiredWhenRule(field.id, ruleIndex, { message: event.target.value })}
@@ -639,7 +659,7 @@ export function FormDesignerDraft() {
                           className="icon-button"
                           type="button"
                           onClick={() => removeRequiredWhenRule(field.id, ruleIndex)}
-                          aria-label="Rule sil"
+                          aria-label={t("form.designer.deleteRule")}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -687,7 +707,7 @@ function upsertForm(forms: FormDefinition[], form: FormDefinition) {
 
 type DesignerFieldErrors = Record<string, { key?: string; label?: string; options?: string; rules?: Record<number, string> }>;
 
-function validateDesignerFields(fields: DesignerField[]) {
+function validateDesignerFields(fields: DesignerField[], language: Language) {
   const errors: DesignerFieldErrors = {};
   const keyCounts = fields.reduce<Record<string, number>>((current, field) => {
     const key = field.key.trim().toLowerCase();
@@ -703,25 +723,25 @@ function validateDesignerFields(fields: DesignerField[]) {
     const key = field.key.trim();
 
     if (!key) {
-      fieldError.key = "Field key zorunludur.";
+      fieldError.key = translate(language, "form.validation.fieldKeyRequired");
     } else if (keyCounts[key.toLowerCase()] > 1) {
-      fieldError.key = "Field key benzersiz olmalidir.";
+      fieldError.key = translate(language, "form.validation.fieldKeyUnique");
     }
 
     if (!field.label.trim()) {
-      fieldError.label = "Label zorunludur.";
+      fieldError.label = translate(language, "form.validation.labelRequired");
     }
 
     if (fieldTypeUsesOptions(field.type)) {
       const filledOptions = field.options.map((option) => option.trim()).filter(Boolean);
       if (filledOptions.length === 0) {
-        fieldError.options = "Select/checkbox alanlari icin en az bir option zorunludur.";
+        fieldError.options = translate(language, "form.validation.optionsRequired");
       }
     }
 
     for (const [ruleIndex, rule] of field.validationRules.entries()) {
       const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey.trim());
-      const ruleError = validateRequiredWhenRule(field, rule, dependency);
+      const ruleError = validateRequiredWhenRule(field, rule, dependency, language);
       if (ruleError) {
         fieldError.rules = { ...fieldError.rules, [ruleIndex]: ruleError };
       }
@@ -755,36 +775,36 @@ function getDefaultExpectedValue(field: DesignerField) {
   return "";
 }
 
-function validateRequiredWhenRule(field: DesignerField, rule: ValidationRule, dependency?: DesignerField) {
+function validateRequiredWhenRule(field: DesignerField, rule: ValidationRule, dependency: DesignerField | undefined, language: Language) {
   if (rule.ruleType !== "RequiredWhen") {
     return undefined;
   }
 
   if (!rule.dependsOnFieldKey.trim()) {
-    return "Bagli alan secilmelidir.";
+    return translate(language, "form.validation.dependencyRequired");
   }
 
   if (!dependency) {
-    return "Bagli alan mevcut alanlardan biri olmalidir.";
+    return translate(language, "form.validation.dependencyMustExist");
   }
 
   if (dependency.id === field.id || dependency.key.trim() === field.key.trim()) {
-    return "Alan kendisine bagimli olamaz.";
+    return translate(language, "form.validation.selfDependency");
   }
 
   if (!rule.expectedValue.trim()) {
-    return "Beklenen deger bos birakilamaz.";
+    return translate(language, "form.validation.expectedValueRequired");
   }
 
   if (dependency.type === "Select") {
     const options = dependency.options.map((option) => option.trim()).filter(Boolean);
     if (!options.includes(rule.expectedValue.trim())) {
-      return "Beklenen deger bagli select alaninin option degerlerinden biri olmalidir.";
+      return translate(language, "form.validation.expectedSelectOption");
     }
   }
 
   if (dependency.type === "Checkbox" && !["true", "false"].includes(rule.expectedValue.trim())) {
-    return "Checkbox bagimli kurali icin beklenen deger true veya false olmalidir.";
+    return translate(language, "form.validation.expectedCheckbox");
   }
 
   return undefined;
@@ -793,20 +813,25 @@ function validateRequiredWhenRule(field: DesignerField, rule: ValidationRule, de
 function ExpectedValueInput({
   dependency,
   expectedValue,
+  language,
   onChange,
 }: {
   dependency?: DesignerField;
   expectedValue: string;
+  language: Language;
   onChange: (expectedValue: string) => void;
 }) {
+  const label = translate(language, "form.designer.expectedValue");
+  const selectValue = translate(language, "form.designer.selectValue");
+
   if (dependency?.type === "Select") {
     const options = dependency.options.map((option) => option.trim()).filter(Boolean);
 
     return (
       <label>
-        Beklenen deger
+        {label}
         <select value={expectedValue} onChange={(event) => onChange(event.target.value)}>
-          <option value="">Deger seciniz</option>
+          <option value="">{selectValue}</option>
           {options.map((option) => (
             <option key={option} value={option}>
               {option}
@@ -820,9 +845,9 @@ function ExpectedValueInput({
   if (dependency?.type === "Checkbox") {
     return (
       <label>
-        Beklenen deger
+        {label}
         <select value={expectedValue} onChange={(event) => onChange(event.target.value)}>
-          <option value="">Deger seciniz</option>
+          <option value="">{selectValue}</option>
           <option value="true">true</option>
           <option value="false">false</option>
         </select>
@@ -832,8 +857,12 @@ function ExpectedValueInput({
 
   return (
     <label>
-      Beklenen deger
-      <input value={expectedValue} onChange={(event) => onChange(event.target.value)} placeholder="Orn. Satinalma" />
+      {label}
+      <input
+        value={expectedValue}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={translate(language, "form.designer.expectedValuePlaceholder")}
+      />
     </label>
   );
 }

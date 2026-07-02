@@ -1,9 +1,11 @@
 import type { FormDefinition } from "@/lib/types";
 import type { FormValues } from "@/features/forms/formValues";
+import { translate } from "@/features/i18n/translations";
+import type { Language } from "@/lib/types";
 
 export type FormValidationErrors = Record<string, string>;
 
-export function validateFormValues(form: FormDefinition, values: FormValues) {
+export function validateFormValues(form: FormDefinition, values: FormValues, language: Language = "tr") {
   const nextErrors: FormValidationErrors = {};
 
   for (const field of form.fields) {
@@ -11,28 +13,28 @@ export function validateFormValues(form: FormDefinition, values: FormValues) {
     const isEmpty = isEmptyValue(value);
 
     if (field.required && isEmpty) {
-      nextErrors[field.key] = `${field.label} zorunludur.`;
+      nextErrors[field.key] = translate(language, "form.validation.required", { label: field.label });
     }
 
     if (!isEmpty) {
       if (field.type === "Email" && !isValidEmail(String(value))) {
-        nextErrors[field.key] = "Gecerli bir e-posta girilmelidir.";
+        nextErrors[field.key] = translate(language, "form.validation.email");
       }
 
       if (field.type === "Number" && !isValidNumber(value)) {
-        nextErrors[field.key] = "Gecerli bir sayi girilmelidir.";
+        nextErrors[field.key] = translate(language, "form.validation.number");
       }
 
       if (field.type === "Date" && !isValidDate(String(value))) {
-        nextErrors[field.key] = "Gecerli bir tarih girilmelidir.";
+        nextErrors[field.key] = translate(language, "form.validation.date");
       }
 
       if (field.type === "Select" && typeof value === "string" && !field.options.includes(value)) {
-        nextErrors[field.key] = "Listede tanimli bir secenek secilmelidir.";
+        nextErrors[field.key] = translate(language, "form.validation.select");
       }
 
       if (field.type === "Checkbox" && typeof value !== "boolean") {
-        nextErrors[field.key] = "Checkbox degeri true veya false olmalidir.";
+        nextErrors[field.key] = translate(language, "form.validation.checkbox");
       }
     }
 
@@ -42,7 +44,7 @@ export function validateFormValues(form: FormDefinition, values: FormValues) {
         String(values[rule.dependsOnFieldKey] ?? "") === rule.expectedValue &&
         isEmpty
       ) {
-        nextErrors[field.key] = rule.message || `${field.label} zorunludur.`;
+        nextErrors[field.key] = rule.message || translate(language, "form.validation.required", { label: field.label });
       }
     }
   }

@@ -1,17 +1,19 @@
 "use client";
 
 import type { ChangeEvent } from "react";
-import type { FieldType, FormFieldDefinition } from "@/lib/types";
+import { translate } from "@/features/i18n/translations";
+import type { FieldType, FormFieldDefinition, Language } from "@/lib/types";
 import type { FormValue } from "@/features/forms/formValues";
 
 type FieldRendererProps = {
   field: FormFieldDefinition;
   value: FormValue;
   error?: string;
+  language: Language;
   onChange: (fieldKey: string, value: FormValue) => void;
 };
 
-export function FieldRenderer({ field, value, error, onChange }: FieldRendererProps) {
+export function FieldRenderer({ field, value, error, language, onChange }: FieldRendererProps) {
   const labelClassName = field.type === "Checkbox" ? "checkbox-row runner-checkbox" : undefined;
 
   return (
@@ -28,7 +30,7 @@ export function FieldRenderer({ field, value, error, onChange }: FieldRendererPr
       ) : (
         <>
           {field.label}
-          <FieldInput field={field} value={value} onChange={onChange} />
+          <FieldInput field={field} value={value} language={language} onChange={onChange} />
         </>
       )}
       {error ? <span className="field-error">{error}</span> : null}
@@ -39,16 +41,18 @@ export function FieldRenderer({ field, value, error, onChange }: FieldRendererPr
 function FieldInput({
   field,
   value,
+  language,
   onChange,
 }: {
   field: FormFieldDefinition;
   value: FormValue;
+  language: Language;
   onChange: (fieldKey: string, value: FormValue) => void;
 }) {
   if (field.type === "Select") {
     return (
       <select value={String(value ?? "")} onChange={(event) => onChange(field.key, event.target.value)}>
-        <option value="">Seciniz</option>
+        <option value="">{translate(language, "form.selectPlaceholder")}</option>
         {field.options.map((option) => (
           <option key={option} value={option}>
             {option}

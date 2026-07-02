@@ -16,12 +16,14 @@ The PDF lists language support as an extra quality item. In this project it is t
   - App shell, sidebar navigation and top bar actions.
   - Dashboard cards and BPM shortcut labels.
   - Settings screen.
+  - Form designer static UI, field editor actions, option/rule editor labels and designer validation messages.
+  - Form runner static UI, process-start buttons, loading/empty states and frontend validation messages.
   - Process/task board, refresh feedback, toast messages, task action dialog, status badges and audit timeline.
 
 ## Intentional Boundaries
 
 - Form names, field labels, select options, process submission values and audit notes loaded from the database are treated as user/domain data. They are displayed as stored instead of being auto-translated.
-- The form designer and form runner still contain some static Turkish UI labels. They should be migrated to the same dictionary in a later form-flow focused pass.
+- The form designer default sample fields and saved form labels are treated as editable form data. They are not automatically translated after the user edits or loads them from the database.
 - Backend error messages are currently displayed as returned by the API. A later production version can map backend error codes to frontend translation keys.
 
 ## Extension Rules
