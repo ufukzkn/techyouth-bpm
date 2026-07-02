@@ -2,17 +2,20 @@
 
 import { CheckCircle2, CircleDot, XCircle } from "lucide-react";
 import { useState } from "react";
+import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { TaskActionDialog } from "@/features/processes/TaskActionDialog";
-import type { ProcessTask, Role, WorkflowAction } from "@/lib/types";
+import type { Language, ProcessTask, Role, WorkflowAction } from "@/lib/types";
 
 type MyTasksViewProps = {
   tasks: ProcessTask[];
+  language: Language;
   role: Role;
-  status: "loading" | "idle" | "acting" | "error";
+  status: "loading" | "refreshing" | "idle" | "acting" | "error";
   onExecuteTask: (taskId: string, action: Exclude<WorkflowAction, "Start">, note: string) => void;
 };
 
-export function MyTasksView({ tasks, role, status, onExecuteTask }: MyTasksViewProps) {
+export function MyTasksView({ tasks, language, role, status, onExecuteTask }: MyTasksViewProps) {
+  const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const openTasks = tasks.filter((task) => task.status === "Open");
   const [pendingAction, setPendingAction] = useState<{
     taskId: string;
@@ -31,8 +34,8 @@ export function MyTasksView({ tasks, role, status, onExecuteTask }: MyTasksViewP
       <article className="process-card">
         <div className="process-card-header">
           <div>
-            <span className="eyebrow">Islerim</span>
-            <strong>{openTasks.length} acik is</strong>
+            <span className="eyebrow">{t("process.myTasks")}</span>
+            <strong>{t("process.openTaskCount", { count: openTasks.length })}</strong>
           </div>
           <CircleDot size={22} />
         </div>
@@ -42,9 +45,9 @@ export function MyTasksView({ tasks, role, status, onExecuteTask }: MyTasksViewP
             {openTasks.map((task) => (
               <div className="task-item" key={task.id}>
                 <div>
-                  <strong>Surec onayi</strong>
+                  <strong>{t("process.approvalTask")}</strong>
                   <span>
-                    {task.id.slice(0, 8)} — {task.assignedRole}
+                    {task.id.slice(0, 8)} - {roleLabel(language, task.assignedRole)}
                   </span>
                   <small className="task-date">
                     {new Date(task.createdAt).toLocaleString("tr-TR")}
@@ -58,7 +61,7 @@ export function MyTasksView({ tasks, role, status, onExecuteTask }: MyTasksViewP
                     type="button"
                   >
                     <CheckCircle2 size={17} />
-                    Onayla
+                    {t("process.approve")}
                   </button>
                   <button
                     className="danger-button"
@@ -67,20 +70,21 @@ export function MyTasksView({ tasks, role, status, onExecuteTask }: MyTasksViewP
                     type="button"
                   >
                     <XCircle size={17} />
-                    Reddet
+                    {t("process.reject")}
                   </button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="empty-state">{role} rolu icin acik is bulunmuyor.</p>
+          <p className="empty-state">{t("process.noOpenTasks", { role: roleLabel(language, role) })}</p>
         )}
       </article>
 
       {pendingAction ? (
         <TaskActionDialog
           action={pendingAction.action}
+          language={language}
           disabled={status === "acting"}
           onCancel={() => setPendingAction(null)}
           onConfirm={handleConfirm}

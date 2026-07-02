@@ -12,18 +12,26 @@ This work coordinates the user entry and navigation experience. It does not own 
 
 - Login starts empty and supports demo-account fill buttons for local testing.
 - Session state stores user, role, token, expiry and theme through Zustand.
+- Theme starts from the operating system preference when the user has no saved manual choice; after the user toggles theme, that explicit choice is persisted.
+- Theme toggle uses a CSS moon/sun transition inspired by the referenced CodePen interaction, implemented locally as `ThemeToggleButton` without adding a package.
+- Language preference is persisted in the same session store and can be switched from both login and authenticated top bar.
+- Language toggle uses a small CSS globe/orbit microinteraction with the active `TR/EN` code, implemented locally as `LanguageToggleButton`.
 - Restored API sessions are verified once through `/api/auth/me`; the app does not poll the user every second.
 - The shell schedules one timeout from the stored `expiresAt` value. Expired or unauthorized sessions return to login and show a confirmable alert dialog.
 - API session duration is read from `Auth:SessionDurationMinutes`; the normal local duration is currently 120 minutes.
 - `Beni hatirla` sends `rememberMe=true` during login and uses `Auth:RememberMeDurationMinutes` for a longer session.
+- Long remember-me sessions are checked with capped browser timers so the timeout scheduler does not overflow for durations longer than the browser's maximum `setTimeout` delay.
 - Demo fallback sessions also respect the local expiry timer, but skip `/api/auth/me` because they do not exist in the API session table.
 - Passwords are verified through PBKDF2 hashes and session tokens are stored as SHA-256 hashes in the database.
 - The authenticated shell filters menu items by role.
 - Workspace navigation uses real route paths such as `/dashboard`, `/forms`, `/tasks` and `/settings` instead of hash-scroll sections or query-only views.
+- Desktop navigation stays fixed on the left while the workspace scrolls.
+- On tablet/mobile widths, workspace navigation is collapsed behind a fixed hamburger button and opens as a drawer with backdrop/escape-close behavior.
 - Dashboard metrics are loaded from process/task API data.
 - Dashboard metrics keep the last loaded values while refreshing, so the cards do not flash to placeholder values during fast navigation.
 - Dashboard metric cards navigate to the related workspace area when the user role has access.
 - BPM flow steps on the dashboard now act as role-aware shortcuts.
+- Process/task refresh keeps the visible data on screen, shows inline button loading and reports success/error with a bottom-right toast.
 - The top bar uses a compact session icon. Clicking it opens session details: display name, username, role and expiry time.
 - Session details are informational only; actual session expiry handling stays in the centralized shell effect.
 
@@ -40,8 +48,12 @@ This work coordinates the user entry and navigation experience. It does not own 
 
 - Adding a new screen should update `navigation.ts`, the matching route page under `apps/web/src/app`, the shell view switch and any dashboard shortcuts that should point to it.
 - Adding a new role should update navigation visibility rules and dashboard shortcut availability together.
+- Desktop navigation should stay fixed because the menu is short and should remain available during long workflow screens.
+- Mobile navigation should stay drawer-based with a fixed floating trigger so the dashboard/content remains the first visual focus on small screens.
 - Session-expiry behavior should stay centralized in `AppShell`/`sessionStore` instead of being duplicated in feature screens.
 - The current remember-me option is useful for the project demo, but a stronger production version should move toward refresh-token rotation and explicit device/session management.
+- Theme ownership should stay centralized in `sessionStore`; feature screens should read the active theme only through shared styling tokens.
+- Static shell/login/dashboard/process text should use the shared i18n dictionary instead of inline copy.
 
 ## Files Changed
 
@@ -63,4 +75,8 @@ npm run lint
 npm run build
 ```
 
-The backend test suite should also stay green because dashboard metrics depend on existing process/task API contracts.
+The backend test suite should also stay green because dashboard metrics depend on existing process/task API contracts:
+
+```bash
+dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj
+```

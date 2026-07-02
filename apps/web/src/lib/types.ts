@@ -14,6 +14,7 @@ export type LoginResponse = {
 };
 
 export type ThemeMode = "light" | "dark";
+export type Language = "tr" | "en";
 
 export type FieldType = "Text" | "Number" | "Email" | "Select" | "Checkbox" | "Date";
 

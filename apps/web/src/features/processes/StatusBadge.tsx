@@ -1,22 +1,17 @@
 "use client";
 
-import type { ProcessStatus } from "@/lib/types";
+import { statusLabel } from "@/features/i18n/translations";
+import type { Language, ProcessStatus } from "@/lib/types";
 
 type StatusBadgeProps = {
   status: ProcessStatus;
+  language: Language;
 };
 
-const statusLabels: Record<ProcessStatus, string> = {
-  Pending: "Beklemede",
-  InProgress: "Devam Ediyor",
-  Completed: "Tamamlandi",
-  Rejected: "Reddedildi",
-};
-
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, language }: StatusBadgeProps) {
   return (
     <span className={`status-badge status-${status.toLowerCase()}`}>
-      {statusLabels[status]}
+      {statusLabel(language, status)}
     </span>
   );
 }

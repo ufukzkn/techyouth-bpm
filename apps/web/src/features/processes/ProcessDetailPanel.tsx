@@ -1,30 +1,34 @@
 "use client";
 
 import { AuditTimeline } from "@/features/processes/AuditTimeline";
+import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { StatusBadge } from "@/features/processes/StatusBadge";
-import type { ProcessDetail } from "@/lib/types";
+import type { Language, ProcessDetail } from "@/lib/types";
 
 type ProcessDetailPanelProps = {
   detail: ProcessDetail | null;
+  language: Language;
 };
 
-export function ProcessDetailPanel({ detail }: ProcessDetailPanelProps) {
+export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps) {
+  const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
+
   if (!detail) {
     return (
       <>
         <article className="process-card">
           <div className="process-card-header">
             <div>
-              <span className="eyebrow">Surec detayi</span>
-              <strong>Secili surec yok</strong>
+              <span className="eyebrow">{t("process.detail")}</span>
+              <strong>{t("process.noSelected")}</strong>
             </div>
           </div>
-          <p className="empty-state">Detay goruntulemek icin bir surec sec.</p>
+          <p className="empty-state">{t("process.selectForDetail")}</p>
         </article>
 
         <article className="process-card audit-card">
           <span className="eyebrow">Audit Log</span>
-          <p className="empty-state">Audit kaydi yok.</p>
+          <p className="empty-state">{t("process.noAudit")}</p>
         </article>
       </>
     );
@@ -38,30 +42,30 @@ export function ProcessDetailPanel({ detail }: ProcessDetailPanelProps) {
       <article className="process-card">
         <div className="process-card-header">
           <div>
-            <span className="eyebrow">Surec detayi</span>
+            <span className="eyebrow">{t("process.detail")}</span>
             <strong>{detail.formName}</strong>
           </div>
-          <StatusBadge status={detail.status} />
+          <StatusBadge status={detail.status} language={language} />
         </div>
 
         <dl className="detail-list">
           <div>
-            <dt>Baslangic</dt>
-            <dd>{new Date(detail.startedAt).toLocaleString("tr-TR")}</dd>
+            <dt>{t("process.start")}</dt>
+            <dd>{new Date(detail.startedAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}</dd>
           </div>
           <div>
-            <dt>Durum</dt>
-            <dd>{detail.status}</dd>
+            <dt>{t("process.status")}</dt>
+            <dd>{statusLabel(language, detail.status)}</dd>
           </div>
           {detail.completedAt ? (
             <div>
-              <dt>Tamamlanma</dt>
-              <dd>{new Date(detail.completedAt).toLocaleString("tr-TR")}</dd>
+              <dt>{t("process.completedAt")}</dt>
+              <dd>{new Date(detail.completedAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}</dd>
             </div>
           ) : null}
           <div>
-            <dt>Tasklar</dt>
-            <dd>{openTaskCount} acik / {completedTaskCount} tamamlanan</dd>
+            <dt>{t("process.tasks")}</dt>
+            <dd>{t("process.taskSummary", { open: openTaskCount, completed: completedTaskCount })}</dd>
           </div>
         </dl>
 
@@ -69,8 +73,8 @@ export function ProcessDetailPanel({ detail }: ProcessDetailPanelProps) {
       </article>
 
       <article className="process-card audit-card">
-        <span className="eyebrow">Audit Log — {detail.auditLogs.length} kayit</span>
-        <AuditTimeline logs={detail.auditLogs} />
+        <span className="eyebrow">{t("process.auditRecords", { count: detail.auditLogs.length })}</span>
+        <AuditTimeline logs={detail.auditLogs} language={language} />
       </article>
     </>
   );

@@ -74,3 +74,4 @@ These notes are the project memory. Update this file whenever an implementation 
 - Dashboard metric cards and BPM flow steps now act as role-aware shortcuts into the workspace.
 - Top bar session details moved behind a compact session icon so the shell keeps expiry/user/role information without permanently showing a long timestamp.
 - Dashboard metrics keep the last loaded values while refreshing to avoid flashing placeholder values during fast navigation.
+- Language support foundation added with persisted `tr/en` preference, login/topbar language toggles, translated shell/dashboard/settings/process/task UI and documented extension rules in `docs/11-i18n-language-support.md`.

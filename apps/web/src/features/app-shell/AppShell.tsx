@@ -1,27 +1,63 @@
 "use client";
 
-import { LogOut, Moon, ShieldCheck, Sun } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getNavItemByPath, getNavItemByView, navItems, type ViewId } from "@/features/app-shell/navigation";
+import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
+import { SessionStatusButton } from "@/features/app-shell/SessionStatusButton";
+import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
 import { LoginView } from "@/features/auth/LoginView";
 import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
 import { FormRunnerDraft } from "@/features/form-runner/FormRunnerDraft";
+import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { ProcessBoardDraft } from "@/features/processes/ProcessBoardDraft";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
-import type { ProcessSummary, ProcessTask, User } from "@/lib/types";
+import type { Language, ProcessSummary, ProcessTask, User } from "@/lib/types";
 
 let dashboardMetricsCache: { processes: ProcessSummary[]; tasks: ProcessTask[] } | null = null;
+const maxBrowserTimeoutDelay = 2_147_483_647;
 
 export function AppShell() {
-  const { user, token, expiresAt, theme, hasHydrated, expireSession, logout, toggleTheme } = useSessionStore();
+  const {
+    user,
+    token,
+    expiresAt,
+    theme,
+    language,
+    hasHydrated,
+    expireSession,
+    logout,
+    syncSystemTheme,
+    toggleLanguage,
+    toggleTheme,
+  } = useSessionStore();
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [isSessionDetailsOpen, setIsSessionDetailsOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const t = useCallback(
+    (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
+    [language],
+  );
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.title = language === "tr" ? "TechYouth BPM Wizard" : "TechYouth BPM Wizard";
+  }, [language]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const syncTheme = () => syncSystemTheme(mediaQuery.matches ? "dark" : "light");
+
+    syncTheme();
+    mediaQuery.addEventListener("change", syncTheme);
+    return () => mediaQuery.removeEventListener("change", syncTheme);
+  }, [syncSystemTheme]);
 
   useEffect(() => {
     if (!hasHydrated || !token || !user) {
@@ -34,14 +70,26 @@ export function AppShell() {
     const expiresAtTime = expiresAt ? Date.parse(expiresAt) : null;
 
     if (expiresAtTime && expiresAtTime <= Date.now()) {
-      expireSession("Oturum suresi doldu. Devam etmek icin tekrar giris yap.");
+      expireSession(t("session.expired"));
       return;
     }
 
+    function scheduleExpiryCheck() {
+      if (!expiresAtTime) {
+        return;
+      }
+
+      const remainingMs = expiresAtTime - Date.now();
+      if (remainingMs <= 0) {
+        expireSession(t("session.expired"));
+        return;
+      }
+
+      expiryTimer = window.setTimeout(scheduleExpiryCheck, Math.min(remainingMs, maxBrowserTimeoutDelay));
+    }
+
     if (expiresAtTime) {
-      expiryTimer = window.setTimeout(() => {
-        expireSession("Oturum suresi doldu. Devam etmek icin tekrar giris yap.");
-      }, expiresAtTime - Date.now());
+      scheduleExpiryCheck();
     }
 
     async function verifySession() {
@@ -57,7 +105,7 @@ export function AppShell() {
         }
 
         if (error instanceof ApiError && error.statusCode === 401) {
-          expireSession("Oturum dogrulanamadi. Lutfen tekrar giris yap.");
+          expireSession(t("session.unverified"));
         }
       }
     }
@@ -70,7 +118,7 @@ export function AppShell() {
         window.clearTimeout(expiryTimer);
       }
     };
-  }, [expiresAt, expireSession, hasHydrated, token, user]);
+  }, [expiresAt, expireSession, hasHydrated, t, token, user]);
 
   useEffect(() => {
     function syncViewFromUrl() {
@@ -85,8 +133,24 @@ export function AppShell() {
     return () => window.removeEventListener("popstate", syncViewFromUrl);
   }, []);
 
+  useEffect(() => {
+    if (!isMobileNavOpen) {
+      return;
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsMobileNavOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isMobileNavOpen]);
+
   const changeView = useCallback((viewId: ViewId) => {
     setActiveView(viewId);
+    setIsMobileNavOpen(false);
     window.history.pushState(null, "", getNavItemByView(viewId)?.path ?? "/dashboard");
   }, []);
 
@@ -100,9 +164,9 @@ export function AppShell() {
       <main className="login-page">
         <section className="login-panel session-loading" aria-live="polite">
           <PrototypeLogo size={44} />
-          <span className="eyebrow">Oturum</span>
-          <h1>Hazirlaniyor</h1>
-          <p>Kayitli oturum bilgisi kontrol ediliyor.</p>
+          <span className="eyebrow">{t("login.session")}</span>
+          <h1>{t("login.preparing")}</h1>
+          <p>{t("login.checkingStoredSession")}</p>
         </section>
       </main>
     );
@@ -118,16 +182,24 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className={isMobileNavOpen ? "sidebar sidebar-open" : "sidebar"} id="workspace-navigation">
         <div className="brand">
           <span className="brand-symbol">
             <PrototypeLogo size={34} />
           </span>
           <div>
-            <strong>TechYouth BPM</strong>
-            <span>Wizard workspace</span>
+            <strong>{t("app.name")}</strong>
+            <span>{t("app.subtitle")}</span>
           </div>
         </div>
+        <button
+          className="mobile-nav-close"
+          type="button"
+          aria-label={t("common.menuClose")}
+          onClick={() => setIsMobileNavOpen(false)}
+        >
+          <X size={18} />
+        </button>
         <nav className="side-nav" aria-label="Main navigation">
           {visibleNavItems.map((item) => {
             const Icon = item.icon;
@@ -140,58 +212,79 @@ export function AppShell() {
                 type="button"
               >
                 <Icon size={18} />
-                {item.label}
+                {t(item.labelKey)}
               </button>
             );
           })}
         </nav>
       </aside>
+      {isMobileNavOpen ? (
+        <button
+          className="mobile-nav-backdrop"
+          type="button"
+          aria-label="Menuyu kapat"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      ) : null}
 
       <div className="main-area">
         <header className="topbar">
-          <div className="topbar-identity">
-            <span className="eyebrow">Aktif kullanici</span>
-            <strong>{user.displayName}</strong>
+          <button
+            className="mobile-nav-toggle icon-button"
+            type="button"
+            aria-controls="workspace-navigation"
+            aria-expanded={isMobileNavOpen}
+            aria-label={t("common.menuOpen")}
+            onClick={() => setIsMobileNavOpen((isOpen) => !isOpen)}
+          >
+            <Menu size={18} />
+          </button>
+          <div className="topbar-user">
+            <div className="topbar-identity">
+              <span className="eyebrow">{t("session.activeUser")}</span>
+              <strong>{user.displayName}</strong>
+            </div>
+            <span className="role-pill">{roleLabel(language, user.role)}</span>
           </div>
-          <span className="role-pill">{user.role}</span>
-          <div className="session-menu">
+          <div className="topbar-actions">
+            <div className="session-menu">
+              <SessionStatusButton
+                expanded={isSessionDetailsOpen}
+                label={t("session.details")}
+                onToggle={() => setIsSessionDetailsOpen((isOpen) => !isOpen)}
+              />
+              {isSessionDetailsOpen ? (
+                <div className="session-popover" role="dialog" aria-label={t("session.details")}>
+                  <div>
+                    <span>{t("session.user")}</span>
+                    <strong>{user.displayName}</strong>
+                  </div>
+                  <div>
+                    <span>{t("session.username")}</span>
+                    <strong>{user.username}</strong>
+                  </div>
+                  <div>
+                    <span>{t("session.role")}</span>
+                    <strong>{roleLabel(language, user.role)}</strong>
+                  </div>
+                  <div>
+                    <span>{t("session.activeUntil")}</span>
+                    <strong>{formatSessionExpiry(expiresAt, language)}</strong>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <LanguageToggleButton language={language} label={t("common.language")} onToggle={toggleLanguage} />
+            <ThemeToggleButton theme={theme} label={t("common.theme")} onToggle={toggleTheme} />
             <button
-              className="session-icon-button"
-              type="button"
-              aria-expanded={isSessionDetailsOpen}
-              aria-label="Oturum detaylari"
-              title="Oturum detaylari"
-              onClick={() => setIsSessionDetailsOpen((isOpen) => !isOpen)}
+              className="icon-button logout-button"
+              onClick={logout}
+              aria-label={t("common.logout")}
+              title={t("common.logout")}
             >
-              <ShieldCheck size={18} />
+              <LogOut size={18} />
             </button>
-            {isSessionDetailsOpen ? (
-              <div className="session-popover" role="dialog" aria-label="Oturum detaylari">
-                <div>
-                  <span>Kullanici</span>
-                  <strong>{user.displayName}</strong>
-                </div>
-                <div>
-                  <span>Kullanici adi</span>
-                  <strong>{user.username}</strong>
-                </div>
-                <div>
-                  <span>Rol</span>
-                  <strong>{user.role}</strong>
-                </div>
-                <div>
-                  <span>Aktiflik</span>
-                  <strong>{formatSessionExpiry(expiresAt)}</strong>
-                </div>
-              </div>
-            ) : null}
           </div>
-          <button className="icon-button" onClick={toggleTheme} aria-label="Tema degistir" title="Tema degistir">
-            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
-          <button className="icon-button" onClick={logout} aria-label="Cikis yap" title="Cikis yap">
-            <LogOut size={18} />
-          </button>
         </header>
 
         <main className="content">
@@ -199,6 +292,7 @@ export function AppShell() {
             <DashboardView
               token={token}
               user={user}
+              language={language}
               visibleViewIds={visibleNavItems.map((item) => item.viewId)}
               onNavigate={changeView}
             />
@@ -207,7 +301,7 @@ export function AppShell() {
           {currentView === "runner" ? <FormRunnerDraft /> : null}
           {currentView === "processes" ? <ProcessBoardDraft mode="processes" role={user.role} /> : null}
           {currentView === "tasks" ? <ProcessBoardDraft mode="tasks" role={user.role} /> : null}
-          {currentView === "settings" ? <SettingsView expiresAt={expiresAt} /> : null}
+          {currentView === "settings" ? <SettingsView expiresAt={expiresAt} language={language} /> : null}
         </main>
       </div>
     </div>
@@ -221,14 +315,20 @@ function isViewId(value: string | null): value is ViewId {
 function DashboardView({
   token,
   user,
+  language,
   visibleViewIds,
   onNavigate,
 }: {
   token: string | null;
   user: User;
+  language: Language;
   visibleViewIds: ViewId[];
   onNavigate: (viewId: ViewId) => void;
 }) {
+  const t = useCallback(
+    (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
+    [language],
+  );
   const [processes, setProcesses] = useState<ProcessSummary[]>(() => dashboardMetricsCache?.processes ?? []);
   const [tasks, setTasks] = useState<ProcessTask[]>(() => dashboardMetricsCache?.tasks ?? []);
   const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "error">(
@@ -273,32 +373,40 @@ function DashboardView({
   const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
 
   const metricCards: Array<{ label: string; value: number; viewId?: ViewId }> = [
-    { label: "Bekleyen isler", value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined },
-    { label: "Devam eden surecler", value: inProgressCount, viewId: canOpen("processes") ? "processes" : undefined },
-    { label: "Tamamlanan surecler", value: completedCount, viewId: canOpen("processes") ? "processes" : undefined },
+    { label: t("dashboard.pendingTasks"), value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined },
+    { label: t("dashboard.inProgress"), value: inProgressCount, viewId: canOpen("processes") ? "processes" : undefined },
+    { label: t("dashboard.completed"), value: completedCount, viewId: canOpen("processes") ? "processes" : undefined },
   ];
 
   const flowSteps: Array<{ label: string; caption: string; viewId: ViewId }> = [
-    { label: "Oturum", caption: "Kimlik ve rol", viewId: "settings" },
-    { label: "Form Definition", caption: "Model tasarimi", viewId: "forms" },
-    { label: "Process Instance", caption: "Surec baslatma", viewId: "runner" },
-    { label: "Task Action", caption: "Onay / red", viewId: "tasks" },
-    { label: "Audit Log", caption: "Karar izi", viewId: "processes" },
+    { label: t("dashboard.flow.session"), caption: t("dashboard.flow.sessionCaption"), viewId: "settings" },
+    {
+      label: t("dashboard.flow.formDefinition"),
+      caption: t("dashboard.flow.formDefinitionCaption"),
+      viewId: "forms",
+    },
+    {
+      label: t("dashboard.flow.processInstance"),
+      caption: t("dashboard.flow.processInstanceCaption"),
+      viewId: "runner",
+    },
+    { label: t("dashboard.flow.taskAction"), caption: t("dashboard.flow.taskActionCaption"), viewId: "tasks" },
+    { label: t("dashboard.flow.auditLog"), caption: t("dashboard.flow.auditLogCaption"), viewId: "processes" },
   ];
 
   return (
     <div className="view-panel">
       <section className="workspace-header">
         <div>
-          <span className="eyebrow">Dashboard</span>
-          <h1>Surec yonetimi paneli</h1>
+          <span className="eyebrow">{t("dashboard.eyebrow")}</span>
+          <h1>{t("dashboard.title")}</h1>
         </div>
         <p>
           {status === "error"
-            ? "Dashboard metrikleri yuklenemedi; API oturumunu kontrol et."
+            ? t("dashboard.error")
             : status === "loading"
-              ? "Surec ve is ozeti yukleniyor."
-            : `${user.role} rolune gore surec ve is ozeti SQLite veritabanindan okunur.`}
+              ? t("dashboard.loading")
+              : t("dashboard.summary", { role: roleLabel(language, user.role) })}
         </p>
       </section>
 
@@ -337,45 +445,54 @@ function DashboardView({
   );
 }
 
-function SettingsView({ expiresAt }: { expiresAt: string | null }) {
+function SettingsView({ expiresAt, language }: { expiresAt: string | null; language: Language }) {
+  const t = useCallback(
+    (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
+    [language],
+  );
+
   return (
     <section className="settings-panel">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Ayarlar</span>
-          <h2>Uygulama ayarlari</h2>
+          <span className="eyebrow">{t("settings.eyebrow")}</span>
+          <h2>{t("settings.title")}</h2>
         </div>
-        <p>Bu alan sonraki adimda bildirim, tema ve surec varsayilanlari icin genisletilecek.</p>
+        <p>{t("settings.description")}</p>
       </div>
       <div className="settings-grid">
         <article className="settings-row">
-          <span>Tema</span>
-          <strong>Ust bardan degistirilir</strong>
+          <span>{t("settings.theme")}</span>
+          <strong>{t("settings.themeValue")}</strong>
         </article>
         <article className="settings-row">
-          <span>Oturum</span>
-          <strong>{formatSessionExpiry(expiresAt)}</strong>
+          <span>{t("settings.language")}</span>
+          <strong>{t("settings.languageValue")}</strong>
         </article>
         <article className="settings-row">
-          <span>Dogrulama</span>
-          <strong>API oturumu acilista kontrol edilir</strong>
+          <span>{t("settings.session")}</span>
+          <strong>{formatSessionExpiry(expiresAt, language)}</strong>
+        </article>
+        <article className="settings-row">
+          <span>{t("settings.auth")}</span>
+          <strong>{t("settings.authValue")}</strong>
         </article>
       </div>
     </section>
   );
 }
 
-function formatSessionExpiry(expiresAt: string | null) {
+function formatSessionExpiry(expiresAt: string | null, language: Language) {
   if (!expiresAt) {
-    return "Oturum suresi yok";
+    return translate(language, "session.noExpiry");
   }
 
   const expiryDate = new Date(expiresAt);
   if (Number.isNaN(expiryDate.getTime())) {
-    return "Oturum suresi bilinmiyor";
+    return translate(language, "session.unknownExpiry");
   }
 
-  return expiryDate.toLocaleString("tr-TR", {
+  return expiryDate.toLocaleString(language === "tr" ? "tr-TR" : "en-US", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",

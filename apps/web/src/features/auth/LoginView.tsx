@@ -1,19 +1,39 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { LogIn, Moon, Sun } from "lucide-react";
+import { LogIn } from "lucide-react";
+import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
+import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
 import { api, ApiError } from "@/lib/api";
 import { demoUsers, loginWithDemoUser } from "@/features/auth/demoUsers";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 
 export function LoginView() {
-  const { clearSessionNotice, sessionNotice, setSession, theme, toggleTheme } = useSessionStore();
+  const { clearSessionNotice, language, sessionNotice, setSession, theme, toggleLanguage, toggleTheme } =
+    useSessionStore();
+  const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  function updateUsername(value: string) {
+    setUsername(value);
+    clearSessionNotice();
+  }
+
+  function updatePassword(value: string) {
+    setPassword(value);
+    clearSessionNotice();
+  }
+
+  function updateRememberMe(value: boolean) {
+    setRememberMe(value);
+    clearSessionNotice();
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,18 +41,29 @@ export function LoginView() {
     setError(null);
     setIsLoading(true);
 
+    const formData = new FormData(event.currentTarget);
+    const submittedUsername = String(formData.get("username") ?? "").trim();
+    const submittedPassword = String(formData.get("password") ?? "");
+    const submittedRememberMe = formData.get("rememberMe") === "on";
+
+    if (!submittedUsername || !submittedPassword) {
+      setIsLoading(false);
+      setError(t("login.required"));
+      return;
+    }
+
     try {
-      const session = await api.login(username, password, rememberMe);
+      const session = await api.login(submittedUsername, submittedPassword, submittedRememberMe);
       setSession(session);
     } catch (apiError) {
-      const demoSession = loginWithDemoUser(username, password, rememberMe);
+      const demoSession = loginWithDemoUser(submittedUsername, submittedPassword, submittedRememberMe);
 
       if (demoSession) {
         setSession(demoSession);
         return;
       }
 
-      setError(apiError instanceof ApiError ? apiError.errors.join(" ") : "Login failed.");
+      setError(apiError instanceof ApiError ? apiError.errors.join(" ") : t("login.invalid"));
     } finally {
       setIsLoading(false);
     }
@@ -40,56 +71,68 @@ export function LoginView() {
 
   return (
     <main className="login-page">
-      <button className="login-theme-toggle icon-button" onClick={toggleTheme} aria-label="Tema degistir" title="Tema degistir">
-        {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-      </button>
+      <div className="login-actions">
+        <LanguageToggleButton language={language} label={t("common.language")} onToggle={toggleLanguage} />
+        <ThemeToggleButton theme={theme} label={t("common.theme")} onToggle={toggleTheme} />
+      </div>
       <section className="login-panel" aria-label="Login">
         <div className="login-mark">
           <PrototypeLogo size={34} />
         </div>
         <h1>TechYouth BPM Wizard</h1>
-        <p>Form tasarimi ve surec yonetimi calisma alani</p>
+        <p>{language === "tr" ? "Form tasarimi ve surec yonetimi calisma alani" : "Form design and process management workspace"}</p>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <label>
-            Kullanici adi
-            <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" />
+            {t("login.username")}
+            <input
+              name="username"
+              value={username}
+              onChange={(event) => updateUsername(event.target.value)}
+              autoComplete="username"
+            />
           </label>
           <label>
-            Sifre
+            {t("login.password")}
             <input
+              name="password"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => updatePassword(event.target.value)}
               type="password"
               autoComplete="current-password"
             />
           </label>
           <label className="checkbox-row remember-row">
-            <input checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} type="checkbox" />
-            Beni hatirla
+            <input
+              name="rememberMe"
+              checked={rememberMe}
+              onChange={(event) => updateRememberMe(event.target.checked)}
+              type="checkbox"
+            />
+            {t("login.rememberMe")}
           </label>
           {error ? <div className="form-error">{error}</div> : null}
           <button className="primary-button" type="submit" disabled={isLoading}>
             <LogIn size={18} />
-            {isLoading ? "Giris yapiliyor" : "Giris yap"}
+            {isLoading ? t("login.signingIn") : t("login.signIn")}
           </button>
         </form>
 
         {sessionNotice ? (
           <div className="session-dialog-backdrop" role="presentation">
             <section className="session-dialog" role="alertdialog" aria-modal="true" aria-labelledby="session-dialog-title">
-              <span className="eyebrow">Oturum</span>
-              <h2 id="session-dialog-title">Oturum sona erdi</h2>
+              <span className="eyebrow">{t("login.session")}</span>
+              <h2 id="session-dialog-title">{t("login.noticeTitle")}</h2>
               <p>{sessionNotice}</p>
               <button className="primary-button" type="button" onClick={clearSessionNotice}>
-                Tamam
+                {t("login.noticeOk")}
               </button>
             </section>
           </div>
         ) : null}
 
         <div className="demo-users">
-          <span>Demo hesaplar:</span>
+          <span>{t("login.demoUsers")}</span>
           {demoUsers.map((demoUser) => (
             <button
               key={demoUser.username}

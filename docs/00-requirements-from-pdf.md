@@ -49,15 +49,30 @@ The project measures whether the team can build a frontend architecture that can
 - ORM with EF Core.
 - Database: SQLite, PostgreSQL or MSSQL.
 
-## Bonus Scope Included In This Implementation
+## Extended Scope Included In This Implementation
+
+The PDF marks some items as bonus or optional. For this project, these are treated as quality targets rather than "nice to have" items whenever they help the final code review story.
 
 - Role-based UI.
 - Role-based backend checks.
 - Dashboard lists by status.
+- i18n/language support.
 - Dark/light theme.
+- Responsive design.
 - Drag/drop field ordering in form designer.
 - State transition audit logs.
+- Transaction handling around form/process updates.
 - Unit tests for state machine transitions.
+
+## Later Production-Readiness Roadmap
+
+These items are not required by the PDF, but they fit the goal of building the most complete version we can reasonably deliver:
+
+- PostgreSQL/Neon setup for shared remote database development.
+- Docker setup for repeatable API, web and database startup.
+- Stronger authentication lifecycle with refresh-token style remember-me behavior.
+- Admin-managed user onboarding and role approval.
+- CI checks for backend tests, frontend lint/build and later end-to-end flows.
 
 ## Important Evaluation Point
 
