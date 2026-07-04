@@ -116,6 +116,7 @@ Frontend files and areas:
 - `ProcessDetailPanel`
 - `AuditTimeline`
 - `StatusBadge`
+- `docs/12-cagdas-process-flow.md`
 
 Tests and review notes:
 
