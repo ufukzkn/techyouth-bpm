@@ -13,11 +13,17 @@
   - Stores a PBKDF2 password hash and starts with `IsEmailVerified=false`.
 - `GET /api/auth/me`
   - Hashes the incoming bearer token and reads the current unexpired session.
-  - Returns active user information.
+  - Returns active user information, including email verification and temporary-password requirement.
+- `PATCH /api/auth/me/profile`
+  - Updates the current user's display name and email.
+  - If email changes, resets `IsEmailVerified=false` and clears any previous verification code.
+- `POST /api/auth/me/password`
+  - Verifies the current password and stores the new password as a PBKDF2 hash.
+  - Clears `MustChangePassword` after a temporary-password user sets a real password.
 - `POST /api/auth/logout`
   - Revokes the current session in the database.
 - `GET /api/auth/sessions`
-  - Lists active sessions for the current user.
+  - Lists active sessions for the current user, including created time, last seen time, IP address and user agent.
 - `DELETE /api/auth/sessions/{sessionId}`
   - Revokes a selected session belonging to the current user.
 - `POST /api/auth/me/email-verification`
@@ -34,13 +40,17 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
 
 - `GET /api/users`
   - Admin-only list of registered users, statuses, roles, verification state and lockout info.
+- `POST /api/users`
+  - Admin-only user creation with username, display name, email, role, status and temporary password.
+  - New admin-created users start with `MustChangePassword=true`.
 - `PATCH /api/users/{userId}/access`
   - Admin-only role/status update.
   - Used for approving `PendingApproval` accounts, rejecting accounts or changing roles.
   - Moving a user out of `Active` revokes existing sessions.
+  - Audit text records the previous role/status and the new role/status.
 - `GET /api/users/{userId}/sessions`
   - Admin-only active-session list for the selected user.
-  - Used by the `Yetki ve Onay` detail panel to show whether a user is online and which sessions are active.
+  - Used by the `Yetki ve Onay` detail panel to show whether a user is online, which sessions are active and which device/IP last touched the API.
 - `DELETE /api/users/{userId}/sessions/{sessionId}`
   - Admin-only session revoke for the selected user.
   - The frontend asks for confirmation before sending this request.
@@ -103,7 +113,7 @@ Most endpoints require `Authorization: Bearer <token>`. Use `POST /api/auth/logi
 
 Controllers should stay thin. Services own decisions:
 
-- `AuthService`: registration, password hash verification, lockout, session-token hashing, session revoke, email verification and admin user access.
+- `AuthService`: registration, profile updates, password changes, password hash verification, lockout, session-token hashing, session metadata, session revoke, email verification and admin user access.
 - `SystemAuditService`: critical system-action logging and Admin-only audit list.
 - `FormService`: form definition CRUD and field validation.
 - `ProcessService`: process start, detail and listing.
@@ -115,8 +125,8 @@ Controllers should stay thin. Services own decisions:
 
 The frontend API client now exposes one method for each planned endpoint:
 
-- Auth: `register`, `login`, `me`, `logout`, `listSessions`, `revokeSession`, `startEmailVerification`, `confirmEmailVerification`
-- Users: `listUsers`, `updateUserAccess`
+- Auth: `register`, `login`, `me`, `logout`, `updateProfile`, `changePassword`, `listSessions`, `revokeSession`, `startEmailVerification`, `confirmEmailVerification`
+- Users: `listUsers`, `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`
 - Audit: `listSystemAuditLogs`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`
 - Processes: `startProcess`, `listProcesses`, `getProcess`

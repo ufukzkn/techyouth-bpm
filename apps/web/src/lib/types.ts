@@ -9,6 +9,7 @@ export type User = {
   role: Role;
   status: UserStatus;
   isEmailVerified: boolean;
+  mustChangePassword: boolean;
 };
 
 export type LoginResponse = {
@@ -36,6 +37,27 @@ export type UserSession = {
   expiresAt: string;
   lastSeenAt?: string | null;
   isCurrent: boolean;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+};
+
+export type UpdateProfileRequest = {
+  displayName: string;
+  email: string;
+};
+
+export type ChangePasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type CreateUserAdminRequest = {
+  username: string;
+  displayName: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+  temporaryPassword: string;
 };
 
 export type EmailVerificationStartResponse = {

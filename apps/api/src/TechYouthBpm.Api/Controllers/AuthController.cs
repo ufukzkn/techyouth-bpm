@@ -21,7 +21,11 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await AuthService.LoginAsync(request, cancellationToken);
+        var result = await AuthService.LoginAsync(
+            request,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString(),
+            cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -37,6 +41,32 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     {
         var result = await AuthService.LogoutAsync(CurrentToken(), cancellationToken);
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
+    }
+
+    [HttpPatch("me/profile")]
+    public async Task<IActionResult> UpdateProfile(UpdateProfileRequest request, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await AuthService.UpdateProfileAsync(request, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpPost("me/password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await AuthService.ChangePasswordAsync(request, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
     [HttpGet("sessions")]

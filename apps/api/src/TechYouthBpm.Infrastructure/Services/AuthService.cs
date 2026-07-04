@@ -94,7 +94,11 @@ public class AuthService(
         return Result<RegisterResponse>.Success(new RegisterResponse(user.Id, user.Username, user.Email, user.Status));
     }
 
-    public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<LoginResponse>> LoginAsync(
+        LoginRequest request,
+        string? ipAddress = null,
+        string? userAgent = null,
+        CancellationToken cancellationToken = default)
     {
         var user = await db.Users
             .SingleOrDefaultAsync(item => item.Username == request.Username, cancellationToken);
@@ -153,7 +157,9 @@ public class AuthService(
             Token = SessionTokenHasher.Hash(rawToken),
             UserId = user.Id,
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes(request.RememberMe))
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes(request.RememberMe)),
+            IpAddress = TrimOrNull(ipAddress, 128),
+            UserAgent = TrimOrNull(userAgent, 512)
         };
 
         db.UserSessions.Add(session);
@@ -192,6 +198,165 @@ public class AuthService(
         await db.SaveChangesAsync(cancellationToken);
 
         return session.User.ToDto();
+    }
+
+    public async Task<Result<UserDto>> UpdateProfileAsync(
+        UpdateProfileRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        if (user is null)
+        {
+            return Result<UserDto>.Failure("User not found.");
+        }
+
+        var displayName = request.DisplayName.Trim();
+        var email = request.Email.Trim().ToLowerInvariant();
+        var errors = ValidateProfile(displayName, email);
+        if (errors.Count > 0)
+        {
+            return Result<UserDto>.Failure(errors);
+        }
+
+        var emailExists = await db.Users.AnyAsync(
+            item => item.Id != user.Id && item.Email == email,
+            cancellationToken);
+        if (emailExists)
+        {
+            return Result<UserDto>.Failure("Email is already registered.");
+        }
+
+        var oldDisplayName = user.DisplayName;
+        var oldEmail = user.Email;
+        var emailChanged = !string.Equals(oldEmail, email, StringComparison.OrdinalIgnoreCase);
+
+        user.DisplayName = displayName;
+        user.Email = email;
+        if (emailChanged)
+        {
+            user.IsEmailVerified = false;
+            user.EmailVerificationCode = null;
+            user.EmailVerificationCodeExpiresAt = null;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            emailChanged ? "User.ProfileAndEmailUpdated" : "User.ProfileUpdated",
+            "User",
+            user.Id.ToString(),
+            emailChanged
+                ? $"Profile changed for '{user.Username}': display name '{oldDisplayName}' -> '{user.DisplayName}', email '{oldEmail}' -> '{user.Email}'. Email verification was reset."
+                : $"Profile changed for '{user.Username}': display name '{oldDisplayName}' -> '{user.DisplayName}'.",
+            cancellationToken);
+
+        return Result<UserDto>.Success(user.ToDto());
+    }
+
+    public async Task<Result<UserDto>> ChangePasswordAsync(
+        ChangePasswordRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        if (user is null)
+        {
+            return Result<UserDto>.Failure("User not found.");
+        }
+
+        if (!PasswordMatches(request.CurrentPassword, user.Password))
+        {
+            return Result<UserDto>.Failure("Current password is incorrect.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+        {
+            return Result<UserDto>.Failure("Password must be at least 8 characters.");
+        }
+
+        var wasTemporary = user.MustChangePassword;
+        user.Password = PasswordHasher.Hash(request.NewPassword);
+        user.MustChangePassword = false;
+        user.FailedLoginCount = 0;
+        user.LockedUntil = null;
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            wasTemporary ? "Auth.TemporaryPasswordChanged" : "Auth.PasswordChanged",
+            "User",
+            user.Id.ToString(),
+            wasTemporary
+                ? $"User '{user.Username}' changed the temporary password required on first sign-in."
+                : $"User '{user.Username}' changed their password.",
+            cancellationToken);
+
+        return Result<UserDto>.Success(user.ToDto());
+    }
+
+    public async Task<Result<UserAdminDto>> CreateUserAsync(
+        CreateUserRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result<UserAdminDto>.Failure("Only Admin users can create users.");
+        }
+
+        var username = request.Username.Trim();
+        var displayName = request.DisplayName.Trim();
+        var email = request.Email.Trim().ToLowerInvariant();
+        var errors = ValidateProfile(displayName, email);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            errors.Add("Username is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.TemporaryPassword) || request.TemporaryPassword.Length < 8)
+        {
+            errors.Add("Password must be at least 8 characters.");
+        }
+
+        if (errors.Count > 0)
+        {
+            return Result<UserAdminDto>.Failure(errors);
+        }
+
+        var exists = await db.Users.AnyAsync(
+            user => user.Username == username || user.Email == email,
+            cancellationToken);
+        if (exists)
+        {
+            return Result<UserAdminDto>.Failure("Username or email is already registered.");
+        }
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = username,
+            DisplayName = displayName,
+            Email = email,
+            Password = PasswordHasher.Hash(request.TemporaryPassword),
+            Role = request.Role,
+            Status = request.Status,
+            IsEmailVerified = false,
+            MustChangePassword = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "User.CreatedByAdmin",
+            "User",
+            user.Id.ToString(),
+            $"Admin '{currentUser.Username}' created user '{user.Username}' with role {user.Role}, status {user.Status} and temporary-password requirement.",
+            cancellationToken);
+
+        return Result<UserAdminDto>.Success(user.ToAdminDto());
     }
 
     public async Task<Result<IReadOnlyList<UserAdminDto>>> ListUsersAsync(
@@ -263,7 +428,9 @@ public class AuthService(
                 session.CreatedAt,
                 session.ExpiresAt,
                 session.LastSeenAt,
-                session.Token == currentTokenHash))
+                session.Token == currentTokenHash,
+                session.IpAddress,
+                session.UserAgent))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
@@ -295,7 +462,9 @@ public class AuthService(
                 session.CreatedAt,
                 session.ExpiresAt,
                 session.LastSeenAt,
-                session.Token == currentTokenHash))
+                session.Token == currentTokenHash,
+                session.IpAddress,
+                session.UserAgent))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
@@ -484,6 +653,33 @@ public class AuthService(
     {
         var configuredValue = configuration[key];
         return int.TryParse(configuredValue, out var value) && value > 0 ? value : fallback;
+    }
+
+    private static List<string> ValidateProfile(string displayName, string email)
+    {
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            errors.Add("Display name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
+        {
+            errors.Add("A valid email is required.");
+        }
+
+        return errors;
+    }
+
+    private static string? TrimOrNull(string? value, int maxLength)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
     }
 
     private async Task RevokeAllSessionsForUserAsync(Guid userId, CancellationToken cancellationToken)

@@ -6,8 +6,24 @@ namespace TechYouthBpm.Application.Services;
 public interface IAuthService
 {
     Task<Result<RegisterResponse>> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default);
-    Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
+    Task<Result<LoginResponse>> LoginAsync(
+        LoginRequest request,
+        string? ipAddress = null,
+        string? userAgent = null,
+        CancellationToken cancellationToken = default);
     Task<UserDto?> GetUserByTokenAsync(string token, CancellationToken cancellationToken = default);
+    Task<Result<UserDto>> UpdateProfileAsync(
+        UpdateProfileRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default);
+    Task<Result<UserDto>> ChangePasswordAsync(
+        ChangePasswordRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default);
+    Task<Result<UserAdminDto>> CreateUserAsync(
+        CreateUserRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<UserAdminDto>>> ListUsersAsync(UserDto currentUser, CancellationToken cancellationToken = default);
     Task<Result<UserAdminDto>> UpdateUserAccessAsync(
         Guid userId,

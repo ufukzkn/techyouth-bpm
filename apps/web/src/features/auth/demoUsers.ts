@@ -29,6 +29,7 @@ export function loginWithDemoUser(username: string, password: string, rememberMe
       role: user.role,
       status: "Active",
       isEmailVerified: true,
+      mustChangePassword: false,
     },
   };
 }

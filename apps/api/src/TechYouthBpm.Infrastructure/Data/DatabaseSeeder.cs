@@ -22,12 +22,77 @@ public static class DatabaseSeeder
     public static async Task SeedAsync(AppDbContext db, bool seedMockData = true, CancellationToken cancellationToken = default)
     {
         await db.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureIdentitySchemaAsync(db, cancellationToken);
         await SeedUsersAsync(db, cancellationToken);
 
         if (seedMockData)
         {
             await SeedMockWorkflowDataAsync(db, cancellationToken);
         }
+    }
+
+    private static async Task EnsureIdentitySchemaAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var provider = db.Database.ProviderName ?? string.Empty;
+        if (provider.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!await SqliteColumnExistsAsync(db, "Users", "MustChangePassword", cancellationToken))
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE Users ADD COLUMN MustChangePassword INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync(db, "UserSessions", "IpAddress", cancellationToken))
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE UserSessions ADD COLUMN IpAddress TEXT NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync(db, "UserSessions", "UserAgent", cancellationToken))
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE UserSessions ADD COLUMN UserAgent TEXT NULL",
+                    cancellationToken);
+            }
+
+            return;
+        }
+
+        if (provider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "MustChangePassword" boolean NOT NULL DEFAULT false""",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "UserSessions" ADD COLUMN IF NOT EXISTS "IpAddress" text NULL""",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "UserSessions" ADD COLUMN IF NOT EXISTS "UserAgent" text NULL""",
+                cancellationToken);
+        }
+    }
+
+    private static async Task<bool> SqliteColumnExistsAsync(
+        AppDbContext db,
+        string tableName,
+        string columnName,
+        CancellationToken cancellationToken)
+    {
+        await db.Database.OpenConnectionAsync(cancellationToken);
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.CommandText = $"PRAGMA table_info({tableName})";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (string.Equals(reader.GetString(1), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static async Task SeedUsersAsync(AppDbContext db, CancellationToken cancellationToken)

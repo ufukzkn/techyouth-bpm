@@ -131,9 +131,9 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 
 Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
 
-Session tokens are stored as SHA-256 hashes. Active sessions can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`.
+Session tokens are stored as SHA-256 hashes. Active sessions include created time, last seen time, IP address and user agent, then can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`.
 
-The current local setup uses `EnsureCreated`, not migrations. When entity columns change, existing SQLite files may not get the new columns automatically. After identity/schema changes, reset local SQLite before testing:
+The current local setup uses `EnsureCreated`, not formal migrations. Identity schema additions for `Users.MustChangePassword`, `UserSessions.IpAddress` and `UserSessions.UserAgent` are patched idempotently by `DatabaseSeeder` on startup for SQLite and PostgreSQL. If a local database still behaves strangely after schema changes, reset local SQLite before testing:
 
 ```powershell
 ./scripts/run-api-local.ps1 -ResetDb -Force

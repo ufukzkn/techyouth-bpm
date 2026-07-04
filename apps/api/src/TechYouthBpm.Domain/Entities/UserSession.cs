@@ -10,4 +10,6 @@ public class UserSession
     public DateTime ExpiresAt { get; set; }
     public DateTime? RevokedAt { get; set; }
     public DateTime? LastSeenAt { get; set; }
+    public string? IpAddress { get; set; }
+    public string? UserAgent { get; set; }
 }

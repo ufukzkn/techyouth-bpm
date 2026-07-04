@@ -295,6 +295,174 @@ public class AuthServiceTests
         Assert.Contains("Only Admin users", sessions.Errors[0]);
     }
 
+    [Fact]
+    public async Task LoginAsync_Stores_Session_Metadata()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.LoginAsync(new LoginRequest("admin", "admin123"), "127.0.0.1", "Chrome on Windows");
+
+        Assert.True(result.IsSuccess);
+        var session = Assert.Single(db.UserSessions);
+        Assert.Equal("127.0.0.1", session.IpAddress);
+        Assert.Equal("Chrome on Windows", session.UserAgent);
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_Allows_Admin_To_Create_Temporary_Password_User()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(admin);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+
+        var result = await service.CreateUserAsync(
+            new CreateUserRequest("newuser", "New User", "new@test.local", Role.Approver, UserStatus.Active, "password123"),
+            adminDto);
+
+        Assert.True(result.IsSuccess);
+        var created = db.Users.Single(user => user.Username == "newuser");
+        Assert.True(created.MustChangePassword);
+        Assert.False(created.IsEmailVerified);
+        Assert.StartsWith("pbkdf2:v1:", created.Password, StringComparison.Ordinal);
+        Assert.Contains(db.SystemAuditLogs, log => log.Action == "User.CreatedByAdmin");
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_Rejects_Non_Admin()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "user123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, true);
+
+        var result = await service.CreateUserAsync(
+            new CreateUserRequest("newuser", "New User", "new@test.local", Role.User, UserStatus.Active, "password123"),
+            userDto);
+
+        Assert.False(result.IsSuccess);
+        Assert.DoesNotContain(db.Users, item => item.Username == "newuser");
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_Clears_Temporary_Password_Requirement()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "temp",
+            DisplayName = "Temp User",
+            Email = "temp@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active,
+            MustChangePassword = true
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, true, true);
+
+        var result = await service.ChangePasswordAsync(new ChangePasswordRequest("password123", "newpass123"), userDto);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(user.MustChangePassword);
+        Assert.StartsWith("pbkdf2:v1:", user.Password, StringComparison.Ordinal);
+        Assert.Contains(db.SystemAuditLogs, log => log.Action == "Auth.TemporaryPasswordChanged");
+    }
+
+    [Fact]
+    public async Task ChangePasswordAsync_Rejects_Wrong_Current_Password()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, true);
+
+        var result = await service.ChangePasswordAsync(new ChangePasswordRequest("wrong", "newpass123"), userDto);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("password123", user.Password);
+    }
+
+    [Fact]
+    public async Task UpdateProfileAsync_Resets_Email_Verification_When_Email_Changes()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active,
+            IsEmailVerified = true,
+            EmailVerificationCode = "old-code",
+            EmailVerificationCodeExpiresAt = DateTime.UtcNow.AddMinutes(5)
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, true);
+
+        var result = await service.UpdateProfileAsync(new UpdateProfileRequest("Updated User", "updated@test.local"), userDto);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Updated User", user.DisplayName);
+        Assert.Equal("updated@test.local", user.Email);
+        Assert.False(user.IsEmailVerified);
+        Assert.Null(user.EmailVerificationCode);
+        Assert.Null(user.EmailVerificationCodeExpiresAt);
+    }
+
     private static IConfiguration CreateTestConfiguration() => new TestConfiguration();
 
     private sealed class TestConfiguration : IConfiguration

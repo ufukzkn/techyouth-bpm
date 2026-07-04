@@ -21,6 +21,19 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
+    [HttpPost]
+    public async Task<IActionResult> Create(CreateUserRequest request, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await AuthService.CreateUserAsync(request, user, cancellationToken);
+        return result.IsSuccess ? Created($"/api/users/{result.Value!.Id}", result.Value) : ValidationProblem(result.Errors);
+    }
+
     [HttpPatch("{userId:guid}/access")]
     public async Task<IActionResult> UpdateAccess(
         Guid userId,

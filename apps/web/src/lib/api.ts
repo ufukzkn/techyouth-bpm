@@ -1,5 +1,6 @@
 import type {
   CreateFormRequest,
+  CreateUserAdminRequest,
   EmailVerificationStartResponse,
   FormDefinition,
   LoginResponse,
@@ -10,11 +11,13 @@ import type {
   StartProcessRequest,
   SystemAuditLog,
   TaskActionRequest,
+  UpdateProfileRequest,
   User,
   UserAdmin,
   UserSession,
   UserStatus,
   Role,
+  ChangePasswordRequest,
 } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5291";
@@ -76,6 +79,20 @@ export const api = {
   logout(token: string) {
     return request<void>("/api/auth/logout", { method: "POST", token });
   },
+  updateProfile(token: string, payload: UpdateProfileRequest) {
+    return request<User>("/api/auth/me/profile", {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  changePassword(token: string, payload: ChangePasswordRequest) {
+    return request<User>("/api/auth/me/password", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
   listSessions(token: string) {
     return request<UserSession[]>("/api/auth/sessions", { token });
   },
@@ -94,6 +111,13 @@ export const api = {
   },
   listUsers(token: string) {
     return request<UserAdmin[]>("/api/users", { token });
+  },
+  createUser(token: string, payload: CreateUserAdminRequest) {
+    return request<UserAdmin>("/api/users", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
   },
   updateUserAccess(token: string, userId: string, role: Role, status: UserStatus) {
     return request<UserAdmin>(`/api/users/${userId}/access`, {

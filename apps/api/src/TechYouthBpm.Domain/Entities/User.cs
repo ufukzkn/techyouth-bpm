@@ -12,6 +12,7 @@ public class User
     public Role Role { get; set; }
     public UserStatus Status { get; set; } = UserStatus.Active;
     public bool IsEmailVerified { get; set; }
+    public bool MustChangePassword { get; set; }
     public int FailedLoginCount { get; set; }
     public DateTime? LockedUntil { get; set; }
     public string? EmailVerificationCode { get; set; }
