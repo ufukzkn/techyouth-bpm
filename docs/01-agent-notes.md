@@ -8,7 +8,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Repository target: private `ufukzkn/techyouth-bpm`.
 - Frontend: Next.js App Router, TypeScript, Zustand.
 - Backend: .NET 8 Web API, EF Core, selectable SQLite/PostgreSQL provider.
-- Active database mode for now: SQLite. PostgreSQL/Neon setup is deferred to a later session.
+- Default database mode: SQLite. Shared team testing can use Neon PostgreSQL through `.env.neon.local` and `scripts/run-api-neon.ps1`.
 - Documentation must be kept current as code changes.
 - Team split: flow-based, not layer-based.
 - Frontend target is multi-screen navigation. Hash-scroll sections were only an early scaffold and should not be treated as final UX.

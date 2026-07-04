@@ -2,9 +2,9 @@
 
 ## Current Decision
 
-The active development and demo database is SQLite for now. PostgreSQL/Neon support exists in configuration, but the team will set it up in a later session.
+The default development and demo database is SQLite. A shared Neon PostgreSQL database can also be used when the team wants to test common data, shared sessions and audit history across different machines.
 
-SQLite is enough for the current local demo because the PDF allows SQLite, PostgreSQL or MSSQL and the app already uses EF Core behind the Infrastructure layer.
+SQLite is enough for fast local demo work because the PDF allows SQLite, PostgreSQL or MSSQL and the app already uses EF Core behind the Infrastructure layer. Neon is useful for team-level remote testing.
 
 ## Local Demo Database File
 
@@ -63,6 +63,30 @@ Seed__MockData=true
 ```
 
 The script then starts the API. Keep that terminal open while using the web app. Stop it with `Ctrl + C`.
+
+## Shared Neon PostgreSQL
+
+Create a gitignored `.env.neon.local` file in the repo root:
+
+```text
+Database__Provider=PostgreSql
+ConnectionStrings__DefaultConnection=Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true;Channel Binding=Require
+Seed__MockData=true
+```
+
+Start the API against Neon:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292
+```
+
+If another API process is already using the compiled backend files, start Neon with the existing build:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292 -NoBuild
+```
+
+The Neon environment file is ignored by git. Do not commit real connection strings or passwords.
 
 The web app can be started from the repo root with:
 

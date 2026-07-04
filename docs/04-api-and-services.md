@@ -144,8 +144,8 @@ The API reads `Database:Provider` from configuration:
 - `Sqlite`: default local mode, using `Data Source=techyouth-bpm.db`.
 - `PostgreSql`: shared database mode, intended for Neon or another PostgreSQL host.
 
-The connection string is read from `ConnectionStrings:DefaultConnection`. Real PostgreSQL credentials must be supplied through environment variables or .NET user secrets. Tracked documentation and config files only contain examples.
+The connection string is read from `ConnectionStrings:DefaultConnection`. Real PostgreSQL credentials must be supplied through environment variables, .NET user secrets or a gitignored `.env.neon.local` file. Tracked documentation and config files only contain examples.
 
-Local SQLite setup, current schema summary and reset/start commands are documented in `docs/08-local-database.md`. Any schema, seed data or local startup change should update that document and `scripts/run-api-local.ps1`.
+Local SQLite and shared Neon setup, current schema summary and reset/start commands are documented in `docs/08-local-database.md`. Any schema, seed data or local startup change should update that document and the matching startup script.
 
 The local startup script enables `Seed__MockData=true` by default. This adds two form definitions, football-themed process submissions, open approver tasks and completed/rejected audit examples. Use `-SkipMockData` when a teammate needs a nearly empty local database.

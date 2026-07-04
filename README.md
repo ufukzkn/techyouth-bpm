@@ -102,6 +102,26 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=your-neon-ho
 
 Ornek format icin `apps/api/src/TechYouthBpm.Api/appsettings.example.json` dosyasi incelenebilir.
 
+Neon icin repo kokunde gitignored `.env.neon.local` dosyasi olusturulabilir:
+
+```text
+Database__Provider=PostgreSql
+ConnectionStrings__DefaultConnection=Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true;Channel Binding=Require
+Seed__MockData=true
+```
+
+Neon baglantisi ayri bir portta denenmek istenirse:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292
+```
+
+SQLite API ayni anda aciksa build dosyalari kilitlenebilir. Bu durumda mevcut build ile Neon'u baslatmak icin:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292 -NoBuild
+```
+
 ## Run Locally
 
 Iki ayri terminal kullanmak en temiz yoldur.
