@@ -99,6 +99,11 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 | `admin` | `admin123` | Admin | Active | true |
 | `user` | `user123` | User | Active | true |
 | `approver` | `approver123` | Approver | Active | true |
+| `mario.gomez` | `mario123` | User | PendingApproval | false |
+| `quaresma` | `trivela123` | Approver | Active | true |
+| `atiba` | `atiba123` | User | Active | true |
+| `alex` | `alex123` | User | Rejected | true |
+| `fatih.terim` | `imparator123` | Admin | PendingApproval | false |
 
 Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
 
@@ -117,10 +122,11 @@ When mock data is enabled, the seeder also creates:
 - 8 demo process instances.
 - 4 open approver tasks.
 - completed/rejected examples with audit logs.
+- system audit examples for registration, login, role/status updates, form updates, process start and task approval.
 
 The seeded form/process data uses deterministic IDs and is idempotent, so restarting the API does not duplicate records. Resetting the SQLite database with `-ResetDb -Force` recreates the full demo scenario.
 
-Mock process names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim and Senol Gunes. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
+Mock user, process and log names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim and Senol Gunes. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
 
 ## Maintenance Rule
 

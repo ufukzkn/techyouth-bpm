@@ -51,7 +51,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Frontend API client expanded with form, process and task methods so feature components can be wired without scattering fetch calls.
 - Backend database provider selection added so local SQLite and shared PostgreSQL/Neon can use the same service/domain code.
 - Local SQLite database guide and reset/start helper script added for teammate onboarding.
-- Local SQLite startup now seeds optional mock workflow data by default: football-themed forms, processes, tasks and audit logs. Use `-SkipMockData` for a nearly empty DB.
+- Local SQLite startup now seeds optional mock workflow data by default: football-themed users, forms, processes, tasks and system/process audit logs. Use `-SkipMockData` for a nearly empty DB.
 - Login no longer pre-fills credentials; demo buttons only fill credentials for testing.
 - Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a confirmable alert dialog instead of flickering or polling.
 - Session duration is configuration-driven through `Auth:SessionDurationMinutes` and is currently 120 minutes. `Auth:RememberMeDurationMinutes` backs the basic remember-me option; a future production version can harden this with refresh-token rotation.

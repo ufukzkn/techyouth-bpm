@@ -764,23 +764,19 @@ function UsersAndRolesView({ language, token }: { language: Language; token: str
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visibleUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const selectedUser = users.find((managedUser) => managedUser.id === selectedUserId) ?? visibleUsers[0] ?? null;
-  const selectedUserLogs = useMemo(() => {
-    if (!selectedUserId) {
-      return [];
-    }
-
-    const selectedUsername = users.find((managedUser) => managedUser.id === selectedUserId)?.username.toLowerCase();
-
-    return logs
-      .filter(
-        (log) =>
-          log.actorUserId === selectedUserId ||
-          (log.entityType === "User" && log.entityId === selectedUserId) ||
-          (selectedUsername ? log.actorUsername.toLowerCase() === selectedUsername : false),
-      )
-      .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
-  }, [logs, selectedUserId, users]);
+  const selectedUser = filteredUsers.find((managedUser) => managedUser.id === selectedUserId) ?? visibleUsers[0] ?? null;
+  const effectiveSelectedUserId = selectedUser?.id ?? null;
+  const selectedUsername = selectedUser?.username.toLowerCase();
+  const selectedUserLogs = effectiveSelectedUserId
+    ? logs
+        .filter(
+          (log) =>
+            log.actorUserId === effectiveSelectedUserId ||
+            (log.entityType === "User" && log.entityId === effectiveSelectedUserId) ||
+            (selectedUsername ? log.actorUsername.toLowerCase() === selectedUsername : false),
+        )
+        .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
+    : [];
 
   async function updateUserAccess(userId: string, role: Role, status: UserStatus) {
     if (!token) {
@@ -1040,7 +1036,7 @@ function SystemLogsView({ language, token }: { language: Language; token: string
           <div className="system-audit-list">
             {visibleLogs.map((log) => (
               <article className="settings-row system-audit-row" key={log.id}>
-                <div>
+                <div className="system-audit-content">
                   <span>{log.action}</span>
                   <strong>{log.description}</strong>
                   <small>

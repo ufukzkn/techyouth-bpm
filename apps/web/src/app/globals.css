@@ -1157,6 +1157,11 @@ input[type="checkbox"] {
   text-align: right;
 }
 
+.system-audit-content {
+  display: grid;
+  gap: 6px;
+}
+
 .stacked-summary {
   display: grid;
   gap: 5px;
