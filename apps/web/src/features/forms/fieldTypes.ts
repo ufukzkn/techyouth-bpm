@@ -18,7 +18,7 @@ export function fieldTypeLabel(language: Language, fieldType: FieldType) {
 }
 
 export function fieldTypeUsesOptions(fieldType: FieldType) {
-  return fieldType === "Select" || fieldType === "Checkbox";
+  return fieldType === "Select";
 }
 
 export function createDefaultOptions(fieldType: FieldType, language: Language = "tr") {
