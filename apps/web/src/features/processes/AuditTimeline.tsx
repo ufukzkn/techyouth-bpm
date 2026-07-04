@@ -38,7 +38,9 @@ export function AuditTimeline({ logs, language }: AuditTimelineProps) {
                 </span>
               </div>
               <div className="audit-meta">
-                <span>{log.userDisplayName}</span>
+                <span>
+                  {log.userDisplayName} / {log.userUsername}
+                </span>
                 <time dateTime={log.createdAt}>
                   {new Date(log.createdAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}
                 </time>

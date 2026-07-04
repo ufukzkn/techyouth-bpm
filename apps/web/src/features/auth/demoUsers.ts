@@ -25,7 +25,10 @@ export function loginWithDemoUser(username: string, password: string, rememberMe
       id: user.username,
       username: user.username,
       displayName: user.displayName,
+      email: `${user.username}@techyouth.local`,
       role: user.role,
+      status: "Active",
+      isEmailVerified: true,
     },
   };
 }

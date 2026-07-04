@@ -256,6 +256,31 @@ select:focus-visible {
   gap: 14px;
 }
 
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.segmented-control button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.08);
+}
+
 .login-form label {
   display: grid;
   gap: 7px;
@@ -1011,6 +1036,12 @@ input[type="checkbox"] {
   background: var(--surface);
 }
 
+.settings-row small {
+  color: var(--muted);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
 .settings-row span {
   color: var(--muted);
   font-size: 12px;
@@ -1020,6 +1051,305 @@ input[type="checkbox"] {
 
 .settings-row strong {
   overflow-wrap: anywhere;
+}
+
+.identity-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.identity-section h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.session-danger-action {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.inline-form input,
+.search-field input,
+.filter-toolbar select,
+.access-editor select,
+.user-management-row select {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--foreground);
+  background: var(--surface);
+}
+
+.filter-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(150px, auto);
+  gap: 10px;
+  align-items: center;
+}
+
+.search-field {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.search-field input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.management-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.compact-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.session-list,
+.user-management-list,
+.system-audit-list {
+  display: grid;
+  gap: 10px;
+}
+
+.audit-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.audit-category-card {
+  display: grid;
+  gap: 5px;
+  min-height: 104px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  text-align: left;
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.audit-category-card:hover,
+.audit-category-card.is-active {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.audit-category-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.audit-category-card strong {
+  font-size: 26px;
+}
+
+.audit-category-card small {
+  color: var(--muted);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.session-row,
+.user-management-row,
+.system-audit-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.user-management-row {
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.system-audit-meta {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
+}
+
+.system-audit-content {
+  display: grid;
+  gap: 6px;
+}
+
+.stacked-summary {
+  display: grid;
+  gap: 5px;
+}
+
+.status-pill {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: var(--foreground);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.status-active {
+  color: #0f6b43;
+  background: color-mix(in srgb, #2bb673 12%, var(--surface));
+  border-color: color-mix(in srgb, #2bb673 34%, var(--border));
+}
+
+.status-pendingapproval {
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+}
+
+.status-rejected {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+.access-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+}
+
+.access-editor .primary-button {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.nested-identity-section {
+  background: var(--surface-muted);
+}
+
+.access-confirm-dialog {
+  max-width: 560px;
+}
+
+.access-confirm-dialog .action-dialog-header svg {
+  color: var(--danger);
+}
+
+.access-confirm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pagination-controls .icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.system-audit-timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.system-audit-event {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-left: 3px solid var(--primary);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.system-audit-event span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.system-audit-event small {
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.danger-button:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.strong-danger-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  border-radius: 7px;
+  color: #ffffff;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--danger) 82%, #8a1220);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.strong-danger-button:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--danger) 76%, #ffffff);
+  background: color-mix(in srgb, var(--danger) 94%, #5f0711);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+.strong-danger-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .section-toolbar {
@@ -1784,8 +2114,31 @@ input[type="checkbox"] {
   .runner-grid,
   .detail-list,
   .settings-grid,
+  .inline-form,
+  .filter-toolbar,
+  .management-layout,
+  .audit-category-grid,
+  .session-row,
+  .user-management-row,
+  .system-audit-row,
+  .compact-grid,
+  .access-editor,
+  .access-confirm-grid,
   .rule-row {
     grid-template-columns: 1fr;
+  }
+
+  .system-audit-meta {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .session-danger-action {
+    justify-content: stretch;
+  }
+
+  .session-danger-action .strong-danger-button {
+    width: 100%;
   }
 
   .workspace-header,

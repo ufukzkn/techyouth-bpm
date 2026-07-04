@@ -1,15 +1,46 @@
 export type Role = "Admin" | "User" | "Approver";
+export type UserStatus = "PendingApproval" | "Active" | "Rejected";
 
 export type User = {
   id: string;
   username: string;
   displayName: string;
+  email: string;
   role: Role;
+  status: UserStatus;
+  isEmailVerified: boolean;
 };
 
 export type LoginResponse = {
   token: string;
   user: User;
+  expiresAt: string;
+};
+
+export type RegisterResponse = {
+  id: string;
+  username: string;
+  email: string;
+  status: UserStatus;
+};
+
+export type UserAdmin = User & {
+  failedLoginCount: number;
+  lockedUntil?: string | null;
+  createdAt: string;
+};
+
+export type UserSession = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  lastSeenAt?: string | null;
+  isCurrent: boolean;
+};
+
+export type EmailVerificationStartResponse = {
+  message: string;
+  demoCode: string;
   expiresAt: string;
 };
 
@@ -72,9 +103,23 @@ export type AuditLog = {
   action: WorkflowAction;
   fromStatus: ProcessStatus;
   toStatus: ProcessStatus;
+  userId: string;
   userDisplayName: string;
+  userUsername: string;
   createdAt: string;
   note: string;
+};
+
+export type SystemAuditLog = {
+  id: string;
+  actorUserId?: string | null;
+  actorDisplayName: string;
+  actorUsername: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  description: string;
+  createdAt: string;
 };
 
 export type ProcessSummary = {

@@ -13,6 +13,11 @@ public static class DatabaseSeeder
     private static readonly Guid AdminId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid UserId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid ApproverId = Guid.Parse("33333333-3333-3333-3333-333333333333");
+    private static readonly Guid MarioGomezId = Guid.Parse("44444444-4444-4444-4444-444444444444");
+    private static readonly Guid QuaresmaId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+    private static readonly Guid AtibaId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+    private static readonly Guid AlexId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+    private static readonly Guid FatihTerimId = Guid.Parse("88888888-8888-8888-8888-888888888888");
 
     public static async Task SeedAsync(AppDbContext db, bool seedMockData = true, CancellationToken cancellationToken = default)
     {
@@ -39,24 +44,96 @@ public static class DatabaseSeeder
                 Id = AdminId,
                 Username = "admin",
                 DisplayName = "Admin User",
+                Email = "admin@techyouth.local",
                 Password = PasswordHasher.Hash("admin123"),
-                Role = Role.Admin
+                Role = Role.Admin,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-30)
             },
             new User
             {
                 Id = UserId,
                 Username = "user",
                 DisplayName = "Process Starter",
+                Email = "user@techyouth.local",
                 Password = PasswordHasher.Hash("user123"),
-                Role = Role.User
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-29)
             },
             new User
             {
                 Id = ApproverId,
                 Username = "approver",
                 DisplayName = "Process Approver",
+                Email = "approver@techyouth.local",
                 Password = PasswordHasher.Hash("approver123"),
-                Role = Role.Approver
+                Role = Role.Approver,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-28)
+            },
+            new User
+            {
+                Id = MarioGomezId,
+                Username = "mario.gomez",
+                DisplayName = "Mario Gomez",
+                Email = "mario.gomez@techyouth.local",
+                Password = PasswordHasher.Hash("mario123"),
+                Role = Role.User,
+                Status = UserStatus.PendingApproval,
+                IsEmailVerified = false,
+                CreatedAt = DateTime.UtcNow.AddDays(-6)
+            },
+            new User
+            {
+                Id = QuaresmaId,
+                Username = "quaresma",
+                DisplayName = "Ricardo Quaresma",
+                Email = "quaresma@techyouth.local",
+                Password = PasswordHasher.Hash("trivela123"),
+                Role = Role.Approver,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-14)
+            },
+            new User
+            {
+                Id = AtibaId,
+                Username = "atiba",
+                DisplayName = "Atiba Hutchinson",
+                Email = "atiba@techyouth.local",
+                Password = PasswordHasher.Hash("atiba123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-11)
+            },
+            new User
+            {
+                Id = AlexId,
+                Username = "alex",
+                DisplayName = "Alex de Souza",
+                Email = "alex@techyouth.local",
+                Password = PasswordHasher.Hash("alex123"),
+                Role = Role.User,
+                Status = UserStatus.Rejected,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-8)
+            },
+            new User
+            {
+                Id = FatihTerimId,
+                Username = "fatih.terim",
+                DisplayName = "Fatih Terim",
+                Email = "fatih.terim@techyouth.local",
+                Password = PasswordHasher.Hash("imparator123"),
+                Role = Role.Admin,
+                Status = UserStatus.PendingApproval,
+                IsEmailVerified = false,
+                CreatedAt = DateTime.UtcNow.AddDays(-3)
             });
 
         await db.SaveChangesAsync(cancellationToken);
@@ -142,6 +219,7 @@ public static class DatabaseSeeder
 
         db.FormDefinitions.AddRange(transferForm, campForm);
         db.ProcessInstances.AddRange(BuildMockProcesses(transferForm.Id, campForm.Id));
+        db.SystemAuditLogs.AddRange(BuildMockSystemAuditLogs());
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -375,6 +453,98 @@ public static class DatabaseSeeder
 
         return process;
     }
+
+    private static IReadOnlyList<SystemAuditLog> BuildMockSystemAuditLogs()
+    {
+        var now = DateTime.UtcNow;
+
+        return
+        [
+            SystemLog(
+                "99999999-0000-0000-0000-000000000001",
+                MarioGomezId,
+                "Auth.RegisterRequested",
+                "User",
+                MarioGomezId.ToString(),
+                "Mario Gomez registered and is waiting for admin approval.",
+                now.AddDays(-6)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000002",
+                AdminId,
+                "User.AccessUpdated",
+                "User",
+                QuaresmaId.ToString(),
+                "Ricardo Quaresma was approved as Approver.",
+                now.AddDays(-5).AddHours(2)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000003",
+                QuaresmaId,
+                "Auth.LoginSucceeded",
+                "Session",
+                "demo-quaresma-session",
+                "Ricardo Quaresma signed in before reviewing open tasks.",
+                now.AddDays(-5).AddHours(3)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000004",
+                AdminId,
+                "FormDefinition.Updated",
+                "FormDefinition",
+                "aaaaaaaa-0000-0000-0000-000000000001",
+                "Transfer Talep Formu field order was adjusted for demo review.",
+                now.AddDays(-4).AddHours(1)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000005",
+                AtibaId,
+                "Process.Started",
+                "ProcessInstance",
+                "cccccccc-0000-0000-0000-000000000005",
+                "Atiba Hutchinson started a camp preparation process.",
+                now.AddDays(-3)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000006",
+                ApproverId,
+                "Task.Approve",
+                "ProcessTask",
+                "dddddddd-0000-0000-0000-000000000005",
+                "Process cccccccc-0000-0000-0000-000000000005 was approved by Process Approver.",
+                now.AddDays(-2)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000007",
+                AlexId,
+                "Auth.LoginFailed",
+                "User",
+                AlexId.ToString(),
+                "Rejected user Alex de Souza attempted to sign in.",
+                now.AddDays(-1).AddHours(2)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000008",
+                FatihTerimId,
+                "Auth.RegisterRequested",
+                "User",
+                FatihTerimId.ToString(),
+                "Fatih Terim requested Admin-level access and is waiting for approval.",
+                now.AddHours(-8))
+        ];
+    }
+
+    private static SystemAuditLog SystemLog(
+        string id,
+        Guid actorUserId,
+        string action,
+        string entityType,
+        string? entityId,
+        string description,
+        DateTime createdAt) =>
+        new()
+        {
+            Id = Guid.Parse(id),
+            ActorUserId = actorUserId,
+            Action = action,
+            EntityType = entityType,
+            EntityId = entityId,
+            Description = description,
+            CreatedAt = createdAt
+        };
 
     private static string Serialize<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
 }

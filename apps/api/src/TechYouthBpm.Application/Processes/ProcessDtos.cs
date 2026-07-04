@@ -8,7 +8,9 @@ public record AuditLogDto(
     WorkflowAction Action,
     ProcessStatus FromStatus,
     ProcessStatus ToStatus,
+    Guid UserId,
     string UserDisplayName,
+    string UserUsername,
     DateTime CreatedAt,
     string Note);
 

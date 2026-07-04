@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.OpenApi.Models;
 using TechYouthBpm.Infrastructure;
 using TechYouthBpm.Infrastructure.Data;
@@ -10,6 +11,18 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("auth", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = builder.Configuration.GetValue("Auth:RateLimitPermitLimit", 10),
+                Window = TimeSpan.FromMinutes(builder.Configuration.GetValue("Auth:RateLimitWindowMinutes", 1)),
+                QueueLimit = 0
+            }));
+});
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -60,6 +73,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors("Web");
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

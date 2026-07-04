@@ -4,6 +4,43 @@ namespace TechYouthBpm.Application.Auth;
 
 public record LoginRequest(string Username, string Password, bool RememberMe = false);
 
-public record UserDto(Guid Id, string Username, string DisplayName, Role Role);
+public record RegisterRequest(string Username, string DisplayName, string Email, string Password);
+
+public record UserDto(
+    Guid Id,
+    string Username,
+    string DisplayName,
+    string Email,
+    Role Role,
+    UserStatus Status,
+    bool IsEmailVerified)
+{
+    public UserDto(Guid id, string username, string displayName, Role role)
+        : this(id, username, displayName, string.Empty, role, UserStatus.Active, true)
+    {
+    }
+}
 
 public record LoginResponse(string Token, UserDto User, DateTime ExpiresAt);
+
+public record RegisterResponse(Guid Id, string Username, string Email, UserStatus Status);
+
+public record UserAdminDto(
+    Guid Id,
+    string Username,
+    string DisplayName,
+    string Email,
+    Role Role,
+    UserStatus Status,
+    bool IsEmailVerified,
+    int FailedLoginCount,
+    DateTime? LockedUntil,
+    DateTime CreatedAt);
+
+public record UpdateUserAccessRequest(Role Role, UserStatus Status);
+
+public record UserSessionDto(Guid Id, DateTime CreatedAt, DateTime ExpiresAt, DateTime? LastSeenAt, bool IsCurrent);
+
+public record EmailVerificationStartResponse(string Message, string DemoCode, DateTime ExpiresAt);
+
+public record EmailVerificationConfirmRequest(string Code);

@@ -1,8 +1,8 @@
-import { ClipboardList, FilePlus2, LayoutDashboard, Settings, Workflow } from "lucide-react";
+import { ClipboardList, FilePlus2, History, LayoutDashboard, Settings, UserCog, Workflow } from "lucide-react";
 import type { TranslationKey } from "@/features/i18n/translations";
 import type { Role } from "@/lib/types";
 
-export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "settings";
+export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "users" | "logs" | "settings";
 
 export type NavItem = {
   labelKey: TranslationKey;
@@ -47,6 +47,20 @@ export const navItems: NavItem[] = [
     path: "/tasks",
     icon: ClipboardList,
     roles: ["Admin", "Approver"],
+  },
+  {
+    labelKey: "nav.users",
+    viewId: "users",
+    path: "/users",
+    icon: UserCog,
+    roles: ["Admin"],
+  },
+  {
+    labelKey: "nav.logs",
+    viewId: "logs",
+    path: "/logs",
+    icon: History,
+    roles: ["Admin"],
   },
   {
     labelKey: "nav.settings",

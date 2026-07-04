@@ -18,6 +18,7 @@ public class AuthServiceTests
             Id = Guid.NewGuid(),
             Username = "admin",
             DisplayName = "Admin User",
+            Email = "admin@test.local",
             Password = "admin123",
             Role = Role.Admin
         });
@@ -42,6 +43,7 @@ public class AuthServiceTests
             Id = Guid.NewGuid(),
             Username = "user",
             DisplayName = "Process Starter",
+            Email = "user@test.local",
             Password = "user123",
             Role = Role.User
         });
@@ -63,6 +65,7 @@ public class AuthServiceTests
             Id = Guid.NewGuid(),
             Username = "approver",
             DisplayName = "Process Approver",
+            Email = "approver@test.local",
             Password = "approver123",
             Role = Role.Approver
         });
@@ -84,6 +87,7 @@ public class AuthServiceTests
             Id = Guid.NewGuid(),
             Username = "admin",
             DisplayName = "Admin User",
+            Email = "admin@test.local",
             Password = "admin123",
             Role = Role.Admin
         });
@@ -96,6 +100,201 @@ public class AuthServiceTests
         Assert.True(result.Value!.ExpiresAt > DateTime.UtcNow.AddDays(20));
     }
 
+    [Fact]
+    public async Task RegisterAsync_Creates_Pending_Unverified_User()
+    {
+        await using var db = TestDbFactory.Create();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.RegisterAsync(new RegisterRequest(
+            "newuser",
+            "New User",
+            "newuser@test.local",
+            "password123"));
+
+        Assert.True(result.IsSuccess);
+        var user = Assert.Single(db.Users);
+        Assert.Equal(UserStatus.PendingApproval, user.Status);
+        Assert.False(user.IsEmailVerified);
+        Assert.StartsWith("pbkdf2:v1:", user.Password, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoginAsync_Rejects_Pending_Approval_User()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "pending",
+            DisplayName = "Pending User",
+            Email = "pending@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.PendingApproval
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.LoginAsync(new LoginRequest("pending", "password123"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Empty(db.UserSessions);
+    }
+
+    [Fact]
+    public async Task LoginAsync_Locks_Account_After_Configured_Failed_Attempts()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "locked",
+            DisplayName = "Locked User",
+            Email = "locked@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        await service.LoginAsync(new LoginRequest("locked", "wrong"));
+        await service.LoginAsync(new LoginRequest("locked", "wrong-again"));
+
+        var user = db.Users.Single();
+        Assert.Equal(2, user.FailedLoginCount);
+        Assert.NotNull(user.LockedUntil);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_Revokes_Current_Session()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var login = await service.LoginAsync(new LoginRequest("admin", "admin123"));
+
+        var logout = await service.LogoutAsync(login.Value!.Token);
+        var user = await service.GetUserByTokenAsync(login.Value.Token);
+
+        Assert.True(logout.IsSuccess);
+        Assert.Null(user);
+        Assert.NotNull(db.UserSessions.Single().RevokedAt);
+    }
+
+    [Fact]
+    public async Task ListUserSessionsAsync_Allows_Admin_To_View_Target_User_Sessions()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "user123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.AddRange(admin, user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var adminLogin = await service.LoginAsync(new LoginRequest("admin", "admin123"));
+        await service.LoginAsync(new LoginRequest("user", "user123"));
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, admin.IsEmailVerified);
+
+        var sessions = await service.ListUserSessionsAsync(user.Id, adminDto, adminLogin.Value!.Token);
+
+        Assert.True(sessions.IsSuccess);
+        var session = Assert.Single(sessions.Value!);
+        Assert.False(session.IsCurrent);
+    }
+
+    [Fact]
+    public async Task RevokeUserSessionAsync_Allows_Admin_To_Revoke_Target_User_Session()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "user123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.AddRange(admin, user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        await service.LoginAsync(new LoginRequest("user", "user123"));
+        var session = db.UserSessions.Single(item => item.UserId == user.Id);
+
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, admin.IsEmailVerified);
+
+        var revoke = await service.RevokeUserSessionAsync(user.Id, session.Id, adminDto);
+
+        Assert.True(revoke.IsSuccess);
+        Assert.NotNull(session.RevokedAt);
+    }
+
+    [Fact]
+    public async Task ListUserSessionsAsync_Rejects_Non_Admin()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "user123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, user.IsEmailVerified);
+
+        var sessions = await service.ListUserSessionsAsync(user.Id, userDto, "token");
+
+        Assert.False(sessions.IsSuccess);
+        Assert.Contains("Only Admin users", sessions.Errors[0]);
+    }
+
     private static IConfiguration CreateTestConfiguration() => new TestConfiguration();
 
     private sealed class TestConfiguration : IConfiguration
@@ -106,6 +305,9 @@ public class AuthServiceTests
             {
                 "Auth:SessionDurationMinutes" => "1",
                 "Auth:RememberMeDurationMinutes" => "43200",
+                "Auth:MaxFailedLoginAttempts" => "2",
+                "Auth:LockoutMinutes" => "10",
+                "Auth:EmailVerificationMinutes" => "10",
                 _ => null
             };
             set { }

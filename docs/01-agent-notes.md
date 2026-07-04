@@ -8,7 +8,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Repository target: private `ufukzkn/techyouth-bpm`.
 - Frontend: Next.js App Router, TypeScript, Zustand.
 - Backend: .NET 8 Web API, EF Core, selectable SQLite/PostgreSQL provider.
-- Active database mode for now: SQLite. PostgreSQL/Neon setup is deferred to a later session.
+- Default database mode: SQLite. Shared team testing can use Neon PostgreSQL through `.env.neon.local` and `scripts/run-api-neon.ps1`.
 - Documentation must be kept current as code changes.
 - Team split: flow-based, not layer-based.
 - Frontend target is multi-screen navigation. Hash-scroll sections were only an early scaffold and should not be treated as final UX.
@@ -51,12 +51,17 @@ These notes are the project memory. Update this file whenever an implementation 
 - Frontend API client expanded with form, process and task methods so feature components can be wired without scattering fetch calls.
 - Backend database provider selection added so local SQLite and shared PostgreSQL/Neon can use the same service/domain code.
 - Local SQLite database guide and reset/start helper script added for teammate onboarding.
-- Local SQLite startup now seeds optional mock workflow data by default: football-themed forms, processes, tasks and audit logs. Use `-SkipMockData` for a nearly empty DB.
+- Local SQLite startup now seeds optional mock workflow data by default: football-themed users, forms, processes, tasks and system/process audit logs. Use `-SkipMockData` for a nearly empty DB.
 - Login no longer pre-fills credentials; demo buttons only fill credentials for testing.
 - Stored frontend sessions are kept across refresh. The shell checks expiry locally, schedules a timeout for the stored expiry, and verifies real API sessions once through `/api/auth/me`; expired or unauthorized sessions return to login with a confirmable alert dialog instead of flickering or polling.
 - Session duration is configuration-driven through `Auth:SessionDurationMinutes` and is currently 120 minutes. `Auth:RememberMeDurationMinutes` backs the basic remember-me option; a future production version can harden this with refresh-token rotation.
 - Authenticated shell navigation now uses real route paths (`/dashboard`, `/forms`, `/runner`, `/processes`, `/tasks`, `/settings`) so refresh, browser history and direct links behave closer to a production app.
 - Auth hardening now stores PBKDF2 password hashes and SHA-256 session-token hashes instead of plaintext passwords or raw session tokens.
+- Auth remains an opaque server-side session model rather than JWT. This is intentional because pending approval, logout/revoke, lockout and active-session management all need server-side state.
+- Register creates `PendingApproval` users. Admin approval/role assignment, email verification demo flow, session listing/revoke, login/register rate limiting and failed-login lockout are now part of Ufuk's access/workspace flow.
+- Critical user actions now use two audit channels: process `AuditLogs` for BPM state history and `SystemAuditLogs` for Admin-visible identity/access/form/process/task activity.
+- Admin user management and system audit were split out of settings into dedicated `/users` and `/logs` workspace routes. Both use search/detail/pagination patterns so large lists are not dumped directly on screen.
+- After identity model changes, reset the local SQLite file with `./scripts/run-api-local.ps1 -ResetDb -Force` before manual testing because the project still uses `EnsureCreated` instead of migrations.
 - Form designer/runner and process/task views are now wired to real API-backed flows.
 - Ozgun's form foundation work continued on `feature/ozgun-form-foundation`.
 - Shared frontend form helpers were added for supported field types, default field creation, reusable field rendering, form value handling and reusable validation.

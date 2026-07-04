@@ -2,9 +2,9 @@
 
 ## Current Decision
 
-The active development and demo database is SQLite for now. PostgreSQL/Neon support exists in configuration, but the team will set it up in a later session.
+The default development and demo database is SQLite. A shared Neon PostgreSQL database can also be used when the team wants to test common data, shared sessions and audit history across different machines.
 
-SQLite is enough for the current local demo because the PDF allows SQLite, PostgreSQL or MSSQL and the app already uses EF Core behind the Infrastructure layer.
+SQLite is enough for fast local demo work because the PDF allows SQLite, PostgreSQL or MSSQL and the app already uses EF Core behind the Infrastructure layer. Neon is useful for team-level remote testing.
 
 ## Local Demo Database File
 
@@ -55,10 +55,38 @@ ASPNETCORE_ENVIRONMENT=Development
 Database__Provider=Sqlite
 Auth__SessionDurationMinutes=120
 Auth__RememberMeDurationMinutes=43200
+Auth__MaxFailedLoginAttempts=5
+Auth__LockoutMinutes=10
+Auth__RateLimitPermitLimit=10
+Auth__RateLimitWindowMinutes=1
 Seed__MockData=true
 ```
 
 The script then starts the API. Keep that terminal open while using the web app. Stop it with `Ctrl + C`.
+
+## Shared Neon PostgreSQL
+
+Create a gitignored `.env.neon.local` file in the repo root:
+
+```text
+Database__Provider=PostgreSql
+ConnectionStrings__DefaultConnection=Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true;Channel Binding=Require
+Seed__MockData=true
+```
+
+Start the API against Neon:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292
+```
+
+If another API process is already using the compiled backend files, start Neon with the existing build:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292 -NoBuild
+```
+
+The Neon environment file is ignored by git. Do not commit real connection strings or passwords.
 
 The web app can be started from the repo root with:
 
@@ -74,14 +102,15 @@ The schema is created from EF Core entities in `TechYouthBpm.Domain` through `Ap
 
 Current tables:
 
-- `Users`: demo users, roles and PBKDF2 password hashes.
-- `UserSessions`: hashed opaque bearer session tokens and expiry times.
+- `Users`: demo users, emails, roles, approval status, email verification state, failed login counters, lockout timestamps and PBKDF2 password hashes.
+- `UserSessions`: session ids, hashed opaque bearer session tokens, expiry times, last-seen timestamps and revoke timestamps.
 - `FormDefinitions`: saved dynamic form definitions.
 - `FormFieldDefinitions`: fields belonging to a form definition.
 - `FieldValidationRules`: dependent validation rules such as required-when.
 - `ProcessInstances`: started BPM process records.
 - `ProcessTasks`: assigned approve/reject work items.
 - `AuditLogs`: traceable process state changes.
+- `SystemAuditLogs`: critical identity, access, form, process and task actions for Admin review.
 
 SQLite stores `Guid` values as lowercase text through an EF Core value converter. Keep this converter in mind when adding new `Guid` properties; it prevents casing mismatches during update/delete statements in local SQLite demos.
 
@@ -89,15 +118,26 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 
 `DatabaseSeeder` creates the demo users on startup if they do not already exist:
 
-| Username | Password | Role |
-| --- | --- | --- |
-| `admin` | `admin123` | Admin |
-| `user` | `user123` | User |
-| `approver` | `approver123` | Approver |
+| Username | Password | Role | Status | Email verified |
+| --- | --- | --- | --- | --- |
+| `admin` | `admin123` | Admin | Active | true |
+| `user` | `user123` | User | Active | true |
+| `approver` | `approver123` | Approver | Active | true |
+| `mario.gomez` | `mario123` | User | PendingApproval | false |
+| `quaresma` | `trivela123` | Approver | Active | true |
+| `atiba` | `atiba123` | User | Active | true |
+| `alex` | `alex123` | User | Rejected | true |
+| `fatih.terim` | `imparator123` | Admin | PendingApproval | false |
 
 Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
 
-Session tokens are stored as SHA-256 hashes. Existing local session rows from the earlier raw-token phase will no longer validate after this change; logging in again creates a new hashed session row. Resetting the SQLite database is optional, not required.
+Session tokens are stored as SHA-256 hashes. Active sessions can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`.
+
+The current local setup uses `EnsureCreated`, not migrations. When entity columns change, existing SQLite files may not get the new columns automatically. After identity/schema changes, reset local SQLite before testing:
+
+```powershell
+./scripts/run-api-local.ps1 -ResetDb -Force
+```
 
 When mock data is enabled, the seeder also creates:
 
@@ -106,10 +146,11 @@ When mock data is enabled, the seeder also creates:
 - 8 demo process instances.
 - 4 open approver tasks.
 - completed/rejected examples with audit logs.
+- system audit examples for registration, login, role/status updates, form updates, process start and task approval.
 
 The seeded form/process data uses deterministic IDs and is idempotent, so restarting the API does not duplicate records. Resetting the SQLite database with `-ResetDb -Force` recreates the full demo scenario.
 
-Mock process names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim and Senol Gunes. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
+Mock user, process and log names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim and Senol Gunes. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
 
 ## Maintenance Rule
 
