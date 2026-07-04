@@ -193,6 +193,108 @@ public class AuthServiceTests
         Assert.NotNull(db.UserSessions.Single().RevokedAt);
     }
 
+    [Fact]
+    public async Task ListUserSessionsAsync_Allows_Admin_To_View_Target_User_Sessions()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "user123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.AddRange(admin, user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var adminLogin = await service.LoginAsync(new LoginRequest("admin", "admin123"));
+        await service.LoginAsync(new LoginRequest("user", "user123"));
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, admin.IsEmailVerified);
+
+        var sessions = await service.ListUserSessionsAsync(user.Id, adminDto, adminLogin.Value!.Token);
+
+        Assert.True(sessions.IsSuccess);
+        var session = Assert.Single(sessions.Value!);
+        Assert.False(session.IsCurrent);
+    }
+
+    [Fact]
+    public async Task RevokeUserSessionAsync_Allows_Admin_To_Revoke_Target_User_Session()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "user123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.AddRange(admin, user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        await service.LoginAsync(new LoginRequest("user", "user123"));
+        var session = db.UserSessions.Single(item => item.UserId == user.Id);
+
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, admin.IsEmailVerified);
+
+        var revoke = await service.RevokeUserSessionAsync(user.Id, session.Id, adminDto);
+
+        Assert.True(revoke.IsSuccess);
+        Assert.NotNull(session.RevokedAt);
+    }
+
+    [Fact]
+    public async Task ListUserSessionsAsync_Rejects_Non_Admin()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "user123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, user.IsEmailVerified);
+
+        var sessions = await service.ListUserSessionsAsync(user.Id, userDto, "token");
+
+        Assert.False(sessions.IsSuccess);
+        Assert.Contains("Only Admin users", sessions.Errors[0]);
+    }
+
     private static IConfiguration CreateTestConfiguration() => new TestConfiguration();
 
     private sealed class TestConfiguration : IConfiguration

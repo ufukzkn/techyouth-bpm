@@ -1,6 +1,18 @@
 "use client";
 
-import { CheckCircle2, ChevronLeft, ChevronRight, History, LogOut, Menu, Search, ShieldCheck, UserCog, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  History,
+  LogOut,
+  Menu,
+  Search,
+  ShieldCheck,
+  UserCog,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getNavItemByPath, getNavItemByView, navItems, type ViewId } from "@/features/app-shell/navigation";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
@@ -28,6 +40,31 @@ import type {
 
 let dashboardMetricsCache: { processes: ProcessSummary[]; tasks: ProcessTask[] } | null = null;
 const maxBrowserTimeoutDelay = 2_147_483_647;
+type AuditCategory = "all" | "identity" | "access" | "forms" | "processes" | "tasks";
+type PendingAccessChange = {
+  userId: string;
+  displayName: string;
+  username: string;
+  fromRole: Role;
+  toRole: Role;
+  fromStatus: UserStatus;
+  toStatus: UserStatus;
+};
+type PendingSessionRevoke = {
+  userId: string;
+  sessionId: string;
+  displayName: string;
+  username: string;
+  expiresAt: string;
+  isCurrent: boolean;
+};
+type AccessDraft = {
+  userId: string;
+  role: Role;
+  status: UserStatus;
+};
+
+const auditCategories: AuditCategory[] = ["all", "identity", "access", "forms", "processes", "tasks"];
 
 export function AppShell() {
   const {
@@ -320,7 +357,7 @@ export function AppShell() {
           {currentView === "processes" ? <ProcessBoardDraft mode="processes" role={user.role} /> : null}
           {currentView === "tasks" ? <ProcessBoardDraft mode="tasks" role={user.role} /> : null}
           {currentView === "users" && user.role === "Admin" ? (
-            <UsersAndRolesView language={language} token={token} />
+            <UsersAndRolesView activeUser={user} language={language} token={token} />
           ) : null}
           {currentView === "logs" && user.role === "Admin" ? <SystemLogsView language={language} token={token} /> : null}
           {currentView === "settings" ? (
@@ -625,10 +662,6 @@ function SettingsView({
           <span>{t("settings.session")}</span>
           <strong>{formatSessionExpiry(expiresAt, language)}</strong>
         </article>
-        <article className="settings-row">
-          <span>{t("settings.auth")}</span>
-          <strong>{t("settings.authValue")}</strong>
-        </article>
       </div>
 
       {statusMessage ? <div className="form-success">{statusMessage}</div> : null}
@@ -671,16 +704,11 @@ function SettingsView({
           <ShieldCheck size={22} />
         </div>
         <p className="helper-copy">{t("settings.sessionsDescription")}</p>
-        <div className="section-actions">
-          <button className="secondary-button danger-button" type="button" disabled={!isApiSession} onClick={revokeAllSessions}>
-            {t("settings.revokeAllSessions")}
-          </button>
-        </div>
         {isLoadingSettings ? <p className="status-line">{t("common.loading")}</p> : null}
         <div className="session-list">
           {sessions.map((session) => (
             <article className="settings-row session-row" key={session.id}>
-              <div>
+              <div className="stacked-summary">
                 <span>{session.isCurrent ? t("settings.currentSession") : t("settings.otherSession")}</span>
                 <strong>{formatSessionExpiry(session.expiresAt, language)}</strong>
                 <small>
@@ -701,12 +729,25 @@ function SettingsView({
           ))}
           {!sessions.length && !isLoadingSettings ? <p className="status-line">{t("settings.noSessions")}</p> : null}
         </div>
+        <div className="session-danger-action">
+          <button className="danger-button strong-danger-button" type="button" disabled={!isApiSession} onClick={revokeAllSessions}>
+            {t("settings.revokeAllSessions")}
+          </button>
+        </div>
       </section>
     </section>
   );
 }
 
-function UsersAndRolesView({ language, token }: { language: Language; token: string | null }) {
+function UsersAndRolesView({
+  activeUser,
+  language,
+  token,
+}: {
+  activeUser: User;
+  language: Language;
+  token: string | null;
+}) {
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
@@ -716,9 +757,14 @@ function UsersAndRolesView({ language, token }: { language: Language; token: str
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UserStatus | "All">("PendingApproval");
+  const [accessDraft, setAccessDraft] = useState<AccessDraft | null>(null);
+  const [pendingAccessChange, setPendingAccessChange] = useState<PendingAccessChange | null>(null);
+  const [selectedUserSessions, setSelectedUserSessions] = useState<UserSession[]>([]);
+  const [pendingSessionRevoke, setPendingSessionRevoke] = useState<PendingSessionRevoke | null>(null);
   const [page, setPage] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingUserSessions, setIsLoadingUserSessions] = useState(false);
   const pageSize = 6;
 
   const loadUsersAndLogs = useCallback(async () => {
@@ -777,6 +823,49 @@ function UsersAndRolesView({ language, token }: { language: Language; token: str
         )
         .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
     : [];
+  const activeSessionCount = selectedUserSessions.length;
+  const isSelectedUserOnline = activeSessionCount > 0;
+  const hasDraftChanges =
+    !!selectedUser &&
+    !!accessDraft &&
+    accessDraft.userId === selectedUser.id &&
+    (accessDraft.role !== selectedUser.role || accessDraft.status !== selectedUser.status);
+
+  const loadSelectedUserSessions = useCallback(
+    async (userId: string) => {
+      if (!token || token.startsWith("demo-")) {
+        setSelectedUserSessions([]);
+        return;
+      }
+
+      setIsLoadingUserSessions(true);
+      try {
+        const result = await api.listUserSessions(token, userId);
+        setSelectedUserSessions(result);
+      } catch (error) {
+        setMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.loadFailed"));
+        setSelectedUserSessions([]);
+      } finally {
+        setIsLoadingUserSessions(false);
+      }
+    },
+    [t, token],
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+    if (!selectedUser) {
+      setAccessDraft(null);
+      setSelectedUserSessions([]);
+      return;
+    }
+
+    setAccessDraft({ userId: selectedUser.id, role: selectedUser.role, status: selectedUser.status });
+    void loadSelectedUserSessions(selectedUser.id);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadSelectedUserSessions, selectedUser]);
 
   async function updateUserAccess(userId: string, role: Role, status: UserStatus) {
     if (!token) {
@@ -789,6 +878,73 @@ function UsersAndRolesView({ language, token }: { language: Language; token: str
       setMessage(t("settings.userAccessUpdated"));
     } catch (error) {
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.userAccessFailed"));
+    }
+  }
+
+  function requestUserAccessChange(managedUser: UserAdmin, role: Role, status: UserStatus) {
+    if (managedUser.role === role && managedUser.status === status) {
+      return;
+    }
+
+    setMessage(null);
+    setPendingAccessChange({
+      userId: managedUser.id,
+      displayName: managedUser.displayName,
+      username: managedUser.username,
+      fromRole: managedUser.role,
+      toRole: role,
+      fromStatus: managedUser.status,
+      toStatus: status,
+    });
+  }
+
+  function requestDraftAccessChange() {
+    if (!selectedUser || !accessDraft || !hasDraftChanges) {
+      return;
+    }
+
+    requestUserAccessChange(selectedUser, accessDraft.role, accessDraft.status);
+  }
+
+  async function confirmUserAccessChange() {
+    if (!pendingAccessChange) {
+      return;
+    }
+
+    const change = pendingAccessChange;
+    setPendingAccessChange(null);
+    await updateUserAccess(change.userId, change.toRole, change.toStatus);
+  }
+
+  function requestSessionRevoke(session: UserSession) {
+    if (!selectedUser) {
+      return;
+    }
+
+    setPendingSessionRevoke({
+      userId: selectedUser.id,
+      sessionId: session.id,
+      displayName: selectedUser.displayName,
+      username: selectedUser.username,
+      expiresAt: session.expiresAt,
+      isCurrent: session.isCurrent && selectedUser.id === activeUser.id,
+    });
+  }
+
+  async function confirmSessionRevoke() {
+    if (!pendingSessionRevoke || !token) {
+      return;
+    }
+
+    const revoke = pendingSessionRevoke;
+    setPendingSessionRevoke(null);
+    try {
+      await api.revokeUserSession(token, revoke.userId, revoke.sessionId);
+      await loadSelectedUserSessions(revoke.userId);
+      await loadUsersAndLogs();
+      setMessage(t("settings.sessionRevoked"));
+    } catch (error) {
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.sessionRevokeFailed"));
     }
   }
 
@@ -892,12 +1048,21 @@ function UsersAndRolesView({ language, token }: { language: Language; token: str
                   <span>{t("settings.emailStatus")}</span>
                   <strong>{selectedUser.isEmailVerified ? t("settings.verified") : t("settings.notVerified")}</strong>
                 </article>
+                <article className="settings-row">
+                  <span>{t("users.onlineStatus")}</span>
+                  <strong>{isSelectedUserOnline ? t("users.online") : t("users.offline")}</strong>
+                  <small>{t("users.activeSessionCount", { count: activeSessionCount })}</small>
+                </article>
               </div>
               <div className="access-editor">
                 <select
-                  value={selectedUser.role}
+                  value={accessDraft?.role ?? selectedUser.role}
                   onChange={(event) =>
-                    updateUserAccess(selectedUser.id, event.target.value as Role, selectedUser.status)
+                    setAccessDraft({
+                      userId: selectedUser.id,
+                      role: event.target.value as Role,
+                      status: accessDraft?.status ?? selectedUser.status,
+                    })
                   }
                 >
                   <option value="Admin">Admin</option>
@@ -905,16 +1070,64 @@ function UsersAndRolesView({ language, token }: { language: Language; token: str
                   <option value="Approver">Approver</option>
                 </select>
                 <select
-                  value={selectedUser.status}
+                  value={accessDraft?.status ?? selectedUser.status}
                   onChange={(event) =>
-                    updateUserAccess(selectedUser.id, selectedUser.role, event.target.value as UserStatus)
+                    setAccessDraft({
+                      userId: selectedUser.id,
+                      role: accessDraft?.role ?? selectedUser.role,
+                      status: event.target.value as UserStatus,
+                    })
                   }
                 >
                   <option value="PendingApproval">{t("settings.statusPending")}</option>
                   <option value="Active">{t("settings.statusActive")}</option>
                   <option value="Rejected">{t("settings.statusRejected")}</option>
                 </select>
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={!hasDraftChanges}
+                  onClick={requestDraftAccessChange}
+                >
+                  {t("users.applyAccessChange")}
+                </button>
               </div>
+              <section className="identity-section nested-identity-section">
+                <div className="section-toolbar">
+                  <div>
+                    <span className="eyebrow">{t("users.sessionsEyebrow")}</span>
+                    <h3>{t("users.sessionsTitle")}</h3>
+                  </div>
+                  <ShieldCheck size={22} />
+                </div>
+                {isLoadingUserSessions ? <p className="status-line">{t("common.loading")}</p> : null}
+                <div className="session-list">
+                  {selectedUserSessions.map((session) => (
+                    <article className="settings-row session-row" key={session.id}>
+                      <div className="stacked-summary">
+                        <span>{session.isCurrent ? t("settings.currentSession") : t("settings.otherSession")}</span>
+                        <strong>{formatSessionExpiry(session.expiresAt, language)}</strong>
+                        <small>
+                          {session.lastSeenAt
+                            ? t("settings.lastSeen", { value: formatSessionExpiry(session.lastSeenAt, language) })
+                            : t("settings.notSeenYet")}
+                        </small>
+                      </div>
+                      <button
+                        className="secondary-button danger-button"
+                        type="button"
+                        disabled={session.isCurrent && selectedUser.id === activeUser.id}
+                        onClick={() => requestSessionRevoke(session)}
+                      >
+                        {t("settings.revokeSession")}
+                      </button>
+                    </article>
+                  ))}
+                  {!selectedUserSessions.length && !isLoadingUserSessions ? (
+                    <p className="status-line">{t("users.noActiveSessions")}</p>
+                  ) : null}
+                </div>
+              </section>
               <SystemAuditTimeline logs={selectedUserLogs} language={language} emptyText={t("users.noUserLogs")} />
             </>
           ) : (
@@ -922,7 +1135,129 @@ function UsersAndRolesView({ language, token }: { language: Language; token: str
           )}
         </section>
       </div>
+      {pendingAccessChange ? (
+        <AccessChangeDialog
+          change={pendingAccessChange}
+          language={language}
+          onCancel={() => setPendingAccessChange(null)}
+          onConfirm={confirmUserAccessChange}
+        />
+      ) : null}
+      {pendingSessionRevoke ? (
+        <SessionRevokeDialog
+          revoke={pendingSessionRevoke}
+          language={language}
+          onCancel={() => setPendingSessionRevoke(null)}
+          onConfirm={confirmSessionRevoke}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function AccessChangeDialog({
+  change,
+  language,
+  onCancel,
+  onConfirm,
+}: {
+  change: PendingAccessChange;
+  language: Language;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const t = useCallback(
+    (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
+    [language],
+  );
+  const isHighRisk = change.toRole === "Admin" || change.fromRole === "Admin" || change.toStatus !== change.fromStatus;
+
+  return (
+    <div className="action-dialog-overlay" onClick={onCancel}>
+      <div className="action-dialog access-confirm-dialog" onClick={(event) => event.stopPropagation()}>
+        <div className="action-dialog-header">
+          <div>
+            <span className="eyebrow">{t("users.accessConfirmEyebrow")}</span>
+            <strong>{t(isHighRisk ? "users.accessConfirmTitleCritical" : "users.accessConfirmTitle")}</strong>
+          </div>
+          <AlertTriangle size={22} />
+        </div>
+        <p className="helper-copy">
+          {t("users.accessConfirmDescription", {
+            displayName: change.displayName,
+            username: change.username,
+          })}
+        </p>
+        <div className="access-confirm-grid">
+          <article className="settings-row">
+            <span>{t("session.role")}</span>
+            <strong>
+              {roleLabel(language, change.fromRole)} -&gt; {roleLabel(language, change.toRole)}
+            </strong>
+          </article>
+          <article className="settings-row">
+            <span>{t("settings.status")}</span>
+            <strong>
+              {userStatusLabel(language, change.fromStatus)} -&gt; {userStatusLabel(language, change.toStatus)}
+            </strong>
+          </article>
+        </div>
+        <div className="action-dialog-actions">
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            {t("common.cancel")}
+          </button>
+          <button className="danger-button strong-danger-button" type="button" onClick={onConfirm}>
+            {t("users.confirmAccessChange")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SessionRevokeDialog({
+  revoke,
+  language,
+  onCancel,
+  onConfirm,
+}: {
+  revoke: PendingSessionRevoke;
+  language: Language;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const t = useCallback(
+    (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
+    [language],
+  );
+
+  return (
+    <div className="action-dialog-overlay" onClick={onCancel}>
+      <div className="action-dialog access-confirm-dialog" onClick={(event) => event.stopPropagation()}>
+        <div className="action-dialog-header">
+          <div>
+            <span className="eyebrow">{t("users.sessionRevokeEyebrow")}</span>
+            <strong>{t("users.sessionRevokeTitle")}</strong>
+          </div>
+          <AlertTriangle size={22} />
+        </div>
+        <p className="helper-copy">
+          {t("users.sessionRevokeDescription", {
+            displayName: revoke.displayName,
+            username: revoke.username,
+            expiresAt: formatSessionExpiry(revoke.expiresAt, language),
+          })}
+        </p>
+        <div className="action-dialog-actions">
+          <button className="secondary-button" type="button" onClick={onCancel}>
+            {t("common.cancel")}
+          </button>
+          <button className="danger-button strong-danger-button" type="button" onClick={onConfirm}>
+            {t("users.confirmSessionRevoke")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -933,6 +1268,7 @@ function SystemLogsView({ language, token }: { language: Language; token: string
   );
   const [logs, setLogs] = useState<SystemAuditLog[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<AuditCategory>("all");
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -967,13 +1303,25 @@ function SystemLogsView({ language, token }: { language: Language; token: string
   }, [token]);
 
   const trimmedQuery = searchQuery.trim().toLowerCase();
+  const categoryCounts = useMemo(
+    () =>
+      auditCategories.reduce(
+        (counts, category) => ({
+          ...counts,
+          [category]: category === "all" ? logs.length : logs.filter((log) => getAuditCategory(log) === category).length,
+        }),
+        {} as Record<AuditCategory, number>,
+      ),
+    [logs],
+  );
   const filteredLogs = useMemo(() => {
-    if (trimmedQuery.length < 2) {
+    if (trimmedQuery.length < 2 && selectedCategory === "all") {
       return [];
     }
 
-    return logs.filter((log) =>
-      [
+    return logs.filter((log) => {
+      const matchesCategory = selectedCategory === "all" || getAuditCategory(log) === selectedCategory;
+      const searchableText = [
         log.actorDisplayName,
         log.actorUsername,
         log.action,
@@ -982,10 +1330,12 @@ function SystemLogsView({ language, token }: { language: Language; token: string
         log.description,
       ]
         .join(" ")
-        .toLowerCase()
-        .includes(trimmedQuery),
-    );
-  }, [logs, trimmedQuery]);
+        .toLowerCase();
+      const matchesSearch = trimmedQuery.length < 2 || searchableText.includes(trimmedQuery);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [logs, selectedCategory, trimmedQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -1016,6 +1366,24 @@ function SystemLogsView({ language, token }: { language: Language; token: string
       </div>
 
       <section className="identity-section">
+        <div className="audit-category-grid">
+          {auditCategories.map((category) => (
+            <button
+              className={`audit-category-card ${selectedCategory === category ? "is-active" : ""}`}
+              key={category}
+              type="button"
+              onClick={() => {
+                setSelectedCategory(category);
+                setPage(1);
+                setSelectedLogId(null);
+              }}
+            >
+              <span>{t(`logs.category.${category}` as TranslationKey)}</span>
+              <strong>{categoryCounts[category] ?? 0}</strong>
+              <small>{t(`logs.categoryHelp.${category}` as TranslationKey)}</small>
+            </button>
+          ))}
+        </div>
         <label className="search-field">
           <Search size={16} />
           <input
@@ -1028,7 +1396,17 @@ function SystemLogsView({ language, token }: { language: Language; token: string
           />
         </label>
         {isLoading ? <p className="status-line">{t("common.loading")}</p> : null}
-        {trimmedQuery.length < 2 ? <p className="helper-copy">{t("logs.searchFirst")}</p> : null}
+        {trimmedQuery.length < 2 && selectedCategory === "all" ? (
+          <p className="helper-copy">{t("logs.searchFirst")}</p>
+        ) : null}
+        {trimmedQuery.length >= 2 || selectedCategory !== "all" ? (
+          <p className="helper-copy">
+            {t("logs.resultSummary", {
+              count: filteredLogs.length,
+              category: t(`logs.category.${selectedCategory}` as TranslationKey),
+            })}
+          </p>
+        ) : null}
       </section>
 
       <div className="management-layout">
@@ -1078,6 +1456,30 @@ function SystemLogsView({ language, token }: { language: Language; token: string
       </div>
     </section>
   );
+}
+
+function getAuditCategory(log: SystemAuditLog): Exclude<AuditCategory, "all"> {
+  if (log.action.startsWith("Auth.")) {
+    return "identity";
+  }
+
+  if (log.action.startsWith("User.") || log.entityType === "User") {
+    return "access";
+  }
+
+  if (log.action.startsWith("FormDefinition.") || log.entityType === "FormDefinition") {
+    return "forms";
+  }
+
+  if (log.action.startsWith("Task.") || log.entityType === "ProcessTask") {
+    return "tasks";
+  }
+
+  if (log.action.startsWith("Process.") || log.entityType === "ProcessInstance") {
+    return "processes";
+  }
+
+  return "identity";
 }
 
 function SystemAuditTimeline({

@@ -27,10 +27,12 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Login/register endpoints are rate limited, and repeated failed login attempts temporarily lock the account.
 - Logout revokes the backend session instead of only clearing frontend state.
 - Settings now includes profile, email verification and active session management.
-- Admin user approval/role management moved to a separate `Kullanicilar / Roller` route instead of being embedded inside settings.
-- Admin system history moved to a separate `Loglar` route. Logs are searched and paginated instead of being dumped as one long list.
+- Admin user approval/role management moved to a separate `Yetki ve Onay` route instead of being embedded inside settings.
+- Admin system history moved to a separate `Loglar` route. Logs are categorized, searched and paginated instead of being dumped as one long list.
 - Email verification has a local demo-code flow; production should replace it with a real email delivery service.
-- Admin users can approve pending registrations, reject accounts and assign roles from the settings screen.
+- Admin users can approve pending registrations, reject accounts and assign roles from the `Yetki ve Onay` screen.
+- Role/status edits are staged locally and only sent after the Admin clicks `Degisikligi uygula` and confirms the critical access dialog.
+- Admin users can inspect a selected user's active sessions from the same detail panel and revoke a session after confirmation.
 - The authenticated shell filters menu items by role.
 - Workspace navigation uses real route paths such as `/dashboard`, `/forms`, `/tasks` and `/settings` instead of hash-scroll sections or query-only views.
 - Desktop navigation stays fixed on the left while the workspace scrolls.
@@ -58,7 +60,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 ## Extensibility Notes
 
 - Adding a new screen should update `navigation.ts`, the matching route page under `apps/web/src/app`, the shell view switch and any dashboard shortcuts that should point to it.
-- Admin-only access screens currently include `/users` for user/role management and `/logs` for focused audit search.
+- Admin-only access screens currently include `/users` for user/role management and `/logs` for categorized audit search.
 - Adding a new role should update navigation visibility rules and dashboard shortcut availability together.
 - Desktop navigation should stay fixed because the menu is short and should remain available during long workflow screens.
 - Mobile navigation should stay drawer-based with a fixed floating trigger so the dashboard/content remains the first visual focus on small screens.

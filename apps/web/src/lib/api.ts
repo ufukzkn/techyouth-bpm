@@ -102,6 +102,12 @@ export const api = {
       body: JSON.stringify({ role, status }),
     });
   },
+  listUserSessions(token: string, userId: string) {
+    return request<UserSession[]>(`/api/users/${userId}/sessions`, { token });
+  },
+  revokeUserSession(token: string, userId: string, sessionId: string) {
+    return request<void>(`/api/users/${userId}/sessions/${sessionId}`, { method: "DELETE", token });
+  },
   listSystemAuditLogs(token: string) {
     return request<SystemAuditLog[]>("/api/audit/system", { token });
   },

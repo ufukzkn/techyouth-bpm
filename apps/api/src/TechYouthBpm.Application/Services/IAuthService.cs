@@ -18,11 +18,21 @@ public interface IAuthService
         UserDto currentUser,
         string currentToken,
         CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<UserSessionDto>>> ListUserSessionsAsync(
+        Guid userId,
+        UserDto currentUser,
+        string currentToken,
+        CancellationToken cancellationToken = default);
     Task<Result> LogoutAsync(string token, CancellationToken cancellationToken = default);
     Task<Result> RevokeSessionAsync(
         Guid sessionId,
         UserDto currentUser,
         string currentToken,
+        CancellationToken cancellationToken = default);
+    Task<Result> RevokeUserSessionAsync(
+        Guid userId,
+        Guid sessionId,
+        UserDto currentUser,
         CancellationToken cancellationToken = default);
     Task<Result<EmailVerificationStartResponse>> StartEmailVerificationAsync(
         UserDto currentUser,

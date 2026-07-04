@@ -38,6 +38,13 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
   - Admin-only role/status update.
   - Used for approving `PendingApproval` accounts, rejecting accounts or changing roles.
   - Moving a user out of `Active` revokes existing sessions.
+- `GET /api/users/{userId}/sessions`
+  - Admin-only active-session list for the selected user.
+  - Used by the `Yetki ve Onay` detail panel to show whether a user is online and which sessions are active.
+- `DELETE /api/users/{userId}/sessions/{sessionId}`
+  - Admin-only session revoke for the selected user.
+  - The frontend asks for confirmation before sending this request.
+  - Writes a system audit log.
 
 ## Audit
 

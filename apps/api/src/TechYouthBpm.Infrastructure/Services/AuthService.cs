@@ -269,6 +269,38 @@ public class AuthService(
         return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
     }
 
+    public async Task<Result<IReadOnlyList<UserSessionDto>>> ListUserSessionsAsync(
+        Guid userId,
+        UserDto currentUser,
+        string currentToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result<IReadOnlyList<UserSessionDto>>.Failure("Only Admin users can view user sessions.");
+        }
+
+        var userExists = await db.Users.AnyAsync(user => user.Id == userId, cancellationToken);
+        if (!userExists)
+        {
+            return Result<IReadOnlyList<UserSessionDto>>.Failure("User not found.");
+        }
+
+        var currentTokenHash = SessionTokenHasher.Hash(currentToken);
+        var sessions = await db.UserSessions
+            .Where(session => session.UserId == userId && session.RevokedAt == null && session.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(session => session.LastSeenAt ?? session.CreatedAt)
+            .Select(session => new UserSessionDto(
+                session.Id,
+                session.CreatedAt,
+                session.ExpiresAt,
+                session.LastSeenAt,
+                session.Token == currentTokenHash))
+            .ToListAsync(cancellationToken);
+
+        return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
+    }
+
     public async Task<Result> LogoutAsync(string token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token))
@@ -320,6 +352,38 @@ public class AuthService(
             "Session",
             session.Id.ToString(),
             "User revoked an active session.",
+            cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> RevokeUserSessionAsync(
+        Guid userId,
+        Guid sessionId,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result.Failure("Only Admin users can revoke user sessions.");
+        }
+
+        var session = await db.UserSessions.SingleOrDefaultAsync(
+            item => item.Id == sessionId && item.UserId == userId && item.RevokedAt == null,
+            cancellationToken);
+
+        if (session is null)
+        {
+            return Result.Failure("Session not found.");
+        }
+
+        session.RevokedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "Auth.AdminSessionRevoked",
+            "Session",
+            session.Id.ToString(),
+            $"Admin '{currentUser.Username}' revoked a session for user '{userId}'.",
             cancellationToken);
         return Result.Success();
     }

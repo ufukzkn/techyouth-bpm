@@ -1073,6 +1073,12 @@ input[type="checkbox"] {
   gap: 10px;
 }
 
+.session-danger-action {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
 .inline-form {
   display: grid;
   grid-template-columns: auto minmax(160px, 1fr) auto;
@@ -1139,6 +1145,55 @@ input[type="checkbox"] {
   gap: 10px;
 }
 
+.audit-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.audit-category-card {
+  display: grid;
+  gap: 5px;
+  min-height: 104px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  text-align: left;
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.audit-category-card:hover,
+.audit-category-card.is-active {
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.audit-category-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.audit-category-card strong {
+  font-size: 26px;
+}
+
+.audit-category-card small {
+  color: var(--muted);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .session-row,
 .user-management-row,
 .system-audit-row {
@@ -1199,6 +1254,29 @@ input[type="checkbox"] {
 
 .access-editor {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+}
+
+.access-editor .primary-button {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.nested-identity-section {
+  background: var(--surface-muted);
+}
+
+.access-confirm-dialog {
+  max-width: 560px;
+}
+
+.access-confirm-dialog .action-dialog-header svg {
+  color: var(--danger);
+}
+
+.access-confirm-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
@@ -1248,6 +1326,30 @@ input[type="checkbox"] {
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
   background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.strong-danger-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
+  border-radius: 7px;
+  color: #ffffff;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--danger) 82%, #8a1220);
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
+.strong-danger-button:hover:not(:disabled) {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--danger) 76%, #ffffff);
+  background: color-mix(in srgb, var(--danger) 94%, #5f0711);
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+.strong-danger-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 .section-toolbar {
@@ -2015,11 +2117,13 @@ input[type="checkbox"] {
   .inline-form,
   .filter-toolbar,
   .management-layout,
+  .audit-category-grid,
   .session-row,
   .user-management-row,
   .system-audit-row,
   .compact-grid,
   .access-editor,
+  .access-confirm-grid,
   .rule-row {
     grid-template-columns: 1fr;
   }
@@ -2027,6 +2131,14 @@ input[type="checkbox"] {
   .system-audit-meta {
     justify-items: start;
     text-align: left;
+  }
+
+  .session-danger-action {
+    justify-content: stretch;
+  }
+
+  .session-danger-action .strong-danger-button {
+    width: 100%;
   }
 
   .workspace-header,
