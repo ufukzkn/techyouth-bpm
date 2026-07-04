@@ -8,7 +8,9 @@ Use this file for the final code review presentation.
 - Form definitions are stored as models, not hardcoded screens.
 - Process status changes are controlled by a state machine.
 - Role checks exist in both UI visibility and backend authorization.
+- Identity lifecycle includes pending approval, verified email state, session revoke, rate limiting and account lockout.
 - Audit logs explain who changed a process and when.
+- System audit logs explain who performed critical identity/access/form/process/task actions.
 - Documentation was updated together with code to keep the project reviewable.
 
 ## Suggested Review Flow
@@ -36,6 +38,7 @@ Use this file for the final code review presentation.
   - admins can execute any task.
   - closed or missing tasks return explicit errors.
 - `AuditLogTests` proves approve/reject actions create audit entries with correct status transitions, user ids and notes.
+- `SystemAuditServiceTests` proves only Admin users can read the system-wide audit trail.
 - `FormServiceTests` covers form definition updates:
   - admin users can update a saved form.
   - non-admin users cannot update form definitions.
@@ -46,19 +49,28 @@ Use this file for the final code review presentation.
   - plaintext legacy passwords are upgraded to PBKDF2 hashes on successful login.
   - invalid passwords do not create sessions.
   - remember-me logins use the longer configured session duration.
-- The backend test suite currently passes with 24 tests across auth, form, workflow, task authorization and audit coverage.
+  - registration creates pending/unverified accounts.
+  - repeated failed login attempts lock the account.
+  - logout revokes the stored session.
+- The backend test suite currently passes with 30 tests across auth, form, workflow, task authorization and audit coverage.
 
 ## Current Frontend Story
 
 - `LoginView` starts empty and uses demo-account buttons only to fill credentials for testing.
+- `LoginView` supports both sign-in and register mode. Register creates a pending account and explains that admin approval is required.
 - `sessionStore` keeps the active user, token, expiry and theme in Zustand so refresh does not reset the demo flow.
 - `AuthService` verifies PBKDF2 password hashes and stores only hashed session tokens, while the frontend receives the raw opaque token once at login.
+- `AuthService` keeps the current opaque-session model instead of JWT because logout, revoke, lockout and pending approval need server-side state anyway.
 - `AppShell` verifies restored API sessions once on load, schedules local expiry, and sends expired/unauthorized sessions back to login with a confirmable alert.
 - `AppShell` filters navigation items by user role and keeps the active screen in real route paths, which demonstrates role-based UI without scattering role checks across pages.
 - `DashboardView` reads process/task metrics from the API, then turns metric cards and BPM flow steps into role-aware workspace shortcuts.
 - Dashboard metrics keep the last loaded values while refreshing so quick navigation does not flash placeholder values.
 - The form runner uses skeleton rows on first load and keeps cached form definitions during quick navigation.
 - The top bar and settings screen show session expiry information so session state is visible after login.
+- Settings now has email verification and active session management, including an all-devices sign-out action.
+- Admin-only user approval/role controls live in the dedicated `Kullanicilar / Roller` route with search, status filtering, pagination and a selected-user detail/history panel.
+- Admin-only system history lives in the dedicated `Loglar` route. Logs are only shown after search, then paginated and inspectable through related chronological history.
+- Process details continue to show process-specific audit history to Admin/Approver and the user who started that process.
 - `FormDesignerDraft` edits a backend-ready definition model, including field keys, labels, field types, options, ordering and dependent validation rules.
 - Saved form definitions can be loaded back into the designer and updated through the API instead of being create-only drafts.
 - `FormRunnerDraft` loads saved form definitions, renders fields through the shared `FieldRenderer`, validates with shared helpers and starts a process through the API.
@@ -74,3 +86,7 @@ Use this file for the final code review presentation.
 - Why store form submissions as JSON?
 - Why is backend validation still needed when frontend validation exists?
 - How does the audit log help reviewers trace process decisions?
+- Why split process audit and system audit?
+- Why opaque session tokens instead of JWT?
+- How does pending approval affect login?
+- What protects login/register against repeated abuse?

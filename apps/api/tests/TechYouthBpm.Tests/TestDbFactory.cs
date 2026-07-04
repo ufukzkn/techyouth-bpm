@@ -25,8 +25,11 @@ internal static class TestDbFactory
             Id = Guid.NewGuid(),
             Username = string.IsNullOrEmpty(username) ? $"{role.ToString().ToLowerInvariant()}-{Guid.NewGuid():N}" : username,
             DisplayName = $"Test {role}",
+            Email = $"{Guid.NewGuid():N}@test.local",
             Password = "test-hash",
-            Role = role
+            Role = role,
+            Status = UserStatus.Active,
+            IsEmailVerified = true
         };
 
         db.Users.Add(user);

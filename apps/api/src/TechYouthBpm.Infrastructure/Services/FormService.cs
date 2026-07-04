@@ -9,8 +9,13 @@ using TechYouthBpm.Infrastructure.Data;
 
 namespace TechYouthBpm.Infrastructure.Services;
 
-public class FormService(AppDbContext db) : IFormService
+public class FormService(AppDbContext db, ISystemAuditService auditService) : IFormService
 {
+    public FormService(AppDbContext db)
+        : this(db, new SystemAuditService(db))
+    {
+    }
+
     public async Task<IReadOnlyList<FormDefinitionDto>> ListAsync(CancellationToken cancellationToken = default)
     {
         var forms = await FormQuery()
@@ -51,6 +56,13 @@ public class FormService(AppDbContext db) : IFormService
 
         db.FormDefinitions.Add(form);
         await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user,
+            "FormDefinition.Created",
+            "FormDefinition",
+            form.Id.ToString(),
+            $"Form definition '{form.Name}' was created.",
+            cancellationToken);
 
         var saved = await GetAsync(form.Id, cancellationToken);
         return Result<FormDefinitionDto>.Success(saved!);
@@ -82,6 +94,8 @@ public class FormService(AppDbContext db) : IFormService
         var formId = form.Id;
         form.Name = request.Name.Trim();
         form.Description = request.Description.Trim();
+        form.UpdatedByUserId = user.Id;
+        form.UpdatedAt = DateTime.UtcNow;
 
         var oldFields = form.Fields.ToList();
         db.FieldValidationRules.RemoveRange(oldFields.SelectMany(field => field.ValidationRules));
@@ -94,6 +108,13 @@ public class FormService(AppDbContext db) : IFormService
         db.FormFieldDefinitions.AddRange(BuildFields(request, formId));
 
         await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user,
+            "FormDefinition.Updated",
+            "FormDefinition",
+            formId.ToString(),
+            $"Form definition '{request.Name.Trim()}' was updated.",
+            cancellationToken);
 
         var saved = await GetAsync(formId, cancellationToken);
         return Result<FormDefinitionDto>.Success(saved!);

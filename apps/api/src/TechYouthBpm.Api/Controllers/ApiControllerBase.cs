@@ -8,14 +8,17 @@ public abstract class ApiControllerBase(IAuthService authService) : ControllerBa
 {
     protected IAuthService AuthService { get; } = authService;
 
-    protected async Task<UserDto?> CurrentUserAsync(CancellationToken cancellationToken)
+    protected string CurrentToken()
     {
         var authorization = Request.Headers.Authorization.ToString();
-        var token = authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+        return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
             ? authorization["Bearer ".Length..].Trim()
             : authorization;
+    }
 
-        return await AuthService.GetUserByTokenAsync(token, cancellationToken);
+    protected async Task<UserDto?> CurrentUserAsync(CancellationToken cancellationToken)
+    {
+        return await AuthService.GetUserByTokenAsync(CurrentToken(), cancellationToken);
     }
 
     protected IActionResult UnauthorizedProblem() =>

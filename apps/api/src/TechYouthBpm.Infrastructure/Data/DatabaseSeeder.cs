@@ -39,24 +39,36 @@ public static class DatabaseSeeder
                 Id = AdminId,
                 Username = "admin",
                 DisplayName = "Admin User",
+                Email = "admin@techyouth.local",
                 Password = PasswordHasher.Hash("admin123"),
-                Role = Role.Admin
+                Role = Role.Admin,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-30)
             },
             new User
             {
                 Id = UserId,
                 Username = "user",
                 DisplayName = "Process Starter",
+                Email = "user@techyouth.local",
                 Password = PasswordHasher.Hash("user123"),
-                Role = Role.User
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-29)
             },
             new User
             {
                 Id = ApproverId,
                 Username = "approver",
                 DisplayName = "Process Approver",
+                Email = "approver@techyouth.local",
                 Password = PasswordHasher.Hash("approver123"),
-                Role = Role.Approver
+                Role = Role.Approver,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-28)
             });
 
         await db.SaveChangesAsync(cancellationToken);

@@ -10,8 +10,13 @@ using TechYouthBpm.Infrastructure.Data;
 
 namespace TechYouthBpm.Infrastructure.Services;
 
-public class TaskService(AppDbContext db, ProcessStateMachine stateMachine) : ITaskService
+public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISystemAuditService auditService) : ITaskService
 {
+    public TaskService(AppDbContext db, ProcessStateMachine stateMachine)
+        : this(db, stateMachine, new SystemAuditService(db))
+    {
+    }
+
     public async Task<IReadOnlyList<ProcessTaskDto>> ListMyTasksAsync(UserDto user, CancellationToken cancellationToken = default)
     {
         var tasks = await db.ProcessTasks
@@ -80,6 +85,13 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine) : IT
         });
 
         await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user,
+            $"Task.{request.Action}",
+            "ProcessTask",
+            task.Id.ToString(),
+            $"Task action '{request.Action}' moved process '{task.ProcessInstance.Id}' from {previousStatus} to {transition.Value}.",
+            cancellationToken);
 
         var process = await db.ProcessInstances
             .Include(item => item.FormDefinition)

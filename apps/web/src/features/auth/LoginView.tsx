@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { LogIn } from "lucide-react";
+import { LogIn, UserPlus } from "lucide-react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
@@ -15,23 +15,36 @@ export function LoginView() {
     useSessionStore();
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   function updateUsername(value: string) {
     setUsername(value);
+    setSuccessMessage(null);
     clearSessionNotice();
   }
 
   function updatePassword(value: string) {
     setPassword(value);
+    setSuccessMessage(null);
     clearSessionNotice();
   }
 
   function updateRememberMe(value: boolean) {
     setRememberMe(value);
+    clearSessionNotice();
+  }
+
+  function switchMode(nextMode: "login" | "register") {
+    setMode(nextMode);
+    setError(null);
+    setSuccessMessage(null);
     clearSessionNotice();
   }
 
@@ -43,8 +56,36 @@ export function LoginView() {
 
     const formData = new FormData(event.currentTarget);
     const submittedUsername = String(formData.get("username") ?? "").trim();
+    const submittedDisplayName = String(formData.get("displayName") ?? "").trim();
+    const submittedEmail = String(formData.get("email") ?? "").trim();
     const submittedPassword = String(formData.get("password") ?? "");
     const submittedRememberMe = formData.get("rememberMe") === "on";
+
+    if (mode === "register") {
+      if (!submittedUsername || !submittedDisplayName || !submittedEmail || !submittedPassword) {
+        setIsLoading(false);
+        setError(t("login.registerRequired"));
+        return;
+      }
+
+      try {
+        const registration = await api.register(
+          submittedUsername,
+          submittedDisplayName,
+          submittedEmail,
+          submittedPassword,
+        );
+        setSuccessMessage(t("login.registerPending", { username: registration.username }));
+        setMode("login");
+        setPassword("");
+      } catch (apiError) {
+        setError(apiError instanceof ApiError ? apiError.errors.join(" ") : t("login.registerFailed"));
+      } finally {
+        setIsLoading(false);
+      }
+
+      return;
+    }
 
     if (!submittedUsername || !submittedPassword) {
       setIsLoading(false);
@@ -82,6 +123,23 @@ export function LoginView() {
         <h1>TechYouth BPM Wizard</h1>
         <p>{language === "tr" ? "Form tasarimi ve surec yonetimi calisma alani" : "Form design and process management workspace"}</p>
 
+        <div className="segmented-control" aria-label={t("login.authMode")}>
+          <button
+            className={mode === "login" ? "active" : undefined}
+            type="button"
+            onClick={() => switchMode("login")}
+          >
+            {t("login.signIn")}
+          </button>
+          <button
+            className={mode === "register" ? "active" : undefined}
+            type="button"
+            onClick={() => switchMode("register")}
+          >
+            {t("login.createAccount")}
+          </button>
+        </div>
+
         <form className="login-form" onSubmit={handleSubmit}>
           <label>
             {t("login.username")}
@@ -92,6 +150,35 @@ export function LoginView() {
               autoComplete="username"
             />
           </label>
+          {mode === "register" ? (
+            <>
+              <label>
+                {t("login.displayName")}
+                <input
+                  name="displayName"
+                  value={displayName}
+                  onChange={(event) => {
+                    setDisplayName(event.target.value);
+                    setSuccessMessage(null);
+                  }}
+                  autoComplete="name"
+                />
+              </label>
+              <label>
+                {t("login.email")}
+                <input
+                  name="email"
+                  value={email}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setSuccessMessage(null);
+                  }}
+                  autoComplete="email"
+                  type="email"
+                />
+              </label>
+            </>
+          ) : null}
           <label>
             {t("login.password")}
             <input
@@ -102,19 +189,28 @@ export function LoginView() {
               autoComplete="current-password"
             />
           </label>
-          <label className="checkbox-row remember-row">
-            <input
-              name="rememberMe"
-              checked={rememberMe}
-              onChange={(event) => updateRememberMe(event.target.checked)}
-              type="checkbox"
-            />
-            {t("login.rememberMe")}
-          </label>
+          {mode === "login" ? (
+            <label className="checkbox-row remember-row">
+              <input
+                name="rememberMe"
+                checked={rememberMe}
+                onChange={(event) => updateRememberMe(event.target.checked)}
+                type="checkbox"
+              />
+              {t("login.rememberMe")}
+            </label>
+          ) : null}
           {error ? <div className="form-error">{error}</div> : null}
+          {successMessage ? <div className="form-success">{successMessage}</div> : null}
           <button className="primary-button" type="submit" disabled={isLoading}>
-            <LogIn size={18} />
-            {isLoading ? t("login.signingIn") : t("login.signIn")}
+            {mode === "login" ? <LogIn size={18} /> : <UserPlus size={18} />}
+            {isLoading
+              ? mode === "login"
+                ? t("login.signingIn")
+                : t("login.registering")
+              : mode === "login"
+                ? t("login.signIn")
+                : t("login.createAccount")}
           </button>
         </form>
 

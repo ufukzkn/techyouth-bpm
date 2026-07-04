@@ -11,6 +11,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 ## Completed Work
 
 - Login starts empty and supports demo-account fill buttons for local testing.
+- Login view now also supports registration. New accounts are created as `PendingApproval` and cannot sign in until an Admin activates them.
 - Session state stores user, role, token, expiry and theme through Zustand.
 - Theme starts from the operating system preference when the user has no saved manual choice; after the user toggles theme, that explicit choice is persisted.
 - Theme toggle uses a CSS moon/sun transition inspired by the referenced CodePen interaction, implemented locally as `ThemeToggleButton` without adding a package.
@@ -23,6 +24,13 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Long remember-me sessions are checked with capped browser timers so the timeout scheduler does not overflow for durations longer than the browser's maximum `setTimeout` delay.
 - Demo fallback sessions also respect the local expiry timer, but skip `/api/auth/me` because they do not exist in the API session table.
 - Passwords are verified through PBKDF2 hashes and session tokens are stored as SHA-256 hashes in the database.
+- Login/register endpoints are rate limited, and repeated failed login attempts temporarily lock the account.
+- Logout revokes the backend session instead of only clearing frontend state.
+- Settings now includes profile, email verification and active session management.
+- Admin user approval/role management moved to a separate `Kullanicilar / Roller` route instead of being embedded inside settings.
+- Admin system history moved to a separate `Loglar` route. Logs are searched and paginated instead of being dumped as one long list.
+- Email verification has a local demo-code flow; production should replace it with a real email delivery service.
+- Admin users can approve pending registrations, reject accounts and assign roles from the settings screen.
 - The authenticated shell filters menu items by role.
 - Workspace navigation uses real route paths such as `/dashboard`, `/forms`, `/tasks` and `/settings` instead of hash-scroll sections or query-only views.
 - Desktop navigation stays fixed on the left while the workspace scrolls.
@@ -34,6 +42,9 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Process/task refresh keeps the visible data on screen, shows inline button loading and reports success/error with a bottom-right toast.
 - The top bar uses a compact session icon. Clicking it opens session details: display name, username, role and expiry time.
 - Session details are informational only; actual session expiry handling stays in the centralized shell effect.
+- Active sessions can be listed and revoked from settings. Revoking the current session logs the user out.
+- Settings includes a `Tum cihazlardan cikis yap` action, which revokes non-current sessions first and then revokes the current session.
+- Identity/access actions are written to `SystemAuditLogs` so Admin can review who registered, signed in, changed access, verified email or revoked sessions.
 
 ## Current Dashboard Behavior
 
@@ -47,11 +58,14 @@ This work coordinates the user entry and navigation experience. It does not own 
 ## Extensibility Notes
 
 - Adding a new screen should update `navigation.ts`, the matching route page under `apps/web/src/app`, the shell view switch and any dashboard shortcuts that should point to it.
+- Admin-only access screens currently include `/users` for user/role management and `/logs` for focused audit search.
 - Adding a new role should update navigation visibility rules and dashboard shortcut availability together.
 - Desktop navigation should stay fixed because the menu is short and should remain available during long workflow screens.
 - Mobile navigation should stay drawer-based with a fixed floating trigger so the dashboard/content remains the first visual focus on small screens.
 - Session-expiry behavior should stay centralized in `AppShell`/`sessionStore` instead of being duplicated in feature screens.
+- User-action traceability has two levels: `AuditLogs` for process state history and `SystemAuditLogs` for broader identity/access/form/process/task events.
 - The current remember-me option is useful for the project demo, but a stronger production version should move toward refresh-token rotation and explicit device/session management.
+- The current token model stays as opaque server-side sessions because pending approval, lockout and revoke all need server-side state. JWT can be considered later only with refresh-token rotation and explicit session/device management.
 - Theme ownership should stay centralized in `sessionStore`; feature screens should read the active theme only through shared styling tokens.
 - Static shell/login/dashboard/process text should use the shared i18n dictionary instead of inline copy.
 

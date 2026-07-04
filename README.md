@@ -66,7 +66,12 @@ Backend varsayilan olarak SQLite kullanir:
     "Provider": "Sqlite"
   },
   "Auth": {
-    "SessionDurationMinutes": 1
+    "SessionDurationMinutes": 120,
+    "RememberMeDurationMinutes": 43200,
+    "MaxFailedLoginAttempts": 5,
+    "LockoutMinutes": 10,
+    "RateLimitPermitLimit": 10,
+    "RateLimitWindowMinutes": 1
   },
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=techyouth-bpm.db"
@@ -74,9 +79,9 @@ Backend varsayilan olarak SQLite kullanir:
 }
 ```
 
-`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` beni-hatirla secenegi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. Daha guclu production tasariminda bu akisin refresh-token mantigiyla ayrica sertlestirilmesi gerekir.
+`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` beni-hatirla secenegi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register endpointlerini sinirlar.
 
-Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Kullanici sifreleri PBKDF2 hash olarak tutulur; eski local SQLite dosyalarindaki plaintext demo sifreleri API startup sirasinda hash formatina yukseltir.
+Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
 
 Takimla ortak PostgreSQL/Neon veritabani kullanmak icin provider ve connection string gizli olarak verilmelidir. Gercek connection string repo'ya commit edilmez.
 
@@ -127,6 +132,12 @@ SQLite ile local demo veritabanini sifirlamak icin:
 ./scripts/run-api-local.ps1 -ResetDb
 ```
 
+Identity veya schema alanlari degistiginde mevcut SQLite dosyasi yeni kolonlari otomatik alamayabilir. Boyle durumlarda local test icin reset onerilir:
+
+```powershell
+./scripts/run-api-local.ps1 -ResetDb -Force
+```
+
 Sadece kullanicilarla baslamak ve mock surec/form verisini kapatmak icin:
 
 ```powershell
@@ -154,6 +165,8 @@ Ana workspace route'lari:
 - `http://localhost:3000/runner`
 - `http://localhost:3000/processes`
 - `http://localhost:3000/tasks`
+- `http://localhost:3000/users`
+- `http://localhost:3000/logs`
 - `http://localhost:3000/settings`
 
 ## Stop Local Servers
@@ -193,6 +206,10 @@ npm run build
 | `approver` | `approver123` | Approver |
 
 Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullanicilarla local fallback devreye girer; boylece UI gelistirmesi backend olmadan da devam edebilir.
+
+Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `PendingApproval` durumunda olusur. Admin, `Kullanicilar / Roller` ekranindan kullaniciyi `Active` yapabilir ve rol atayabilir. `Ayarlar` ekraninda email verification demo kodu, aktif oturumlar, tek oturum kapatma ve tum cihazlardan cikis akisi denenebilir.
+
+Admin kullanicisi `Loglar` ekraninda sistem gecmisini arayabilir. Loglar varsayilan olarak toplu dokulmez; kisi, surec, entity veya aksiyon aramasi ile paginated sonuc ve ilgili kronolojik gecmis gorulur. Bu liste register, login/logout, rol/status degisikligi, form create/update, process start ve task approve/reject gibi kritik aksiyonlari kullanici, entity ve zaman bilgisiyle takip eder. Surec detay ekranindaki audit timeline ise ilgili surecin state history bilgisini gosterir; sureci baslatan kullanici kendi surec gecmisini, Admin/Approver ise gorebildigi sureclerin gecmisini inceleyebilir.
 
 Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari ve audit log ornekleriyle gelir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
 

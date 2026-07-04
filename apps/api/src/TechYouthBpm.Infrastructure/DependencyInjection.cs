@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<IFormService, FormService>();
         services.AddScoped<IProcessService, ProcessService>();
         services.AddScoped<ITaskService, TaskService>();
+        services.AddScoped<ISystemAuditService, SystemAuditService>();
         services.AddSingleton<ProcessStateMachine>();
 
         return services;

@@ -57,6 +57,11 @@ These notes are the project memory. Update this file whenever an implementation 
 - Session duration is configuration-driven through `Auth:SessionDurationMinutes` and is currently 120 minutes. `Auth:RememberMeDurationMinutes` backs the basic remember-me option; a future production version can harden this with refresh-token rotation.
 - Authenticated shell navigation now uses real route paths (`/dashboard`, `/forms`, `/runner`, `/processes`, `/tasks`, `/settings`) so refresh, browser history and direct links behave closer to a production app.
 - Auth hardening now stores PBKDF2 password hashes and SHA-256 session-token hashes instead of plaintext passwords or raw session tokens.
+- Auth remains an opaque server-side session model rather than JWT. This is intentional because pending approval, logout/revoke, lockout and active-session management all need server-side state.
+- Register creates `PendingApproval` users. Admin approval/role assignment, email verification demo flow, session listing/revoke, login/register rate limiting and failed-login lockout are now part of Ufuk's access/workspace flow.
+- Critical user actions now use two audit channels: process `AuditLogs` for BPM state history and `SystemAuditLogs` for Admin-visible identity/access/form/process/task activity.
+- Admin user management and system audit were split out of settings into dedicated `/users` and `/logs` workspace routes. Both use search/detail/pagination patterns so large lists are not dumped directly on screen.
+- After identity model changes, reset the local SQLite file with `./scripts/run-api-local.ps1 -ResetDb -Force` before manual testing because the project still uses `EnsureCreated` instead of migrations.
 - Form designer/runner and process/task views are now wired to real API-backed flows.
 - Ozgun's form foundation work continued on `feature/ozgun-form-foundation`.
 - Shared frontend form helpers were added for supported field types, default field creation, reusable field rendering, form value handling and reusable validation.

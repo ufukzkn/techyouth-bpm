@@ -14,6 +14,7 @@ type SessionState = {
   sessionNotice: string | null;
   hasHydrated: boolean;
   setSession: (session: LoginResponse) => void;
+  setUser: (user: User) => void;
   expireSession: (message: string) => void;
   clearSessionNotice: () => void;
   setHasHydrated: (hasHydrated: boolean) => void;
@@ -49,6 +50,7 @@ export const useSessionStore = create<SessionState>()(
           expiresAt: session.expiresAt,
           sessionNotice: null,
         }),
+      setUser: (user) => set({ user }),
       expireSession: (message) => set({ token: null, user: null, expiresAt: null, sessionNotice: message }),
       clearSessionNotice: () => set({ sessionNotice: null }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
