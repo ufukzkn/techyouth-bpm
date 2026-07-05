@@ -227,7 +227,7 @@ npm run build
 
 Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullanicilarla local fallback devreye girer; boylece UI gelistirmesi backend olmadan da devam edebilir.
 
-Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `PendingApproval` durumunda olusur. Admin, `Yetki ve Onay` ekranindan kullaniciyi `Active` yapabilir ve rol atayabilir. `Ayarlar` ekraninda email verification demo kodu, aktif oturumlar, tek oturum kapatma ve tum cihazlardan cikis akisi denenebilir.
+Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `PendingApproval` durumunda olusur. Admin, `Yetki ve Onay` ekranindan kullaniciyi `Active` yapabilir, rol atayabilir, gecici sifreyle yeni kullanici olusturabilir ve kullanici oturumlarini gorebilir/kapatabilir. `Ayarlar` ekraninda profil guncelleme, sifre degistirme, email verification demo kodu, aktif oturumlar, tek oturum kapatma ve tum cihazlardan cikis akisi denenebilir.
 
 Admin kullanicisi `Loglar` ekraninda sistem gecmisini arayabilir. Loglar varsayilan olarak toplu dokulmez; kisi, surec, entity veya aksiyon aramasi ile paginated sonuc ve ilgili kronolojik gecmis gorulur. Bu liste register, login/logout, rol/status degisikligi, form create/update, process start ve task approve/reject gibi kritik aksiyonlari kullanici, entity ve zaman bilgisiyle takip eder. Surec detay ekranindaki audit timeline ise ilgili surecin state history bilgisini gosterir; sureci baslatan kullanici kendi surec gecmisini, Admin/Approver ise gorebildigi sureclerin gecmisini inceleyebilir.
 

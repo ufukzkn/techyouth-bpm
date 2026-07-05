@@ -4,6 +4,7 @@ import { CheckCircle2, CircleDot, XCircle } from "lucide-react";
 import { useState } from "react";
 import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { TaskActionDialog } from "@/features/processes/TaskActionDialog";
+import { formatApiDateTime } from "@/lib/dateTime";
 import type { Language, ProcessTask, Role, WorkflowAction } from "@/lib/types";
 
 type MyTasksViewProps = {
@@ -50,7 +51,7 @@ export function MyTasksView({ tasks, language, role, status, onExecuteTask }: My
                     {task.id.slice(0, 8)} - {roleLabel(language, task.assignedRole)}
                   </span>
                   <small className="task-date">
-                    {new Date(task.createdAt).toLocaleString("tr-TR")}
+                    {formatApiDateTime(task.createdAt, language)}
                   </small>
                 </div>
                 <div className="task-actions">

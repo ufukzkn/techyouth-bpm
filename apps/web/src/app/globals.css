@@ -1019,11 +1019,12 @@ input[type="checkbox"] {
 .settings-panel {
   display: grid;
   gap: 16px;
+  max-width: 1180px;
 }
 
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 12px;
 }
 
@@ -1053,6 +1054,48 @@ input[type="checkbox"] {
   overflow-wrap: anywhere;
 }
 
+.text-link-button {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  color: var(--primary-strong);
+  font-weight: 800;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.text-link-button:hover:not(:disabled) {
+  color: var(--primary);
+}
+
+.text-link-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.inline-verification-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-verification-form input {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--foreground);
+  background: var(--surface);
+}
+
+.inline-verification-form small {
+  grid-column: 1 / -1;
+}
+
 .identity-section {
   display: grid;
   gap: 12px;
@@ -1065,6 +1108,28 @@ input[type="checkbox"] {
 .identity-section h3 {
   margin: 0;
   font-size: 18px;
+}
+
+.settings-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.compact-identity-section {
+  min-height: 100%;
+  gap: 10px;
+  padding: 14px;
+}
+
+.compact-identity-section h3 {
+  font-size: 16px;
+}
+
+.compact-identity-section .helper-copy {
+  margin: 0;
+  font-size: 13px;
 }
 
 .section-actions {
@@ -1087,6 +1152,9 @@ input[type="checkbox"] {
 }
 
 .inline-form input,
+.compact-form input,
+.admin-create-grid input,
+.admin-create-grid select,
 .search-field input,
 .filter-toolbar select,
 .access-editor select,
@@ -1097,6 +1165,41 @@ input[type="checkbox"] {
   border-radius: 7px;
   color: var(--foreground);
   background: var(--surface);
+}
+
+.compact-form {
+  display: grid;
+  gap: 8px;
+}
+
+.compact-form .primary-button,
+.compact-form .secondary-button {
+  min-height: 40px;
+  width: fit-content;
+}
+
+.profile-form {
+  grid-template-columns: repeat(2, minmax(160px, 1fr)) auto;
+}
+
+.admin-create-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-create-grid .primary-button {
+  min-height: 40px;
+}
+
+.urgent-identity-section {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+}
+
+.urgent-identity-section svg {
+  color: var(--danger);
 }
 
 .filter-toolbar {
@@ -1215,6 +1318,55 @@ input[type="checkbox"] {
 .system-audit-content {
   display: grid;
   gap: 6px;
+}
+
+.audit-label-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.audit-category-pill {
+  width: fit-content;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.audit-category-identity {
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+}
+
+.audit-category-access {
+  color: #0f6b43;
+  background: color-mix(in srgb, #2bb673 10%, var(--surface));
+  border-color: color-mix(in srgb, #2bb673 32%, var(--border));
+}
+
+.audit-category-forms {
+  color: #7a4b05;
+  background: color-mix(in srgb, #f5a623 12%, var(--surface));
+  border-color: color-mix(in srgb, #f5a623 36%, var(--border));
+}
+
+.audit-category-processes {
+  color: #31537f;
+  background: color-mix(in srgb, #5b8def 10%, var(--surface));
+  border-color: color-mix(in srgb, #5b8def 34%, var(--border));
+}
+
+.audit-category-tasks {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
 }
 
 .stacked-summary {
@@ -2114,13 +2266,17 @@ input[type="checkbox"] {
   .runner-grid,
   .detail-list,
   .settings-grid,
+  .settings-action-grid,
   .inline-form,
+  .profile-form,
+  .admin-create-grid,
   .filter-toolbar,
   .management-layout,
   .audit-category-grid,
   .session-row,
   .user-management-row,
   .system-audit-row,
+  .inline-verification-form,
   .compact-grid,
   .access-editor,
   .access-confirm-grid,

@@ -3,6 +3,7 @@
 import { AuditTimeline } from "@/features/processes/AuditTimeline";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { StatusBadge } from "@/features/processes/StatusBadge";
+import { formatApiDateTime } from "@/lib/dateTime";
 import type { Language, ProcessDetail } from "@/lib/types";
 
 type ProcessDetailPanelProps = {
@@ -51,7 +52,7 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
         <dl className="detail-list">
           <div>
             <dt>{t("process.start")}</dt>
-            <dd>{new Date(detail.startedAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}</dd>
+            <dd>{formatApiDateTime(detail.startedAt, language)}</dd>
           </div>
           <div>
             <dt>{t("process.status")}</dt>
@@ -60,7 +61,7 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
           {detail.completedAt ? (
             <div>
               <dt>{t("process.completedAt")}</dt>
-              <dd>{new Date(detail.completedAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}</dd>
+              <dd>{formatApiDateTime(detail.completedAt, language)}</dd>
             </div>
           ) : null}
           <div>

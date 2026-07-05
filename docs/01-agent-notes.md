@@ -80,3 +80,5 @@ These notes are the project memory. Update this file whenever an implementation 
 - Top bar session details moved behind a compact session icon so the shell keeps expiry/user/role information without permanently showing a long timestamp.
 - Dashboard metrics keep the last loaded values while refreshing to avoid flashing placeholder values during fast navigation.
 - Language support foundation added with persisted `tr/en` preference, login/topbar language toggles, translated shell/dashboard/settings/process/task UI and documented extension rules in `docs/11-i18n-language-support.md`.
+- Ufuk access flow was extended with editable profile details, password change, admin-created temporary-password users, `MustChangePassword` workspace restriction, session IP/User-Agent metadata and localized known auth/access API errors.
+- Existing SQLite/PostgreSQL databases are patched on startup for the latest identity columns through `DatabaseSeeder`; formal EF migrations are still deferred.

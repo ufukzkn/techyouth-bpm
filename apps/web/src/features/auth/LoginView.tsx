@@ -5,8 +5,9 @@ import { LogIn, UserPlus } from "lucide-react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { demoUsers, loginWithDemoUser } from "@/features/auth/demoUsers";
+import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 
@@ -79,7 +80,7 @@ export function LoginView() {
         setMode("login");
         setPassword("");
       } catch (apiError) {
-        setError(apiError instanceof ApiError ? apiError.errors.join(" ") : t("login.registerFailed"));
+        setError(localizeApiError(apiError, language, t("login.registerFailed")));
       } finally {
         setIsLoading(false);
       }
@@ -104,7 +105,7 @@ export function LoginView() {
         return;
       }
 
-      setError(apiError instanceof ApiError ? apiError.errors.join(" ") : t("login.invalid"));
+      setError(localizeApiError(apiError, language, t("login.invalid")));
     } finally {
       setIsLoading(false);
     }

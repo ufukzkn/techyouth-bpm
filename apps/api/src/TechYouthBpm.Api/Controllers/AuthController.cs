@@ -23,7 +23,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     {
         var result = await AuthService.LoginAsync(
             request,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            ResolveClientIpAddress(),
             Request.Headers.UserAgent.ToString(),
             cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
@@ -121,5 +121,22 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
 
         var result = await AuthService.ConfirmEmailVerificationAsync(request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    private string? ResolveClientIpAddress()
+    {
+        var forwardedFor = Request.Headers["X-Forwarded-For"].ToString();
+        if (!string.IsNullOrWhiteSpace(forwardedFor))
+        {
+            return forwardedFor.Split(',')[0].Trim();
+        }
+
+        var realIp = Request.Headers["X-Real-IP"].ToString();
+        if (!string.IsNullOrWhiteSpace(realIp))
+        {
+            return realIp.Trim();
+        }
+
+        return HttpContext.Connection.RemoteIpAddress?.ToString();
     }
 }

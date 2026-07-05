@@ -2,6 +2,7 @@
 
 import { ArrowRight, CheckCircle2, Play, XCircle } from "lucide-react";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
+import { formatApiDateTime } from "@/lib/dateTime";
 import type { AuditLog, Language, WorkflowAction } from "@/lib/types";
 
 type AuditTimelineProps = {
@@ -42,7 +43,7 @@ export function AuditTimeline({ logs, language }: AuditTimelineProps) {
                   {log.userDisplayName} / {log.userUsername}
                 </span>
                 <time dateTime={log.createdAt}>
-                  {new Date(log.createdAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}
+                  {formatApiDateTime(log.createdAt, language)}
                 </time>
               </div>
               {log.note ? <p className="audit-note">{log.note}</p> : null}

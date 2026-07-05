@@ -4,6 +4,7 @@ import { CircleDot, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { StatusBadge } from "@/features/processes/StatusBadge";
+import { formatApiDateTime } from "@/lib/dateTime";
 import type { Language, ProcessStatus, ProcessSummary } from "@/lib/types";
 
 type ProcessListViewProps = {
@@ -71,7 +72,7 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
             >
               <span>
                 <strong>{process.formName}</strong>
-                <small>{new Date(process.startedAt).toLocaleString("tr-TR")}</small>
+                <small>{formatApiDateTime(process.startedAt, language)}</small>
               </span>
               <StatusBadge status={process.status} language={language} />
             </button>

@@ -2,15 +2,17 @@
 
 import {
   AlertTriangle,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   History,
+  KeyRound,
   LogOut,
   Menu,
+  Save,
   Search,
   ShieldCheck,
   UserCog,
+  UserPlus,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -22,10 +24,12 @@ import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
 import { LoginView } from "@/features/auth/LoginView";
 import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
 import { FormRunnerDraft } from "@/features/form-runner/FormRunnerDraft";
+import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { ProcessBoardDraft } from "@/features/processes/ProcessBoardDraft";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
+import { formatApiDateTime } from "@/lib/dateTime";
 import type {
   Language,
   ProcessSummary,
@@ -203,9 +207,27 @@ export function AppShell() {
   }, []);
 
   const visibleNavItems = useMemo(
-    () => navItems.filter((item) => (user ? item.roles.includes(user.role) : false)),
+    () =>
+      navItems.filter((item) => {
+        if (!user || !item.roles.includes(user.role)) {
+          return false;
+        }
+
+        return user.mustChangePassword ? item.viewId === "settings" : true;
+      }),
     [user],
   );
+
+  useEffect(() => {
+    if (user?.mustChangePassword && window.location.pathname !== "/settings") {
+      const timer = window.setTimeout(() => {
+        setActiveView("settings");
+        window.history.replaceState(null, "", "/settings");
+      }, 0);
+
+      return () => window.clearTimeout(timer);
+    }
+  }, [user?.mustChangePassword]);
 
   if (!hasHydrated) {
     return (
@@ -224,7 +246,9 @@ export function AppShell() {
     return <LoginView />;
   }
 
-  const currentView = visibleNavItems.some((item) => item.viewId === activeView)
+  const currentView = user.mustChangePassword
+    ? "settings"
+    : visibleNavItems.some((item) => item.viewId === activeView)
     ? activeView
     : visibleNavItems[0]?.viewId ?? "dashboard";
 
@@ -533,10 +557,17 @@ function SettingsView({
     [language],
   );
   const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [profileDisplayName, setProfileDisplayName] = useState(user.displayName);
+  const [profileEmail, setProfileEmail] = useState(user.email);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [demoCode, setDemoCode] = useState<string | null>(null);
+  const [isEmailVerificationOpen, setIsEmailVerificationOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const isApiSession = Boolean(token && !token.startsWith("demo-"));
 
@@ -550,11 +581,11 @@ function SettingsView({
       const sessionResult = await api.listSessions(token);
       setSessions(sessionResult);
     } catch (error) {
-      setStatusMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.loadFailed"));
+      setStatusMessage(localizeApiError(error, language, t("settings.loadFailed")));
     } finally {
       setIsLoadingSettings(false);
     }
-  }, [t, token]);
+  }, [language, t, token]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -563,6 +594,55 @@ function SettingsView({
 
     return () => window.clearTimeout(timer);
   }, [loadIdentityData]);
+
+  async function saveProfile() {
+    if (!token) {
+      return;
+    }
+
+    setIsSavingProfile(true);
+    try {
+      const updatedUser = await api.updateProfile(token, {
+        displayName: profileDisplayName,
+        email: profileEmail,
+      });
+      onUserUpdated(updatedUser);
+      setProfileDisplayName(updatedUser.displayName);
+      setProfileEmail(updatedUser.email);
+      if (!updatedUser.isEmailVerified) {
+        setDemoCode(null);
+        setVerificationCode("");
+        setIsEmailVerificationOpen(false);
+      }
+      setStatusMessage(t("settings.profileSaved"));
+    } catch (error) {
+      setStatusMessage(localizeApiError(error, language, t("settings.profileFailed")));
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  async function changePassword() {
+    if (!token) {
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const updatedUser = await api.changePassword(token, {
+        currentPassword,
+        newPassword,
+      });
+      onUserUpdated(updatedUser);
+      setCurrentPassword("");
+      setNewPassword("");
+      setStatusMessage(t("settings.passwordChanged"));
+    } catch (error) {
+      setStatusMessage(localizeApiError(error, language, t("settings.passwordFailed")));
+    } finally {
+      setIsChangingPassword(false);
+    }
+  }
 
   async function requestVerification() {
     if (!token) {
@@ -574,7 +654,7 @@ function SettingsView({
       setDemoCode(response.demoCode);
       setStatusMessage(t("settings.verificationCodeReady"));
     } catch (error) {
-      setStatusMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.verificationFailed"));
+      setStatusMessage(localizeApiError(error, language, t("settings.verificationFailed")));
     }
   }
 
@@ -588,9 +668,10 @@ function SettingsView({
       onUserUpdated(updatedUser);
       setVerificationCode("");
       setDemoCode(null);
+      setIsEmailVerificationOpen(false);
       setStatusMessage(t("settings.emailVerified"));
     } catch (error) {
-      setStatusMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.verificationFailed"));
+      setStatusMessage(localizeApiError(error, language, t("settings.verificationFailed")));
     }
   }
 
@@ -609,7 +690,7 @@ function SettingsView({
       await loadIdentityData();
       setStatusMessage(t("settings.sessionRevoked"));
     } catch (error) {
-      setStatusMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.sessionRevokeFailed"));
+      setStatusMessage(localizeApiError(error, language, t("settings.sessionRevokeFailed")));
     }
   }
 
@@ -635,7 +716,7 @@ function SettingsView({
       await loadIdentityData();
       setStatusMessage(t("settings.allSessionsRevoked"));
     } catch (error) {
-      setStatusMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.sessionRevokeFailed"));
+      setStatusMessage(localizeApiError(error, language, t("settings.sessionRevokeFailed")));
     }
   }
 
@@ -657,6 +738,36 @@ function SettingsView({
         <article className="settings-row">
           <span>{t("settings.emailStatus")}</span>
           <strong>{user.isEmailVerified ? t("settings.verified") : t("settings.notVerified")}</strong>
+          {!user.isEmailVerified ? (
+            <>
+              <button
+                className="text-link-button"
+                type="button"
+                disabled={!isApiSession}
+                onClick={() => {
+                  setIsEmailVerificationOpen(true);
+                  if (!demoCode) {
+                    void requestVerification();
+                  }
+                }}
+              >
+                {t("settings.verifyEmail")}
+              </button>
+              {isEmailVerificationOpen ? (
+                <div className="inline-verification-form">
+                  <input
+                    value={verificationCode}
+                    onChange={(event) => setVerificationCode(event.target.value)}
+                    placeholder={t("settings.verificationCode")}
+                  />
+                  <button className="primary-button" type="button" disabled={!isApiSession} onClick={confirmVerification}>
+                    {t("settings.verifyEmail")}
+                  </button>
+                  {demoCode ? <small>{t("settings.demoVerificationCode", { code: demoCode })}</small> : null}
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </article>
         <article className="settings-row">
           <span>{t("settings.session")}</span>
@@ -666,34 +777,80 @@ function SettingsView({
 
       {statusMessage ? <div className="form-success">{statusMessage}</div> : null}
 
-      <section className="identity-section">
-        <div className="section-toolbar">
-          <div>
-            <span className="eyebrow">{t("settings.emailVerification")}</span>
-            <h3>{t("settings.emailVerificationTitle")}</h3>
+      {user.mustChangePassword ? (
+        <section className="identity-section urgent-identity-section">
+          <div className="section-toolbar">
+            <div>
+              <span className="eyebrow">{t("settings.mustChangePasswordTitle")}</span>
+              <h3>{t("settings.passwordTitle")}</h3>
+            </div>
+            <AlertTriangle size={22} />
           </div>
-          <CheckCircle2 size={22} />
-        </div>
-        <p className="helper-copy">{t("settings.emailVerificationDescription")}</p>
-        {user.isEmailVerified ? (
-          <div className="form-success">{t("settings.emailAlreadyVerified")}</div>
-        ) : (
-          <div className="inline-form">
-            <button className="secondary-button" type="button" disabled={!isApiSession} onClick={requestVerification}>
-              {t("settings.sendVerificationCode")}
-            </button>
+          <p className="helper-copy">{t("settings.mustChangePasswordDescription")}</p>
+        </section>
+      ) : null}
+
+      <div className="settings-action-grid">
+        <section className="identity-section compact-identity-section">
+          <div className="section-toolbar">
+            <div>
+              <span className="eyebrow">{t("settings.profile")}</span>
+              <h3>{t("settings.profileTitle")}</h3>
+            </div>
+            <Save size={20} />
+          </div>
+          <p className="helper-copy">{t("settings.profileDescription")}</p>
+          <div className="compact-form">
             <input
-              value={verificationCode}
-              onChange={(event) => setVerificationCode(event.target.value)}
-              placeholder={t("settings.verificationCode")}
+              value={profileDisplayName}
+              onChange={(event) => setProfileDisplayName(event.target.value)}
+              placeholder={t("login.displayName")}
             />
-            <button className="primary-button" type="button" disabled={!isApiSession} onClick={confirmVerification}>
-              {t("settings.verifyEmail")}
+            <input
+              value={profileEmail}
+              onChange={(event) => setProfileEmail(event.target.value)}
+              placeholder={t("login.email")}
+              type="email"
+            />
+            <button className="primary-button" type="button" disabled={!isApiSession || isSavingProfile} onClick={saveProfile}>
+              {isSavingProfile ? t("common.saving") : t("settings.saveProfile")}
             </button>
           </div>
-        )}
-        {demoCode ? <p className="status-line">{t("settings.demoVerificationCode", { code: demoCode })}</p> : null}
-      </section>
+        </section>
+
+        <section className="identity-section compact-identity-section">
+          <div className="section-toolbar">
+            <div>
+              <span className="eyebrow">{t("settings.auth")}</span>
+              <h3>{t("settings.passwordTitle")}</h3>
+            </div>
+            <KeyRound size={20} />
+          </div>
+          <p className="helper-copy">{t("settings.passwordDescription")}</p>
+          <div className="compact-form">
+            <input
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              placeholder={t("settings.currentPassword")}
+              type="password"
+            />
+            <input
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              placeholder={t("settings.newPassword")}
+              type="password"
+            />
+            <button
+              className={user.mustChangePassword ? "primary-button danger-button" : "primary-button"}
+              type="button"
+              disabled={!isApiSession || isChangingPassword || !currentPassword || !newPassword}
+              onClick={changePassword}
+            >
+              {isChangingPassword ? t("common.saving") : t("settings.changePassword")}
+            </button>
+          </div>
+        </section>
+      </div>
 
       <section className="identity-section">
         <div className="section-toolbar">
@@ -716,6 +873,9 @@ function SettingsView({
                     ? t("settings.lastSeen", { value: formatSessionExpiry(session.lastSeenAt, language) })
                     : t("settings.notSeenYet")}
                 </small>
+                <small>{t("settings.createdAt", { value: formatSessionExpiry(session.createdAt, language) })}</small>
+                <small>{t("settings.device", { value: summarizeUserAgent(session.userAgent, language) })}</small>
+                <small>{t("settings.ipAddress", { value: formatIpAddress(session.ipAddress, language) })}</small>
               </div>
               <button
                 className="secondary-button danger-button"
@@ -761,10 +921,19 @@ function UsersAndRolesView({
   const [pendingAccessChange, setPendingAccessChange] = useState<PendingAccessChange | null>(null);
   const [selectedUserSessions, setSelectedUserSessions] = useState<UserSession[]>([]);
   const [pendingSessionRevoke, setPendingSessionRevoke] = useState<PendingSessionRevoke | null>(null);
+  const [createUserDraft, setCreateUserDraft] = useState({
+    username: "",
+    displayName: "",
+    email: "",
+    role: "User" as Role,
+    status: "Active" as UserStatus,
+    temporaryPassword: "",
+  });
   const [page, setPage] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingUserSessions, setIsLoadingUserSessions] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
   const pageSize = 6;
 
   const loadUsersAndLogs = useCallback(async () => {
@@ -779,11 +948,11 @@ function UsersAndRolesView({
       setLogs(auditResult);
       setSelectedUserId((current) => current ?? userResult.find((item) => item.status === "PendingApproval")?.id ?? null);
     } catch (error) {
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.loadFailed"));
+      setMessage(localizeApiError(error, language, t("settings.loadFailed")));
     } finally {
       setIsLoading(false);
     }
-  }, [t, token]);
+  }, [language, t, token]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -843,13 +1012,13 @@ function UsersAndRolesView({
         const result = await api.listUserSessions(token, userId);
         setSelectedUserSessions(result);
       } catch (error) {
-        setMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.loadFailed"));
+        setMessage(localizeApiError(error, language, t("settings.loadFailed")));
         setSelectedUserSessions([]);
       } finally {
         setIsLoadingUserSessions(false);
       }
     },
-    [t, token],
+    [language, t, token],
   );
 
   useEffect(() => {
@@ -877,7 +1046,33 @@ function UsersAndRolesView({
       await loadUsersAndLogs();
       setMessage(t("settings.userAccessUpdated"));
     } catch (error) {
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.userAccessFailed"));
+      setMessage(localizeApiError(error, language, t("settings.userAccessFailed")));
+    }
+  }
+
+  async function createUser() {
+    if (!token) {
+      return;
+    }
+
+    setIsCreatingUser(true);
+    try {
+      const createdUser = await api.createUser(token, createUserDraft);
+      setCreateUserDraft({
+        username: "",
+        displayName: "",
+        email: "",
+        role: "User",
+        status: "Active",
+        temporaryPassword: "",
+      });
+      await loadUsersAndLogs();
+      setSelectedUserId(createdUser.id);
+      setMessage(t("users.userCreated", { username: createdUser.username }));
+    } catch (error) {
+      setMessage(localizeApiError(error, language, t("users.userCreateFailed")));
+    } finally {
+      setIsCreatingUser(false);
     }
   }
 
@@ -944,7 +1139,7 @@ function UsersAndRolesView({
       await loadUsersAndLogs();
       setMessage(t("settings.sessionRevoked"));
     } catch (error) {
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("settings.sessionRevokeFailed"));
+      setMessage(localizeApiError(error, language, t("settings.sessionRevokeFailed")));
     }
   }
 
@@ -959,6 +1154,60 @@ function UsersAndRolesView({
       </div>
 
       <div className="identity-section">
+        <section className="identity-section nested-identity-section">
+          <div className="section-toolbar">
+            <div>
+              <span className="eyebrow">{t("users.createEyebrow")}</span>
+              <h3>{t("users.createTitle")}</h3>
+            </div>
+            <UserPlus size={22} />
+          </div>
+          <p className="helper-copy">{t("users.createDescription")}</p>
+          <div className="admin-create-grid">
+            <input
+              value={createUserDraft.username}
+              onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, username: event.target.value }))}
+              placeholder={t("login.username")}
+            />
+            <input
+              value={createUserDraft.displayName}
+              onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, displayName: event.target.value }))}
+              placeholder={t("login.displayName")}
+            />
+            <input
+              value={createUserDraft.email}
+              onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, email: event.target.value }))}
+              placeholder={t("login.email")}
+              type="email"
+            />
+            <input
+              value={createUserDraft.temporaryPassword}
+              onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: event.target.value }))}
+              placeholder={t("users.temporaryPassword")}
+              type="password"
+            />
+            <select
+              value={createUserDraft.role}
+              onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, role: event.target.value as Role }))}
+            >
+              <option value="Admin">Admin</option>
+              <option value="User">User</option>
+              <option value="Approver">Approver</option>
+            </select>
+            <select
+              value={createUserDraft.status}
+              onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, status: event.target.value as UserStatus }))}
+            >
+              <option value="PendingApproval">{t("settings.statusPending")}</option>
+              <option value="Active">{t("settings.statusActive")}</option>
+              <option value="Rejected">{t("settings.statusRejected")}</option>
+            </select>
+            <button className="primary-button" type="button" disabled={isCreatingUser} onClick={createUser}>
+              {isCreatingUser ? t("users.creatingUser") : t("users.createUser")}
+            </button>
+          </div>
+        </section>
+
         <div className="filter-toolbar">
           <label className="search-field">
             <Search size={16} />
@@ -1053,6 +1302,10 @@ function UsersAndRolesView({
                   <strong>{isSelectedUserOnline ? t("users.online") : t("users.offline")}</strong>
                   <small>{t("users.activeSessionCount", { count: activeSessionCount })}</small>
                 </article>
+                <article className="settings-row">
+                  <span>{t("users.mustChangePassword")}</span>
+                  <strong>{selectedUser.mustChangePassword ? t("common.yes") : t("common.no")}</strong>
+                </article>
               </div>
               <div className="access-editor">
                 <select
@@ -1112,6 +1365,9 @@ function UsersAndRolesView({
                             ? t("settings.lastSeen", { value: formatSessionExpiry(session.lastSeenAt, language) })
                             : t("settings.notSeenYet")}
                         </small>
+                        <small>{t("settings.createdAt", { value: formatSessionExpiry(session.createdAt, language) })}</small>
+                        <small>{t("settings.device", { value: summarizeUserAgent(session.userAgent, language) })}</small>
+                        <small>{t("settings.ipAddress", { value: formatIpAddress(session.ipAddress, language) })}</small>
                       </div>
                       <button
                         className="secondary-button danger-button"
@@ -1341,19 +1597,21 @@ function SystemLogsView({ language, token }: { language: Language; token: string
   const currentPage = Math.min(page, totalPages);
   const visibleLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const selectedLog = logs.find((log) => log.id === selectedLogId) ?? null;
+  const selectedLogCategory = selectedLog ? getAuditCategory(selectedLog) : null;
   const relatedLogs = useMemo(() => {
-    if (!selectedLog) {
+    if (!selectedLog || !selectedLogCategory) {
       return [];
     }
 
     return logs
       .filter(
         (log) =>
-          (selectedLog.entityId && log.entityId === selectedLog.entityId && log.entityType === selectedLog.entityType) ||
-          (selectedLog.actorUserId && log.actorUserId === selectedLog.actorUserId),
+          getAuditCategory(log) === selectedLogCategory &&
+          ((selectedLog.entityId && log.entityId === selectedLog.entityId && log.entityType === selectedLog.entityType) ||
+            (selectedLog.actorUserId && log.actorUserId === selectedLog.actorUserId)),
       )
       .sort((left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime());
-  }, [logs, selectedLog]);
+  }, [logs, selectedLog, selectedLogCategory]);
 
   return (
     <section className="settings-panel">
@@ -1415,7 +1673,12 @@ function SystemLogsView({ language, token }: { language: Language; token: string
             {visibleLogs.map((log) => (
               <article className="settings-row system-audit-row" key={log.id}>
                 <div className="system-audit-content">
-                  <span>{log.action}</span>
+                  <div className="audit-label-row">
+                    <span className={`audit-category-pill audit-category-${getAuditCategory(log)}`}>
+                      {t(`logs.category.${getAuditCategory(log)}` as TranslationKey)}
+                    </span>
+                    <span>{formatAuditAction(log.action, language)}</span>
+                  </div>
                   <strong>{log.description}</strong>
                   <small>
                     {log.actorDisplayName} / {log.actorUsername}
@@ -1423,7 +1686,7 @@ function SystemLogsView({ language, token }: { language: Language; token: string
                 </div>
                 <div className="system-audit-meta">
                   <strong>{log.entityType}</strong>
-                  <small>{new Date(log.createdAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}</small>
+                  <small>{formatApiDateTime(log.createdAt, language)}</small>
                   <button className="secondary-button" type="button" onClick={() => setSelectedLogId(log.id)}>
                     {t("logs.viewRelated")}
                   </button>
@@ -1459,11 +1722,27 @@ function SystemLogsView({ language, token }: { language: Language; token: string
 }
 
 function getAuditCategory(log: SystemAuditLog): Exclude<AuditCategory, "all"> {
-  if (log.action.startsWith("Auth.")) {
+  const identityActions = new Set([
+    "Auth.AccountLocked",
+    "Auth.EmailVerificationRequested",
+    "Auth.EmailVerified",
+    "Auth.LoginFailed",
+    "Auth.LoginSucceeded",
+    "Auth.Logout",
+    "Auth.PasswordChanged",
+    "Auth.RegisterRequested",
+    "Auth.SessionRevoked",
+    "Auth.TemporaryPasswordChanged",
+    "User.ProfileAndEmailUpdated",
+    "User.ProfileUpdated",
+  ]);
+  const accessActions = new Set(["Auth.AdminSessionRevoked", "User.AccessUpdated", "User.CreatedByAdmin"]);
+
+  if (identityActions.has(log.action)) {
     return "identity";
   }
 
-  if (log.action.startsWith("User.") || log.entityType === "User") {
+  if (accessActions.has(log.action)) {
     return "access";
   }
 
@@ -1480,6 +1759,12 @@ function getAuditCategory(log: SystemAuditLog): Exclude<AuditCategory, "all"> {
   }
 
   return "identity";
+}
+
+function formatAuditAction(action: string, language: Language) {
+  const key = `logs.action.${action}` as TranslationKey;
+  const translated = translate(language, key);
+  return translated === key ? action : translated;
 }
 
 function SystemAuditTimeline({
@@ -1503,7 +1788,7 @@ function SystemAuditTimeline({
           <strong>{log.description}</strong>
           <small>
             {log.actorDisplayName} / {log.actorUsername} -{" "}
-            {new Date(log.createdAt).toLocaleString(language === "tr" ? "tr-TR" : "en-US")}
+            {formatApiDateTime(log.createdAt, language)}
           </small>
         </article>
       ))}
@@ -1538,22 +1823,50 @@ function PaginationControls({
 }
 
 function formatSessionExpiry(expiresAt: string | null, language: Language) {
-  if (!expiresAt) {
-    return translate(language, "session.noExpiry");
+  return formatApiDateTime(expiresAt, language);
+}
+
+function summarizeUserAgent(userAgent: string | null | undefined, language: Language) {
+  if (!userAgent) {
+    return translate(language, "settings.unknownDevice");
   }
 
-  const expiryDate = new Date(expiresAt);
-  if (Number.isNaN(expiryDate.getTime())) {
-    return translate(language, "session.unknownExpiry");
+  const browser = userAgent.includes("Edg/")
+    ? "Edge"
+    : userAgent.includes("Chrome/")
+      ? "Chrome"
+      : userAgent.includes("Firefox/")
+        ? "Firefox"
+        : userAgent.includes("Safari/")
+          ? "Safari"
+          : "Browser";
+  const os = userAgent.includes("Windows")
+    ? "Windows"
+    : userAgent.includes("Mac OS")
+      ? "macOS"
+      : userAgent.includes("Android")
+        ? "Android"
+        : userAgent.includes("iPhone") || userAgent.includes("iPad")
+          ? "iOS"
+          : "Device";
+
+  return `${browser} / ${os}`;
+}
+
+function formatIpAddress(ipAddress: string | null | undefined, language: Language) {
+  if (!ipAddress) {
+    return translate(language, "settings.unknownIp");
   }
 
-  return expiryDate.toLocaleString(language === "tr" ? "tr-TR" : "en-US", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (ipAddress === "::1" || ipAddress === "127.0.0.1") {
+    return translate(language, "settings.localhostIp");
+  }
+
+  if (ipAddress.startsWith("::ffff:")) {
+    return ipAddress.replace("::ffff:", "");
+  }
+
+  return ipAddress;
 }
 
 function userStatusLabel(language: Language, status: UserStatus) {

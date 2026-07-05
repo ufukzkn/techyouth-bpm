@@ -26,13 +26,16 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Passwords are verified through PBKDF2 hashes and session tokens are stored as SHA-256 hashes in the database.
 - Login/register endpoints are rate limited, and repeated failed login attempts temporarily lock the account.
 - Logout revokes the backend session instead of only clearing frontend state.
-- Settings now includes profile, email verification and active session management.
+- Settings now includes editable profile details, password change, email verification and active session management.
+- Email changes reset verification status and clear any previous verification code.
+- Admin-created accounts can start with a temporary password. Those users are restricted to settings until they change the password.
 - Admin user approval/role management moved to a separate `Yetki ve Onay` route instead of being embedded inside settings.
 - Admin system history moved to a separate `Loglar` route. Logs are categorized, searched and paginated instead of being dumped as one long list.
 - Email verification has a local demo-code flow; production should replace it with a real email delivery service.
 - Admin users can approve pending registrations, reject accounts and assign roles from the `Yetki ve Onay` screen.
+- Admin users can create a new user with role, status and temporary password from the `Yetki ve Onay` screen.
 - Role/status edits are staged locally and only sent after the Admin clicks `Degisikligi uygula` and confirms the critical access dialog.
-- Admin users can inspect a selected user's active sessions from the same detail panel and revoke a session after confirmation.
+- Admin users can inspect a selected user's active sessions from the same detail panel, see session device/IP metadata and revoke a session after confirmation.
 - The authenticated shell filters menu items by role.
 - Workspace navigation uses real route paths such as `/dashboard`, `/forms`, `/tasks` and `/settings` instead of hash-scroll sections or query-only views.
 - Desktop navigation stays fixed on the left while the workspace scrolls.
@@ -46,7 +49,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Session details are informational only; actual session expiry handling stays in the centralized shell effect.
 - Active sessions can be listed and revoked from settings. Revoking the current session logs the user out.
 - Settings includes a `Tum cihazlardan cikis yap` action, which revokes non-current sessions first and then revokes the current session.
-- Identity/access actions are written to `SystemAuditLogs` so Admin can review who registered, signed in, changed access, verified email or revoked sessions.
+- Identity/access actions are written to `SystemAuditLogs` so Admin can review who registered, signed in, changed access, updated profile/email, changed password, verified email, created users or revoked sessions.
 
 ## Current Dashboard Behavior
 
