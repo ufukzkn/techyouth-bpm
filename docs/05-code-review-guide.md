@@ -68,7 +68,8 @@ Use this file for the final code review presentation.
 - The form runner uses skeleton rows on first load and keeps cached form definitions during quick navigation.
 - The top bar and settings screen show session expiry information so session state is visible after login.
 - Settings now has email verification and active session management, including an all-devices sign-out action.
-- Admin-only user approval/role controls live in the dedicated `Yetki ve Onay` workspace route with search, status filtering, pagination and a selected-user detail/history/session panel.
+- Admin-only user approval/role/session controls live in the dedicated `Yonetim` workspace route with search, status filtering, pagination and a selected-user detail/history/session panel.
+- User management and system audit search use backend paging/search parameters, so large user or audit tables are not fully loaded into the browser just to paginate in the UI.
 - Role/status changes are staged until the Admin clicks an explicit apply button, then confirmed through a critical-action dialog before the API request is sent.
 - Admin-only system history lives in the dedicated `Loglar` route. Logs are only shown after search, then paginated and inspectable through related chronological history.
 - Process details continue to show process-specific audit history to Admin/Approver and the user who started that process.

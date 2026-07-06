@@ -1,4 +1,5 @@
 using TechYouthBpm.Application.Auth;
+using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Services;
 
@@ -15,10 +16,11 @@ public class SystemAuditServiceTests
         await service.LogAsync(admin.Id, "Test.Action", "TestEntity", "entity-1", "Test description");
         var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
 
-        var result = await service.ListAsync(adminDto);
+        var result = await service.ListAsync(adminDto, new SystemAuditSearchRequest(Page: 1, PageSize: 5));
 
         Assert.True(result.IsSuccess);
-        var log = Assert.Single(result.Value!);
+        Assert.Equal(1, result.Value!.TotalCount);
+        var log = Assert.Single(result.Value.Items);
         Assert.Equal("Test.Action", log.Action);
         Assert.Equal(admin.Username, log.ActorUsername);
     }
@@ -32,7 +34,7 @@ public class SystemAuditServiceTests
         await service.LogAsync(user.Id, "Test.Action", "TestEntity", "entity-1", "Test description");
         var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, true);
 
-        var result = await service.ListAsync(userDto);
+        var result = await service.ListAsync(userDto, new SystemAuditSearchRequest(Page: 1, PageSize: 5));
 
         Assert.False(result.IsSuccess);
     }

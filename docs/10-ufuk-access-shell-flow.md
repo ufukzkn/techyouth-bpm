@@ -27,13 +27,37 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Login/register endpoints are rate limited, and repeated failed login attempts temporarily lock the account.
 - Logout revokes the backend session instead of only clearing frontend state.
 - Settings now includes editable profile details, password change, email verification and active session management.
+- Settings profile, password and active-session areas are collapsible disclosure cards. This keeps the account page compact while preserving the full workflows behind explicit user intent.
+- Settings action buttons are right-aligned inside their forms, and active-session lists are paginated to avoid long account pages.
+- Shared pagination controls support direct page-number entry as well as previous/next buttons, so long lists do not require stepping through pages one by one.
 - Email changes reset verification status and clear any previous verification code.
 - Admin-created accounts can start with a temporary password. Those users are restricted to settings until they change the password.
-- Admin user approval/role management moved to a separate `Yetki ve Onay` route instead of being embedded inside settings.
+- Admin user approval/role/session management moved to a separate `Yonetim` route instead of being embedded inside settings.
 - Admin system history moved to a separate `Loglar` route. Logs are categorized, searched and paginated instead of being dumped as one long list.
-- Email verification has a local demo-code flow; production should replace it with a real email delivery service.
-- Admin users can approve pending registrations, reject accounts and assign roles from the `Yetki ve Onay` screen.
-- Admin users can create a new user with role, status and temporary password from the `Yetki ve Onay` screen.
+- Email verification has a provider-based OTP flow. `Demo` mode shows a local code for development; `Mailtrap`/`Smtp` mode sends the code by email. `Routing` mode sends allowlisted users through live SMTP and sends everyone else to Mailtrap Sandbox.
+- The verification panel is rendered outside the settings summary grid, so opening the code form does not stretch the profile/session cards.
+- Outgoing verification and temporary-password emails use a simple HTML card template so the Mailtrap preview is readable during demo.
+- The email verification panel is two-step: opening the panel does not send mail; the user explicitly clicks `Kod gonder`. Codes are valid for 24 hours by default.
+- After sending a code, the UI shows a 5-minute resend countdown. The backend also blocks immediate resend requests so the cooldown is not only cosmetic.
+- OTP generation and verification now live behind `IOtpService`, and mail delivery lives behind `IEmailSender`, so AuthService only coordinates the email verification workflow.
+- Admin users can approve pending registrations, reject accounts and assign roles from the `Yonetim` screen.
+- The `Yonetim` user search is server-side paged and debounced. Search/status/page changes call `/api/users` with query parameters instead of loading every user into the browser.
+- Server-paged user and audit lists prefetch the previous and next page into a small in-memory cache after the current page loads. This keeps near-page navigation fast without downloading the full table.
+- `Yonetim` and `Loglar` include manual refresh buttons that clear the local page cache and reload the current server-filtered data.
+- Identity/access status messages use tone-aware alert styling: success messages are green, errors are red and neutral progress/info messages stay neutral.
+- Admin users can create a new user with role, status and temporary password from the `Yonetim` screen.
+- The user creation form sits below the searchable/paginated user list in the left management column and opens as a compact animated disclosure panel, keeping listing and review as the primary screen flow.
+- The user detail panel is visible as a placeholder by default; clicking `Detay` expands the existing right-side panel instead of creating a new panel from nothing.
+- Management and email-verification disclosure panels use a slower soft-reveal transition instead of instant toggles.
+- User-detail history and related audit timelines are paginated, so destructive actions such as user deletion stay reachable without scrolling through very long logs.
+- System logs now use roomier audit cards and searchable chronological history. The main log search is server-side paged and debounced through `/api/audit/system`, and category cards use `/api/audit/system/counts`, so large audit tables are not loaded into the browser. Timelines show the newest audit event first. After opening `Ilgili gecmis`, the right-side panel can switch between action context, actor history and affected-user history. Action context is intentionally an intersection filter: the same actor's actions on the same target entity.
+- The audit-history perspective switcher uses a compact liquid-slider radio control with explicit selected state, instead of a plain segmented button group.
+- The affected-user label in audit history is resolved from the log's `User` entity id when possible, so entries such as Admin-created users point to the created user instead of the Admin actor.
+- Frontend date/time display and verification email expiry text are shown in Turkey time with an explicit `GMT+3` suffix.
+- Admin user creation defaults to backend-generated temporary passwords. Admins can opt into a manual temporary password with a checkbox when needed.
+- Admin-created temporary passwords are sent through the configured email provider; Mailtrap/Smtp mode sends a real sandbox/SMTP email.
+- Users created with a temporary password see a blocking password-change gate instead of the normal workspace menu until the password is changed.
+- Admin users can delete test users from the detail panel. The backend refuses self-delete and users with workflow history so BPM audit traceability is not broken.
 - Role/status edits are staged locally and only sent after the Admin clicks `Degisikligi uygula` and confirms the critical access dialog.
 - Admin users can inspect a selected user's active sessions from the same detail panel, see session device/IP metadata and revoke a session after confirmation.
 - The authenticated shell filters menu items by role.

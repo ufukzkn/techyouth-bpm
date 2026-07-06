@@ -55,6 +55,7 @@ Write-Host "Mock workflow data: $($env:Seed__MockData)"
 Write-Host "Session duration: $SessionDurationMinutes minute(s)"
 Write-Host "Remember-me duration: $RememberMeDurationMinutes minute(s)"
 Write-Host "Failed login lockout: $MaxFailedLoginAttempts attempt(s), $LockoutMinutes minute(s)"
+Write-Host "Stop with Ctrl+C in this terminal."
 if ($NoBuild) {
     dotnet run --no-build --project src/TechYouthBpm.Api --urls $Url
 } else {

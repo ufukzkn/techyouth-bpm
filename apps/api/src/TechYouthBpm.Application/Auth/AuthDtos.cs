@@ -18,6 +18,12 @@ public record CreateUserRequest(
     UserStatus Status,
     string TemporaryPassword);
 
+public record UserSearchRequest(
+    string? Query = null,
+    UserStatus? Status = null,
+    int Page = 1,
+    int PageSize = 10);
+
 public record UserDto(
     Guid Id,
     string Username,

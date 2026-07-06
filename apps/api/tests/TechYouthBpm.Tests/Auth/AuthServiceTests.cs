@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Primitives;
 using TechYouthBpm.Application.Auth;
+using TechYouthBpm.Application.Services;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Services;
@@ -352,6 +353,178 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task CreateUserAsync_Sends_Temporary_Password_Email()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(admin);
+        await db.SaveChangesAsync();
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+
+        var result = await service.CreateUserAsync(
+            new CreateUserRequest("newuser", "New User", "new@test.local", Role.User, UserStatus.Active, "TempPass123!"),
+            adminDto);
+
+        Assert.True(result.IsSuccess);
+        var message = Assert.Single(emailSender.Messages);
+        Assert.Equal("new@test.local", message.To);
+        Assert.Contains("TempPass123!", message.Body, StringComparison.Ordinal);
+        Assert.Contains("newuser", message.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_Does_Not_Save_User_When_Temporary_Password_Email_Fails()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(admin);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), new FailingEmailSender());
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+
+        var result = await service.CreateUserAsync(
+            new CreateUserRequest("newuser", "New User", "new@test.local", Role.User, UserStatus.Active, "TempPass123!"),
+            adminDto);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Temporary password email could not be sent.", result.Errors);
+        Assert.DoesNotContain(db.Users, user => user.Username == "newuser");
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_Generates_Temporary_Password_When_Request_Is_Blank()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(admin);
+        await db.SaveChangesAsync();
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+
+        var result = await service.CreateUserAsync(
+            new CreateUserRequest("autouser", "Auto User", "auto@test.local", Role.User, UserStatus.Active, ""),
+            adminDto);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(db.Users.Single(user => user.Username == "autouser").MustChangePassword);
+        var message = Assert.Single(emailSender.Messages);
+        Assert.Contains("Gecici sifre", message.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain("Gecici sifre</div>\r\n                            <div style=\"margin-top:6px;font-size:24px;font-weight:800;color:#d95f05;letter-spacing:.04em;\"></div>", message.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DeleteUserAsync_Allows_Admin_To_Delete_User_Without_Workflow_History()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "delete-me",
+            DisplayName = "Delete Me",
+            Email = "delete@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.AddRange(admin, user);
+        db.UserSessions.Add(new UserSession
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Token = "token-hash",
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), new DemoEmailSender());
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+
+        var result = await service.DeleteUserAsync(user.Id, adminDto);
+
+        Assert.True(result.IsSuccess);
+        Assert.DoesNotContain(db.Users, item => item.Id == user.Id);
+        Assert.DoesNotContain(db.UserSessions, session => session.UserId == user.Id);
+        Assert.Contains(db.SystemAuditLogs, log => log.Action == "User.DeletedByAdmin");
+    }
+
+    [Fact]
+    public async Task DeleteUserAsync_Rejects_User_With_Workflow_History()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        };
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "starter",
+            DisplayName = "Starter",
+            Email = "starter@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.AddRange(admin, user);
+        await db.SaveChangesAsync();
+        TestDbFactory.SeedOpenApproverTask(db, user);
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), new DemoEmailSender());
+        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+
+        var result = await service.DeleteUserAsync(user.Id, adminDto);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("User has workflow history and cannot be deleted.", result.Errors);
+        Assert.Contains(db.Users, item => item.Id == user.Id);
+    }
+
+    [Fact]
     public async Task CreateUserAsync_Rejects_Non_Admin()
     {
         await using var db = TestDbFactory.Create();
@@ -463,6 +636,36 @@ public class AuthServiceTests
         Assert.Null(user.EmailVerificationCodeExpiresAt);
     }
 
+    [Fact]
+    public async Task StartEmailVerificationAsync_Rejects_Immediate_Resend()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active,
+            IsEmailVerified = false
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Email, user.Role, user.Status, false);
+
+        var first = await service.StartEmailVerificationAsync(userDto);
+        var second = await service.StartEmailVerificationAsync(userDto);
+
+        Assert.True(first.IsSuccess);
+        Assert.False(second.IsSuccess);
+        Assert.Contains("Verification code was sent recently. Please wait before requesting another code.", second.Errors);
+        Assert.Single(emailSender.Messages);
+    }
+
     private static IConfiguration CreateTestConfiguration() => new TestConfiguration();
 
     private sealed class TestConfiguration : IConfiguration
@@ -476,6 +679,7 @@ public class AuthServiceTests
                 "Auth:MaxFailedLoginAttempts" => "2",
                 "Auth:LockoutMinutes" => "10",
                 "Auth:EmailVerificationMinutes" => "10",
+                "Auth:EmailVerificationResendCooldownMinutes" => "5",
                 _ => null
             };
             set { }
@@ -520,5 +724,26 @@ public class AuthServiceTests
         public void Dispose()
         {
         }
+    }
+
+    private sealed class CapturingEmailSender : IEmailSender
+    {
+        public bool ExposesVerificationCode => false;
+
+        public List<EmailMessage> Messages { get; } = [];
+
+        public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default)
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FailingEmailSender : IEmailSender
+    {
+        public bool ExposesVerificationCode => false;
+
+        public Task SendAsync(EmailMessage message, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("SMTP is not configured.");
     }
 }

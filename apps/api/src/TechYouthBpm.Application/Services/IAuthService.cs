@@ -24,10 +24,17 @@ public interface IAuthService
         CreateUserRequest request,
         UserDto currentUser,
         CancellationToken cancellationToken = default);
-    Task<Result<IReadOnlyList<UserAdminDto>>> ListUsersAsync(UserDto currentUser, CancellationToken cancellationToken = default);
+    Task<Result<PagedResult<UserAdminDto>>> ListUsersAsync(
+        UserDto currentUser,
+        UserSearchRequest request,
+        CancellationToken cancellationToken = default);
     Task<Result<UserAdminDto>> UpdateUserAccessAsync(
         Guid userId,
         UpdateUserAccessRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default);
+    Task<Result> DeleteUserAsync(
+        Guid userId,
         UserDto currentUser,
         CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<UserSessionDto>>> ListSessionsAsync(

@@ -19,7 +19,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - .NET SDK 10 is installed and can target `net8.0`.
 - Git history should stay progressive and easy to review.
 - Repository documentation should avoid machine-specific paths, credentials, tokens, or private workflow details.
-- Database connection strings must stay in environment variables or .NET user secrets, not tracked files.
+- Database connection strings and email provider credentials must stay in environment variables or .NET user secrets, not tracked files.
 - When database schema, seed data or local startup changes, update `docs/08-local-database.md` and `scripts/run-api-local.ps1`.
 
 ## Architecture Principles
@@ -82,3 +82,8 @@ These notes are the project memory. Update this file whenever an implementation 
 - Language support foundation added with persisted `tr/en` preference, login/topbar language toggles, translated shell/dashboard/settings/process/task UI and documented extension rules in `docs/11-i18n-language-support.md`.
 - Ufuk access flow was extended with editable profile details, password change, admin-created temporary-password users, `MustChangePassword` workspace restriction, session IP/User-Agent metadata and localized known auth/access API errors.
 - Existing SQLite/PostgreSQL databases are patched on startup for the latest identity columns through `DatabaseSeeder`; formal EF migrations are still deferred.
+- Email verification OTP uses `IOtpService`/`OtpService` for generation, PBKDF2 hashing and expiry validation. Delivery is abstracted behind `IEmailSender`: `DemoEmailSender` exposes the code for local demo, `SmtpEmailSender` sends through one SMTP provider, and `RoutingEmailSender` sends allowlisted users through live SMTP while falling back to Mailtrap Sandbox for non-allowlisted teammates.
+- Email verification validity is configured with `Auth:EmailVerificationMinutes` and is currently 1440 minutes. Resends are guarded by `Auth:EmailVerificationResendCooldownMinutes` and are currently limited to one request per 5 minutes. Mailtrap Sandbox is a capture inbox, not real recipient delivery; it is intentionally used for teammates who are outside the live-send allowlist.
+- Real SMTP delivery can be safety-gated with `Email:AllowedRecipients` and `Email:AllowedUsernames`. For Ufuk-only live testing, allow the Ufuk test email/username; do not commit real Mailtrap API tokens or SMTP passwords.
+- Admin-created temporary-password users now use the same `IEmailSender` boundary. SMTP/Mailtrap mode sends the temporary password by email; backend generates a strong temporary password unless Admin explicitly provides a custom one; users with `MustChangePassword=true` are blocked by a dedicated password-change gate before entering the workspace.
+- Admin-created users now default to backend-generated temporary passwords unless the Admin explicitly enables a manual password. Admin hard-delete is available only for users without workflow history; workflow-linked users should be disabled/rejected instead of deleted.

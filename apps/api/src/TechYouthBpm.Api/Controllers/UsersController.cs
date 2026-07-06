@@ -9,7 +9,7 @@ namespace TechYouthBpm.Api.Controllers;
 public class UsersController(IAuthService authService) : ApiControllerBase(authService)
 {
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken cancellationToken)
+    public async Task<IActionResult> List([FromQuery] UserSearchRequest request, CancellationToken cancellationToken)
     {
         var user = await CurrentUserAsync(cancellationToken);
         if (user is null)
@@ -17,7 +17,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.ListUsersAsync(user, cancellationToken);
+        var result = await AuthService.ListUsersAsync(user, request, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -48,6 +48,19 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
 
         var result = await AuthService.UpdateUserAccessAsync(userId, request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpDelete("{userId:guid}")]
+    public async Task<IActionResult> Delete(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await AuthService.DeleteUserAsync(userId, user, cancellationToken);
+        return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
     [HttpGet("{userId:guid}/sessions")]

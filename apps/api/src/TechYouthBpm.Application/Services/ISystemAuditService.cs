@@ -22,7 +22,13 @@ public interface ISystemAuditService
         string description,
         CancellationToken cancellationToken = default);
 
-    Task<Result<IReadOnlyList<SystemAuditLogDto>>> ListAsync(
+    Task<Result<PagedResult<SystemAuditLogDto>>> ListAsync(
         UserDto currentUser,
+        SystemAuditSearchRequest request,
+        CancellationToken cancellationToken = default);
+
+    Task<Result<SystemAuditCategoryCountsDto>> CountByCategoryAsync(
+        UserDto currentUser,
+        string? query = null,
         CancellationToken cancellationToken = default);
 }

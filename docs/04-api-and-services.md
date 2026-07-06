@@ -27,8 +27,15 @@
 - `DELETE /api/auth/sessions/{sessionId}`
   - Revokes a selected session belonging to the current user.
 - `POST /api/auth/me/email-verification`
-  - Generates a short-lived local demo verification code.
-  - Production should replace the response-visible demo code with an email delivery service.
+  - Generates a short-lived verification code.
+  - Uses `IOtpService` for OTP generation, PBKDF2 hashing and expiry validation.
+  - Uses `IEmailSender` for delivery.
+  - Default OTP validity is 24 hours through `Auth:EmailVerificationMinutes=1440`.
+  - Immediate resends are blocked for 5 minutes through `Auth:EmailVerificationResendCooldownMinutes=5`.
+  - `Email:Provider=Demo` exposes the code in the response for local development.
+  - `Email:Provider=Mailtrap` or `Smtp` sends the code through SMTP and does not expose the code in the response.
+  - Mailtrap Sandbox captures emails inside the Mailtrap inbox; real user inbox delivery needs Gmail SMTP app password, Mailtrap Email Sending or another production mail provider.
+  - If SMTP delivery fails, the verification code is not persisted.
 - `POST /api/auth/me/email-verification/confirm`
   - Confirms the code and marks the current user's email as verified.
 
@@ -39,10 +46,20 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
 ## Users And Access
 
 - `GET /api/users`
-  - Admin-only list of registered users, statuses, roles, verification state and lockout info.
+  - Admin-only paged list of registered users, statuses, roles, verification state and lockout info.
+  - Supports `query`, `status`, `page` and `pageSize` query parameters.
+  - Returns `PagedResult<UserAdminDto>` so large user tables are searched and paged in the database instead of loaded fully into the browser.
 - `POST /api/users`
   - Admin-only user creation with username, display name, email, role, status and temporary password.
   - New admin-created users start with `MustChangePassword=true`.
+  - If the request does not include a custom temporary password, the backend generates a strong temporary password.
+  - Sends the temporary password to the created user's email through `IEmailSender`.
+  - If the temporary-password email cannot be sent, the user is not persisted.
+- `DELETE /api/users/{userId}`
+  - Admin-only hard delete for users without workflow history.
+  - Rejects deleting the current Admin account.
+  - Rejects deleting users referenced by form, process, task or process-audit history.
+  - Removes active sessions and writes `User.DeletedByAdmin` to system audit.
 - `PATCH /api/users/{userId}/access`
   - Admin-only role/status update.
   - Used for approving `PendingApproval` accounts, rejecting accounts or changing roles.
@@ -50,7 +67,7 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
   - Audit text records the previous role/status and the new role/status.
 - `GET /api/users/{userId}/sessions`
   - Admin-only active-session list for the selected user.
-  - Used by the `Yetki ve Onay` detail panel to show whether a user is online, which sessions are active and which device/IP last touched the API.
+  - Used by the `Yonetim` detail panel to show whether a user is online, which sessions are active and which device/IP last touched the API.
 - `DELETE /api/users/{userId}/sessions/{sessionId}`
   - Admin-only session revoke for the selected user.
   - The frontend asks for confirmation before sending this request.
@@ -59,10 +76,14 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
 ## Audit
 
 - `GET /api/audit/system`
-  - Admin-only list of the latest critical system actions.
-  - Shows actor user, action name, entity type/id, description and date.
+  - Admin-only paged list of critical system actions.
+  - Supports `query`, `category`, `page` and `pageSize` query parameters.
+  - Shows actor user, action name, entity type/id, affected user display/username when the entity is a user, description and date.
   - Covers identity/access actions and core BPM actions such as form create/update, process start and task approve/reject.
-  - The frontend does not dump all logs by default; Admin users search and page through the results, then open related chronological history.
+  - The frontend does not dump all logs by default; Admin users search and page through server-filtered results, then open related chronological history.
+- `GET /api/audit/system/counts`
+  - Admin-only category counts for the log cards.
+  - Supports `query`, so the category cards can show count totals without loading the full audit table into the browser.
 
 Process-specific history is still returned from `GET /api/processes/{id}` as `auditLogs`. Admins and approvers can inspect visible process history; a normal user can inspect the history of processes they started. This satisfies the PDF expectation that actions such as start/approve/reject are tied back to the user who performed them.
 
@@ -113,8 +134,13 @@ Most endpoints require `Authorization: Bearer <token>`. Use `POST /api/auth/logi
 
 Controllers should stay thin. Services own decisions:
 
-- `AuthService`: registration, profile updates, password changes, password hash verification, lockout, session-token hashing, session metadata, session revoke, email verification and admin user access.
-- `SystemAuditService`: critical system-action logging and Admin-only audit list.
+- `AuthService`: registration, profile updates, password changes, password hash verification, lockout, session-token hashing, session metadata, session revoke, email verification orchestration and admin user access.
+- `OtpService`: six-digit email verification code generation, hashed OTP storage and expiry/code validation.
+- `IEmailSender` implementations:
+  - `DemoEmailSender`: no external dependency; exposes the generated OTP for local demo and no-ops admin temporary-password emails.
+  - `SmtpEmailSender`: sends HTML OTP and admin-created temporary-password emails through SMTP providers such as Mailtrap.
+  - `RoutingEmailSender`: tries the primary live SMTP provider first, then falls back to Mailtrap Sandbox when the recipient or username is outside the live-send allowlist.
+- `SystemAuditService`: critical system-action logging, Admin-only paged/searchable audit list and category count queries.
 - `FormService`: form definition CRUD and field validation.
 - `ProcessService`: process start, detail and listing.
 - `TaskService`: task listing and action execution.
@@ -126,8 +152,8 @@ Controllers should stay thin. Services own decisions:
 The frontend API client now exposes one method for each planned endpoint:
 
 - Auth: `register`, `login`, `me`, `logout`, `updateProfile`, `changePassword`, `listSessions`, `revokeSession`, `startEmailVerification`, `confirmEmailVerification`
-- Users: `listUsers`, `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`
-- Audit: `listSystemAuditLogs`
+- Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`
+- Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`
 - Processes: `startProcess`, `listProcesses`, `getProcess`
 - Tasks: `listMyTasks`, `executeTaskAction`
@@ -159,3 +185,19 @@ The connection string is read from `ConnectionStrings:DefaultConnection`. Real P
 Local SQLite and shared Neon setup, current schema summary and reset/start commands are documented in `docs/08-local-database.md`. Any schema, seed data or local startup change should update that document and the matching startup script.
 
 The local startup script enables `Seed__MockData=true` by default. This adds two form definitions, football-themed process submissions, open approver tasks and completed/rejected audit examples. Use `-SkipMockData` when a teammate needs a nearly empty local database.
+
+## Email Configuration
+
+The API reads email delivery settings from the `Email` configuration section:
+
+- `Email:Provider`: `Demo`, `Mailtrap`, `Smtp` or `Routing`.
+- `Email:FromAddress`: sender address used in the email envelope.
+- `Email:FromName`: display name shown to the recipient.
+- `Email:AllowedRecipients`: optional comma-separated safety allowlist for real SMTP recipients.
+- `Email:AllowedUsernames`: optional comma-separated safety allowlist for usernames allowed to receive real SMTP emails.
+- `Email:Smtp:Host`, `Email:Smtp:Port`, `Email:Smtp:Username`, `Email:Smtp:Password`, `Email:Smtp:EnableSsl`: SMTP delivery settings.
+- `Email:Sandbox:*`: fallback SMTP settings used by `Routing` mode for Mailtrap Sandbox capture delivery.
+
+Default local mode is `Demo`, so the project runs without an external mail service. Mailtrap credentials should be set with .NET user secrets or environment variables. Tracked config files only contain placeholders.
+
+Mailtrap Sandbox credentials capture emails inside the Mailtrap inbox and do not deliver to real recipients. Real inbox delivery requires Gmail SMTP app password, Mailtrap Email Sending with a verified sending domain or another production mail provider. For a narrow real-delivery test, set `Email:AllowedRecipients=ufukzkn08@gmail.com` and `Email:AllowedUsernames=ufukzkn` before using live SMTP credentials.

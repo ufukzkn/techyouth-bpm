@@ -350,6 +350,7 @@ input[type="checkbox"] {
 .primary-button {
   min-height: 44px;
   gap: 8px;
+  padding: 0 18px;
   color: #fff;
   background: var(--primary);
   font-weight: 700;
@@ -1016,6 +1017,18 @@ input[type="checkbox"] {
   color: var(--muted);
 }
 
+.section-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.section-heading-actions p {
+  flex: 1 1 320px;
+}
+
 .settings-panel {
   display: grid;
   gap: 16px;
@@ -1054,6 +1067,23 @@ input[type="checkbox"] {
   overflow-wrap: anywhere;
 }
 
+.verified-status {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  color: #18874c;
+}
+
+[data-theme="dark"] .verified-status {
+  color: #6ee7a8;
+}
+
+.settings-card-action {
+  display: flex;
+  align-items: center;
+}
+
 .text-link-button {
   width: fit-content;
   padding: 0;
@@ -1081,6 +1111,11 @@ input[type="checkbox"] {
   grid-template-columns: minmax(120px, 1fr) auto;
   gap: 8px;
   align-items: center;
+}
+
+.email-verification-section {
+  max-width: 760px;
+  animation: disclosure-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .inline-verification-form input {
@@ -1117,6 +1152,76 @@ input[type="checkbox"] {
   align-items: start;
 }
 
+.settings-disclosure-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.disclosure-section {
+  gap: 0;
+}
+
+.disclosure-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0;
+  border: 0;
+  color: var(--foreground);
+  text-align: left;
+  background: transparent;
+}
+
+.disclosure-trigger h3,
+.disclosure-trigger p {
+  margin: 0;
+}
+
+.disclosure-title-group {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.disclosure-leading-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 8px;
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+.disclosure-icons {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.disclosure-chevron {
+  transition: transform 260ms ease;
+}
+
+.disclosure-chevron.open {
+  transform: rotate(180deg);
+}
+
+.disclosure-content {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  transform-origin: top center;
+  animation: disclosure-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .compact-identity-section {
   min-height: 100%;
   gap: 10px;
@@ -1139,6 +1244,12 @@ input[type="checkbox"] {
 }
 
 .session-danger-action {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.detail-danger-action {
   display: flex;
   justify-content: flex-end;
   padding-top: 2px;
@@ -1176,6 +1287,7 @@ input[type="checkbox"] {
 .compact-form .secondary-button {
   min-height: 40px;
   width: fit-content;
+  justify-self: end;
 }
 
 .profile-form {
@@ -1184,13 +1296,115 @@ input[type="checkbox"] {
 
 .admin-create-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
   gap: 10px;
   align-items: center;
 }
 
-.admin-create-grid .primary-button {
+.user-create-disclosure {
+  gap: 14px;
+}
+
+.admin-create-panel {
+  display: grid;
+  gap: 12px;
+  transform-origin: top center;
+  animation: disclosure-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes disclosure-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.975);
+  }
+
+  60% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.admin-create-grid .primary-button,
+.admin-create-grid .secondary-button {
   min-height: 40px;
+}
+
+.custom-password-toggle {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.custom-password-toggle input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.admin-create-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-create-actions .primary-button {
+  min-height: 40px;
+}
+
+.compact-password-toggle {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.compact-password-toggle input {
+  width: 15px;
+  height: 15px;
+}
+
+.generated-password-placeholder {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.generated-password-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.admin-create-note {
+  grid-column: 1 / -1;
+  color: var(--muted);
 }
 
 .urgent-identity-section {
@@ -1209,7 +1423,8 @@ input[type="checkbox"] {
   align-items: center;
 }
 
-.search-field {
+.search-field,
+.filter-select-field {
   min-height: 42px;
   display: flex;
   align-items: center;
@@ -1221,13 +1436,16 @@ input[type="checkbox"] {
   background: var(--surface);
 }
 
-.search-field input {
+.search-field input,
+.filter-select-field select {
   width: 100%;
   min-height: 38px;
   padding: 0;
   border: 0;
   outline: 0;
   box-shadow: none;
+  color: var(--foreground);
+  background: transparent;
 }
 
 .management-layout {
@@ -1235,6 +1453,27 @@ input[type="checkbox"] {
   grid-template-columns: minmax(280px, 0.85fr) minmax(320px, 1.15fr);
   gap: 16px;
   align-items: start;
+}
+
+.management-left-column {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.user-detail-panel {
+  align-content: start;
+}
+
+.user-detail-content {
+  display: grid;
+  gap: 12px;
+  transform-origin: top right;
+  animation: disclosure-enter 580ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.detail-placeholder {
+  min-height: 156px;
 }
 
 .compact-grid {
@@ -1304,27 +1543,171 @@ input[type="checkbox"] {
   align-items: center;
 }
 
+.system-audit-row {
+  align-items: start;
+  gap: 16px;
+  padding: 16px;
+}
+
 .user-management-row {
   grid-template-columns: minmax(220px, 1fr) auto;
 }
 
 .system-audit-meta {
   display: grid;
-  gap: 4px;
+  gap: 8px;
   justify-items: end;
   text-align: right;
 }
 
 .system-audit-content {
   display: grid;
-  gap: 6px;
+  gap: 10px;
+  line-height: 1.45;
 }
 
 .audit-label-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
+}
+
+.audit-radio-group {
+  --audit-gap: 6px;
+  --audit-radius: 14px;
+  --audit-speed: 0.55s;
+  --audit-ease: cubic-bezier(0.22, 0.9, 0.25, 1);
+  --audit-slider-color: var(--primary);
+
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--audit-option-count), minmax(0, 1fr));
+  margin-bottom: 14px;
+  padding: var(--audit-gap);
+  border: 1px solid color-mix(in srgb, var(--border) 72%, var(--primary) 28%);
+  border-radius: var(--audit-radius);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-muted) 82%, #fff 18%), var(--surface-muted)),
+    var(--surface-muted);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 72%, transparent),
+    inset 0 -10px 22px color-mix(in srgb, var(--foreground) 5%, transparent);
+  overflow: hidden;
+}
+
+.audit-radio-active-actor {
+  --audit-slider-color: #2d6cdf;
+}
+
+.audit-radio-active-target {
+  --audit-slider-color: #18874c;
+}
+
+.audit-radio-item {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+
+.audit-radio-item input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.audit-radio-option {
+  position: relative;
+  z-index: 2;
+  min-height: 42px;
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: calc(var(--audit-radius) - 4px);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition:
+    color 0.35s ease,
+    transform 0.2s ease;
+}
+
+.audit-radio-option:active {
+  transform: scale(0.97);
+}
+
+.audit-radio-item input[type="radio"]:checked + .audit-radio-option {
+  color: var(--foreground);
+}
+
+.audit-radio-item input[type="radio"]:focus-visible + .audit-radio-option {
+  outline: 2px solid color-mix(in srgb, var(--audit-slider-color) 60%, #fff 20%);
+  outline-offset: -3px;
+}
+
+.audit-radio-slider {
+  position: absolute;
+  z-index: 1;
+  inset: var(--audit-gap);
+  width: calc((100% - (var(--audit-gap) * 2)) / var(--audit-option-count));
+  border: 1px solid color-mix(in srgb, var(--audit-slider-color) 32%, var(--border));
+  border-radius: calc(var(--audit-radius) - 4px);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--audit-slider-color) 22%, var(--surface)), var(--surface)),
+    var(--surface);
+  box-shadow:
+    0 10px 22px color-mix(in srgb, var(--audit-slider-color) 16%, transparent),
+    inset 0 1px 1px color-mix(in srgb, #fff 66%, transparent),
+    inset 0 -1px 2px color-mix(in srgb, #000 12%, transparent);
+  transform: translateX(calc(var(--audit-active-index) * 100%));
+  transition:
+    transform var(--audit-speed) var(--audit-ease),
+    border-color 0.3s ease,
+    background 0.3s ease,
+    box-shadow 0.3s ease;
+}
+
+[data-theme="dark"] .audit-radio-group {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--surface-muted) 88%, #fff 4%), var(--surface-muted)),
+    var(--surface-muted);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    inset 0 -10px 22px color-mix(in srgb, #000 20%, transparent);
+}
+
+[data-theme="dark"] .audit-radio-slider {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--audit-slider-color) 24%, var(--surface)), var(--surface)),
+    var(--surface);
+  box-shadow:
+    0 10px 22px color-mix(in srgb, var(--audit-slider-color) 18%, transparent),
+    inset 0 1px 1px color-mix(in srgb, #fff 9%, transparent),
+    inset 0 -1px 2px color-mix(in srgb, #000 40%, transparent);
+}
+
+.system-audit-content strong,
+.system-audit-content small,
+.system-audit-meta small {
+  line-height: 1.45;
+}
+
+.timeline-filter {
+  margin-bottom: 4px;
+}
+
+.timeline-reveal {
+  display: grid;
+  gap: 12px;
+  transform-origin: top center;
+  animation: disclosure-enter 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .audit-category-pill {
@@ -1443,6 +1826,25 @@ input[type="checkbox"] {
   font-weight: 800;
 }
 
+.pagination-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-jump input {
+  width: 64px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--foreground);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 850;
+  text-align: center;
+}
+
 .pagination-controls .icon-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -1450,16 +1852,17 @@ input[type="checkbox"] {
 
 .system-audit-timeline {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .system-audit-event {
   display: grid;
-  gap: 5px;
-  padding: 12px;
+  gap: 8px;
+  padding: 14px;
   border-left: 3px solid var(--primary);
   border-radius: 8px;
   background: var(--surface-muted);
+  line-height: 1.45;
 }
 
 .system-audit-event span {
@@ -1851,7 +2254,7 @@ input[type="checkbox"] {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 0 10px;
+  padding: 0 14px;
   border: 0;
   border-radius: 7px;
   font-weight: 800;
@@ -1918,10 +2321,24 @@ input[type="checkbox"] {
 
 .form-success {
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border: 1px solid color-mix(in srgb, #18874c 38%, var(--border));
   border-radius: 7px;
-  color: var(--primary-strong);
-  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: #18874c;
+  background: color-mix(in srgb, #18874c 10%, transparent);
+}
+
+[data-theme="dark"] .form-success {
+  color: #6ee7a8;
+  border-color: color-mix(in srgb, #6ee7a8 34%, var(--border));
+  background: color-mix(in srgb, #6ee7a8 10%, transparent);
+}
+
+.form-info {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 7px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
 .runner-actions {
@@ -1953,12 +2370,29 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 0 14px;
+  padding: 0 16px;
   border: 1px solid var(--border);
   border-radius: 7px;
   color: var(--foreground);
   background: var(--surface-muted);
   font-weight: 700;
+}
+
+.button-spinner {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  opacity: 0.9;
+  animation: button-spin 720ms linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .primary-button,
@@ -2128,6 +2562,24 @@ input[type="checkbox"] {
   border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+.force-password-page {
+  align-items: center;
+}
+
+.force-password-dialog {
+  width: min(520px, calc(100vw - 32px));
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--border));
+  animation: toast-enter 220ms ease both;
+}
+
+.force-password-dialog .action-dialog-header svg {
+  color: var(--danger);
+}
+
+.force-password-dialog .compact-form .primary-button {
+  width: 100%;
 }
 
 .action-dialog-header {
@@ -2361,7 +2813,12 @@ input[type="checkbox"] {
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle-orb,
   .language-toggle-orbit,
-  .language-toggle-code {
+  .language-toggle-code,
+  .email-verification-section,
+  .admin-create-panel,
+  .disclosure-content,
+  .user-detail-content,
+  .timeline-reveal {
     animation-duration: 1ms;
     transition-duration: 1ms;
   }

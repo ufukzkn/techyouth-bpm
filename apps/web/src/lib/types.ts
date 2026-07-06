@@ -31,6 +31,13 @@ export type UserAdmin = User & {
   createdAt: string;
 };
 
+export type PagedResult<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+};
+
 export type UserSession = {
   id: string;
   createdAt: string;
@@ -142,6 +149,17 @@ export type SystemAuditLog = {
   entityId?: string | null;
   description: string;
   createdAt: string;
+  entityDisplayName?: string | null;
+  entityUsername?: string | null;
+};
+
+export type SystemAuditCategoryCounts = {
+  all: number;
+  identity: number;
+  access: number;
+  forms: number;
+  processes: number;
+  tasks: number;
 };
 
 export type ProcessSummary = {

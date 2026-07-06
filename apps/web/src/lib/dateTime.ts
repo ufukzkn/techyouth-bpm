@@ -16,11 +16,13 @@ export function formatApiDateTime(value: string | null | undefined, language: La
     return translate(language, "session.unknownExpiry");
   }
 
-  return date.toLocaleString(language === "tr" ? "tr-TR" : "en-US", {
+  const formatted = date.toLocaleString(language === "tr" ? "tr-TR" : "en-US", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "Europe/Istanbul",
   });
+  return `${formatted} GMT+3`;
 }

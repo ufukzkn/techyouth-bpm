@@ -1,4 +1,5 @@
-using System.Security.Cryptography;
+using System.Net;
+using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
@@ -14,15 +15,18 @@ namespace TechYouthBpm.Infrastructure.Services;
 public class AuthService(
     AppDbContext db,
     IConfiguration configuration,
-    ISystemAuditService auditService) : IAuthService
+    ISystemAuditService auditService,
+    IOtpService otpService,
+    IEmailSender emailSender) : IAuthService
 {
     private const int FallbackSessionDurationMinutes = 1;
     private const int DefaultMaxFailedLoginAttempts = 5;
     private const int DefaultLockoutMinutes = 10;
-    private const int DefaultEmailVerificationMinutes = 10;
+    private const int DefaultEmailVerificationMinutes = 1440;
+    private const int DefaultEmailVerificationResendCooldownMinutes = 5;
 
     public AuthService(AppDbContext db, IConfiguration configuration)
-        : this(db, configuration, new SystemAuditService(db))
+        : this(db, configuration, new SystemAuditService(db), new OtpService(), new DemoEmailSender())
     {
     }
 
@@ -314,7 +318,11 @@ public class AuthService(
             errors.Add("Username is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.TemporaryPassword) || request.TemporaryPassword.Length < 8)
+        var temporaryPassword = string.IsNullOrWhiteSpace(request.TemporaryPassword)
+            ? GenerateTemporaryPassword()
+            : request.TemporaryPassword;
+
+        if (temporaryPassword.Length < 8)
         {
             errors.Add("Password must be at least 8 characters.");
         }
@@ -338,13 +346,29 @@ public class AuthService(
             Username = username,
             DisplayName = displayName,
             Email = email,
-            Password = PasswordHasher.Hash(request.TemporaryPassword),
+            Password = PasswordHasher.Hash(temporaryPassword),
             Role = request.Role,
             Status = request.Status,
             IsEmailVerified = false,
             MustChangePassword = true,
             CreatedAt = DateTime.UtcNow
         };
+
+        try
+        {
+            await emailSender.SendAsync(
+                new EmailMessage(
+                    user.Email,
+                    "TechYouth BPM gecici sifre bilgisi",
+                    BuildTemporaryPasswordBody(user.DisplayName, user.Username, temporaryPassword),
+                    user.Username,
+                    true),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
+        {
+            return Result<UserAdminDto>.Failure("Temporary password email could not be sent.");
+        }
 
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
@@ -359,21 +383,105 @@ public class AuthService(
         return Result<UserAdminDto>.Success(user.ToAdminDto());
     }
 
-    public async Task<Result<IReadOnlyList<UserAdminDto>>> ListUsersAsync(
+    public async Task<Result> DeleteUserAsync(
+        Guid userId,
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
         if (currentUser.Role != Role.Admin)
         {
-            return Result<IReadOnlyList<UserAdminDto>>.Failure("Only Admin users can list users.");
+            return Result.Failure("Only Admin users can delete users.");
         }
 
-        var users = await db.Users
+        if (currentUser.Id == userId)
+        {
+            return Result.Failure("Admin users cannot delete their own account.");
+        }
+
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return Result.Failure("User not found.");
+        }
+
+        var hasWorkflowHistory =
+            await db.FormDefinitions.AnyAsync(
+                form => form.CreatedByUserId == userId || form.UpdatedByUserId == userId,
+                cancellationToken)
+            || await db.ProcessInstances.AnyAsync(process => process.StartedByUserId == userId, cancellationToken)
+            || await db.ProcessTasks.AnyAsync(task => task.CompletedByUserId == userId, cancellationToken)
+            || await db.AuditLogs.AnyAsync(log => log.UserId == userId, cancellationToken);
+
+        if (hasWorkflowHistory)
+        {
+            return Result.Failure("User has workflow history and cannot be deleted.");
+        }
+
+        var sessions = await db.UserSessions.Where(session => session.UserId == userId).ToListAsync(cancellationToken);
+        db.UserSessions.RemoveRange(sessions);
+
+        var actorLogs = await db.SystemAuditLogs
+            .Where(log => log.ActorUserId == userId)
+            .ToListAsync(cancellationToken);
+        foreach (var log in actorLogs)
+        {
+            log.ActorUserId = null;
+        }
+
+        db.Users.Remove(user);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "User.DeletedByAdmin",
+            "User",
+            userId.ToString(),
+            $"Admin '{currentUser.Username}' deleted user '{user.Username}'.",
+            cancellationToken);
+
+        return Result.Success();
+    }
+
+    public async Task<Result<PagedResult<UserAdminDto>>> ListUsersAsync(
+        UserDto currentUser,
+        UserSearchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result<PagedResult<UserAdminDto>>.Failure("Only Admin users can list users.");
+        }
+
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        var query = db.Users.AsQueryable();
+
+        if (request.Status is not null)
+        {
+            query = query.Where(user => user.Status == request.Status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Query))
+        {
+            var search = request.Query.Trim().ToLowerInvariant();
+            query = query.Where(user =>
+                user.Username.ToLower().Contains(search)
+                || user.DisplayName.ToLower().Contains(search)
+                || user.Email.ToLower().Contains(search));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var users = await query
             .OrderBy(user => user.Status)
             .ThenBy(user => user.Username)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return Result<IReadOnlyList<UserAdminDto>>.Success(users.Select(user => user.ToAdminDto()).ToArray());
+        return Result<PagedResult<UserAdminDto>>.Success(new PagedResult<UserAdminDto>(
+            users.Select(user => user.ToAdminDto()).ToArray(),
+            page,
+            pageSize,
+            totalCount));
     }
 
     public async Task<Result<UserAdminDto>> UpdateUserAccessAsync(
@@ -572,11 +680,47 @@ public class AuthService(
             return Result<EmailVerificationStartResponse>.Failure("Email is already verified.");
         }
 
-        var code = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
-        var expiresAt = DateTime.UtcNow.AddMinutes(GetInt("Auth:EmailVerificationMinutes", DefaultEmailVerificationMinutes));
+        var verificationMinutes = GetInt("Auth:EmailVerificationMinutes", DefaultEmailVerificationMinutes);
+        var resendCooldownMinutes = GetInt(
+            "Auth:EmailVerificationResendCooldownMinutes",
+            DefaultEmailVerificationResendCooldownMinutes);
+        if (user.EmailVerificationCodeExpiresAt is { } currentExpiry)
+        {
+            var lastIssuedAt = currentExpiry.AddMinutes(-verificationMinutes);
+            if (lastIssuedAt.AddMinutes(resendCooldownMinutes) > DateTime.UtcNow)
+            {
+                return Result<EmailVerificationStartResponse>.Failure(
+                    "Verification code was sent recently. Please wait before requesting another code.");
+            }
+        }
 
-        user.EmailVerificationCode = PasswordHasher.Hash(code);
-        user.EmailVerificationCodeExpiresAt = expiresAt;
+        var otp = otpService.IssueEmailVerificationCode(
+            user,
+            verificationMinutes);
+
+        try
+        {
+            await emailSender.SendAsync(
+                new EmailMessage(
+                    user.Email,
+                    "TechYouth BPM e-posta dogrulama kodu",
+                    BuildEmailVerificationBody(
+                        user.DisplayName,
+                        otp.DemoCode,
+                        otp.ExpiresAt,
+                        IsSandboxDelivery(user)),
+                    user.Username,
+                    true),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
+        {
+            return Result<EmailVerificationStartResponse>.Failure(
+                exception.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase)
+                    ? "Email recipient is not allowed for SMTP delivery."
+                    : "Verification email could not be sent.");
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
             currentUser,
@@ -587,9 +731,11 @@ public class AuthService(
             cancellationToken);
 
         return Result<EmailVerificationStartResponse>.Success(new EmailVerificationStartResponse(
-            "Verification code generated for local demo. A production flow should send this code by email.",
-            code,
-            expiresAt));
+            emailSender.ExposesVerificationCode
+                ? "Verification code generated for local demo."
+                : "Verification code sent by email.",
+            emailSender.ExposesVerificationCode ? otp.DemoCode : string.Empty,
+            otp.ExpiresAt));
     }
 
     public async Task<Result<UserDto>> ConfirmEmailVerificationAsync(
@@ -608,15 +754,10 @@ public class AuthService(
             return Result<UserDto>.Success(user.ToDto());
         }
 
-        if (user.EmailVerificationCodeExpiresAt is null || user.EmailVerificationCodeExpiresAt <= DateTime.UtcNow)
+        var otpVerification = otpService.VerifyEmailVerificationCode(user, request.Code);
+        if (!otpVerification.IsSuccess)
         {
-            return Result<UserDto>.Failure("Verification code expired.");
-        }
-
-        if (string.IsNullOrWhiteSpace(user.EmailVerificationCode)
-            || !PasswordHasher.Verify(request.Code.Trim(), user.EmailVerificationCode))
-        {
-            return Result<UserDto>.Failure("Verification code is incorrect.");
+            return Result<UserDto>.Failure(otpVerification.Errors);
         }
 
         user.IsEmailVerified = true;
@@ -680,6 +821,214 @@ public class AuthService(
         }
 
         return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    private static string GenerateTemporaryPassword()
+    {
+        const string lower = "abcdefghijkmnopqrstuvwxyz";
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string digits = "23456789";
+        const string symbols = "!@#$%";
+        const string all = lower + upper + digits + symbols;
+
+        var characters = new List<char>
+        {
+            RandomChar(upper),
+            RandomChar(lower),
+            RandomChar(digits),
+            RandomChar(symbols)
+        };
+
+        for (var index = characters.Count; index < 14; index += 1)
+        {
+            characters.Add(RandomChar(all));
+        }
+
+        for (var index = characters.Count - 1; index > 0; index -= 1)
+        {
+            var swapIndex = System.Security.Cryptography.RandomNumberGenerator.GetInt32(index + 1);
+            (characters[index], characters[swapIndex]) = (characters[swapIndex], characters[index]);
+        }
+
+        return new string(characters.ToArray());
+    }
+
+    private static char RandomChar(string characters)
+    {
+        var index = System.Security.Cryptography.RandomNumberGenerator.GetInt32(characters.Length);
+        return characters[index];
+    }
+
+    private bool IsSandboxDelivery(User user)
+    {
+        return IsMailtrapSandboxMode()
+            || (IsRoutingMode() && !IsPrimarySmtpAllowed(user) && IsSandboxSmtpConfigured());
+    }
+
+    private bool IsMailtrapSandboxMode()
+    {
+        var provider = configuration["Email:Provider"] ?? "Demo";
+        var host = configuration["Email:Smtp:Host"] ?? string.Empty;
+        return provider.Equals("Mailtrap", StringComparison.OrdinalIgnoreCase)
+            && host.Contains("sandbox", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsRoutingMode()
+    {
+        var provider = configuration["Email:Provider"] ?? "Demo";
+        return provider.Equals("Routing", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsSandboxSmtpConfigured()
+    {
+        return !string.IsNullOrWhiteSpace(configuration["Email:Sandbox:Smtp:Host"]);
+    }
+
+    private bool IsPrimarySmtpAllowed(User user)
+    {
+        var allowedRecipients = GetCsv("Email:AllowedRecipients");
+        if (allowedRecipients.Count > 0
+            && !allowedRecipients.Contains(user.Email.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var allowedUsernames = GetCsv("Email:AllowedUsernames");
+        if (allowedUsernames.Count > 0
+            && !allowedUsernames.Contains(user.Username.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private IReadOnlyList<string> GetCsv(string key)
+    {
+        var configuredValue = configuration[key];
+        if (string.IsNullOrWhiteSpace(configuredValue))
+        {
+            return [];
+        }
+
+        return configuredValue
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+    }
+
+    private static string BuildEmailVerificationBody(
+        string displayName,
+        string code,
+        DateTime expiresAt,
+        bool isSandboxMode)
+    {
+        var safeName = WebUtility.HtmlEncode(displayName);
+        var safeCode = WebUtility.HtmlEncode(code);
+        var expiry = WebUtility.HtmlEncode(FormatTurkeyTime(expiresAt));
+        var deliveryNote = isSandboxMode
+            ? "Gelistirme ortaminda bu e-posta Mailtrap Sandbox inbox icinde goruntulenir; gercek alici inbox teslimati icin production mail provider gerekir."
+            : "Bu e-posta yapilandirilmis SMTP saglayicisi uzerinden gercek alici inbox teslimati icin gonderilmistir.";
+        var safeDeliveryNote = WebUtility.HtmlEncode(deliveryNote);
+
+        return $"""
+            <!doctype html>
+            <html lang="tr">
+            <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;color:#18243a;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:28px 12px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #d8deea;border-radius:12px;overflow:hidden;">
+                      <tr>
+                        <td style="background:#18243a;color:#ffffff;padding:22px 26px;">
+                          <div style="font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#ffb06a;">TechYouth BPM</div>
+                          <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;">E-posta dogrulama kodu</h1>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:26px;">
+                          <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Merhaba <strong>{safeName}</strong>,</p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">TechYouth BPM hesabinin e-posta dogrulamasi icin asagidaki kodu kullan.</p>
+                          <div style="margin:20px 0;padding:18px 20px;border-radius:10px;background:#fff0e3;border:1px solid #ffd1aa;text-align:center;">
+                            <div style="font-size:12px;color:#647187;text-transform:uppercase;letter-spacing:.08em;">Dogrulama kodu</div>
+                            <div style="margin-top:8px;font-size:34px;line-height:1;font-weight:800;letter-spacing:.18em;color:#d95f05;">{safeCode}</div>
+                          </div>
+                          <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#647187;">Kod gecerliligi: <strong>{expiry}</strong></p>
+                          <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#647187;">{safeDeliveryNote}</p>
+                          <p style="margin:0;font-size:13px;line-height:1.6;color:#647187;">Bu istegi sen baslatmadiysan e-postayi yok sayabilirsin.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """;
+    }
+
+    private static string BuildTemporaryPasswordBody(string displayName, string username, string temporaryPassword)
+    {
+        var safeName = WebUtility.HtmlEncode(displayName);
+        var safeUsername = WebUtility.HtmlEncode(username);
+        var safePassword = WebUtility.HtmlEncode(temporaryPassword);
+
+        return $"""
+            <!doctype html>
+            <html lang="tr">
+            <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;color:#18243a;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:28px 12px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #d8deea;border-radius:12px;overflow:hidden;">
+                      <tr>
+                        <td style="background:#18243a;color:#ffffff;padding:22px 26px;">
+                          <div style="font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#ffb06a;">TechYouth BPM</div>
+                          <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;">Gecici sifre bilgisi</h1>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:26px;">
+                          <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Merhaba <strong>{safeName}</strong>,</p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">TechYouth BPM hesabin bir yonetici tarafindan olusturuldu. Ilk giristen sonra sifreni degistirmen zorunludur.</p>
+                          <div style="display:block;margin:18px 0;padding:16px 18px;border-radius:10px;background:#f0f3f8;border:1px solid #d8deea;">
+                            <div style="font-size:13px;color:#647187;">Kullanici adi</div>
+                            <div style="margin-top:4px;font-size:18px;font-weight:700;color:#18243a;">{safeUsername}</div>
+                          </div>
+                          <div style="display:block;margin:18px 0;padding:16px 18px;border-radius:10px;background:#fff0e3;border:1px solid #ffd1aa;">
+                            <div style="font-size:13px;color:#647187;">Gecici sifre</div>
+                            <div style="margin-top:6px;font-size:24px;font-weight:800;color:#d95f05;letter-spacing:.04em;">{safePassword}</div>
+                          </div>
+                          <p style="margin:0;font-size:13px;line-height:1.6;color:#647187;">Bu bilgileri beklemiyorsan sistem yoneticisiyle iletisime gec.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """;
+    }
+
+    private static string FormatTurkeyTime(DateTime value)
+    {
+        var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        var turkeyTimeZone = ResolveTurkeyTimeZone();
+        var turkeyTime = TimeZoneInfo.ConvertTimeFromUtc(utcValue, turkeyTimeZone);
+        return $"{turkeyTime:dd.MM.yyyy HH:mm} GMT+3";
+    }
+
+    private static TimeZoneInfo ResolveTurkeyTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul");
+        }
     }
 
     private async Task RevokeAllSessionsForUserAsync(Guid userId, CancellationToken cancellationToken)

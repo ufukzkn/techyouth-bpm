@@ -62,7 +62,7 @@ Auth__RateLimitWindowMinutes=1
 Seed__MockData=true
 ```
 
-The script then starts the API. Keep that terminal open while using the web app. Stop it with `Ctrl + C`.
+The script starts the API in the same terminal. Keep that terminal open while using the web app and stop the API with `Ctrl+C` in that terminal.
 
 ## Shared Neon PostgreSQL
 
