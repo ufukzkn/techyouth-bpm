@@ -47,11 +47,13 @@ Implemented frontend folders:
 - `src/lib`: shared API client and types.
 - `src/features/session`: Zustand session/theme store.
 - `src/features/auth`: login view and demo-user fallback.
-- `src/features/app-shell`: role-aware navigation and authenticated layout.
+- `src/features/app-shell`: role-aware navigation, authenticated layout, dashboard/settings/access/log views and shared shell components.
 - `src/features/forms`: shared field metadata, field renderer, form value helpers and frontend validation.
 - `src/features/form-designer`: admin-facing dynamic form definition editor.
 - `src/features/form-runner`: saved-form runner that starts process instances.
 - `src/features/processes`: process list, task list, task action dialog, process detail, audit timeline and status badge components.
+
+`AppShell.tsx` is intentionally kept as the authenticated workspace coordinator. It owns session verification, route/view synchronization, topbar/sidebar behavior and active-view composition. Heavier UI flows are split into `views`, `components`, `auditUtils`, `sessionFormatters` and shared shell types so access, settings and audit work can evolve without turning the shell into a monolithic file again.
 
 ## Extensibility Strategy
 

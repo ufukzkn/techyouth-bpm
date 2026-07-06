@@ -42,8 +42,9 @@ This work coordinates the user entry and navigation experience. It does not own 
 - OTP generation and verification now live behind `IOtpService`, and mail delivery lives behind `IEmailSender`, so AuthService only coordinates the email verification workflow.
 - Admin users can approve pending registrations, reject accounts and assign roles from the `Yonetim` screen.
 - The `Yonetim` user search is server-side paged and debounced. Search/status/page changes call `/api/users` with query parameters instead of loading every user into the browser.
-- Server-paged user and audit lists prefetch the previous and next page into a small in-memory cache after the current page loads. This keeps near-page navigation fast without downloading the full table.
-- `Yonetim` and `Loglar` include manual refresh buttons that clear the local page cache and reload the current server-filtered data.
+- Server-paged user and audit lists use single-page lazy loading. Page changes fetch only the active page, so previous/next prefetch does not repeat extra requests.
+- `Loglar` keeps category counts in a small query-based cache; the manual refresh button clears that count cache and reloads the current server-filtered data.
+- `Yonetim` and `Loglar` include manual refresh buttons that reload the current server-filtered data without dumping large tables into the browser.
 - Identity/access status messages use tone-aware alert styling: success messages are green, errors are red and neutral progress/info messages stay neutral.
 - Admin users can create a new user with role, status and temporary password from the `Yonetim` screen.
 - The user creation form sits below the searchable/paginated user list in the left management column and opens as a compact animated disclosure panel, keeping listing and review as the primary screen flow.
@@ -61,6 +62,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Role/status edits are staged locally and only sent after the Admin clicks `Degisikligi uygula` and confirms the critical access dialog.
 - Admin users can inspect a selected user's active sessions from the same detail panel, see session device/IP metadata and revoke a session after confirmation.
 - The authenticated shell filters menu items by role.
+- The authenticated shell is split into focused view/component/helper modules. `AppShell` now coordinates session, route, navigation and active view rendering, while dashboard, settings, user management, system logs, dialogs, pagination and audit helpers live in separate files.
 - Workspace navigation uses real route paths such as `/dashboard`, `/forms`, `/tasks` and `/settings` instead of hash-scroll sections or query-only views.
 - Desktop navigation stays fixed on the left while the workspace scrolls.
 - On tablet/mobile widths, workspace navigation is collapsed behind a fixed hamburger button and opens as a drawer with backdrop/escape-close behavior.

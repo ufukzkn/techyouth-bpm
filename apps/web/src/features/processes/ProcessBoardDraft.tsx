@@ -1,7 +1,8 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
+import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
 import { MyTasksView } from "@/features/processes/MyTasksView";
 import { ProcessDetailPanel } from "@/features/processes/ProcessDetailPanel";
 import { ProcessListView } from "@/features/processes/ProcessListView";
@@ -15,6 +16,8 @@ type ProcessBoardDraftProps = {
   role: Role;
 };
 
+const minimumRefreshDelayMs = 1000;
+
 export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
   const token = useSessionStore((state) => state.token);
   const language = useSessionStore((state) => state.language);
@@ -25,6 +28,7 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
   const [detail, setDetail] = useState<ProcessDetail | null>(null);
   const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "acting" | "error">("loading");
   const [message, setMessage] = useState(() => t("process.loading"));
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
@@ -44,11 +48,22 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
       return;
     }
 
+    const isManualRefresh = options.manual === true;
+    const refreshStartedAt = Date.now();
+
     try {
       await Promise.resolve();
       const hasVisibleData = processes.length > 0 || tasks.length > 0 || detail !== null;
-      setStatus(hasVisibleData ? "refreshing" : "loading");
-      setMessage(options.manual ? t("process.refreshing") : t("process.loading"));
+
+      if (isManualRefresh) {
+        setIsManualRefreshing(true);
+        setStatus("refreshing");
+        setMessage(t("process.refreshing"));
+      } else if (!hasVisibleData) {
+        setStatus("loading");
+        setMessage(t("process.loading"));
+      }
+
       const [processResult, taskResult] = await Promise.all([api.listProcesses(token), api.listMyTasks(token)]);
       const nextSelected = nextSelectedProcessId || processResult[0]?.id || "";
 
@@ -64,10 +79,16 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
 
       setStatus("idle");
       setMessage(processResult.length > 0 ? t("process.loaded") : t("process.empty"));
-      if (options.manual) {
+      if (isManualRefresh) {
+        await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
+        setIsManualRefreshing(false);
         setToast({ kind: "success", text: t("process.toastRefreshed") });
       }
     } catch (error) {
+      if (isManualRefresh) {
+        await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
+        setIsManualRefreshing(false);
+      }
       setStatus("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.loadFailed"));
       setToast({
@@ -118,9 +139,9 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
     }
   }
 
-  const isRefreshing = status === "refreshing";
+  const isRefreshing = isManualRefreshing;
   const isInitialLoading = status === "loading" && processes.length === 0 && tasks.length === 0 && !detail;
-  const isRefreshButtonDisabled = status === "loading" || status === "refreshing" || status === "acting";
+  const isRefreshButtonDisabled = isInitialLoading || isManualRefreshing || status === "acting";
 
   return (
     <section className="process-section">
@@ -142,8 +163,8 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
           type="button"
           onClick={() => refreshData(selectedProcessId, { manual: true })}
         >
-          <RefreshCw className={isRefreshing || status === "loading" ? "spin-icon" : undefined} size={17} />
-          {isRefreshing || status === "loading" ? t("common.refreshing") : t("common.refresh")}
+          <RefreshCw className={isRefreshing ? "spin-icon" : undefined} size={17} />
+          {isRefreshing ? t("common.refreshing") : t("common.refresh")}
         </button>
       </div>
 
@@ -176,14 +197,14 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
         )}
       </div>
 
-      {toast ? (
-        <div className={`toast toast-${toast.kind}`} role="status" aria-live="polite">
-          {toast.kind === "success" ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
-          <span>{toast.text}</span>
-        </div>
-      ) : null}
+      {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
     </section>
   );
+}
+
+function waitForMinimumDelay(startedAt: number, minimumDelayMs: number) {
+  const remainingMs = minimumDelayMs - (Date.now() - startedAt);
+  return remainingMs > 0 ? new Promise((resolve) => window.setTimeout(resolve, remainingMs)) : Promise.resolve();
 }
 
 function ProcessBoardSkeleton({ mode }: { mode: "processes" | "tasks" }) {
