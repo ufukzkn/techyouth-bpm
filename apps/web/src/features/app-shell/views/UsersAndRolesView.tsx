@@ -12,7 +12,7 @@ import { roleLabel, translate, type TranslationKey } from "@/features/i18n/trans
 import { api } from "@/lib/api";
 import type { Language, Role, SystemAuditLog, User, UserAdmin, UserSession, UserStatus } from "@/lib/types";
 
-const minimumRefreshDelayMs = 1000;
+const minimumRefreshDelayMs = 500;
 
 export function UsersAndRolesView({
   activeUser,

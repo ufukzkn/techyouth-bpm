@@ -16,7 +16,7 @@ type ProcessBoardDraftProps = {
   role: Role;
 };
 
-const minimumRefreshDelayMs = 1000;
+const minimumRefreshDelayMs = 500;
 
 export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
   const token = useSessionStore((state) => state.token);

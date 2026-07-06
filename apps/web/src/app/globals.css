@@ -13,7 +13,7 @@
   --navy-soft: #24324d;
   --teal: #2c8c82;
   --danger: #b42318;
-  --focus-blue: #2471ed;
+  --focus-blue: #0d6efd;
   --shadow: 0 16px 48px rgba(24, 36, 58, 0.12);
   --sidebar-width: 260px;
 }
@@ -32,7 +32,7 @@
   --navy-soft: #202c44;
   --teal: #5ac0b3;
   --danger: #ff9389;
-  --focus-blue: #2471ed;
+  --focus-blue: #0d6efd;
   --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
 }
 
@@ -1660,16 +1660,16 @@ input[type="checkbox"] {
 }
 
 [data-theme="dark"] .audit-radio-group {
-  border-color: color-mix(in srgb, var(--focus-blue) 38%, var(--border));
-  background: color-mix(in srgb, var(--focus-blue) 16%, var(--surface-muted));
+  border-color: var(--border);
+  background: var(--surface-muted);
 }
 
 [data-theme="dark"] .audit-radio-slider {
-  border-color: color-mix(in srgb, var(--focus-blue) 68%, var(--border));
-  background: color-mix(in srgb, var(--focus-blue) 42%, var(--surface));
+  border-color: color-mix(in srgb, var(--focus-blue) 82%, #ffffff 8%);
+  background: var(--focus-blue);
   box-shadow:
-    0 10px 24px color-mix(in srgb, var(--focus-blue) 28%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent);
+    0 12px 28px color-mix(in srgb, var(--focus-blue) 34%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
 }
 
 [data-theme="dark"] .audit-radio-item input[type="radio"]:checked + .audit-radio-option {
@@ -2369,21 +2369,21 @@ input[type="checkbox"] {
 }
 
 [data-theme="dark"] .context-button {
-  border-color: color-mix(in srgb, var(--focus-blue) 46%, var(--border));
-  color: #f0f8ff;
-  background: color-mix(in srgb, var(--focus-blue) 26%, var(--surface-muted));
+  border-color: color-mix(in srgb, var(--focus-blue) 82%, #ffffff 8%);
+  color: #ffffff;
+  background: var(--focus-blue);
 }
 
 [data-theme="dark"] .context-button:hover {
-  border-color: color-mix(in srgb, var(--focus-blue) 62%, var(--border));
-  background: color-mix(in srgb, var(--focus-blue) 34%, var(--surface-muted));
+  border-color: color-mix(in srgb, var(--focus-blue) 72%, #ffffff 18%);
+  background: #1b7aff;
 }
 
 [data-theme="dark"] .context-button.is-active {
-  border-color: color-mix(in srgb, var(--focus-blue) 78%, var(--border));
+  border-color: color-mix(in srgb, var(--focus-blue) 68%, #ffffff 24%);
   color: #ffffff;
-  background: color-mix(in srgb, var(--focus-blue) 46%, var(--surface-muted));
-  box-shadow: 0 12px 26px color-mix(in srgb, var(--focus-blue) 30%, transparent);
+  background: var(--focus-blue);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--focus-blue) 36%, transparent);
 }
 
 .context-button:focus-visible {

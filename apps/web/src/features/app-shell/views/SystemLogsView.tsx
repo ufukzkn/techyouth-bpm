@@ -11,7 +11,7 @@ import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
 import type { Language, SystemAuditLog } from "@/lib/types";
 
-const minimumRefreshDelayMs = 1000;
+const minimumRefreshDelayMs = 500;
 
 export function SystemLogsView({ language, token }: { language: Language; token: string | null }) {
   const t = useCallback(
