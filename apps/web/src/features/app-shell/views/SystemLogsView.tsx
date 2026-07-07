@@ -255,7 +255,13 @@ export function SystemLogsView({ language, token }: { language: Language; token:
               }}
             >
               <span>{t(`logs.category.${category}` as TranslationKey)}</span>
-              <strong>{categoryCounts[category] ?? "-"}</strong>
+              {categoryCounts[category] === null ? (
+                <span className="metric-inline-loader audit-count-loader" aria-label={t("common.loading")}>
+                  <span className="button-spinner" aria-hidden="true" />
+                </span>
+              ) : (
+                <strong>{categoryCounts[category]}</strong>
+              )}
               <small>{t(`logs.categoryHelp.${category}` as TranslationKey)}</small>
             </button>
           ))}

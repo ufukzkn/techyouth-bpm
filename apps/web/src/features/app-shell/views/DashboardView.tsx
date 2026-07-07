@@ -65,6 +65,7 @@ export function DashboardView({
   const inProgressCount = processes.filter((process) => process.status === "InProgress").length;
   const completedCount = processes.filter((process) => process.status === "Completed").length;
   const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
+  const shouldShowMetricLoader = status === "loading" && !dashboardMetricsCache;
 
   const metricCards: Array<{ label: string; value: number; viewId?: ViewId }> = [
     { label: t("dashboard.pendingTasks"), value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined },
@@ -114,12 +115,24 @@ export function DashboardView({
               type="button"
             >
               <span>{card.label}</span>
-              <strong>{card.value}</strong>
+              {shouldShowMetricLoader ? (
+                <span className="metric-inline-loader" aria-label={t("common.loading")}>
+                  <span className="button-spinner" aria-hidden="true" />
+                </span>
+              ) : (
+                <strong>{card.value}</strong>
+              )}
             </button>
           ) : (
             <article className="metric-card" key={card.label}>
               <span>{card.label}</span>
-              <strong>{card.value}</strong>
+              {shouldShowMetricLoader ? (
+                <span className="metric-inline-loader" aria-label={t("common.loading")}>
+                  <span className="button-spinner" aria-hidden="true" />
+                </span>
+              ) : (
+                <strong>{card.value}</strong>
+              )}
             </article>
           ),
         )}

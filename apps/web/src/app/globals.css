@@ -889,6 +889,28 @@ input[type="checkbox"] {
   font-size: 32px;
 }
 
+.metric-inline-loader {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--primary);
+}
+
+.metric-inline-loader .button-spinner {
+  width: 22px;
+  height: 22px;
+  border-width: 3px;
+}
+
+.audit-count-loader {
+  min-height: 32px;
+}
+
+.audit-count-loader .button-spinner {
+  width: 20px;
+  height: 20px;
+}
+
 .flow-preview {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -1553,6 +1575,46 @@ input[type="checkbox"] {
 
 .user-management-row {
   grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.user-management-skeleton {
+  pointer-events: none;
+}
+
+.user-management-skeleton span,
+.user-management-skeleton strong,
+.user-management-skeleton small {
+  display: block;
+  border-radius: 999px;
+  color: transparent;
+  background: linear-gradient(
+    90deg,
+    var(--surface-muted),
+    color-mix(in srgb, var(--primary) 10%, var(--surface-muted)),
+    var(--surface-muted)
+  );
+  animation: skeleton-pulse 900ms ease-in-out infinite;
+}
+
+.user-management-skeleton .stacked-summary > span {
+  width: 92px;
+  height: 22px;
+}
+
+.user-management-skeleton strong {
+  width: min(220px, 72%);
+  height: 22px;
+}
+
+.user-management-skeleton small {
+  width: min(280px, 88%);
+  height: 16px;
+}
+
+.user-management-skeleton > span:last-child {
+  width: 112px;
+  height: 42px;
+  border-radius: 7px;
 }
 
 .system-audit-meta {

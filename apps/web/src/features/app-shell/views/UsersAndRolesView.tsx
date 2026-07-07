@@ -52,6 +52,7 @@ export function UsersAndRolesView({
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<StatusTone>("info");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasLoadedUsers, setHasLoadedUsers] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [isLoadingUserLogs, setIsLoadingUserLogs] = useState(false);
@@ -99,6 +100,7 @@ export function UsersAndRolesView({
       });
       setUsers(userResult.items ?? []);
       setTotalUsers(userResult.totalCount ?? 0);
+      setHasLoadedUsers(true);
       if (isManualRefresh) {
         await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
         setToast({ kind: "success", text: t("common.refreshed") });
@@ -111,6 +113,7 @@ export function UsersAndRolesView({
       } else {
         showUserMessage(errorMessage, "error");
       }
+      setHasLoadedUsers(true);
     } finally {
       if (isManualRefresh) {
         setIsRefreshing(false);
@@ -135,6 +138,7 @@ export function UsersAndRolesView({
   const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visibleUsers = users;
+  const shouldShowUserSkeleton = !hasLoadedUsers || (isLoading && !visibleUsers.length);
   const selectedUser = selectedUserId ? users.find((managedUser) => managedUser.id === selectedUserId) ?? null : null;
   const effectiveSelectedUserId = selectedUser?.id ?? null;
   const selectedUsername = selectedUser?.username.toLowerCase();
@@ -417,7 +421,6 @@ export function UsersAndRolesView({
           </label>
         </div>
         {message ? <div className={userMessageClassName}>{message}</div> : null}
-        {isLoading && !visibleUsers.length ? <p className="status-line">{t("common.loading")}</p> : null}
       </div>
 
       <div className="management-layout">
@@ -431,6 +434,7 @@ export function UsersAndRolesView({
             <UserCog size={22} />
           </div>
           <div className="user-management-list">
+            {shouldShowUserSkeleton ? <UserManagementSkeleton /> : null}
             {visibleUsers.map((managedUser) => (
               <article className="settings-row user-management-row" key={managedUser.id}>
                 <div className="stacked-summary">
@@ -451,7 +455,7 @@ export function UsersAndRolesView({
                 </button>
               </article>
             ))}
-            {!visibleUsers.length && !isLoading ? <p className="status-line">{t("users.empty")}</p> : null}
+            {!visibleUsers.length && hasLoadedUsers && !isLoading ? <p className="status-line">{t("users.empty")}</p> : null}
           </div>
           <PaginationControls
             currentPage={currentPage}
@@ -723,6 +727,23 @@ export function UsersAndRolesView({
       ) : null}
       {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
     </section>
+  );
+}
+
+function UserManagementSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 4 }, (_, index) => (
+        <article className="settings-row user-management-row user-management-skeleton" key={index}>
+          <div className="stacked-summary">
+            <span />
+            <strong />
+            <small />
+          </div>
+          <span />
+        </article>
+      ))}
+    </>
   );
 }
 
