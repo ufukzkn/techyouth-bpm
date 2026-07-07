@@ -9,7 +9,29 @@ namespace TechYouthBpm.Infrastructure.Services;
 internal static class MappingExtensions
 {
     public static UserDto ToDto(this User user) =>
-        new(user.Id, user.Username, user.DisplayName, user.Role);
+        new(
+            user.Id,
+            user.Username,
+            user.DisplayName,
+            user.Email,
+            user.Role,
+            user.Status,
+            user.IsEmailVerified,
+            user.MustChangePassword);
+
+    public static UserAdminDto ToAdminDto(this User user) =>
+        new(
+            user.Id,
+            user.Username,
+            user.DisplayName,
+            user.Email,
+            user.Role,
+            user.Status,
+            user.IsEmailVerified,
+            user.FailedLoginCount,
+            user.LockedUntil,
+            user.CreatedAt,
+            user.MustChangePassword);
 
     public static FormDefinitionDto ToDto(this FormDefinition form) =>
         new(
@@ -69,7 +91,9 @@ internal static class MappingExtensions
                 log.Action,
                 log.FromStatus,
                 log.ToStatus,
+                log.UserId,
                 log.User?.DisplayName ?? "Unknown user",
+                log.User?.Username ?? "unknown",
                 log.CreatedAt,
                 log.Note)).ToArray());
 }

@@ -40,19 +40,26 @@ The frontend is organized by domain features:
 
 Pages compose feature components. API calls are made through service modules. Zustand stores only app-wide state such as the active session and theme.
 
-Navigation behaves as a multi-screen app inside the authenticated shell. The current implementation uses a route-like `?view=` query parameter for the active screen, so refresh and browser back/forward keep the user in the expected workspace area without returning to hash-scroll anchors.
+Navigation behaves as a multi-screen app inside the authenticated shell. The current implementation uses real route paths such as `/dashboard`, `/forms`, `/runner`, `/processes`, `/tasks` and `/settings`, so refresh/direct links keep the user in the expected workspace area without returning to hash-scroll anchors.
 
 Implemented frontend folders:
 
 - `src/lib`: shared API client and types.
 - `src/features/session`: Zustand session/theme store.
 - `src/features/auth`: login view and demo-user fallback.
-- `src/features/app-shell`: role-aware navigation and authenticated layout.
+- `src/features/app-shell`: role-aware navigation, authenticated layout, dashboard/settings/access/log views and shared shell components.
+- `src/features/forms`: shared field metadata, field renderer, form value helpers and frontend validation.
+- `src/features/form-designer`: admin-facing dynamic form definition editor.
+- `src/features/form-runner`: saved-form runner that starts process instances.
+- `src/features/processes`: process list, task list, task action dialog, process detail, audit timeline and status badge components.
+
+`AppShell.tsx` is intentionally kept as the authenticated workspace coordinator. It owns session verification, route/view synchronization, topbar/sidebar behavior and active-view composition. Heavier UI flows are split into `views`, `components`, `auditUtils`, `sessionFormatters` and shared shell types so access, settings and audit work can evolve without turning the shell into a monolithic file again.
 
 ## Extensibility Strategy
 
 - Adding a new field type should require a field renderer, validation rule and designer option, without rewriting the wizard.
 - Adding a new process action should be handled in the backend state machine and exposed to the frontend as available task actions.
 - Adding a new role should be centralized in auth/authorization rules and menu visibility logic.
+- Strengthening auth should preserve centralized session handling: password hashing, token hashing, session expiry and future remember-me/refresh-token behavior belong in the auth/session boundary.
 - Changing persistence provider should stay inside Infrastructure configuration and EF Core package setup.
 - Adding a new screen should update the navigation model, route/screen ownership and team presentation notes.

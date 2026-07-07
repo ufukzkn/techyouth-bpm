@@ -20,6 +20,8 @@ Production tasks:
 - Header with active user information.
 - Left menu filtered by role.
 - Dashboard cards for pending, in-progress and completed work.
+- Dashboard shortcuts that route users to role-available workflow screens.
+- Session expiry visibility in the top bar and settings screen.
 - Settings page draft for theme and user preferences.
 
 Backend/API touchpoints:
@@ -34,12 +36,15 @@ Frontend files and areas:
 - `features/session`
 - `features/app-shell`
 - Dashboard and settings sections.
+- `docs/10-ufuk-access-shell-flow.md`
 
 Tests and review notes:
 
 - Login success and failure scenarios.
 - Role-based menu visibility.
+- Role-aware dashboard shortcut visibility.
 - Theme/session persistence behavior.
+- Expired/invalid session handling.
 
 Presentation angle:
 
@@ -68,7 +73,7 @@ Backend/API touchpoints:
 Frontend files and areas:
 
 - `features/form-designer`
-- Future `features/form-runner`
+- `features/form-runner`
 - Shared field renderer and validation helpers.
 
 Tests and review notes:
@@ -105,8 +110,13 @@ Backend/API touchpoints:
 Frontend files and areas:
 
 - `features/processes`
-- Task action controls.
-- Process detail and audit log views.
+- `ProcessListView`
+- `MyTasksView`
+- `TaskActionDialog`
+- `ProcessDetailPanel`
+- `AuditTimeline`
+- `StatusBadge`
+- `docs/12-cagdas-process-flow.md`
 
 Tests and review notes:
 
@@ -114,6 +124,7 @@ Tests and review notes:
 - Invalid state transitions.
 - Unauthorized task action.
 - Audit log entry after every process action.
+- Action notes are collected before approve/reject and persisted through audit logs.
 
 Presentation angle:
 
@@ -126,11 +137,3 @@ How BPM is modeled with statuses, tasks, actions and traceable transitions.
 - Every meaningful feature should update the relevant documentation file.
 - Commit history should stay progressive and readable.
 - Demo flow should remain: login, design form, start process, complete task, view process detail.
-
-## Suggested Next Commits
-
-- `feature(web): form runner taslagi eklendi`
-- `feature(api): form baslatma validasyonlari tamamlandi`
-- `feature(web): task aksiyonlari api ile baglandi`
-- `test(api): yetki kontrol senaryolari test edildi`
-- `docs: code review anlatimi detaylandirildi`

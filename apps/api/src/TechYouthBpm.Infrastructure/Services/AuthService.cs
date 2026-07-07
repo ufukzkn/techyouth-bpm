@@ -1,36 +1,182 @@
+using System.Net;
+using System.Net.Mail;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Domain.Entities;
+using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Data;
+using TechYouthBpm.Infrastructure.Security;
 
 namespace TechYouthBpm.Infrastructure.Services;
 
-public class AuthService(AppDbContext db) : IAuthService
+public class AuthService(
+    AppDbContext db,
+    IConfiguration configuration,
+    ISystemAuditService auditService,
+    IOtpService otpService,
+    IEmailSender emailSender) : IAuthService
 {
-    public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    private const int FallbackSessionDurationMinutes = 1;
+    private const int DefaultMaxFailedLoginAttempts = 5;
+    private const int DefaultLockoutMinutes = 10;
+    private const int DefaultEmailVerificationMinutes = 1440;
+    private const int DefaultEmailVerificationResendCooldownMinutes = 5;
+
+    public AuthService(AppDbContext db, IConfiguration configuration)
+        : this(db, configuration, new SystemAuditService(db), new OtpService(), new DemoEmailSender())
+    {
+    }
+
+    public async Task<Result<RegisterResponse>> RegisterAsync(
+        RegisterRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var username = request.Username.Trim();
+        var email = request.Email.Trim().ToLowerInvariant();
+        var displayName = request.DisplayName.Trim();
+
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            errors.Add("Username is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            errors.Add("Display name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
+        {
+            errors.Add("A valid email is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
+        {
+            errors.Add("Password must be at least 8 characters.");
+        }
+
+        if (errors.Count > 0)
+        {
+            return Result<RegisterResponse>.Failure(errors);
+        }
+
+        var exists = await db.Users.AnyAsync(
+            user => user.Username == username || user.Email == email,
+            cancellationToken);
+        if (exists)
+        {
+            return Result<RegisterResponse>.Failure("Username or email is already registered.");
+        }
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = username,
+            DisplayName = displayName,
+            Email = email,
+            Password = PasswordHasher.Hash(request.Password),
+            Role = Role.User,
+            Status = UserStatus.PendingApproval,
+            IsEmailVerified = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user.Id,
+            "Auth.RegisterRequested",
+            "User",
+            user.Id.ToString(),
+            $"User '{user.Username}' registered and is waiting for admin approval.",
+            cancellationToken);
+
+        return Result<RegisterResponse>.Success(new RegisterResponse(user.Id, user.Username, user.Email, user.Status));
+    }
+
+    public async Task<Result<LoginResponse>> LoginAsync(
+        LoginRequest request,
+        string? ipAddress = null,
+        string? userAgent = null,
+        CancellationToken cancellationToken = default)
     {
         var user = await db.Users
             .SingleOrDefaultAsync(item => item.Username == request.Username, cancellationToken);
 
-        if (user is null || user.Password != request.Password)
+        if (user is null)
         {
             return Result<LoginResponse>.Failure("Username or password is incorrect.");
         }
 
+        if (user.LockedUntil is { } lockedUntil && lockedUntil > DateTime.UtcNow)
+        {
+            return Result<LoginResponse>.Failure("Account is temporarily locked after multiple failed login attempts.");
+        }
+
+        if (!PasswordMatches(request.Password, user.Password))
+        {
+            user.FailedLoginCount += 1;
+
+            if (user.FailedLoginCount >= GetInt("Auth:MaxFailedLoginAttempts", DefaultMaxFailedLoginAttempts))
+            {
+                user.LockedUntil = DateTime.UtcNow.AddMinutes(GetInt("Auth:LockoutMinutes", DefaultLockoutMinutes));
+            }
+
+            await db.SaveChangesAsync(cancellationToken);
+            await auditService.LogAsync(
+                user.Id,
+                user.LockedUntil is null ? "Auth.LoginFailed" : "Auth.AccountLocked",
+                "User",
+                user.Id.ToString(),
+                user.LockedUntil is null
+                    ? $"Failed login attempt for '{user.Username}'."
+                    : $"User '{user.Username}' was temporarily locked after failed login attempts.",
+                cancellationToken);
+            return Result<LoginResponse>.Failure("Username or password is incorrect.");
+        }
+
+        if (user.Status != UserStatus.Active)
+        {
+            return Result<LoginResponse>.Failure(user.Status == UserStatus.PendingApproval
+                ? "Account is waiting for admin approval."
+                : "Account is not active.");
+        }
+
+        if (!PasswordHasher.IsHashed(user.Password))
+        {
+            user.Password = PasswordHasher.Hash(request.Password);
+        }
+
+        user.FailedLoginCount = 0;
+        user.LockedUntil = null;
+
+        var rawToken = SessionTokenHasher.CreateToken();
         var session = new UserSession
         {
-            Token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("/", string.Empty).Replace("+", string.Empty),
+            Id = Guid.NewGuid(),
+            Token = SessionTokenHasher.Hash(rawToken),
             UserId = user.Id,
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddHours(8)
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes(request.RememberMe)),
+            IpAddress = TrimOrNull(ipAddress, 128),
+            UserAgent = TrimOrNull(userAgent, 512)
         };
 
         db.UserSessions.Add(session);
         await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user.Id,
+            "Auth.LoginSucceeded",
+            "Session",
+            session.Id.ToString(),
+            $"User '{user.Username}' signed in.",
+            cancellationToken);
 
-        return Result<LoginResponse>.Success(new LoginResponse(session.Token, user.ToDto(), session.ExpiresAt));
+        return Result<LoginResponse>.Success(new LoginResponse(rawToken, user.ToDto(), session.ExpiresAt));
     }
 
     public async Task<UserDto?> GetUserByTokenAsync(string token, CancellationToken cancellationToken = default)
@@ -40,10 +186,860 @@ public class AuthService(AppDbContext db) : IAuthService
             return null;
         }
 
+        var tokenHash = SessionTokenHasher.Hash(token);
         var session = await db.UserSessions
             .Include(item => item.User)
-            .SingleOrDefaultAsync(item => item.Token == token && item.ExpiresAt > DateTime.UtcNow, cancellationToken);
+            .SingleOrDefaultAsync(
+                item => item.Token == tokenHash && item.ExpiresAt > DateTime.UtcNow && item.RevokedAt == null,
+                cancellationToken);
 
-        return session?.User?.ToDto();
+        if (session?.User is null || session.User.Status != UserStatus.Active)
+        {
+            return null;
+        }
+
+        session.LastSeenAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return session.User.ToDto();
+    }
+
+    public async Task<Result<UserDto>> UpdateProfileAsync(
+        UpdateProfileRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        if (user is null)
+        {
+            return Result<UserDto>.Failure("User not found.");
+        }
+
+        var displayName = request.DisplayName.Trim();
+        var email = request.Email.Trim().ToLowerInvariant();
+        var errors = ValidateProfile(displayName, email);
+        if (errors.Count > 0)
+        {
+            return Result<UserDto>.Failure(errors);
+        }
+
+        var emailExists = await db.Users.AnyAsync(
+            item => item.Id != user.Id && item.Email == email,
+            cancellationToken);
+        if (emailExists)
+        {
+            return Result<UserDto>.Failure("Email is already registered.");
+        }
+
+        var oldDisplayName = user.DisplayName;
+        var oldEmail = user.Email;
+        var emailChanged = !string.Equals(oldEmail, email, StringComparison.OrdinalIgnoreCase);
+
+        user.DisplayName = displayName;
+        user.Email = email;
+        if (emailChanged)
+        {
+            user.IsEmailVerified = false;
+            user.EmailVerificationCode = null;
+            user.EmailVerificationCodeExpiresAt = null;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            emailChanged ? "User.ProfileAndEmailUpdated" : "User.ProfileUpdated",
+            "User",
+            user.Id.ToString(),
+            emailChanged
+                ? $"Profile changed for '{user.Username}': display name '{oldDisplayName}' -> '{user.DisplayName}', email '{oldEmail}' -> '{user.Email}'. Email verification was reset."
+                : $"Profile changed for '{user.Username}': display name '{oldDisplayName}' -> '{user.DisplayName}'.",
+            cancellationToken);
+
+        return Result<UserDto>.Success(user.ToDto());
+    }
+
+    public async Task<Result<UserDto>> ChangePasswordAsync(
+        ChangePasswordRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        if (user is null)
+        {
+            return Result<UserDto>.Failure("User not found.");
+        }
+
+        if (!PasswordMatches(request.CurrentPassword, user.Password))
+        {
+            return Result<UserDto>.Failure("Current password is incorrect.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+        {
+            return Result<UserDto>.Failure("Password must be at least 8 characters.");
+        }
+
+        var wasTemporary = user.MustChangePassword;
+        user.Password = PasswordHasher.Hash(request.NewPassword);
+        user.MustChangePassword = false;
+        user.FailedLoginCount = 0;
+        user.LockedUntil = null;
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            wasTemporary ? "Auth.TemporaryPasswordChanged" : "Auth.PasswordChanged",
+            "User",
+            user.Id.ToString(),
+            wasTemporary
+                ? $"User '{user.Username}' changed the temporary password required on first sign-in."
+                : $"User '{user.Username}' changed their password.",
+            cancellationToken);
+
+        return Result<UserDto>.Success(user.ToDto());
+    }
+
+    public async Task<Result<UserAdminDto>> CreateUserAsync(
+        CreateUserRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result<UserAdminDto>.Failure("Only Admin users can create users.");
+        }
+
+        var username = request.Username.Trim();
+        var displayName = request.DisplayName.Trim();
+        var email = request.Email.Trim().ToLowerInvariant();
+        var errors = ValidateProfile(displayName, email);
+        if (string.IsNullOrWhiteSpace(username))
+        {
+            errors.Add("Username is required.");
+        }
+
+        var temporaryPassword = string.IsNullOrWhiteSpace(request.TemporaryPassword)
+            ? GenerateTemporaryPassword()
+            : request.TemporaryPassword;
+
+        if (temporaryPassword.Length < 8)
+        {
+            errors.Add("Password must be at least 8 characters.");
+        }
+
+        if (errors.Count > 0)
+        {
+            return Result<UserAdminDto>.Failure(errors);
+        }
+
+        var exists = await db.Users.AnyAsync(
+            user => user.Username == username || user.Email == email,
+            cancellationToken);
+        if (exists)
+        {
+            return Result<UserAdminDto>.Failure("Username or email is already registered.");
+        }
+
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = username,
+            DisplayName = displayName,
+            Email = email,
+            Password = PasswordHasher.Hash(temporaryPassword),
+            Role = request.Role,
+            Status = request.Status,
+            IsEmailVerified = false,
+            MustChangePassword = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        try
+        {
+            await emailSender.SendAsync(
+                new EmailMessage(
+                    user.Email,
+                    "TechYouth BPM gecici sifre bilgisi",
+                    BuildTemporaryPasswordBody(user.DisplayName, user.Username, temporaryPassword),
+                    user.Username,
+                    true),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
+        {
+            return Result<UserAdminDto>.Failure("Temporary password email could not be sent.");
+        }
+
+        db.Users.Add(user);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "User.CreatedByAdmin",
+            "User",
+            user.Id.ToString(),
+            $"Admin '{currentUser.Username}' created user '{user.Username}' with role {user.Role}, status {user.Status} and temporary-password requirement.",
+            cancellationToken);
+
+        return Result<UserAdminDto>.Success(user.ToAdminDto());
+    }
+
+    public async Task<Result> DeleteUserAsync(
+        Guid userId,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result.Failure("Only Admin users can delete users.");
+        }
+
+        if (currentUser.Id == userId)
+        {
+            return Result.Failure("Admin users cannot delete their own account.");
+        }
+
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return Result.Failure("User not found.");
+        }
+
+        var hasWorkflowHistory =
+            await db.FormDefinitions.AnyAsync(
+                form => form.CreatedByUserId == userId || form.UpdatedByUserId == userId,
+                cancellationToken)
+            || await db.ProcessInstances.AnyAsync(process => process.StartedByUserId == userId, cancellationToken)
+            || await db.ProcessTasks.AnyAsync(task => task.CompletedByUserId == userId, cancellationToken)
+            || await db.AuditLogs.AnyAsync(log => log.UserId == userId, cancellationToken);
+
+        if (hasWorkflowHistory)
+        {
+            return Result.Failure("User has workflow history and cannot be deleted.");
+        }
+
+        var sessions = await db.UserSessions.Where(session => session.UserId == userId).ToListAsync(cancellationToken);
+        db.UserSessions.RemoveRange(sessions);
+
+        var actorLogs = await db.SystemAuditLogs
+            .Where(log => log.ActorUserId == userId)
+            .ToListAsync(cancellationToken);
+        foreach (var log in actorLogs)
+        {
+            log.ActorUserId = null;
+        }
+
+        db.Users.Remove(user);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "User.DeletedByAdmin",
+            "User",
+            userId.ToString(),
+            $"Admin '{currentUser.Username}' deleted user '{user.Username}'.",
+            cancellationToken);
+
+        return Result.Success();
+    }
+
+    public async Task<Result<PagedResult<UserAdminDto>>> ListUsersAsync(
+        UserDto currentUser,
+        UserSearchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result<PagedResult<UserAdminDto>>.Failure("Only Admin users can list users.");
+        }
+
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        var query = db.Users.AsQueryable();
+
+        if (request.Status is not null)
+        {
+            query = query.Where(user => user.Status == request.Status);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Query))
+        {
+            var search = request.Query.Trim().ToLowerInvariant();
+            query = query.Where(user =>
+                user.Username.ToLower().Contains(search)
+                || user.DisplayName.ToLower().Contains(search)
+                || user.Email.ToLower().Contains(search));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var users = await query
+            .OrderBy(user => user.Status)
+            .ThenBy(user => user.Username)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return Result<PagedResult<UserAdminDto>>.Success(new PagedResult<UserAdminDto>(
+            users.Select(user => user.ToAdminDto()).ToArray(),
+            page,
+            pageSize,
+            totalCount));
+    }
+
+    public async Task<Result<UserAdminDto>> UpdateUserAccessAsync(
+        Guid userId,
+        UpdateUserAccessRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result<UserAdminDto>.Failure("Only Admin users can update access.");
+        }
+
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return Result<UserAdminDto>.Failure("User not found.");
+        }
+
+        var oldStatus = user.Status;
+        var oldRole = user.Role;
+        user.Role = request.Role;
+        user.Status = request.Status;
+
+        if (request.Status != UserStatus.Active)
+        {
+            await RevokeAllSessionsForUserAsync(user.Id, cancellationToken);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "User.AccessUpdated",
+            "User",
+            user.Id.ToString(),
+            $"User '{user.Username}' access changed from {oldRole}/{oldStatus} to {user.Role}/{user.Status}.",
+            cancellationToken);
+        return Result<UserAdminDto>.Success(user.ToAdminDto());
+    }
+
+    public async Task<Result<IReadOnlyList<UserSessionDto>>> ListSessionsAsync(
+        UserDto currentUser,
+        string currentToken,
+        CancellationToken cancellationToken = default)
+    {
+        var currentTokenHash = SessionTokenHasher.Hash(currentToken);
+        var sessions = await db.UserSessions
+            .Where(session => session.UserId == currentUser.Id && session.RevokedAt == null && session.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(session => session.CreatedAt)
+            .Select(session => new UserSessionDto(
+                session.Id,
+                session.CreatedAt,
+                session.ExpiresAt,
+                session.LastSeenAt,
+                session.Token == currentTokenHash,
+                session.IpAddress,
+                session.UserAgent))
+            .ToListAsync(cancellationToken);
+
+        return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
+    }
+
+    public async Task<Result<IReadOnlyList<UserSessionDto>>> ListUserSessionsAsync(
+        Guid userId,
+        UserDto currentUser,
+        string currentToken,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result<IReadOnlyList<UserSessionDto>>.Failure("Only Admin users can view user sessions.");
+        }
+
+        var userExists = await db.Users.AnyAsync(user => user.Id == userId, cancellationToken);
+        if (!userExists)
+        {
+            return Result<IReadOnlyList<UserSessionDto>>.Failure("User not found.");
+        }
+
+        var currentTokenHash = SessionTokenHasher.Hash(currentToken);
+        var sessions = await db.UserSessions
+            .Where(session => session.UserId == userId && session.RevokedAt == null && session.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(session => session.LastSeenAt ?? session.CreatedAt)
+            .Select(session => new UserSessionDto(
+                session.Id,
+                session.CreatedAt,
+                session.ExpiresAt,
+                session.LastSeenAt,
+                session.Token == currentTokenHash,
+                session.IpAddress,
+                session.UserAgent))
+            .ToListAsync(cancellationToken);
+
+        return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
+    }
+
+    public async Task<Result> LogoutAsync(string token, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return Result.Failure("A valid session token is required.");
+        }
+
+        var tokenHash = SessionTokenHasher.Hash(token);
+        var session = await db.UserSessions.SingleOrDefaultAsync(
+            item => item.Token == tokenHash && item.RevokedAt == null,
+            cancellationToken);
+
+        if (session is not null)
+        {
+            session.RevokedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+            await auditService.LogAsync(
+                session.UserId,
+                "Auth.Logout",
+                "Session",
+                session.Id.ToString(),
+                "User session was revoked by logout.",
+                cancellationToken);
+        }
+
+        return Result.Success();
+    }
+
+    public async Task<Result> RevokeSessionAsync(
+        Guid sessionId,
+        UserDto currentUser,
+        string currentToken,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await db.UserSessions.SingleOrDefaultAsync(
+            item => item.Id == sessionId && item.UserId == currentUser.Id && item.RevokedAt == null,
+            cancellationToken);
+
+        if (session is null)
+        {
+            return Result.Failure("Session not found.");
+        }
+
+        session.RevokedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "Auth.SessionRevoked",
+            "Session",
+            session.Id.ToString(),
+            "User revoked an active session.",
+            cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result> RevokeUserSessionAsync(
+        Guid userId,
+        Guid sessionId,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUser.Role != Role.Admin)
+        {
+            return Result.Failure("Only Admin users can revoke user sessions.");
+        }
+
+        var session = await db.UserSessions.SingleOrDefaultAsync(
+            item => item.Id == sessionId && item.UserId == userId && item.RevokedAt == null,
+            cancellationToken);
+
+        if (session is null)
+        {
+            return Result.Failure("Session not found.");
+        }
+
+        session.RevokedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "Auth.AdminSessionRevoked",
+            "Session",
+            session.Id.ToString(),
+            $"Admin '{currentUser.Username}' revoked a session for user '{userId}'.",
+            cancellationToken);
+        return Result.Success();
+    }
+
+    public async Task<Result<EmailVerificationStartResponse>> StartEmailVerificationAsync(
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        if (user is null)
+        {
+            return Result<EmailVerificationStartResponse>.Failure("User not found.");
+        }
+
+        if (user.IsEmailVerified)
+        {
+            return Result<EmailVerificationStartResponse>.Failure("Email is already verified.");
+        }
+
+        var verificationMinutes = GetInt("Auth:EmailVerificationMinutes", DefaultEmailVerificationMinutes);
+        var resendCooldownMinutes = GetInt(
+            "Auth:EmailVerificationResendCooldownMinutes",
+            DefaultEmailVerificationResendCooldownMinutes);
+        if (user.EmailVerificationCodeExpiresAt is { } currentExpiry)
+        {
+            var lastIssuedAt = currentExpiry.AddMinutes(-verificationMinutes);
+            if (lastIssuedAt.AddMinutes(resendCooldownMinutes) > DateTime.UtcNow)
+            {
+                return Result<EmailVerificationStartResponse>.Failure(
+                    "Verification code was sent recently. Please wait before requesting another code.");
+            }
+        }
+
+        var otp = otpService.IssueEmailVerificationCode(
+            user,
+            verificationMinutes);
+
+        try
+        {
+            await emailSender.SendAsync(
+                new EmailMessage(
+                    user.Email,
+                    "TechYouth BPM e-posta dogrulama kodu",
+                    BuildEmailVerificationBody(
+                        user.DisplayName,
+                        otp.DemoCode,
+                        otp.ExpiresAt,
+                        IsSandboxDelivery(user)),
+                    user.Username,
+                    true),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
+        {
+            return Result<EmailVerificationStartResponse>.Failure(
+                exception.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase)
+                    ? "Email recipient is not allowed for SMTP delivery."
+                    : "Verification email could not be sent.");
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "Auth.EmailVerificationRequested",
+            "User",
+            user.Id.ToString(),
+            $"Email verification requested for '{user.Email}'.",
+            cancellationToken);
+
+        return Result<EmailVerificationStartResponse>.Success(new EmailVerificationStartResponse(
+            emailSender.ExposesVerificationCode
+                ? "Verification code generated for local demo."
+                : "Verification code sent by email.",
+            emailSender.ExposesVerificationCode ? otp.DemoCode : string.Empty,
+            otp.ExpiresAt));
+    }
+
+    public async Task<Result<UserDto>> ConfirmEmailVerificationAsync(
+        EmailVerificationConfirmRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        if (user is null)
+        {
+            return Result<UserDto>.Failure("User not found.");
+        }
+
+        if (user.IsEmailVerified)
+        {
+            return Result<UserDto>.Success(user.ToDto());
+        }
+
+        var otpVerification = otpService.VerifyEmailVerificationCode(user, request.Code);
+        if (!otpVerification.IsSuccess)
+        {
+            return Result<UserDto>.Failure(otpVerification.Errors);
+        }
+
+        user.IsEmailVerified = true;
+        user.EmailVerificationCode = null;
+        user.EmailVerificationCodeExpiresAt = null;
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "Auth.EmailVerified",
+            "User",
+            user.Id.ToString(),
+            $"Email '{user.Email}' was verified.",
+            cancellationToken);
+
+        return Result<UserDto>.Success(user.ToDto());
+    }
+
+    private static bool PasswordMatches(string password, string storedPassword) =>
+        PasswordHasher.IsHashed(storedPassword)
+            ? PasswordHasher.Verify(password, storedPassword)
+            : string.Equals(password, storedPassword, StringComparison.Ordinal);
+
+    private int GetSessionDurationMinutes(bool rememberMe)
+    {
+        var configuredDuration = rememberMe
+            ? configuration["Auth:RememberMeDurationMinutes"]
+            : configuration["Auth:SessionDurationMinutes"];
+        return int.TryParse(configuredDuration, out var minutes) && minutes > 0
+            ? minutes
+            : FallbackSessionDurationMinutes;
+    }
+
+    private int GetInt(string key, int fallback)
+    {
+        var configuredValue = configuration[key];
+        return int.TryParse(configuredValue, out var value) && value > 0 ? value : fallback;
+    }
+
+    private static List<string> ValidateProfile(string displayName, string email)
+    {
+        var errors = new List<string>();
+        if (string.IsNullOrWhiteSpace(displayName))
+        {
+            errors.Add("Display name is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
+        {
+            errors.Add("A valid email is required.");
+        }
+
+        return errors;
+    }
+
+    private static string? TrimOrNull(string? value, int maxLength)
+    {
+        var trimmed = value?.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed))
+        {
+            return null;
+        }
+
+        return trimmed.Length <= maxLength ? trimmed : trimmed[..maxLength];
+    }
+
+    private static string GenerateTemporaryPassword()
+    {
+        const string lower = "abcdefghijkmnopqrstuvwxyz";
+        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+        const string digits = "23456789";
+        const string symbols = "!@#$%";
+        const string all = lower + upper + digits + symbols;
+
+        var characters = new List<char>
+        {
+            RandomChar(upper),
+            RandomChar(lower),
+            RandomChar(digits),
+            RandomChar(symbols)
+        };
+
+        for (var index = characters.Count; index < 14; index += 1)
+        {
+            characters.Add(RandomChar(all));
+        }
+
+        for (var index = characters.Count - 1; index > 0; index -= 1)
+        {
+            var swapIndex = System.Security.Cryptography.RandomNumberGenerator.GetInt32(index + 1);
+            (characters[index], characters[swapIndex]) = (characters[swapIndex], characters[index]);
+        }
+
+        return new string(characters.ToArray());
+    }
+
+    private static char RandomChar(string characters)
+    {
+        var index = System.Security.Cryptography.RandomNumberGenerator.GetInt32(characters.Length);
+        return characters[index];
+    }
+
+    private bool IsSandboxDelivery(User user)
+    {
+        return IsMailtrapSandboxMode()
+            || (IsRoutingMode() && !IsPrimarySmtpAllowed(user) && IsSandboxSmtpConfigured());
+    }
+
+    private bool IsMailtrapSandboxMode()
+    {
+        var provider = configuration["Email:Provider"] ?? "Demo";
+        var host = configuration["Email:Smtp:Host"] ?? string.Empty;
+        return provider.Equals("Mailtrap", StringComparison.OrdinalIgnoreCase)
+            && host.Contains("sandbox", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsRoutingMode()
+    {
+        var provider = configuration["Email:Provider"] ?? "Demo";
+        return provider.Equals("Routing", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsSandboxSmtpConfigured()
+    {
+        return !string.IsNullOrWhiteSpace(configuration["Email:Sandbox:Smtp:Host"]);
+    }
+
+    private bool IsPrimarySmtpAllowed(User user)
+    {
+        var allowedRecipients = GetCsv("Email:AllowedRecipients");
+        if (allowedRecipients.Count > 0
+            && !allowedRecipients.Contains(user.Email.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var allowedUsernames = GetCsv("Email:AllowedUsernames");
+        if (allowedUsernames.Count > 0
+            && !allowedUsernames.Contains(user.Username.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private IReadOnlyList<string> GetCsv(string key)
+    {
+        var configuredValue = configuration[key];
+        if (string.IsNullOrWhiteSpace(configuredValue))
+        {
+            return [];
+        }
+
+        return configuredValue
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+    }
+
+    private static string BuildEmailVerificationBody(
+        string displayName,
+        string code,
+        DateTime expiresAt,
+        bool isSandboxMode)
+    {
+        var safeName = WebUtility.HtmlEncode(displayName);
+        var safeCode = WebUtility.HtmlEncode(code);
+        var expiry = WebUtility.HtmlEncode(FormatTurkeyTime(expiresAt));
+        var deliveryNote = isSandboxMode
+            ? "Gelistirme ortaminda bu e-posta Mailtrap Sandbox inbox icinde goruntulenir; gercek alici inbox teslimati icin production mail provider gerekir."
+            : "Bu e-posta yapilandirilmis SMTP saglayicisi uzerinden gercek alici inbox teslimati icin gonderilmistir.";
+        var safeDeliveryNote = WebUtility.HtmlEncode(deliveryNote);
+
+        return $"""
+            <!doctype html>
+            <html lang="tr">
+            <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;color:#18243a;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:28px 12px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #d8deea;border-radius:12px;overflow:hidden;">
+                      <tr>
+                        <td style="background:#18243a;color:#ffffff;padding:22px 26px;">
+                          <div style="font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#ffb06a;">TechYouth BPM</div>
+                          <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;">E-posta dogrulama kodu</h1>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:26px;">
+                          <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Merhaba <strong>{safeName}</strong>,</p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">TechYouth BPM hesabinin e-posta dogrulamasi icin asagidaki kodu kullan.</p>
+                          <div style="margin:20px 0;padding:18px 20px;border-radius:10px;background:#fff0e3;border:1px solid #ffd1aa;text-align:center;">
+                            <div style="font-size:12px;color:#647187;text-transform:uppercase;letter-spacing:.08em;">Dogrulama kodu</div>
+                            <div style="margin-top:8px;font-size:34px;line-height:1;font-weight:800;letter-spacing:.18em;color:#d95f05;">{safeCode}</div>
+                          </div>
+                          <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#647187;">Kod gecerliligi: <strong>{expiry}</strong></p>
+                          <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#647187;">{safeDeliveryNote}</p>
+                          <p style="margin:0;font-size:13px;line-height:1.6;color:#647187;">Bu istegi sen baslatmadiysan e-postayi yok sayabilirsin.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """;
+    }
+
+    private static string BuildTemporaryPasswordBody(string displayName, string username, string temporaryPassword)
+    {
+        var safeName = WebUtility.HtmlEncode(displayName);
+        var safeUsername = WebUtility.HtmlEncode(username);
+        var safePassword = WebUtility.HtmlEncode(temporaryPassword);
+
+        return $"""
+            <!doctype html>
+            <html lang="tr">
+            <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;color:#18243a;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:28px 12px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #d8deea;border-radius:12px;overflow:hidden;">
+                      <tr>
+                        <td style="background:#18243a;color:#ffffff;padding:22px 26px;">
+                          <div style="font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#ffb06a;">TechYouth BPM</div>
+                          <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;">Gecici sifre bilgisi</h1>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:26px;">
+                          <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Merhaba <strong>{safeName}</strong>,</p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">TechYouth BPM hesabin bir yonetici tarafindan olusturuldu. Ilk giristen sonra sifreni degistirmen zorunludur.</p>
+                          <div style="display:block;margin:18px 0;padding:16px 18px;border-radius:10px;background:#f0f3f8;border:1px solid #d8deea;">
+                            <div style="font-size:13px;color:#647187;">Kullanici adi</div>
+                            <div style="margin-top:4px;font-size:18px;font-weight:700;color:#18243a;">{safeUsername}</div>
+                          </div>
+                          <div style="display:block;margin:18px 0;padding:16px 18px;border-radius:10px;background:#fff0e3;border:1px solid #ffd1aa;">
+                            <div style="font-size:13px;color:#647187;">Gecici sifre</div>
+                            <div style="margin-top:6px;font-size:24px;font-weight:800;color:#d95f05;letter-spacing:.04em;">{safePassword}</div>
+                          </div>
+                          <p style="margin:0;font-size:13px;line-height:1.6;color:#647187;">Bu bilgileri beklemiyorsan sistem yoneticisiyle iletisime gec.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """;
+    }
+
+    private static string FormatTurkeyTime(DateTime value)
+    {
+        var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
+        var turkeyTimeZone = ResolveTurkeyTimeZone();
+        var turkeyTime = TimeZoneInfo.ConvertTimeFromUtc(utcValue, turkeyTimeZone);
+        return $"{turkeyTime:dd.MM.yyyy HH:mm} GMT+3";
+    }
+
+    private static TimeZoneInfo ResolveTurkeyTimeZone()
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Turkey Standard Time");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Istanbul");
+        }
+    }
+
+    private async Task RevokeAllSessionsForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var sessions = await db.UserSessions
+            .Where(session => session.UserId == userId && session.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var session in sessions)
+        {
+            session.RevokedAt = DateTime.UtcNow;
+        }
     }
 }

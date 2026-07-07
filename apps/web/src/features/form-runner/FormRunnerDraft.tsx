@@ -1,27 +1,40 @@
 "use client";
 
 import { Play, RotateCcw } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
 import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
 import { validateFormValues } from "@/features/forms/formValidation";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
 import type { FormDefinition, ProcessDetail } from "@/lib/types";
 
-type LoadStatus = "loading" | "idle" | "error";
+type LoadStatus = "loading" | "refreshing" | "idle" | "error";
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
+
+let formRunnerFormsCache: FormDefinition[] | null = null;
 
 export function FormRunnerDraft() {
   const token = useSessionStore((state) => state.token);
-  const [forms, setForms] = useState<FormDefinition[]>([]);
-  const [selectedFormId, setSelectedFormId] = useState("");
-  const [values, setValues] = useState<FormValues>({});
+  const language = useSessionStore((state) => state.language);
+  const t = useCallback(
+    (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
+    [language],
+  );
+  const [forms, setForms] = useState<FormDefinition[]>(() => formRunnerFormsCache ?? []);
+  const [selectedFormId, setSelectedFormId] = useState(() => formRunnerFormsCache?.[0]?.id ?? "");
+  const [values, setValues] = useState<FormValues>(() =>
+    formRunnerFormsCache?.[0] ? buildInitialValues(formRunnerFormsCache[0]) : {},
+  );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [loadStatus, setLoadStatus] = useState<LoadStatus>("loading");
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>(formRunnerFormsCache ? "refreshing" : "loading");
   const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
-  const [message, setMessage] = useState("Formlar yukleniyor.");
+  const [message, setMessage] = useState(() =>
+    formRunnerFormsCache ? t("form.runner.refreshingForms") : t("form.runner.loadingForms"),
+  );
   const [submitResult, setSubmitResult] = useState<ProcessDetail | null>(null);
+  const selectedFormIdRef = useRef(selectedFormId);
 
   const selectedForm = forms.find((form) => form.id === selectedFormId);
   const sortedFields = selectedForm?.fields.slice().sort((first, second) => first.sortOrder - second.sortOrder) ?? [];
@@ -34,33 +47,41 @@ export function FormRunnerDraft() {
   };
 
   useEffect(() => {
+    selectedFormIdRef.current = selectedFormId;
+  }, [selectedFormId]);
+
+  useEffect(() => {
     async function loadForms() {
       if (!token) {
         setLoadStatus("error");
-        setMessage("Formlari listelemek icin API oturumu gerekli.");
+        setMessage(t("form.runner.sessionRequired"));
         return;
       }
 
       try {
-        setLoadStatus("loading");
+        setLoadStatus(formRunnerFormsCache ? "refreshing" : "loading");
         const result = await api.listForms(token);
-        const nextSelectedForm = result[0];
+        formRunnerFormsCache = result;
+        const currentSelection = result.find((form) => form.id === selectedFormIdRef.current);
+        const nextSelectedForm = currentSelection ?? result[0];
         setForms(result);
         setSelectedFormId(nextSelectedForm?.id ?? "");
-        setValues(nextSelectedForm ? buildInitialValues(nextSelectedForm) : {});
+        setValues((current) =>
+          currentSelection && Object.keys(current).length > 0 ? current : nextSelectedForm ? buildInitialValues(nextSelectedForm) : {},
+        );
         setErrors({});
         setSubmitResult(null);
         setLoadStatus("idle");
         setSubmitStatus("idle");
-        setMessage(result.length > 0 ? "Kayitli formlar yuklendi." : "Once bir form tasarimi kaydedilmeli.");
+        setMessage(result.length > 0 ? t("form.runner.loadedForms") : t("form.runner.designFirst"));
       } catch (error) {
         setLoadStatus("error");
-        setMessage(error instanceof ApiError ? error.errors.join(" ") : "Formlar yuklenemedi.");
+        setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.runner.loadFailed"));
       }
     }
 
     void loadForms();
-  }, [token]);
+  }, [token, language, t]);
 
   function handleChange(fieldKey: string, value: FormValue) {
     setValues((current) => ({ ...current, [fieldKey]: value }));
@@ -75,11 +96,11 @@ export function FormRunnerDraft() {
       return;
     }
 
-    const nextErrors = validateFormValues(selectedForm, values);
+    const nextErrors = validateFormValues(selectedForm, values, language);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       setSubmitStatus("idle");
-      setMessage("Formda duzeltilmesi gereken alanlar var.");
+      setMessage(t("form.runner.fixFields"));
       return;
     }
 
@@ -92,10 +113,10 @@ export function FormRunnerDraft() {
       });
       setSubmitStatus("success");
       setSubmitResult(process);
-      setMessage("Surec baslatildi ve form verisi kaydedildi.");
+      setMessage(t("form.runner.started", { id: process.id }));
     } catch (error) {
       setSubmitStatus("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Surec baslatilamadi.");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.runner.startFailed"));
     }
   }
 
@@ -108,39 +129,34 @@ export function FormRunnerDraft() {
     setErrors({});
     setSubmitStatus("idle");
     setSubmitResult(null);
-    setMessage("Form temizlendi.");
+    setMessage(t("form.runner.cleared"));
   }
 
   return (
     <section className="runner-section">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Formu Baslat</span>
-          <h2>Dinamik veri girisi</h2>
+          <span className="eyebrow">{t("form.runner.eyebrow")}</span>
+          <h2>{t("form.runner.title")}</h2>
         </div>
-        <p>Demo akisi: form sec, alanlari doldur, validation hatalarini gor, RequiredWhen kosulunu tetikle ve process start payload ciktisini kontrol et.</p>
+        <p>{t("form.runner.description")}</p>
       </div>
 
       <div className="runner-grid">
         <form className="runner-form" onSubmit={handleSubmit}>
-          {loadStatus === "loading" ? (
-            <div className="runner-state-panel" aria-live="polite">
-              <strong>Formlar yukleniyor</strong>
-              <span>Kayitli form definition listesi API uzerinden okunuyor. Birazdan form secimi hazir olacak.</span>
-            </div>
-          ) : null}
+          {loadStatus === "loading" ? <FormRunnerSkeleton language={language} /> : null}
 
           {loadStatus === "error" ? (
             <div className="runner-state-panel runner-state-error" role="alert">
-              <strong>Form listesi yuklenemedi</strong>
+              <strong>{t("form.runner.loadFailed")}</strong>
               <span>{message}</span>
             </div>
           ) : null}
 
           {loadStatus === "idle" && !hasForms ? (
             <div className="runner-state-panel">
-              <strong>Kayitli form yok</strong>
-              <span>Demo icin once Form Tasarimi ekraninda bir form kaydet; sonra burada secip doldurabilirsin.</span>
+              <strong>{t("form.runner.noSavedForm")}</strong>
+              <span>{t("form.runner.noFormPrompt")}</span>
             </div>
           ) : null}
 
@@ -150,7 +166,8 @@ export function FormRunnerDraft() {
           </div>
 
           <label>
-            Kayitli form            <select
+            {t("form.runner.savedForm")}
+            <select
               disabled={loadStatus !== "idle" || !hasForms || submitStatus === "submitting"}
               value={selectedFormId}
               onChange={(event) => {
@@ -160,10 +177,10 @@ export function FormRunnerDraft() {
                 setErrors({});
                 setSubmitStatus("idle");
                 setSubmitResult(null);
-                setMessage(nextForm ? `${nextForm.name} secildi.` : "Form secimi temizlendi.");
+                setMessage(nextForm ? `${nextForm.name} secildi.` : t("form.runner.noSavedForm"));
               }}
             >
-              {forms.length === 0 ? <option value="">Kayitli form yok</option> : null}
+              {forms.length === 0 ? <option value="">{t("form.runner.noSavedForm")}</option> : null}
               {forms.map((form) => (
                 <option key={form.id} value={form.id}>
                   {form.name}
@@ -177,20 +194,25 @@ export function FormRunnerDraft() {
               <span className="eyebrow">1. Secili form</span>
               <strong>{selectedForm.name}</strong>
               <span>
-                {sortedFields.length} alan - {selectedForm.description || "Aciklama yok"} - RequiredWhen kurallari varsa kosul saglandiginda alan bazinda hata gorunur.
+                {sortedFields.length} alan - {selectedForm.description || "Aciklama yok"} - RequiredWhen kurallari varsa kosul
+                saglandiginda alan bazinda hata gorunur.
               </span>
             </div>
           ) : null}
 
-          {sortedFields.map((field) => (
-            <FieldRenderer
-              key={field.key}
-              field={field}
-              value={values[field.key]}
-              error={errors[field.key]}
-              onChange={handleChange}
-            />
-          ))}
+          {loadStatus !== "loading" && !selectedForm ? <p className="empty-state">{t("form.runner.noFormPrompt")}</p> : null}
+
+          {loadStatus !== "loading" &&
+            sortedFields.map((field) => (
+              <FieldRenderer
+                key={field.key}
+                field={field}
+                value={values[field.key]}
+                error={errors[field.key]}
+                language={language}
+                onChange={handleChange}
+              />
+            ))}
 
           {errorCount > 0 ? (
             <div className="runner-state-panel runner-state-error" role="alert">
@@ -213,11 +235,11 @@ export function FormRunnerDraft() {
           <div className="runner-actions">
             <button className="primary-button" disabled={!selectedForm || submitStatus === "submitting"} type="submit">
               <Play size={18} />
-              {submitStatus === "submitting" ? "Baslatiliyor" : "Surec baslat"}
+              {submitStatus === "submitting" ? t("form.runner.starting") : t("form.runner.startProcess")}
             </button>
             <button className="secondary-button" disabled={!selectedForm || submitStatus === "submitting"} type="button" onClick={resetForm}>
               <RotateCcw size={18} />
-              Temizle
+              {t("form.runner.clear")}
             </button>
           </div>
         </form>
@@ -225,10 +247,21 @@ export function FormRunnerDraft() {
         <div className="runner-preview-panel">
           <div>
             <span className="eyebrow">5. Process start payload</span>
-            <h3>APIye gonderilecek submitted form data JSON</h3>`n          </div>
+            <h3>APIye gonderilecek submitted form data JSON</h3>
+          </div>
           <pre className="json-preview runner-output">{JSON.stringify(output, null, 2)}</pre>
         </div>
       </div>
     </section>
+  );
+}
+
+function FormRunnerSkeleton({ language }: { language: "tr" | "en" }) {
+  return (
+    <div className="form-skeleton" aria-label={translate(language, "form.runner.skeleton")}>
+      <span />
+      <span />
+      <span />
+    </div>
   );
 }

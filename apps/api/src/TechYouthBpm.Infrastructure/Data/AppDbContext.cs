@@ -14,13 +14,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<ProcessInstance> ProcessInstances => Set<ProcessInstance>();
     public DbSet<ProcessTask> ProcessTasks => Set<ProcessTask>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<SystemAuditLog> SystemAuditLogs => Set<SystemAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ConfigureSqliteGuidConversion(modelBuilder);
 
         modelBuilder.Entity<User>().HasIndex(user => user.Username).IsUnique();
-        modelBuilder.Entity<UserSession>().HasKey(session => session.Token);
+        modelBuilder.Entity<User>().HasIndex(user => user.Email).IsUnique();
+        modelBuilder.Entity<UserSession>().HasKey(session => session.Id);
+        modelBuilder.Entity<UserSession>().HasIndex(session => session.Token).IsUnique();
+
+        modelBuilder.Entity<FormDefinition>()
+            .HasOne(form => form.UpdatedByUser)
+            .WithMany()
+            .HasForeignKey(form => form.UpdatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<FormDefinition>()
             .HasMany(form => form.Fields)
@@ -45,6 +54,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithOne(log => log.ProcessInstance)
             .HasForeignKey(log => log.ProcessInstanceId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SystemAuditLog>()
+            .HasOne(log => log.ActorUser)
+            .WithMany()
+            .HasForeignKey(log => log.ActorUserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 
     private void ConfigureSqliteGuidConversion(ModelBuilder modelBuilder)

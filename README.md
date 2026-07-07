@@ -65,11 +65,65 @@ Backend varsayilan olarak SQLite kullanir:
   "Database": {
     "Provider": "Sqlite"
   },
+  "Auth": {
+    "SessionDurationMinutes": 120,
+    "RememberMeDurationMinutes": 43200,
+    "MaxFailedLoginAttempts": 5,
+    "LockoutMinutes": 10,
+    "EmailVerificationMinutes": 1440,
+    "EmailVerificationResendCooldownMinutes": 5,
+    "RateLimitPermitLimit": 10,
+    "RateLimitWindowMinutes": 1
+  },
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=techyouth-bpm.db"
   }
 }
 ```
+
+`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` beni-hatirla secenegi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:EmailVerificationMinutes` e-posta dogrulama kodu gecerliligini, `Auth:EmailVerificationResendCooldownMinutes` yeniden kod gonderme bekleme suresini belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register endpointlerini sinirlar.
+
+Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
+
+Email verification varsayilan olarak `Demo` provider ile calisir. Bu modda OTP hashlenerek veritabanina yazilir ve demo kod UI'da gorunur. Kodlar varsayilan olarak 24 saat gecerlidir ve yeniden kod gonderme icin 5 dakikalik cooldown uygulanir. `Routing` provider kullanildiginda once guvenli allowlist'e bagli canli SMTP denenir; allowlist disindaki kullanicilar Mailtrap Sandbox'a yonlendirilir. Sandbox mail gercek Gmail/Outlook inbox'ina degil, Mailtrap Sandbox inbox'ina gider.
+
+Mailtrap kurulumunda takip edilecek ayarlar:
+
+```bash
+cd apps/api/src/TechYouthBpm.Api
+dotnet user-secrets set "Email:Provider" "Routing"
+dotnet user-secrets set "Email:FromAddress" "no-reply@techyouth.local"
+dotnet user-secrets set "Email:FromName" "TechYouth BPM"
+dotnet user-secrets set "Email:Smtp:Host" "live.smtp.mailtrap.io"
+dotnet user-secrets set "Email:Smtp:Port" "587"
+dotnet user-secrets set "Email:Smtp:Username" "api"
+dotnet user-secrets set "Email:Smtp:Password" "your-mailtrap-live-token"
+dotnet user-secrets set "Email:Smtp:EnableSsl" "true"
+dotnet user-secrets set "Email:AllowedRecipients" "your-test-email@example.com"
+dotnet user-secrets set "Email:AllowedUsernames" "your-test-username"
+dotnet user-secrets set "Email:Sandbox:FromAddress" "sandbox@techyouth.local"
+dotnet user-secrets set "Email:Sandbox:FromName" "TechYouth BPM Sandbox"
+dotnet user-secrets set "Email:Sandbox:Smtp:Host" "sandbox.smtp.mailtrap.io"
+dotnet user-secrets set "Email:Sandbox:Smtp:Port" "2525"
+dotnet user-secrets set "Email:Sandbox:Smtp:Username" "your-mailtrap-sandbox-username"
+dotnet user-secrets set "Email:Sandbox:Smtp:Password" "your-mailtrap-sandbox-password"
+dotnet user-secrets set "Email:Sandbox:Smtp:EnableSsl" "true"
+```
+
+Mailtrap Sandbox kullaniliyorsa `Email:Sandbox:*` degerleri Mailtrap projesindeki Sandbox inbox `SMTP` sekmesinden kopyalanir. Email Sending kullaniliyorsa canli SMTP icin Mailtrap'in verdigi host/token `Email:Smtp:*` key'lerine yazilir. Gercek username/password/token degerleri repo'ya commit edilmez.
+
+Gercek inbox'a test maili gondermek icin Mailtrap Email Sending tarafinda sending domain dogrulanmis olmalidir. Mailtrap'in SMTP orneklerinde gercek gonderim icin host genellikle `live.smtp.mailtrap.io`, port `587`, username `api`, password ise API token degeridir. Gercek teslim testinde guvenlik icin allowlist kullan:
+
+```bash
+dotnet user-secrets set "Email:Smtp:Host" "live.smtp.mailtrap.io"
+dotnet user-secrets set "Email:Smtp:Port" "587"
+dotnet user-secrets set "Email:Smtp:Username" "api"
+dotnet user-secrets set "Email:Smtp:Password" "your-mailtrap-api-token"
+dotnet user-secrets set "Email:AllowedRecipients" "ufukzkn08@gmail.com"
+dotnet user-secrets set "Email:AllowedUsernames" "ufukzkn"
+```
+
+Bu allowlist doluyken SMTP sender sadece `ufukzkn` kullanicisi ve `ufukzkn08@gmail.com` alicisi icin mail gonderir. Diger kullanicilar icin backend SMTP gonderimini reddeder.
 
 Takimla ortak PostgreSQL/Neon veritabani kullanmak icin provider ve connection string gizli olarak verilmelidir. Gercek connection string repo'ya commit edilmez.
 
@@ -90,6 +144,28 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=your-neon-ho
 
 Ornek format icin `apps/api/src/TechYouthBpm.Api/appsettings.example.json` dosyasi incelenebilir.
 
+Neon icin repo kokunde gitignored `.env.neon.local` dosyasi olusturulabilir:
+
+```text
+Database__Provider=PostgreSql
+ConnectionStrings__DefaultConnection=Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true;Channel Binding=Require
+Seed__MockData=true
+```
+
+Neon baglantisi ayri bir portta denenmek istenirse:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292
+```
+
+Script API'yi calistirdigin terminalde foreground olarak baslatir. API'yi durdurmak icin ayni terminalde `Ctrl+C` kullan.
+
+SQLite API ayni anda aciksa build dosyalari kilitlenebilir. Bu durumda mevcut build ile Neon'u baslatmak icin:
+
+```powershell
+./scripts/run-api-neon.ps1 -Url http://localhost:5292 -NoBuild
+```
+
 ## Run Locally
 
 Iki ayri terminal kullanmak en temiz yoldur.
@@ -98,6 +174,14 @@ Terminal 1 - API:
 
 ```powershell
 ./scripts/run-api-local.ps1
+```
+
+Script API'yi calistirdigin terminalde foreground olarak baslatir. API'yi durdurmak icin ayni terminalde `Ctrl+C` kullan.
+
+Script varsayilan olarak 120 dakikalik normal session kullanir. Timeout testini hizlandirmak icin:
+
+```powershell
+./scripts/run-api-local.ps1 -SessionDurationMinutes 1
 ```
 
 API ayaga kalkinca Swagger acilir:
@@ -112,6 +196,12 @@ SQLite ile local demo veritabanini sifirlamak icin:
 
 ```powershell
 ./scripts/run-api-local.ps1 -ResetDb
+```
+
+Identity veya schema alanlari degistiginde mevcut SQLite dosyasi yeni kolonlari otomatik alamayabilir. Boyle durumlarda local test icin reset onerilir:
+
+```powershell
+./scripts/run-api-local.ps1 -ResetDb -Force
 ```
 
 Sadece kullanicilarla baslamak ve mock surec/form verisini kapatmak icin:
@@ -133,6 +223,17 @@ Web uygulamasi:
 ```bash
 http://localhost:3000
 ```
+
+Ana workspace route'lari:
+
+- `http://localhost:3000/dashboard`
+- `http://localhost:3000/forms`
+- `http://localhost:3000/runner`
+- `http://localhost:3000/processes`
+- `http://localhost:3000/tasks`
+- `http://localhost:3000/users`
+- `http://localhost:3000/logs`
+- `http://localhost:3000/settings`
 
 ## Stop Local Servers
 
@@ -172,6 +273,10 @@ npm run build
 
 Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullanicilarla local fallback devreye girer; boylece UI gelistirmesi backend olmadan da devam edebilir.
 
+Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `PendingApproval` durumunda olusur. Admin, `Yonetim` ekranindan kullaniciyi `Active` yapabilir, rol atayabilir, gecici sifreyle yeni kullanici olusturabilir ve kullanici oturumlarini gorebilir/kapatabilir. Admin-created kullanicilar `MustChangePassword=true` baslar; normal workspace'e girmeden once zorunlu sifre degistirme ekranindan gecmek zorundadir. Manuel sifre secilmezse backend guclu bir gecici sifre uretir ve mail provider `Mailtrap`/`Smtp` ise kullaniciya e-posta ile gonderir. Admin, is akisi gecmisi olmayan test kullanicilarini silebilir; process/form/task/audit gecmisi olan kullanicilar icin backend silmeyi reddeder. `Ayarlar` ekraninda profil guncelleme, sifre degistirme, email verification OTP akisi, aktif oturumlar, tek oturum kapatma ve tum cihazlardan cikis akisi denenebilir.
+
+Admin kullanicisi `Loglar` ekraninda sistem gecmisini arayabilir. Loglar varsayilan olarak toplu dokulmez; kisi, surec, entity veya aksiyon aramasi ile server-side paginated sonuc ve ilgili kronolojik gecmis gorulur. Bu liste register, login/logout, rol/status degisikligi, form create/update, process start ve task approve/reject gibi kritik aksiyonlari kullanici, entity ve zaman bilgisiyle takip eder. Surec detay ekranindaki audit timeline ise ilgili surecin state history bilgisini gosterir; sureci baslatan kullanici kendi surec gecmisini, Admin/Approver ise gorebildigi sureclerin gecmisini inceleyebilir.
+
 Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari ve audit log ornekleriyle gelir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
 
 ## Current Demo Flow
@@ -179,9 +284,10 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 1. Login ol.
 2. Role gore menu ve dashboard'u gor.
 3. Admin kullanicisiyle seeded formlari ve dashboard metriklerini incele.
-4. Form runner ekraninda seeded bir form secip yeni surec baslat.
-5. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
-6. Surec detayinda JSON veri ve audit log mantigini incele.
+4. Form tasarimi ekraninda kayitli bir formu sec, alan modelini duzenle ve guncelle.
+5. Form runner ekraninda seeded veya guncellenmis bir form secip yeni surec baslat.
+6. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
+7. Surec detayinda JSON veri ve audit log mantigini incele.
 
 ## Troubleshooting
 
@@ -201,3 +307,7 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 - `docs/06-team-presentation-split.md`
 - `docs/07-product-todo.md`
 - `docs/08-local-database.md`
+- `docs/09-ozgun-form-flow.md`
+- `docs/10-ufuk-access-shell-flow.md`
+- `docs/11-i18n-language-support.md`
+- `docs/12-cagdas-process-flow.md`

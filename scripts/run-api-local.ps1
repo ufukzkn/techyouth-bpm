@@ -1,5 +1,9 @@
 param(
     [string]$Url = "http://localhost:5291",
+    [int]$SessionDurationMinutes = 120,
+    [int]$RememberMeDurationMinutes = 43200,
+    [int]$MaxFailedLoginAttempts = 5,
+    [int]$LockoutMinutes = 10,
     [switch]$ResetDb,
     [switch]$Force,
     [switch]$SkipMockData
@@ -35,6 +39,10 @@ if ($ResetDb) {
 
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:Database__Provider = "Sqlite"
+$env:Auth__SessionDurationMinutes = "$SessionDurationMinutes"
+$env:Auth__RememberMeDurationMinutes = "$RememberMeDurationMinutes"
+$env:Auth__MaxFailedLoginAttempts = "$MaxFailedLoginAttempts"
+$env:Auth__LockoutMinutes = "$LockoutMinutes"
 $env:Seed__MockData = if ($SkipMockData) { "false" } else { "true" }
 $Host.UI.RawUI.WindowTitle = "TechYouth BPM API"
 
@@ -42,4 +50,8 @@ Set-Location $apiRoot
 Write-Host "Starting API with SQLite at $Url"
 Write-Host "The database is created and seeded on API startup if it does not exist."
 Write-Host "Mock workflow data: $($env:Seed__MockData)"
+Write-Host "Session duration: $SessionDurationMinutes minute(s)"
+Write-Host "Remember-me duration: $RememberMeDurationMinutes minute(s)"
+Write-Host "Failed login lockout: $MaxFailedLoginAttempts attempt(s), $LockoutMinutes minute(s)"
+Write-Host "Stop with Ctrl+C in this terminal."
 dotnet run --project src/TechYouthBpm.Api --urls $Url

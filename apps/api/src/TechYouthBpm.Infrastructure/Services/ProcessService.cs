@@ -14,7 +14,8 @@ namespace TechYouthBpm.Infrastructure.Services;
 public class ProcessService(
     AppDbContext db,
     IFormService formService,
-    ProcessStateMachine stateMachine) : IProcessService
+    ProcessStateMachine stateMachine,
+    ISystemAuditService auditService) : IProcessService
 {
     public async Task<IReadOnlyList<ProcessSummaryDto>> ListAsync(UserDto user, CancellationToken cancellationToken = default)
     {
@@ -107,6 +108,13 @@ public class ProcessService(
 
         db.ProcessInstances.Add(process);
         await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user,
+            "Process.Started",
+            "ProcessInstance",
+            process.Id.ToString(),
+            $"Process was started from form '{form.Name}'.",
+            cancellationToken);
 
         var saved = await GetAsync(process.Id, user, cancellationToken);
         return Result<ProcessDetailDto>.Success(saved!);

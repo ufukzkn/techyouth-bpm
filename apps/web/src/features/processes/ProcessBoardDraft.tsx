@@ -1,8 +1,13 @@
 "use client";
 
-import { CheckCircle2, CircleDot, RefreshCw, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
+import { MyTasksView } from "@/features/processes/MyTasksView";
+import { ProcessDetailPanel } from "@/features/processes/ProcessDetailPanel";
+import { ProcessListView } from "@/features/processes/ProcessListView";
 import { useSessionStore } from "@/features/session/sessionStore";
+import { actionLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { api, ApiError } from "@/lib/api";
 import type { ProcessDetail, ProcessSummary, ProcessTask, Role, WorkflowAction } from "@/lib/types";
 
@@ -11,27 +16,54 @@ type ProcessBoardDraftProps = {
   role: Role;
 };
 
+const minimumRefreshDelayMs = 500;
+
 export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
   const token = useSessionStore((state) => state.token);
+  const language = useSessionStore((state) => state.language);
+  const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [tasks, setTasks] = useState<ProcessTask[]>([]);
   const [selectedProcessId, setSelectedProcessId] = useState("");
   const [detail, setDetail] = useState<ProcessDetail | null>(null);
-  const [status, setStatus] = useState<"loading" | "idle" | "acting" | "error">("loading");
-  const [message, setMessage] = useState("Surec verileri yukleniyor.");
+  const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "acting" | "error">("loading");
+  const [message, setMessage] = useState(() => t("process.loading"));
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
-  const openTasks = useMemo(() => tasks.filter((task) => task.status === "Open"), [tasks]);
-
-  async function refreshData(nextSelectedProcessId = selectedProcessId) {
-    if (!token) {
-      setStatus("error");
-      setMessage("Surecleri listelemek icin API oturumu gerekli.");
+  useEffect(() => {
+    if (!toast) {
       return;
     }
 
+    const timer = window.setTimeout(() => setToast(null), 3600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  async function refreshData(nextSelectedProcessId = selectedProcessId, options: { manual?: boolean } = {}) {
+    if (!token) {
+      setStatus("error");
+      setMessage(t("process.sessionRequired"));
+      setToast({ kind: "error", text: t("process.toastSessionRequired") });
+      return;
+    }
+
+    const isManualRefresh = options.manual === true;
+    const refreshStartedAt = Date.now();
+
     try {
       await Promise.resolve();
-      setStatus("loading");
+      const hasVisibleData = processes.length > 0 || tasks.length > 0 || detail !== null;
+
+      if (isManualRefresh) {
+        setIsManualRefreshing(true);
+        setStatus("refreshing");
+        setMessage(t("process.refreshing"));
+      } else if (!hasVisibleData) {
+        setStatus("loading");
+        setMessage(t("process.loading"));
+      }
+
       const [processResult, taskResult] = await Promise.all([api.listProcesses(token), api.listMyTasks(token)]);
       const nextSelected = nextSelectedProcessId || processResult[0]?.id || "";
 
@@ -46,10 +78,23 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
       }
 
       setStatus("idle");
-      setMessage(processResult.length > 0 ? "Surecler SQLite veritabanindan yuklendi." : "Henuz surec yok.");
+      setMessage(processResult.length > 0 ? t("process.loaded") : t("process.empty"));
+      if (isManualRefresh) {
+        await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
+        setIsManualRefreshing(false);
+        setToast({ kind: "success", text: t("process.toastRefreshed") });
+      }
     } catch (error) {
+      if (isManualRefresh) {
+        await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
+        setIsManualRefreshing(false);
+      }
       setStatus("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Surecler yuklenemedi.");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.loadFailed"));
+      setToast({
+        kind: "error",
+        text: error instanceof ApiError ? t("process.toastRefreshFailed") : t("process.toastUnexpectedRefreshFailed"),
+      });
     }
   }
 
@@ -57,7 +102,7 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshData("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, language]);
 
   async function selectProcess(id: string) {
     if (!token) {
@@ -68,178 +113,118 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
       setSelectedProcessId(id);
       setDetail(await api.getProcess(token, id));
       setStatus("idle");
-      setMessage("Surec detayi yuklendi.");
+      setMessage(t("process.detailLoaded"));
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Surec detayi yuklenemedi.");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.detailFailed"));
     }
   }
 
-  async function executeTask(taskId: string, action: Exclude<WorkflowAction, "Start">) {
+  async function executeTask(taskId: string, action: Exclude<WorkflowAction, "Start">, note: string) {
     if (!token) {
       return;
     }
 
     try {
       setStatus("acting");
-      const updated = await api.executeTaskAction(token, taskId, {
-        action,
-        note: action === "Approve" ? "UI uzerinden onaylandi." : "UI uzerinden reddedildi.",
-      });
+      const updated = await api.executeTaskAction(token, taskId, { action, note });
       setDetail(updated);
       await refreshData(updated.id);
-      setMessage(`${action === "Approve" ? "Onay" : "Red"} aksiyonu kaydedildi.`);
+      setMessage(t("process.actionSaved", { action: actionLabel(language, action) }));
+      setToast({ kind: "success", text: t("process.toastActionSaved") });
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : "Task aksiyonu tamamlanamadi.");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.taskActionFailed"));
+      setToast({ kind: "error", text: t("process.taskActionFailed") });
     }
   }
+
+  const isRefreshing = isManualRefreshing;
+  const isInitialLoading = status === "loading" && processes.length === 0 && tasks.length === 0 && !detail;
+  const isRefreshButtonDisabled = isInitialLoading || isManualRefreshing || status === "acting";
 
   return (
     <section className="process-section">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">{mode === "tasks" ? "Islerim" : "Surecler"}</span>
-          <h2>{mode === "tasks" ? "Bekleyen task aksiyonlari" : "Surec takibi"}</h2>
+          <span className="eyebrow">{mode === "tasks" ? t("process.tasksEyebrow") : t("process.processesEyebrow")}</span>
+          <h2>{mode === "tasks" ? t("process.tasksTitle") : t("process.processesTitle")}</h2>
         </div>
-        <p>Surecler, tasklar ve audit log backend state machine uzerinden SQLite veritabanina kaydedilir.</p>
+        <p>{t("process.description")}</p>
       </div>
 
       <div className="section-toolbar">
-        <p className={`status-line status-line-${status}`}>{message}</p>
-        <button className="secondary-button" disabled={status === "loading"} type="button" onClick={() => refreshData()}>
-          <RefreshCw size={17} />
-          Yenile
+        <p className={`status-line status-line-${status}`} aria-live="polite">
+          {message}
+        </p>
+        <button
+          className="secondary-button refresh-button"
+          disabled={isRefreshButtonDisabled}
+          type="button"
+          onClick={() => refreshData(selectedProcessId, { manual: true })}
+        >
+          <RefreshCw className={isRefreshing ? "spin-icon" : undefined} size={17} />
+          {isRefreshing ? t("common.refreshing") : t("common.refresh")}
         </button>
       </div>
 
-      <div className="process-grid">
-        {mode === "processes" ? (
-          <article className="process-card">
-            <div className="process-card-header">
-              <div>
-                <span className="eyebrow">Surec listesi</span>
-                <strong>{processes.length} kayit</strong>
-              </div>
-              <CircleDot size={22} />
-            </div>
+      <div className={isRefreshing ? "process-grid is-refreshing" : "process-grid"}>
+        {isInitialLoading ? (
+          <ProcessBoardSkeleton mode={mode} />
+        ) : (
+          <>
+            {mode === "processes" ? (
+              <ProcessListView
+                processes={processes}
+                language={language}
+                selectedProcessId={selectedProcessId}
+                onSelectProcess={selectProcess}
+              />
+            ) : null}
 
-            {processes.length === 0 ? (
-              <p className="empty-state">Henuz baslatilmis surec yok.</p>
-            ) : (
-              <div className="process-list">
-                {processes.map((process) => (
-                  <button
-                    className={process.id === selectedProcessId ? "process-list-item active" : "process-list-item"}
-                    key={process.id}
-                    onClick={() => selectProcess(process.id)}
-                    type="button"
-                  >
-                    <span>
-                      <strong>{process.formName}</strong>
-                      <small>{new Date(process.startedAt).toLocaleString("tr-TR")}</small>
-                    </span>
-                    <StatusBadge status={process.status} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </article>
-        ) : null}
+            {mode === "tasks" ? (
+              <MyTasksView
+                tasks={tasks}
+                language={language}
+                role={role}
+                status={status}
+                onExecuteTask={executeTask}
+              />
+            ) : null}
 
-        <article className="process-card">
-          <div className="process-card-header">
-            <div>
-              <span className="eyebrow">Islerim</span>
-              <strong>{openTasks.length} acik is</strong>
-            </div>
-            <CircleDot size={22} />
-          </div>
-
-          {openTasks.length > 0 ? (
-            <div className="task-list">
-              {openTasks.map((task) => (
-                <div className="task-item" key={task.id}>
-                  <div>
-                    <strong>Surec onayi</strong>
-                    <span>
-                      {task.id.slice(0, 8)} - {task.assignedRole}
-                    </span>
-                  </div>
-                  <div className="task-actions">
-                    <button
-                      className="success-button"
-                      disabled={status === "acting"}
-                      onClick={() => executeTask(task.id, "Approve")}
-                      type="button"
-                    >
-                      <CheckCircle2 size={17} />
-                      Onayla
-                    </button>
-                    <button
-                      className="danger-button"
-                      disabled={status === "acting"}
-                      onClick={() => executeTask(task.id, "Reject")}
-                      type="button"
-                    >
-                      <XCircle size={17} />
-                      Reddet
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="empty-state">{role} rolu icin acik is bulunmuyor.</p>
-          )}
-        </article>
-
-        <article className="process-card">
-          <div className="process-card-header">
-            <div>
-              <span className="eyebrow">Surec detayi</span>
-              <strong>{detail?.formName ?? "Secili surec yok"}</strong>
-            </div>
-            {detail ? <StatusBadge status={detail.status} /> : null}
-          </div>
-          {detail ? (
-            <>
-              <dl className="detail-list">
-                <div>
-                  <dt>Baslangic</dt>
-                  <dd>{new Date(detail.startedAt).toLocaleString("tr-TR")}</dd>
-                </div>
-                <div>
-                  <dt>Durum</dt>
-                  <dd>{detail.status}</dd>
-                </div>
-              </dl>
-              <pre className="json-preview compact-json">{JSON.stringify(detail.formData, null, 2)}</pre>
-            </>
-          ) : (
-            <p className="empty-state">Detay goruntulemek icin bir surec sec.</p>
-          )}
-        </article>
-
-        <article className="process-card audit-card">
-          <span className="eyebrow">Audit Log</span>
-          {detail && detail.auditLogs.length > 0 ? (
-            <ol>
-              {detail.auditLogs.map((item) => (
-                <li key={item.id}>
-                  {item.action}: {item.fromStatus} - {item.toStatus}
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="empty-state">Audit kaydi yok.</p>
-          )}
-        </article>
+            <ProcessDetailPanel detail={detail} language={language} />
+          </>
+        )}
       </div>
+
+      {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
     </section>
   );
 }
 
-function StatusBadge({ status }: { status: ProcessSummary["status"] }) {
-  return <span className={`status-badge status-${status.toLowerCase()}`}>{status}</span>;
+function waitForMinimumDelay(startedAt: number, minimumDelayMs: number) {
+  const remainingMs = minimumDelayMs - (Date.now() - startedAt);
+  return remainingMs > 0 ? new Promise((resolve) => window.setTimeout(resolve, remainingMs)) : Promise.resolve();
+}
+
+function ProcessBoardSkeleton({ mode }: { mode: "processes" | "tasks" }) {
+  const language = useSessionStore((state) => state.language);
+  const label = translate(language, mode === "tasks" ? "process.skeletonTasks" : "process.skeletonProcesses");
+
+  return (
+    <>
+      <article className="process-card process-skeleton" aria-label={label}>
+        <span />
+        <span />
+        <span />
+        <span />
+      </article>
+      <article className="process-card process-skeleton" aria-label={translate(language, "process.skeletonDetail")}>
+        <span />
+        <span />
+        <span />
+        <span />
+      </article>
+    </>
+  );
 }

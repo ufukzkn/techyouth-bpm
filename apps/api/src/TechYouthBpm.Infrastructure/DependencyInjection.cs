@@ -34,9 +34,23 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IOtpService, OtpService>();
+        services.AddScoped<IEmailSender>(_ =>
+        {
+            var emailProvider = configuration["Email:Provider"] ?? "Demo";
+            return emailProvider.Trim().ToLowerInvariant() switch
+            {
+                "smtp" or "mailtrap" => new SmtpEmailSender(configuration),
+                "routing" => new RoutingEmailSender(configuration),
+                "demo" => new DemoEmailSender(),
+                _ => throw new InvalidOperationException(
+                    $"Unsupported email provider '{emailProvider}'. Use 'Demo', 'Smtp', 'Mailtrap' or 'Routing'.")
+            };
+        });
         services.AddScoped<IFormService, FormService>();
         services.AddScoped<IProcessService, ProcessService>();
         services.AddScoped<ITaskService, TaskService>();
+        services.AddScoped<ISystemAuditService, SystemAuditService>();
         services.AddSingleton<ProcessStateMachine>();
 
         return services;

@@ -1,10 +1,15 @@
 export type Role = "Admin" | "User" | "Approver";
+export type UserStatus = "PendingApproval" | "Active" | "Rejected";
 
 export type User = {
   id: string;
   username: string;
   displayName: string;
+  email: string;
   role: Role;
+  status: UserStatus;
+  isEmailVerified: boolean;
+  mustChangePassword: boolean;
 };
 
 export type LoginResponse = {
@@ -13,7 +18,63 @@ export type LoginResponse = {
   expiresAt: string;
 };
 
+export type RegisterResponse = {
+  id: string;
+  username: string;
+  email: string;
+  status: UserStatus;
+};
+
+export type UserAdmin = User & {
+  failedLoginCount: number;
+  lockedUntil?: string | null;
+  createdAt: string;
+};
+
+export type PagedResult<T> = {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+};
+
+export type UserSession = {
+  id: string;
+  createdAt: string;
+  expiresAt: string;
+  lastSeenAt?: string | null;
+  isCurrent: boolean;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+};
+
+export type UpdateProfileRequest = {
+  displayName: string;
+  email: string;
+};
+
+export type ChangePasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type CreateUserAdminRequest = {
+  username: string;
+  displayName: string;
+  email: string;
+  role: Role;
+  status: UserStatus;
+  temporaryPassword: string;
+};
+
+export type EmailVerificationStartResponse = {
+  message: string;
+  demoCode: string;
+  expiresAt: string;
+};
+
 export type ThemeMode = "light" | "dark";
+export type Language = "tr" | "en";
 
 export type FieldType = "Text" | "Number" | "Email" | "Select" | "Checkbox" | "Date";
 
@@ -71,9 +132,34 @@ export type AuditLog = {
   action: WorkflowAction;
   fromStatus: ProcessStatus;
   toStatus: ProcessStatus;
+  userId: string;
   userDisplayName: string;
+  userUsername: string;
   createdAt: string;
   note: string;
+};
+
+export type SystemAuditLog = {
+  id: string;
+  actorUserId?: string | null;
+  actorDisplayName: string;
+  actorUsername: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  description: string;
+  createdAt: string;
+  entityDisplayName?: string | null;
+  entityUsername?: string | null;
+};
+
+export type SystemAuditCategoryCounts = {
+  all: number;
+  identity: number;
+  access: number;
+  forms: number;
+  processes: number;
+  tasks: number;
 };
 
 export type ProcessSummary = {

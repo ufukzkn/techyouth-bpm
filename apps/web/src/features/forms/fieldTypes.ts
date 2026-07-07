@@ -1,4 +1,6 @@
 import type { FieldType, FormFieldDefinition } from "@/lib/types";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
+import type { Language } from "@/lib/types";
 
 export const supportedFieldTypes = ["Text", "Number", "Email", "Select", "Checkbox", "Date"] as const satisfies readonly FieldType[];
 
@@ -11,12 +13,16 @@ export const fieldTypeLabels: Record<FieldType, string> = {
   Date: "Date",
 };
 
-export function fieldTypeUsesOptions(fieldType: FieldType) {
-  return fieldType === "Select" || fieldType === "Checkbox";
+export function fieldTypeLabel(language: Language, fieldType: FieldType) {
+  return translate(language, `form.type.${fieldType}` as TranslationKey);
 }
 
-export function createDefaultOptions(fieldType: FieldType) {
-  return fieldTypeUsesOptions(fieldType) ? ["Secenek A"] : [];
+export function fieldTypeUsesOptions(fieldType: FieldType) {
+  return fieldType === "Select";
+}
+
+export function createDefaultOptions(fieldType: FieldType, language: Language = "tr") {
+  return fieldTypeUsesOptions(fieldType) ? [translate(language, "form.defaultOption")] : [];
 }
 
 export function createFieldKey(label: string, fallbackIndex: number) {
@@ -35,22 +41,24 @@ export function createDefaultField({
   type,
   required,
   sortOrder,
+  language = "tr",
 }: {
   label: string;
   type: FieldType;
   required: boolean;
   sortOrder: number;
+  language?: Language;
 }): Omit<FormFieldDefinition, "id"> {
   const trimmedLabel = label.trim();
   const key = createFieldKey(trimmedLabel, sortOrder);
 
   return {
     key,
-    label: trimmedLabel || `Alan ${sortOrder}`,
+    label: trimmedLabel || translate(language, "form.defaultField", { sortOrder }),
     type,
     required,
     sortOrder,
-    options: createDefaultOptions(type),
+    options: createDefaultOptions(type, language),
     validationRules: [],
   };
 }

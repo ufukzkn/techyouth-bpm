@@ -45,4 +45,17 @@ public class FormsController(IFormService formService, IAuthService authService)
         var result = await formService.CreateAsync(request, user, cancellationToken);
         return result.IsSuccess ? CreatedAtAction(nameof(Get), new { id = result.Value!.Id }, result.Value) : ValidationProblem(result.Errors);
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, CreateFormRequest request, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await formService.UpdateAsync(id, request, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
 }

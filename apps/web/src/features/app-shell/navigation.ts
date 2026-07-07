@@ -1,50 +1,80 @@
-import { ClipboardList, FilePlus2, LayoutDashboard, Settings, Workflow } from "lucide-react";
+import { ClipboardList, FilePlus2, History, LayoutDashboard, Settings, UserCog, Workflow } from "lucide-react";
+import type { TranslationKey } from "@/features/i18n/translations";
 import type { Role } from "@/lib/types";
 
-export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "settings";
+export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "users" | "logs" | "settings";
 
 export type NavItem = {
-  label: string;
+  labelKey: TranslationKey;
   viewId: ViewId;
+  path: string;
   icon: typeof LayoutDashboard;
   roles: Role[];
 };
 
 export const navItems: NavItem[] = [
   {
-    label: "Dashboard",
+    labelKey: "nav.dashboard",
     viewId: "dashboard",
+    path: "/dashboard",
     icon: LayoutDashboard,
     roles: ["Admin", "User", "Approver"],
   },
   {
-    label: "Form Tasarimi",
+    labelKey: "nav.forms",
     viewId: "forms",
+    path: "/forms",
     icon: FilePlus2,
     roles: ["Admin"],
   },
   {
-    label: "Form Baslat",
+    labelKey: "nav.runner",
     viewId: "runner",
+    path: "/runner",
     icon: FilePlus2,
     roles: ["Admin", "User"],
   },
   {
-    label: "Surecler",
+    labelKey: "nav.processes",
     viewId: "processes",
+    path: "/processes",
     icon: Workflow,
     roles: ["Admin", "User", "Approver"],
   },
   {
-    label: "Islerim",
+    labelKey: "nav.tasks",
     viewId: "tasks",
+    path: "/tasks",
     icon: ClipboardList,
     roles: ["Admin", "Approver"],
   },
   {
-    label: "Ayarlar",
+    labelKey: "nav.users",
+    viewId: "users",
+    path: "/users",
+    icon: UserCog,
+    roles: ["Admin"],
+  },
+  {
+    labelKey: "nav.logs",
+    viewId: "logs",
+    path: "/logs",
+    icon: History,
+    roles: ["Admin"],
+  },
+  {
+    labelKey: "nav.settings",
     viewId: "settings",
+    path: "/settings",
     icon: Settings,
     roles: ["Admin", "User", "Approver"],
   },
 ];
+
+export function getNavItemByPath(pathname: string) {
+  return navItems.find((item) => item.path === pathname || (pathname === "/" && item.viewId === "dashboard"));
+}
+
+export function getNavItemByView(viewId: ViewId) {
+  return navItems.find((item) => item.viewId === viewId);
+}

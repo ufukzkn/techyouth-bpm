@@ -8,5 +8,8 @@ public class FormDefinition
     public Guid CreatedByUserId { get; set; }
     public User? CreatedByUser { get; set; }
     public DateTime CreatedAt { get; set; }
+    public Guid? UpdatedByUserId { get; set; }
+    public User? UpdatedByUser { get; set; }
+    public DateTime? UpdatedAt { get; set; }
     public List<FormFieldDefinition> Fields { get; set; } = [];
 }

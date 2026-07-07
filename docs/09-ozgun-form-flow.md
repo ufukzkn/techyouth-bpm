@@ -6,12 +6,13 @@ This document tracks Ozgun Saz's ownership area: Form Design and Form Run Flow. 
 
 ## Scope Boundary
 
-This work is frontend-focused. It uses the existing backend form definition and `RequiredWhen` validation model without changing backend process rules.
+This work is mostly form-flow focused. It uses the existing backend form definition and `RequiredWhen` validation model without changing backend process rules.
 
 The scope includes:
 
 - Form designer behavior.
 - Form definition JSON shape.
+- Form definition create/update API behavior.
 - Field type metadata.
 - Shared field rendering.
 - Frontend validation helpers.
@@ -34,11 +35,14 @@ The scope includes:
 - Made the process-start payload easier to inspect as `formDefinitionId` plus `formData`.
 - Added presentation-oriented UI copy and scoped layout polish for the designer and runner.
 - Ran a manual demo check through the local API for login, form creation, dependent validation, email validation and successful process start.
+- Added `PUT /api/forms/{id}` so saved form definitions can be edited after creation.
+- Added form designer loading for saved forms, with create/update behavior behind the same save control.
 - Kept backend, login/session, dashboard, app shell, process/task and audit behavior out of scope.
 
 ## Current Form Designer Capabilities
 
 - Admin users can create a form definition model.
+- Admin users can load and update an existing form definition from the saved form selector.
 - Form name and description are editable.
 - Fields can be added, removed and reordered with drag/drop or move up/down controls.
 - Existing field `key`, `label`, `type` and `required` values can be edited.
@@ -54,6 +58,9 @@ The scope includes:
 - Dependent `RequiredWhen` rules can be configured per field without changing backend models.
 - The JSON preview reflects the same form model that is sent to the API, including ordering, options and validation rules.
 - UI guidance now shows the demo path: add fields, edit properties, manage options/rules, reorder, inspect JSON and save.
+- When a saved form is selected, save calls `PUT /api/forms/{id}`; otherwise save calls `POST /api/forms`.
+- The designer layout uses two control panels at the top, then a full-width field list on desktop. Field editors spread key, label, type and required controls across the available width, then collapse to fewer columns on smaller screens.
+- Checkbox controls are styled separately from text inputs so required toggles stay compact while still using the app accent color.
 
 ## Current Form Runner Capabilities
 
@@ -68,6 +75,7 @@ The scope includes:
 - Validated form data is sent to `POST /api/processes/start` through the existing API client.
 - Number values are converted before submit so they do not stay as plain strings when sent to the backend.
 - Checkbox values stay boolean in the submitted payload.
+- The form runner keeps the latest loaded form definitions in a lightweight client cache and uses skeleton rows on first load, preventing form fields from flashing empty during quick navigation.
 
 ## Validation Coverage
 
@@ -87,7 +95,7 @@ The manual API check confirmed:
 - Invalid email values are rejected.
 - A valid payload starts a process and returns `InProgress` process data.
 
-Backend validation remains the final source of truth when a process is started.
+Backend validation remains the final source of truth when a process is started. Backend form definition validation also protects create/update requests by requiring a name, at least one field, unique field keys and option values for option-based fields.
 
 ## Dependent Validation Behavior
 
@@ -138,6 +146,13 @@ Frontend form-flow files:
 - `apps/web/src/features/forms/formValues.ts`
 - `apps/web/src/app/globals.css`
 
+Backend form-flow files:
+
+- `apps/api/src/TechYouthBpm.Api/Controllers/FormsController.cs`
+- `apps/api/src/TechYouthBpm.Application/Services/IFormService.cs`
+- `apps/api/src/TechYouthBpm.Infrastructure/Services/FormService.cs`
+- `apps/api/tests/TechYouthBpm.Tests/Forms/FormServiceTests.cs`
+
 Documentation files:
 
 - `docs/01-agent-notes.md`
@@ -147,7 +162,6 @@ Documentation files:
 
 These areas were intentionally not changed:
 
-- Backend code.
 - Login/session flow.
 - Dashboard.
 - App shell behavior.
@@ -163,10 +177,13 @@ These areas were intentionally not changed:
 - Address any PR review feedback.
 - Run a short smoke test before final merge.
 - Check integration with the process/task/audit flow after the teammate-owned process/task/audit work is complete.
+- Decide whether form definitions should become immutable once processes are started. The current demo behavior updates the form definition in place so form editing is easy to demonstrate.
+- Prepare a demo scenario if needed, for example: if request type is purchase, approval note becomes required.
+- Do final documentation and final test verification.
 
 ## Verification
 
-The frontend checks passed after the form foundation, designer editing, dependent validation, runner state, drag/drop ordering and UI polish work:
+The frontend checks passed after the form foundation, designer editing, dependent validation, saved-form update, runner state, drag/drop ordering and UI polish work:
 
 ```bash
 cd apps/web
@@ -181,3 +198,9 @@ Manual local checks were also run against the API for:
 - `RequiredWhen` validation failure when the dependent field condition is met.
 - Email validation failure.
 - Successful process start with number and boolean payload values preserved.
+
+The backend checks also passed after adding form update tests:
+
+```bash
+dotnet test apps/api/TechYouthBpm.slnx
+```
