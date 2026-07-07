@@ -40,6 +40,8 @@ export function FormRunnerDraft() {
   const sortedFields = selectedForm?.fields.slice().sort((first, second) => first.sortOrder - second.sortOrder) ?? [];
   const errorCount = Object.keys(errors).length;
   const hasForms = forms.length > 0;
+  const isRunnerReady = Boolean(token) && loadStatus === "idle";
+  const isActionDisabled = !selectedForm || !isRunnerReady || submitStatus === "submitting";
 
   const output = {
     formDefinitionId: selectedFormId,
@@ -239,11 +241,11 @@ export function FormRunnerDraft() {
           <p className={`status-line status-line-${submitStatus}`}>{message}</p>
 
           <div className="runner-actions">
-            <button className="primary-button" disabled={!selectedForm || submitStatus === "submitting"} type="submit">
+            <button className="primary-button" disabled={isActionDisabled} type="submit">
               <Play size={18} />
               {submitStatus === "submitting" ? t("form.runner.starting") : t("form.runner.startProcess")}
             </button>
-            <button className="secondary-button" disabled={!selectedForm || submitStatus === "submitting"} type="button" onClick={resetForm}>
+            <button className="secondary-button" disabled={isActionDisabled} type="button" onClick={resetForm}>
               <RotateCcw size={18} />
               {t("form.runner.clear")}
             </button>
