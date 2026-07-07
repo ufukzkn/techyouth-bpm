@@ -1,7 +1,24 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, GripVertical, Plus, Save, Trash2 } from "lucide-react";
+import { type ReactNode, useMemo, useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   createDefaultField,
   createDefaultOptions,
@@ -69,6 +86,12 @@ export function FormDesignerDraft() {
   const [message, setMessage] = useState("Form henuz kaydedilmedi.");
   const fieldErrors = useMemo(() => validateDesignerFields(fields), [fields]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   const formModel = useMemo<CreateFormRequest>(
     () => ({
@@ -91,6 +114,26 @@ export function FormDesignerDraft() {
     }),
     [description, fields, formName],
   );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setFields((current) => {
+      const oldIndex = current.findIndex((field) => field.id === active.id);
+      const newIndex = current.findIndex((field) => field.id === over.id);
+
+      if (oldIndex < 0 || newIndex < 0) {
+        return current;
+      }
+
+      return normalizeSortOrder(arrayMove(current, oldIndex, newIndex));
+    });
+    markUnsaved();
+  }
 
   function addField() {
     const field = createDefaultField({
@@ -316,12 +359,12 @@ export function FormDesignerDraft() {
           <span className="eyebrow">Form Tasarimi</span>
           <h2>Dinamik form modeli</h2>
         </div>
-        <p>Alanlar UI tarafinda tasarlanir ve backend tarafinda form definition olarak saklanir.</p>
+        <p>Demo akisi: alan ekle, ozellikleri duzenle, option ve RequiredWhen kurallarini ayarla, sirala, JSON modelini kontrol et ve formu kaydet.</p>
       </div>
 
       <div className="designer-grid">
         <div className="tool-panel">
-          <h3>Form bilgisi</h3>
+          <h3>1. Form bilgisi</h3>
           <label>
             Form adi
             <input value={formName} onChange={(event) => setFormName(event.target.value)} />
@@ -336,10 +379,16 @@ export function FormDesignerDraft() {
           </button>
           {hasFieldErrors ? <p className="field-error">Alanlarda kaydetmeyi engelleyen hatalar var.</p> : null}
           <p className={`status-line status-line-${saveState}`}>{message}</p>
+          <ol className="demo-steps" aria-label="Form designer demo steps">
+            <li>Alan ekle ve key/label/type bilgisini duzenle.</li>
+            <li>Select veya checkbox alanlarinda option listesini yonet.</li>
+            <li>RequiredWhen ile kosullu zorunluluk kuralini tanimla.</li>
+            <li>Surukle veya ok butonlariyla sirala, JSON preview ile kontrol et.</li>
+          </ol>
         </div>
 
         <div className="tool-panel">
-          <h3>Alan ekle</h3>
+          <h3>2. Alan ekle</h3>
           <label>
             Etiket
             <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Alan etiketi" />
@@ -364,191 +413,245 @@ export function FormDesignerDraft() {
           </button>
         </div>
 
-        <div className="field-list" aria-label="Designed fields">
-          {fields.map((field, index) => (
-            <article className="field-card field-editor" key={field.id}>
-              <div className="field-editor-header">
-                <div>
-                  <strong>{field.label || "Etiketsiz alan"}</strong>
-                  <span>
-                    {field.key || "key yok"} - {field.type} - Sira {field.sortOrder}
-                  </span>
-                </div>
-                <div className="field-editor-actions">
-                  <button
-                    className="icon-button"
-                    disabled={index === 0}
-                    onClick={() => moveField(field.id, -1)}
-                    type="button"
-                    aria-label={`${field.label || field.key} yukari tasi`}
-                  >
-                    <ChevronUp size={17} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    disabled={index === fields.length - 1}
-                    onClick={() => moveField(field.id, 1)}
-                    type="button"
-                    aria-label={`${field.label || field.key} asagi tasi`}
-                  >
-                    <ChevronDown size={17} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    onClick={() => removeField(field.id)}
-                    type="button"
-                    aria-label={`${field.label || field.key} sil`}
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={fields.map((field) => field.id)} strategy={verticalListSortingStrategy}>
+            <div className="field-list" aria-label="Designed fields">
+              <div className="designer-help-panel">
+                <strong>3. Alanlari duzenle ve sirala</strong>
+                <span>Surukle tutamacini kullanarak sirala; klavye/fallback icin yukari-asagi butonlari da calisir.</span>
               </div>
-
-              <div className="field-editor-grid">
-                <label>
-                  Key
-                  <input value={field.key} onChange={(event) => updateField(field.id, { key: event.target.value })} />
-                  {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
-                </label>
-                <label>
-                  Etiket
-                  <input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />
-                  {fieldErrors[field.id]?.label ? (
-                    <span className="field-error">{fieldErrors[field.id]?.label}</span>
-                  ) : null}
-                </label>
-                <label>
-                  Tip
-                  <select value={field.type} onChange={(event) => updateFieldType(field.id, event.target.value as FieldType)}>
-                    {supportedFieldTypes.map((fieldType) => (
-                      <option key={fieldType} value={fieldType}>
-                        {fieldTypeLabels[fieldType]}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="checkbox-row field-required-toggle">
-                  <input checked={field.required} onChange={() => toggleRequired(field.id)} type="checkbox" />
-                  Zorunlu
-                </label>
-              </div>
-
-              {fieldTypeUsesOptions(field.type) ? (
-                <div className="option-editor">
-                  <div className="option-editor-header">
-                    <strong>Options</strong>
-                    <button className="secondary-button" type="button" onClick={() => addOption(field.id)}>
-                      <Plus size={16} />
-                      Option ekle
-                    </button>
-                  </div>
-                  {fieldErrors[field.id]?.options ? (
-                    <span className="field-error">{fieldErrors[field.id]?.options}</span>
-                  ) : null}
-                  <div className="option-list">
-                    {field.options.map((option, optionIndex) => (
-                      <div className="option-row" key={`${field.id}-${optionIndex}`}>
-                        <label>
-                          Label / value
-                          <input value={option} onChange={(event) => updateOption(field.id, optionIndex, event.target.value)} />
-                        </label>
-                        <button
-                          className="icon-button"
-                          type="button"
-                          onClick={() => removeOption(field.id, optionIndex)}
-                          aria-label={`${option || "option"} sil`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="rule-editor">
-                <div className="rule-editor-header">
-                  <div>
-                    <strong>Dependent validation</strong>
-                    <span>RequiredWhen: baska bir alan belirli degeri alinca bu alan zorunlu olur.</span>
-                  </div>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={getDependencyCandidates(fields, field).length === 0}
-                    onClick={() => addRequiredWhenRule(field.id)}
-                  >
-                    <Plus size={16} />
-                    Rule ekle
-                  </button>
-                </div>
-
-                {field.validationRules.length === 0 ? (
-                  <p className="empty-state">Bu alan icin dependent rule tanimli degil.</p>
-                ) : null}
-
-                <div className="rule-list">
-                  {field.validationRules.map((rule, ruleIndex) => {
-                    const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey);
-                    const candidates = getDependencyCandidates(fields, field);
-                    const ruleError = fieldErrors[field.id]?.rules?.[ruleIndex];
-
-                    return (
-                      <div className="rule-row" key={`${field.id}-rule-${ruleIndex}`}>
-                        <label>
-                          Bagli alan
-                          <select
-                            value={rule.dependsOnFieldKey}
-                            onChange={(event) => updateRuleDependency(field.id, ruleIndex, event.target.value)}
+              {fields.map((field, index) => (
+                <SortableFieldCard id={field.id} key={field.id}>
+                  {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
+                    <article className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}`}>
+                      <div className="field-editor-header">
+                        <div>
+                          <strong>{field.label || "Etiketsiz alan"}</strong>
+                          <span>
+                            {field.key || "key yok"} - {field.type} - Sira {field.sortOrder}
+                          </span>
+                        </div>
+                        <div className="field-editor-actions">
+                          <button
+                            className="drag-handle"
+                            type="button"
+                            ref={setActivatorNodeRef}
+                            aria-label={`${field.label || field.key} surukle ve sirala`}
+                            {...attributes}
+                            {...listeners}
                           >
-                            <option value="">Alan seciniz</option>
-                            {candidates.map((candidate) => (
-                              <option key={candidate.id} value={candidate.key.trim()}>
-                                {candidate.label || candidate.key}
+                            <GripVertical size={17} />
+                            <span>Surukle</span>
+                          </button>
+                          <button
+                            className="icon-button"
+                            disabled={index === 0}
+                            onClick={() => moveField(field.id, -1)}
+                            type="button"
+                            aria-label={`${field.label || field.key} yukari tasi`}
+                          >
+                            <ChevronUp size={17} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            disabled={index === fields.length - 1}
+                            onClick={() => moveField(field.id, 1)}
+                            type="button"
+                            aria-label={`${field.label || field.key} asagi tasi`}
+                          >
+                            <ChevronDown size={17} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            onClick={() => removeField(field.id)}
+                            type="button"
+                            aria-label={`${field.label || field.key} sil`}
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="field-editor-grid">
+                        <label>
+                          Key
+                          <input value={field.key} onChange={(event) => updateField(field.id, { key: event.target.value })} />
+                          {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
+                        </label>
+                        <label>
+                          Etiket
+                          <input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />
+                          {fieldErrors[field.id]?.label ? (
+                            <span className="field-error">{fieldErrors[field.id]?.label}</span>
+                          ) : null}
+                        </label>
+                        <label>
+                          Tip
+                          <select value={field.type} onChange={(event) => updateFieldType(field.id, event.target.value as FieldType)}>
+                            {supportedFieldTypes.map((fieldType) => (
+                              <option key={fieldType} value={fieldType}>
+                                {fieldTypeLabels[fieldType]}
                               </option>
                             ))}
                           </select>
                         </label>
-
-                        <ExpectedValueInput
-                          dependency={dependency}
-                          expectedValue={rule.expectedValue}
-                          onChange={(expectedValue) => updateRequiredWhenRule(field.id, ruleIndex, { expectedValue })}
-                        />
-
-                        <label>
-                          Mesaj
-                          <input
-                            value={rule.message}
-                            onChange={(event) => updateRequiredWhenRule(field.id, ruleIndex, { message: event.target.value })}
-                          />
+                        <label className="checkbox-row field-required-toggle">
+                          <input checked={field.required} onChange={() => toggleRequired(field.id)} type="checkbox" />
+                          Zorunlu
                         </label>
-
-                        <button
-                          className="icon-button"
-                          type="button"
-                          onClick={() => removeRequiredWhenRule(field.id, ruleIndex)}
-                          aria-label="Rule sil"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-
-                        {ruleError ? <span className="field-error rule-error">{ruleError}</span> : null}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
 
-        <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
+                      {fieldTypeUsesOptions(field.type) ? (
+                        <div className="option-editor">
+                          <div className="option-editor-header">
+                            <strong>Options</strong>
+                            <button className="secondary-button" type="button" onClick={() => addOption(field.id)}>
+                              <Plus size={16} />
+                              Option ekle
+                            </button>
+                          </div>
+                          {fieldErrors[field.id]?.options ? (
+                            <span className="field-error">{fieldErrors[field.id]?.options}</span>
+                          ) : null}
+                          <div className="option-list">
+                            {field.options.map((option, optionIndex) => (
+                              <div className="option-row" key={`${field.id}-${optionIndex}`}>
+                                <label>
+                                  Label / value
+                                  <input value={option} onChange={(event) => updateOption(field.id, optionIndex, event.target.value)} />
+                                </label>
+                                <button
+                                  className="icon-button"
+                                  type="button"
+                                  onClick={() => removeOption(field.id, optionIndex)}
+                                  aria-label={`${option || "option"} sil`}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="rule-editor">
+                        <div className="rule-editor-header">
+                          <div>
+                            <strong>Dependent validation</strong>
+                            <span>Demo: Talep tipi Satinalma olursa Onay aciklamasi zorunlu olur.</span>
+                          </div>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            disabled={getDependencyCandidates(fields, field).length === 0}
+                            onClick={() => addRequiredWhenRule(field.id)}
+                          >
+                            <Plus size={16} />
+                            Rule ekle
+                          </button>
+                        </div>
+
+                        {field.validationRules.length === 0 ? (
+                          <p className="empty-state">Bu alan icin dependent rule tanimli degil.</p>
+                        ) : null}
+
+                        <div className="rule-list">
+                          {field.validationRules.map((rule, ruleIndex) => {
+                            const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey);
+                            const candidates = getDependencyCandidates(fields, field);
+                            const ruleError = fieldErrors[field.id]?.rules?.[ruleIndex];
+
+                            return (
+                              <div className="rule-row" key={`${field.id}-rule-${ruleIndex}`}>
+                                <label>
+                                  Bagli alan
+                                  <select
+                                    value={rule.dependsOnFieldKey}
+                                    onChange={(event) => updateRuleDependency(field.id, ruleIndex, event.target.value)}
+                                  >
+                                    <option value="">Alan seciniz</option>
+                                    {candidates.map((candidate) => (
+                                      <option key={candidate.id} value={candidate.key.trim()}>
+                                        {candidate.label || candidate.key}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+
+                                <ExpectedValueInput
+                                  dependency={dependency}
+                                  expectedValue={rule.expectedValue}
+                                  onChange={(expectedValue) => updateRequiredWhenRule(field.id, ruleIndex, { expectedValue })}
+                                />
+
+                                <label>
+                                  Mesaj
+                                  <input
+                                    value={rule.message}
+                                    onChange={(event) => updateRequiredWhenRule(field.id, ruleIndex, { message: event.target.value })}
+                                  />
+                                </label>
+
+                                <button
+                                  className="icon-button"
+                                  type="button"
+                                  onClick={() => removeRequiredWhenRule(field.id, ruleIndex)}
+                                  aria-label="Rule sil"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+
+                                {ruleError ? <span className="field-error rule-error">{ruleError}</span> : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </article>
+                  )}
+                </SortableFieldCard>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        <div className="json-preview-panel">
+          <div>
+            <span className="eyebrow">4. JSON preview</span>
+            <h3>Kaydedilecek form definition modeli</h3>
+            <p>Bu ciktida field sirasi, options ve validationRules kaydedilecek payload ile aynidir.</p>
+          </div>
+          <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
+        </div>
       </div>
     </section>
   );
 }
 
+type SortableFieldCardRenderProps = Pick<
+  ReturnType<typeof useSortable>,
+  "attributes" | "listeners" | "setActivatorNodeRef" | "isDragging"
+>;
+
+function SortableFieldCard({
+  id,
+  children,
+}: {
+  id: string;
+  children: (props: SortableFieldCardRenderProps) => ReactNode;
+}) {
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
+    </div>
+  );
+}
 function normalizeSortOrder(fields: DesignerField[]) {
   return fields.map((field, index) => ({ ...field, sortOrder: index + 1 }));
 }

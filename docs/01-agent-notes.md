@@ -63,3 +63,13 @@ These notes are the project memory. Update this file whenever an implementation 
 - Dependent `RequiredWhen` validation can now be configured in the form designer and is included in the saved form definition model.
 - Backend, login/session, dashboard, app shell, process/task and audit behavior were intentionally left unchanged during Ozgun's form-flow frontend work.
 - Frontend `npm run lint` and `npm run build` passed after the form foundation, designer editing and dependent validation updates.
+- Form runner loading, empty, error, submitting, success and backend-error states were strengthened for the demo flow.
+- Form runner blocks the process-start API call when frontend validation finds required, type-based or dependent validation errors.
+- Process-start payload is now shown more explicitly as `formDefinitionId` plus `formData`, and submitted JSON remains visible for demo review.
+- Number values are prepared as numbers before submit, while checkbox values are preserved as booleans.
+- Form designer drag/drop field ordering was added using the existing dnd-kit packages; no new dependency was added.
+- Move up/down ordering remains available as an accessibility and fallback control.
+- Field `sortOrder` values are normalized after drag/drop, move up/down and remove operations so JSON preview and saved payload stay aligned.
+- Form designer and runner UI copy, demo guidance and scoped layout polish were improved for presentation readiness.
+- Backend, login/session, dashboard, app shell, process/task and audit areas were not changed during these Ozgun form-flow updates.
+- Frontend `npm run lint` and `npm run build` passed after the runner, drag/drop and UI polish updates.
