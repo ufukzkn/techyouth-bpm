@@ -1,14 +1,17 @@
 "use client";
 
 import { Play, RotateCcw } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
 import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
 import { validateFormValues } from "@/features/forms/formValidation";
-import { translate, type TranslationKey } from "@/features/i18n/translations";
+import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
-import type { FormDefinition } from "@/lib/types";
+import type { FormDefinition, ProcessDetail } from "@/lib/types";
+
+type LoadStatus = "loading" | "refreshing" | "idle" | "error";
+type SubmitStatus = "idle" | "submitting" | "success" | "error";
 
 let formRunnerFormsCache: FormDefinition[] | null = null;
 
@@ -25,24 +28,25 @@ export function FormRunnerDraft() {
     formRunnerFormsCache?.[0] ? buildInitialValues(formRunnerFormsCache[0]) : {},
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "submitting" | "success" | "error">(
-    formRunnerFormsCache ? "refreshing" : "loading",
-  );
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>(formRunnerFormsCache ? "refreshing" : "loading");
+  const [submitStatus, setSubmitStatus] = useState<SubmitStatus>("idle");
   const [message, setMessage] = useState(() =>
     formRunnerFormsCache ? t("form.runner.refreshingForms") : t("form.runner.loadingForms"),
   );
+  const [submitResult, setSubmitResult] = useState<ProcessDetail | null>(null);
   const selectedFormIdRef = useRef(selectedFormId);
 
   const selectedForm = forms.find((form) => form.id === selectedFormId);
+  const sortedFields = selectedForm?.fields.slice().sort((first, second) => first.sortOrder - second.sortOrder) ?? [];
+  const errorCount = Object.keys(errors).length;
+  const hasForms = forms.length > 0;
+  const isRunnerReady = Boolean(token) && loadStatus === "idle";
+  const isActionDisabled = !selectedForm || !isRunnerReady || submitStatus === "submitting";
 
-  const output = useMemo(() => {
-    const formData = selectedForm ? prepareFormData(selectedForm, values) : values;
-
-    return {
-      formDefinitionId: selectedFormId,
-      formData,
-    };
-  }, [selectedForm, selectedFormId, values]);
+  const output = {
+    formDefinitionId: selectedFormId,
+    formData: selectedForm ? prepareFormData(selectedForm, values) : values,
+  };
 
   useEffect(() => {
     selectedFormIdRef.current = selectedFormId;
@@ -51,13 +55,13 @@ export function FormRunnerDraft() {
   useEffect(() => {
     async function loadForms() {
       if (!token) {
-        setStatus("error");
+        setLoadStatus("error");
         setMessage(t("form.runner.sessionRequired"));
         return;
       }
 
       try {
-        setStatus(formRunnerFormsCache ? "refreshing" : "loading");
+        setLoadStatus(formRunnerFormsCache ? "refreshing" : "loading");
         const result = await api.listForms(token);
         formRunnerFormsCache = result;
         const currentSelection = result.find((form) => form.id === selectedFormIdRef.current);
@@ -68,10 +72,12 @@ export function FormRunnerDraft() {
           currentSelection && Object.keys(current).length > 0 ? current : nextSelectedForm ? buildInitialValues(nextSelectedForm) : {},
         );
         setErrors({});
-        setStatus("idle");
+        setSubmitResult(null);
+        setLoadStatus("idle");
+        setSubmitStatus("idle");
         setMessage(result.length > 0 ? t("form.runner.loadedForms") : t("form.runner.designFirst"));
       } catch (error) {
-        setStatus("error");
+        setLoadStatus("error");
         setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.runner.loadFailed"));
       }
     }
@@ -81,7 +87,8 @@ export function FormRunnerDraft() {
 
   function handleChange(fieldKey: string, value: FormValue) {
     setValues((current) => ({ ...current, [fieldKey]: value }));
-    setStatus("idle");
+    setSubmitStatus("idle");
+    setSubmitResult(null);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -94,21 +101,23 @@ export function FormRunnerDraft() {
     const nextErrors = validateFormValues(selectedForm, values, language);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
-      setStatus("idle");
+      setSubmitStatus("idle");
       setMessage(t("form.runner.fixFields"));
       return;
     }
 
     try {
-      setStatus("submitting");
+      setSubmitStatus("submitting");
+      setSubmitResult(null);
       const process = await api.startProcess(token, {
         formDefinitionId: selectedForm.id,
         formData: prepareFormData(selectedForm, values),
       });
-      setStatus("success");
+      setSubmitStatus("success");
+      setSubmitResult(process);
       setMessage(t("form.runner.started", { id: process.id }));
     } catch (error) {
-      setStatus("error");
+      setSubmitStatus("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.runner.startFailed"));
     }
   }
@@ -120,7 +129,8 @@ export function FormRunnerDraft() {
 
     setValues(buildInitialValues(selectedForm));
     setErrors({});
-    setStatus("idle");
+    setSubmitStatus("idle");
+    setSubmitResult(null);
     setMessage(t("form.runner.cleared"));
   }
 
@@ -136,16 +146,40 @@ export function FormRunnerDraft() {
 
       <div className="runner-grid">
         <form className="runner-form" onSubmit={handleSubmit}>
+          {loadStatus === "loading" ? <FormRunnerSkeleton language={language} /> : null}
+
+          {loadStatus === "error" ? (
+            <div className="runner-state-panel runner-state-error" role="alert">
+              <strong>{token ? t("form.runner.loadFailed") : t("form.runner.sessionRequired")}</strong>
+              <span>{message}</span>
+            </div>
+          ) : null}
+
+          {loadStatus === "idle" && !hasForms ? (
+            <div className="runner-state-panel">
+              <strong>{t("form.runner.noSavedForm")}</strong>
+              <span>{t("form.runner.noFormPrompt")}</span>
+            </div>
+          ) : null}
+
+          <div className="runner-demo-guide">
+            <strong>{t("form.runner.demoGuideTitle")}</strong>
+            <span>{t("form.runner.demoGuideSteps")}</span>
+          </div>
+
           <label>
             {t("form.runner.savedForm")}
             <select
+              disabled={loadStatus !== "idle" || !hasForms || submitStatus === "submitting"}
               value={selectedFormId}
               onChange={(event) => {
                 const nextForm = forms.find((form) => form.id === event.target.value);
                 setSelectedFormId(event.target.value);
                 setValues(nextForm ? buildInitialValues(nextForm) : {});
                 setErrors({});
-                setStatus("idle");
+                setSubmitStatus("idle");
+                setSubmitResult(null);
+                setMessage(nextForm ? t("form.runner.selectedMessage", { name: nextForm.name }) : t("form.runner.noSavedForm"));
               }}
             >
               {forms.length === 0 ? <option value="">{t("form.runner.noSavedForm")}</option> : null}
@@ -157,16 +191,23 @@ export function FormRunnerDraft() {
             </select>
           </label>
 
-          {status === "loading" ? <FormRunnerSkeleton language={language} /> : null}
-
-          {!selectedForm && status !== "loading" ? (
-            <p className="empty-state">{t("form.runner.noFormPrompt")}</p>
+          {selectedForm ? (
+            <div className="selected-form-summary">
+              <span className="eyebrow">{t("form.runner.selectedSummaryEyebrow")}</span>
+              <strong>{selectedForm.name}</strong>
+              <span>
+                {t("form.runner.selectedSummary", {
+                  count: sortedFields.length,
+                  description: selectedForm.description || t("form.runner.noDescription"),
+                })}
+              </span>
+            </div>
           ) : null}
 
-          {status !== "loading" && selectedForm?.fields
-            .slice()
-            .sort((first, second) => first.sortOrder - second.sortOrder)
-            .map((field) => (
+          {loadStatus !== "loading" && !selectedForm ? <p className="empty-state">{t("form.runner.noFormPrompt")}</p> : null}
+
+          {loadStatus !== "loading" &&
+            sortedFields.map((field) => (
               <FieldRenderer
                 key={field.key}
                 field={field}
@@ -177,21 +218,47 @@ export function FormRunnerDraft() {
               />
             ))}
 
-          <p className={`status-line status-line-${status}`}>{message}</p>
+          {errorCount > 0 ? (
+            <div className="runner-state-panel runner-state-error" role="alert">
+              <strong>{t("form.runner.validationBlockedTitle", { count: errorCount })}</strong>
+              <span>{t("form.runner.validationBlockedDescription")}</span>
+            </div>
+          ) : null}
+
+          {submitResult ? (
+            <div className="runner-state-panel runner-state-success">
+              <strong>{t("form.runner.successTitle")}</strong>
+              <span>
+                {t("form.runner.successSummary", {
+                  id: submitResult.id,
+                  status: statusLabel(language, submitResult.status),
+                  startedAt: new Date(submitResult.startedAt).toLocaleString(),
+                })}
+              </span>
+            </div>
+          ) : null}
+
+          <p className={`status-line status-line-${submitStatus}`}>{message}</p>
 
           <div className="runner-actions">
-            <button className="primary-button" disabled={!selectedForm || status === "submitting"} type="submit">
+            <button className="primary-button" disabled={isActionDisabled} type="submit">
               <Play size={18} />
-              {status === "submitting" ? t("form.runner.starting") : t("form.runner.startProcess")}
+              {submitStatus === "submitting" ? t("form.runner.starting") : t("form.runner.startProcess")}
             </button>
-            <button className="secondary-button" disabled={!selectedForm} type="button" onClick={resetForm}>
+            <button className="secondary-button" disabled={isActionDisabled} type="button" onClick={resetForm}>
               <RotateCcw size={18} />
               {t("form.runner.clear")}
             </button>
           </div>
         </form>
 
-        <pre className="json-preview runner-output">{JSON.stringify(output, null, 2)}</pre>
+        <div className="runner-preview-panel">
+          <div>
+            <span className="eyebrow">{t("form.runner.payloadEyebrow")}</span>
+            <h3>{t("form.runner.payloadTitle")}</h3>
+          </div>
+          <pre className="json-preview runner-output">{JSON.stringify(output, null, 2)}</pre>
+        </div>
       </div>
     </section>
   );

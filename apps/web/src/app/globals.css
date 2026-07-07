@@ -1991,7 +1991,8 @@ input[type="checkbox"] {
 
 .designer-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(240px, 0.72fr) minmax(320px, 1fr);
+  align-items: start;
   gap: 14px;
 }
 
@@ -2024,10 +2025,45 @@ input[type="checkbox"] {
   gap: 8px;
 }
 
-.field-list {
+.demo-steps,
+.designer-help-panel,
+.json-preview-panel,
+.runner-demo-guide {
   display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+
+.demo-steps {
+  padding-left: 28px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.designer-help-panel span,
+.json-preview-panel p,
+.runner-demo-guide span {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.json-preview-panel {
   grid-column: 1 / -1;
-  gap: 10px;
+}
+
+.json-preview-panel .json-preview {
+  grid-column: auto;
+}
+.field-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
 }
 
 .field-card {
@@ -2061,9 +2097,34 @@ input[type="checkbox"] {
   justify-content: flex-end;
 }
 
+.field-editor .drag-handle {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 38%, var(--border));
+  border-radius: 7px;
+  color: var(--foreground);
+  background: var(--surface-muted);
+  font-weight: 700;
+  cursor: grab;
+}
+
+.field-editor .drag-handle:active {
+  cursor: grabbing;
+}
+
+.field-editor-dragging {
+  opacity: 0.78;
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
+  box-shadow: 0 14px 32px rgba(24, 36, 58, 0.16);
+}
 .field-editor-grid {
   display: grid;
   grid-template-columns: minmax(150px, 1fr) minmax(190px, 1.25fr) minmax(150px, 0.85fr) minmax(120px, auto);
+  align-items: end;
   gap: 12px;
 }
 
@@ -2077,20 +2138,39 @@ input[type="checkbox"] {
 .field-required-toggle {
   align-self: end;
   min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+}
+
+.field-required-toggle input,
+.designer-section .checkbox-row input,
+.runner-section .checkbox-row input,
+.compact-toggle input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  box-shadow: none;
+  flex: 0 0 auto;
 }
 
 .option-editor,
 .rule-editor {
   display: grid;
-  gap: 10px;
-  padding-top: 4px;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-muted) 48%, var(--surface));
 }
 
 .rule-editor-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -2113,8 +2193,8 @@ input[type="checkbox"] {
 
 .rule-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-  gap: 10px;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(180px, 0.9fr) minmax(240px, 1.2fr) auto;
+  gap: 12px;
   align-items: end;
 }
 
@@ -2478,6 +2558,35 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 
+.runner-state-panel,
+.selected-form-summary,
+.runner-preview-panel {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.runner-state-panel span,
+.selected-form-summary span,
+.runner-preview-panel h3 {
+  overflow-wrap: anywhere;
+}
+
+.runner-state-error {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--border));
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+}
+
+.runner-state-success {
+  border-color: color-mix(in srgb, var(--teal) 42%, var(--border));
+  color: #0f6b43;
+  background: color-mix(in srgb, var(--teal) 12%, transparent);
+}
 .runner-output {
   grid-column: auto;
   max-height: none;

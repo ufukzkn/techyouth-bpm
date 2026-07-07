@@ -1,7 +1,24 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Plus, Save, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp, GripVertical, Plus, Save, Trash2 } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   createDefaultField,
   createDefaultOptions,
@@ -79,6 +96,12 @@ export function FormDesignerDraft() {
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   const formModel = useMemo<CreateFormRequest>(
     () => ({
@@ -134,6 +157,26 @@ export function FormDesignerDraft() {
       ignore = true;
     };
   }, [token, language, t]);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    setFields((current) => {
+      const oldIndex = current.findIndex((field) => field.id === active.id);
+      const newIndex = current.findIndex((field) => field.id === over.id);
+
+      if (oldIndex < 0 || newIndex < 0) {
+        return current;
+      }
+
+      return normalizeSortOrder(arrayMove(current, oldIndex, newIndex));
+    });
+    markUnsaved();
+  }
 
   function addField() {
     const field = createDefaultField({
@@ -465,6 +508,12 @@ export function FormDesignerDraft() {
           </button>
           {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
           <p className={`status-line status-line-${saveState}`}>{message}</p>
+          <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
+            <li>{t("form.designer.demoStepEdit")}</li>
+            <li>{t("form.designer.demoStepOptions")}</li>
+            <li>{t("form.designer.demoStepRequiredWhen")}</li>
+            <li>{t("form.designer.demoStepOrdering")}</li>
+          </ol>
         </div>
 
         <div className="tool-panel">
@@ -493,190 +542,245 @@ export function FormDesignerDraft() {
           </button>
         </div>
 
-        <div className="field-list" aria-label="Designed fields">
-          {fields.map((field, index) => (
-            <article className="field-card field-editor" key={field.id}>
-              <div className="field-editor-header">
-                <div>
-                  <strong>{field.label || t("form.designer.untitledField")}</strong>
-                  <span>
-                    {field.key || t("form.designer.noKey")} - {fieldTypeLabel(language, field.type)} -{" "}
-                    {t("form.designer.order", { sortOrder: field.sortOrder })}
-                  </span>
-                </div>
-                <div className="field-editor-actions">
-                  <button
-                    className="icon-button"
-                    disabled={index === 0}
-                    onClick={() => moveField(field.id, -1)}
-                    type="button"
-                    aria-label={t("form.designer.moveUp", { label: field.label || field.key })}
-                  >
-                    <ChevronUp size={17} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    disabled={index === fields.length - 1}
-                    onClick={() => moveField(field.id, 1)}
-                    type="button"
-                    aria-label={t("form.designer.moveDown", { label: field.label || field.key })}
-                  >
-                    <ChevronDown size={17} />
-                  </button>
-                  <button
-                    className="icon-button"
-                    onClick={() => removeField(field.id)}
-                    type="button"
-                    aria-label={t("form.designer.deleteField", { label: field.label || field.key })}
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={fields.map((field) => field.id)} strategy={verticalListSortingStrategy}>
+            <div className="field-list" aria-label={t("form.designer.fieldListAria")}>
+              <div className="designer-help-panel">
+                <strong>{t("form.designer.fieldListHelpTitle")}</strong>
+                <span>{t("form.designer.fieldListHelpDescription")}</span>
               </div>
-
-              <div className="field-editor-grid">
-                <label>
-                  Key
-                  <input value={field.key} onChange={(event) => updateField(field.id, { key: event.target.value })} />
-                  {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
-                </label>
-                <label>
-                  {t("form.designer.label")}
-                  <input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />
-                  {fieldErrors[field.id]?.label ? (
-                    <span className="field-error">{fieldErrors[field.id]?.label}</span>
-                  ) : null}
-                </label>
-                <label>
-                  {t("form.designer.type")}
-                  <select value={field.type} onChange={(event) => updateFieldType(field.id, event.target.value as FieldType)}>
-                    {supportedFieldTypes.map((fieldType) => (
-                      <option key={fieldType} value={fieldType}>
-                        {fieldTypeLabel(language, fieldType)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="checkbox-row field-required-toggle">
-                  <input checked={field.required} onChange={() => toggleRequired(field.id)} type="checkbox" />
-                  {t("form.designer.required")}
-                </label>
-              </div>
-
-              {fieldTypeUsesOptions(field.type) ? (
-                <div className="option-editor">
-                  <div className="option-editor-header">
-                    <strong>{t("form.designer.options")}</strong>
-                    <button className="secondary-button" type="button" onClick={() => addOption(field.id)}>
-                      <Plus size={16} />
-                      {t("form.designer.addOption")}
-                    </button>
-                  </div>
-                  {fieldErrors[field.id]?.options ? (
-                    <span className="field-error">{fieldErrors[field.id]?.options}</span>
-                  ) : null}
-                  <div className="option-list">
-                    {field.options.map((option, optionIndex) => (
-                      <div className="option-row" key={`${field.id}-${optionIndex}`}>
-                        <label>
-                          {t("form.designer.optionLabel")}
-                          <input value={option} onChange={(event) => updateOption(field.id, optionIndex, event.target.value)} />
-                        </label>
-                        <button
-                          className="icon-button"
-                          type="button"
-                          onClick={() => removeOption(field.id, optionIndex)}
-                          aria-label={t("form.designer.deleteOption", { label: option || t("form.designer.options") })}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="rule-editor">
-                <div className="rule-editor-header">
-                  <div>
-                    <strong>{t("form.designer.dependentValidation")}</strong>
-                    <span>{t("form.designer.requiredWhenDescription")}</span>
-                  </div>
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    disabled={getDependencyCandidates(fields, field).length === 0}
-                    onClick={() => addRequiredWhenRule(field.id)}
-                  >
-                    <Plus size={16} />
-                    {t("form.designer.addRule")}
-                  </button>
-                </div>
-
-                {field.validationRules.length === 0 ? (
-                  <p className="empty-state">{t("form.designer.noDependentRule")}</p>
-                ) : null}
-
-                <div className="rule-list">
-                  {field.validationRules.map((rule, ruleIndex) => {
-                    const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey);
-                    const candidates = getDependencyCandidates(fields, field);
-                    const ruleError = fieldErrors[field.id]?.rules?.[ruleIndex];
-
-                    return (
-                      <div className="rule-row" key={`${field.id}-rule-${ruleIndex}`}>
-                        <label>
-                          {t("form.designer.dependencyField")}
-                          <select
-                            value={rule.dependsOnFieldKey}
-                            onChange={(event) => updateRuleDependency(field.id, ruleIndex, event.target.value)}
+              {fields.map((field, index) => (
+                <SortableFieldCard id={field.id} key={field.id}>
+                  {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
+                    <article className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}`}>
+                      <div className="field-editor-header">
+                        <div>
+                          <strong>{field.label || t("form.designer.untitledField")}</strong>
+                          <span>
+                            {field.key || t("form.designer.noKey")} - {fieldTypeLabel(language, field.type)} -{" "}
+                            {t("form.designer.order", { sortOrder: field.sortOrder })}
+                          </span>
+                        </div>
+                        <div className="field-editor-actions">
+                          <button
+                            className="drag-handle"
+                            type="button"
+                            ref={setActivatorNodeRef}
+                            aria-label={t("form.designer.dragHandleAria", { label: field.label || field.key })}
+                            {...attributes}
+                            {...listeners}
                           >
-                            <option value="">{t("form.designer.selectField")}</option>
-                            {candidates.map((candidate) => (
-                              <option key={candidate.id} value={candidate.key.trim()}>
-                                {candidate.label || candidate.key}
+                            <GripVertical size={17} />
+                            <span>{t("form.designer.dragHandleLabel")}</span>
+                          </button>
+                          <button
+                            className="icon-button"
+                            disabled={index === 0}
+                            onClick={() => moveField(field.id, -1)}
+                            type="button"
+                            aria-label={t("form.designer.moveUp", { label: field.label || field.key })}
+                          >
+                            <ChevronUp size={17} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            disabled={index === fields.length - 1}
+                            onClick={() => moveField(field.id, 1)}
+                            type="button"
+                            aria-label={t("form.designer.moveDown", { label: field.label || field.key })}
+                          >
+                            <ChevronDown size={17} />
+                          </button>
+                          <button
+                            className="icon-button"
+                            onClick={() => removeField(field.id)}
+                            type="button"
+                            aria-label={t("form.designer.deleteField", { label: field.label || field.key })}
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="field-editor-grid">
+                        <label>
+                          Key
+                          <input value={field.key} onChange={(event) => updateField(field.id, { key: event.target.value })} />
+                          {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
+                        </label>
+                        <label>
+                          {t("form.designer.label")}
+                          <input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />
+                          {fieldErrors[field.id]?.label ? (
+                            <span className="field-error">{fieldErrors[field.id]?.label}</span>
+                          ) : null}
+                        </label>
+                        <label>
+                          {t("form.designer.type")}
+                          <select value={field.type} onChange={(event) => updateFieldType(field.id, event.target.value as FieldType)}>
+                            {supportedFieldTypes.map((fieldType) => (
+                              <option key={fieldType} value={fieldType}>
+                                {fieldTypeLabel(language, fieldType)}
                               </option>
                             ))}
                           </select>
                         </label>
-
-                        <ExpectedValueInput
-                          dependency={dependency}
-                          expectedValue={rule.expectedValue}
-                          language={language}
-                          onChange={(expectedValue) => updateRequiredWhenRule(field.id, ruleIndex, { expectedValue })}
-                        />
-
-                        <label>
-                          {t("form.designer.message")}
-                          <input
-                            value={rule.message}
-                            onChange={(event) => updateRequiredWhenRule(field.id, ruleIndex, { message: event.target.value })}
-                          />
+                        <label className="checkbox-row field-required-toggle">
+                          <input checked={field.required} onChange={() => toggleRequired(field.id)} type="checkbox" />
+                          {t("form.designer.required")}
                         </label>
-
-                        <button
-                          className="icon-button"
-                          type="button"
-                          onClick={() => removeRequiredWhenRule(field.id, ruleIndex)}
-                          aria-label={t("form.designer.deleteRule")}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-
-                        {ruleError ? <span className="field-error rule-error">{ruleError}</span> : null}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
 
-        <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
+                      {fieldTypeUsesOptions(field.type) ? (
+                        <div className="option-editor">
+                          <div className="option-editor-header">
+                            <strong>{t("form.designer.options")}</strong>
+                            <button className="secondary-button" type="button" onClick={() => addOption(field.id)}>
+                              <Plus size={16} />
+                              {t("form.designer.addOption")}
+                            </button>
+                          </div>
+                          {fieldErrors[field.id]?.options ? (
+                            <span className="field-error">{fieldErrors[field.id]?.options}</span>
+                          ) : null}
+                          <div className="option-list">
+                            {field.options.map((option, optionIndex) => (
+                              <div className="option-row" key={`${field.id}-${optionIndex}`}>
+                                <label>
+                                  {t("form.designer.optionLabel")}
+                                  <input value={option} onChange={(event) => updateOption(field.id, optionIndex, event.target.value)} />
+                                </label>
+                                <button
+                                  className="icon-button"
+                                  type="button"
+                                  onClick={() => removeOption(field.id, optionIndex)}
+                                  aria-label={t("form.designer.deleteOption", { label: option || t("form.designer.options") })}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="rule-editor">
+                        <div className="rule-editor-header">
+                          <div>
+                            <strong>{t("form.designer.dependentValidation")}</strong>
+                            <span>{t("form.designer.requiredWhenDescription")}</span>
+                          </div>
+                          <button
+                            className="secondary-button"
+                            type="button"
+                            disabled={getDependencyCandidates(fields, field).length === 0}
+                            onClick={() => addRequiredWhenRule(field.id)}
+                          >
+                            <Plus size={16} />
+                            {t("form.designer.addRule")}
+                          </button>
+                        </div>
+
+                        {field.validationRules.length === 0 ? (
+                          <p className="empty-state">{t("form.designer.noDependentRule")}</p>
+                        ) : null}
+
+                        <div className="rule-list">
+                          {field.validationRules.map((rule, ruleIndex) => {
+                            const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey);
+                            const candidates = getDependencyCandidates(fields, field);
+                            const ruleError = fieldErrors[field.id]?.rules?.[ruleIndex];
+
+                            return (
+                              <div className="rule-row" key={`${field.id}-rule-${ruleIndex}`}>
+                                <label>
+                                  {t("form.designer.dependencyField")}
+                                  <select
+                                    value={rule.dependsOnFieldKey}
+                                    onChange={(event) => updateRuleDependency(field.id, ruleIndex, event.target.value)}
+                                  >
+                                    <option value="">{t("form.designer.selectField")}</option>
+                                    {candidates.map((candidate) => (
+                                      <option key={candidate.id} value={candidate.key.trim()}>
+                                        {candidate.label || candidate.key}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+
+                                <ExpectedValueInput
+                                  dependency={dependency}
+                                  expectedValue={rule.expectedValue}
+                                  language={language}
+                                  onChange={(expectedValue) => updateRequiredWhenRule(field.id, ruleIndex, { expectedValue })}
+                                />
+
+                                <label>
+                                  {t("form.designer.message")}
+                                  <input
+                                    value={rule.message}
+                                    onChange={(event) => updateRequiredWhenRule(field.id, ruleIndex, { message: event.target.value })}
+                                  />
+                                </label>
+
+                                <button
+                                  className="icon-button"
+                                  type="button"
+                                  onClick={() => removeRequiredWhenRule(field.id, ruleIndex)}
+                                  aria-label={t("form.designer.deleteRule")}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+
+                                {ruleError ? <span className="field-error rule-error">{ruleError}</span> : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </article>
+                  )}
+                </SortableFieldCard>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+
+        <div className="json-preview-panel">
+          <div>
+            <span className="eyebrow">{t("form.designer.jsonPreviewEyebrow")}</span>
+            <h3>{t("form.designer.jsonPreviewTitle")}</h3>
+            <p>{t("form.designer.jsonPreviewDescription")}</p>
+          </div>
+          <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
+        </div>
       </div>
     </section>
+  );
+}
+
+type SortableFieldCardRenderProps = Pick<
+  ReturnType<typeof useSortable>,
+  "attributes" | "listeners" | "setActivatorNodeRef" | "isDragging"
+>;
+
+function SortableFieldCard({
+  id,
+  children,
+}: {
+  id: string;
+  children: (props: SortableFieldCardRenderProps) => ReactNode;
+}) {
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
+    </div>
   );
 }
 
