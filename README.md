@@ -309,3 +309,5 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 - `docs/08-local-database.md`
 - `docs/09-ozgun-form-flow.md`
 - `docs/10-ufuk-access-shell-flow.md`
+- `docs/11-i18n-language-support.md`
+- `docs/12-cagdas-process-flow.md`
