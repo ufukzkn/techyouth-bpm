@@ -5,7 +5,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
 import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
 import { validateFormValues } from "@/features/forms/formValidation";
-import { translate, type TranslationKey } from "@/features/i18n/translations";
+import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
 import type { FormDefinition, ProcessDetail } from "@/lib/types";
@@ -148,7 +148,7 @@ export function FormRunnerDraft() {
 
           {loadStatus === "error" ? (
             <div className="runner-state-panel runner-state-error" role="alert">
-              <strong>{t("form.runner.loadFailed")}</strong>
+              <strong>{token ? t("form.runner.loadFailed") : t("form.runner.sessionRequired")}</strong>
               <span>{message}</span>
             </div>
           ) : null}
@@ -161,8 +161,8 @@ export function FormRunnerDraft() {
           ) : null}
 
           <div className="runner-demo-guide">
-            <strong>Demo adimlari</strong>
-            <span>1. Form sec  2. Alanlari doldur  3. Hatalari kontrol et  4. Sureci baslat  5. JSON payloadi incele</span>
+            <strong>{t("form.runner.demoGuideTitle")}</strong>
+            <span>{t("form.runner.demoGuideSteps")}</span>
           </div>
 
           <label>
@@ -177,7 +177,7 @@ export function FormRunnerDraft() {
                 setErrors({});
                 setSubmitStatus("idle");
                 setSubmitResult(null);
-                setMessage(nextForm ? `${nextForm.name} secildi.` : t("form.runner.noSavedForm"));
+                setMessage(nextForm ? t("form.runner.selectedMessage", { name: nextForm.name }) : t("form.runner.noSavedForm"));
               }}
             >
               {forms.length === 0 ? <option value="">{t("form.runner.noSavedForm")}</option> : null}
@@ -191,11 +191,13 @@ export function FormRunnerDraft() {
 
           {selectedForm ? (
             <div className="selected-form-summary">
-              <span className="eyebrow">1. Secili form</span>
+              <span className="eyebrow">{t("form.runner.selectedSummaryEyebrow")}</span>
               <strong>{selectedForm.name}</strong>
               <span>
-                {sortedFields.length} alan - {selectedForm.description || "Aciklama yok"} - RequiredWhen kurallari varsa kosul
-                saglandiginda alan bazinda hata gorunur.
+                {t("form.runner.selectedSummary", {
+                  count: sortedFields.length,
+                  description: selectedForm.description || t("form.runner.noDescription"),
+                })}
               </span>
             </div>
           ) : null}
@@ -216,16 +218,20 @@ export function FormRunnerDraft() {
 
           {errorCount > 0 ? (
             <div className="runner-state-panel runner-state-error" role="alert">
-              <strong>{errorCount} alan kontrol edilmeli</strong>
-              <span>Alan bazli hatalari duzeltmeden submit yapilmaz; API istegi engellendi.</span>
+              <strong>{t("form.runner.validationBlockedTitle", { count: errorCount })}</strong>
+              <span>{t("form.runner.validationBlockedDescription")}</span>
             </div>
           ) : null}
 
           {submitResult ? (
             <div className="runner-state-panel runner-state-success">
-              <strong>Process start basarili</strong>
+              <strong>{t("form.runner.successTitle")}</strong>
               <span>
-                ID: {submitResult.id} - Status: {submitResult.status} - Started: {new Date(submitResult.startedAt).toLocaleString()}
+                {t("form.runner.successSummary", {
+                  id: submitResult.id,
+                  status: statusLabel(language, submitResult.status),
+                  startedAt: new Date(submitResult.startedAt).toLocaleString(),
+                })}
               </span>
             </div>
           ) : null}
@@ -246,8 +252,8 @@ export function FormRunnerDraft() {
 
         <div className="runner-preview-panel">
           <div>
-            <span className="eyebrow">5. Process start payload</span>
-            <h3>APIye gonderilecek submitted form data JSON</h3>
+            <span className="eyebrow">{t("form.runner.payloadEyebrow")}</span>
+            <h3>{t("form.runner.payloadTitle")}</h3>
           </div>
           <pre className="json-preview runner-output">{JSON.stringify(output, null, 2)}</pre>
         </div>

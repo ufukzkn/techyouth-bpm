@@ -508,11 +508,11 @@ export function FormDesignerDraft() {
           </button>
           {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
           <p className={`status-line status-line-${saveState}`}>{message}</p>
-          <ol className="demo-steps" aria-label="Form designer demo steps">
-            <li>Alan ekle ve key/label/type bilgisini duzenle.</li>
-            <li>Select veya checkbox alanlarinda option listesini yonet.</li>
-            <li>RequiredWhen ile kosullu zorunluluk kuralini tanimla.</li>
-            <li>Surukle veya ok butonlariyla sirala, JSON preview ile kontrol et.</li>
+          <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
+            <li>{t("form.designer.demoStepEdit")}</li>
+            <li>{t("form.designer.demoStepOptions")}</li>
+            <li>{t("form.designer.demoStepRequiredWhen")}</li>
+            <li>{t("form.designer.demoStepOrdering")}</li>
           </ol>
         </div>
 
@@ -544,10 +544,10 @@ export function FormDesignerDraft() {
 
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={fields.map((field) => field.id)} strategy={verticalListSortingStrategy}>
-            <div className="field-list" aria-label="Designed fields">
+            <div className="field-list" aria-label={t("form.designer.fieldListAria")}>
               <div className="designer-help-panel">
-                <strong>3. Alanlari duzenle ve sirala</strong>
-                <span>Surukle tutamacini kullanarak sirala; klavye/fallback icin yukari-asagi butonlari da calisir.</span>
+                <strong>{t("form.designer.fieldListHelpTitle")}</strong>
+                <span>{t("form.designer.fieldListHelpDescription")}</span>
               </div>
               {fields.map((field, index) => (
                 <SortableFieldCard id={field.id} key={field.id}>
@@ -566,12 +566,12 @@ export function FormDesignerDraft() {
                             className="drag-handle"
                             type="button"
                             ref={setActivatorNodeRef}
-                            aria-label={`${field.label || field.key} surukle ve sirala`}
+                            aria-label={t("form.designer.dragHandleAria", { label: field.label || field.key })}
                             {...attributes}
                             {...listeners}
                           >
                             <GripVertical size={17} />
-                            <span>Surukle</span>
+                            <span>{t("form.designer.dragHandleLabel")}</span>
                           </button>
                           <button
                             className="icon-button"
@@ -748,9 +748,9 @@ export function FormDesignerDraft() {
 
         <div className="json-preview-panel">
           <div>
-            <span className="eyebrow">4. JSON preview</span>
-            <h3>Kaydedilecek form definition modeli</h3>
-            <p>Bu ciktida field sirasi, options ve validationRules kaydedilecek payload ile aynidir.</p>
+            <span className="eyebrow">{t("form.designer.jsonPreviewEyebrow")}</span>
+            <h3>{t("form.designer.jsonPreviewTitle")}</h3>
+            <p>{t("form.designer.jsonPreviewDescription")}</p>
           </div>
           <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
         </div>
