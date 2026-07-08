@@ -68,6 +68,8 @@ Backend varsayilan olarak SQLite kullanir:
   "Auth": {
     "SessionDurationMinutes": 120,
     "RememberMeDurationMinutes": 43200,
+    "RefreshTokenDurationMinutes": 43200,
+    "PasswordResetMinutes": 30,
     "MaxFailedLoginAttempts": 5,
     "LockoutMinutes": 10,
     "EmailVerificationMinutes": 1440,
@@ -81,9 +83,11 @@ Backend varsayilan olarak SQLite kullanir:
 }
 ```
 
-`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` beni-hatirla secenegi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:EmailVerificationMinutes` e-posta dogrulama kodu gecerliligini, `Auth:EmailVerificationResendCooldownMinutes` yeniden kod gonderme bekleme suresini belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register endpointlerini sinirlar.
+`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` ve `Auth:RefreshTokenDurationMinutes` beni-hatirla/refresh-token akisi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:PasswordResetMinutes` sifre sifirlama token gecerliligini belirler. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:EmailVerificationMinutes` e-posta dogrulama kodu gecerliligini, `Auth:EmailVerificationResendCooldownMinutes` yeniden kod gonderme bekleme suresini belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register/verification/reset endpointlerini sinirlar.
 
-Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
+Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Browser akisi access token'i HttpOnly cookie olarak da alir, mutating cookie isteklerinde CSRF header kullanir. `Beni hatirla` secilirse hashed rotating refresh token uretilir; refresh reuse tespitinde aktif oturumlar revoke edilir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
+
+Sifre sifirlama e-postalarindaki link `Frontend:BaseUrl` ayarindan uretilir. Local varsayilan `http://localhost:3000` degeridir; farkli web portu kullanilirsa scriptlerde `-FrontendBaseUrl` verilebilir.
 
 Email verification varsayilan olarak `Demo` provider ile calisir. Bu modda OTP hashlenerek veritabanina yazilir ve demo kod UI'da gorunur. Kodlar varsayilan olarak 24 saat gecerlidir ve yeniden kod gonderme icin 5 dakikalik cooldown uygulanir. `Routing` provider kullanildiginda once guvenli allowlist'e bagli canli SMTP denenir; allowlist disindaki kullanicilar Mailtrap Sandbox'a yonlendirilir. Sandbox mail gercek Gmail/Outlook inbox'ina degil, Mailtrap Sandbox inbox'ina gider.
 
@@ -119,11 +123,11 @@ dotnet user-secrets set "Email:Smtp:Host" "live.smtp.mailtrap.io"
 dotnet user-secrets set "Email:Smtp:Port" "587"
 dotnet user-secrets set "Email:Smtp:Username" "api"
 dotnet user-secrets set "Email:Smtp:Password" "your-mailtrap-api-token"
-dotnet user-secrets set "Email:AllowedRecipients" "ufukzkn08@gmail.com"
-dotnet user-secrets set "Email:AllowedUsernames" "ufukzkn"
+dotnet user-secrets set "Email:AllowedRecipients" "your-email@example.com"
+dotnet user-secrets set "Email:AllowedUsernames" "your-username"
 ```
 
-Bu allowlist doluyken SMTP sender sadece `ufukzkn` kullanicisi ve `ufukzkn08@gmail.com` alicisi icin mail gonderir. Diger kullanicilar icin backend SMTP gonderimini reddeder.
+Bu allowlist doluyken SMTP sender sadece belirtilen kullanici ve alici icin mail gonderir. Diger kullanicilar icin backend SMTP gonderimini reddeder.
 
 Takimla ortak PostgreSQL/Neon veritabani kullanmak icin provider ve connection string gizli olarak verilmelidir. Gercek connection string repo'ya commit edilmez.
 

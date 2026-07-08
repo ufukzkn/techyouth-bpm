@@ -3,6 +3,9 @@ param(
     [string]$EnvFile = ".env.neon.local",
     [int]$SessionDurationMinutes = 120,
     [int]$RememberMeDurationMinutes = 43200,
+    [int]$RefreshTokenDurationMinutes = 43200,
+    [int]$PasswordResetMinutes = 30,
+    [string]$FrontendBaseUrl = "http://localhost:3000",
     [int]$MaxFailedLoginAttempts = 5,
     [int]$LockoutMinutes = 10,
     [switch]$SkipMockData,
@@ -43,6 +46,9 @@ $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:Database__Provider = "PostgreSql"
 $env:Auth__SessionDurationMinutes = "$SessionDurationMinutes"
 $env:Auth__RememberMeDurationMinutes = "$RememberMeDurationMinutes"
+$env:Auth__RefreshTokenDurationMinutes = "$RefreshTokenDurationMinutes"
+$env:Auth__PasswordResetMinutes = "$PasswordResetMinutes"
+$env:Frontend__BaseUrl = "$FrontendBaseUrl"
 $env:Auth__MaxFailedLoginAttempts = "$MaxFailedLoginAttempts"
 $env:Auth__LockoutMinutes = "$LockoutMinutes"
 $env:Seed__MockData = if ($SkipMockData) { "false" } else { "true" }
@@ -54,6 +60,9 @@ Write-Host "Environment file: $EnvFile"
 Write-Host "Mock workflow data: $($env:Seed__MockData)"
 Write-Host "Session duration: $SessionDurationMinutes minute(s)"
 Write-Host "Remember-me duration: $RememberMeDurationMinutes minute(s)"
+Write-Host "Refresh-token duration: $RefreshTokenDurationMinutes minute(s)"
+Write-Host "Password reset token duration: $PasswordResetMinutes minute(s)"
+Write-Host "Frontend base URL: $FrontendBaseUrl"
 Write-Host "Failed login lockout: $MaxFailedLoginAttempts attempt(s), $LockoutMinutes minute(s)"
 Write-Host "Stop with Ctrl+C in this terminal."
 if ($NoBuild) {

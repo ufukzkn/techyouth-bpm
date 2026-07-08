@@ -70,8 +70,7 @@ These items are not required by the PDF, but they fit the goal of building the m
 
 - PostgreSQL/Neon setup for shared remote database development.
 - Docker setup for repeatable API, web and database startup.
-- Stronger authentication lifecycle with refresh-token style remember-me behavior.
-- Admin-managed user onboarding and role approval.
+- Production deployment hardening for HTTPS cookie settings, SMTP domain verification and environment-specific secrets.
 - CI checks for backend tests, frontend lint/build and later end-to-end flows.
 
 ## Important Evaluation Point

@@ -104,6 +104,7 @@ Current tables:
 
 - `Users`: demo users, emails, roles, approval status, email verification state, failed login counters, lockout timestamps and PBKDF2 password hashes.
 - `UserSessions`: session ids, hashed opaque bearer session tokens, expiry times, last-seen timestamps and revoke timestamps.
+- `RefreshTokens`: hashed rotating remember-me tokens tied to access sessions and devices.
 - `FormDefinitions`: saved dynamic form definitions.
 - `FormFieldDefinitions`: fields belonging to a form definition.
 - `FieldValidationRules`: dependent validation rules such as required-when.
@@ -128,12 +129,15 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 | `atiba` | `atiba123` | User | Active | true |
 | `alex` | `alex123` | User | Rejected | true |
 | `fatih.terim` | `imparator123` | Admin | PendingApproval | false |
+| `sergen.yalcin` | `sergen123` | Approver | Active | true |
+| `tuncay.sanli` | `tuncay123` | User | Active | true |
+| `volkan.demirel` | `volkan123` | User | Rejected | true |
 
 Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
 
-Session tokens are stored as SHA-256 hashes. Active sessions include created time, last seen time, IP address and user agent, then can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`.
+Session tokens are stored as SHA-256 hashes. Active sessions include created time, last seen time, IP address, user agent and remembered-device state, then can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`. Remember-me sessions also create hashed rows in `RefreshTokens`; refresh tokens are rotated when used and revoked together with their access session.
 
-The current local setup uses `EnsureCreated`, not formal migrations. Identity schema additions for `Users.MustChangePassword`, `UserSessions.IpAddress` and `UserSessions.UserAgent` are patched idempotently by `DatabaseSeeder` on startup for SQLite and PostgreSQL. If a local database still behaves strangely after schema changes, reset local SQLite before testing:
+The current local setup uses `EnsureCreated`, not formal migrations. Identity schema additions for `Users.MustChangePassword`, `Users.PasswordResetToken`, `Users.PasswordResetTokenExpiresAt`, `UserSessions.IpAddress`, `UserSessions.UserAgent`, `UserSessions.RememberedDevice` and the `RefreshTokens` table are patched idempotently by `DatabaseSeeder` on startup for SQLite and PostgreSQL. If a local database still behaves strangely after schema changes, reset local SQLite before testing:
 
 ```powershell
 ./scripts/run-api-local.ps1 -ResetDb -Force
@@ -143,14 +147,14 @@ When mock data is enabled, the seeder also creates:
 
 - `Transfer Talep Formu`
 - `Kamp Hazirlik Onay Formu`
-- 8 demo process instances.
-- 4 open approver tasks.
+- 12 demo process instances.
+- 6 open approver tasks.
 - completed/rejected examples with audit logs.
 - system audit examples for registration, login, role/status updates, form updates, process start and task approval.
 
 The seeded form/process data uses deterministic IDs and is idempotent, so restarting the API does not duplicate records. Resetting the SQLite database with `-ResetDb -Force` recreates the full demo scenario.
 
-Mock user, process and log names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim and Senol Gunes. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
+Mock user, process and log names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim, Senol Gunes, Sergen Yalcin, Tuncay Sanli and Volkan Demirel. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
 
 ## Maintenance Rule
 

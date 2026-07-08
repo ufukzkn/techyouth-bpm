@@ -5,14 +5,26 @@
 - `POST /api/auth/login`
   - Validates username/password against the stored password hash.
   - Rejects pending/rejected users and temporarily locked accounts.
-  - Returns an opaque session token value, user profile and expiry time.
+  - Returns an opaque session token value, user profile, CSRF token and expiry time.
+  - Also writes the access token to an HttpOnly cookie for browser flows; Swagger can still use the returned bearer token.
   - Stores only the SHA-256 hash of the session token in `UserSessions`.
-  - Accepts `rememberMe` to use the longer remember-me session duration.
+  - Accepts `rememberMe` to create a remembered-device refresh token stored as a hash in `RefreshTokens`.
+- `POST /api/auth/refresh`
+  - Uses the HttpOnly refresh cookie to rotate the refresh token and issue a new opaque access session.
+  - Revokes the previous access session and previous refresh token.
+  - If a revoked refresh token is reused, active sessions for that user are revoked and `Auth.RefreshReuseDetected` is written to system audit.
 - `POST /api/auth/register`
   - Creates a new `User` account with `PendingApproval` status.
   - Stores a PBKDF2 password hash and starts with `IsEmailVerified=false`.
+- `POST /api/auth/forgot-password`
+  - Sends a password reset token by email when the account exists.
+  - Always returns a generic success response so unknown users are not revealed.
+  - The email includes a `Sifreyi sifirla` link built from `Frontend:BaseUrl`; the token remains long and random because it is intended to be carried by the link, not typed manually.
+  - `Email:Provider=Demo` returns the reset token in the response for local debugging. SMTP/Mailtrap modes keep the token only in the email.
+- `POST /api/auth/reset-password`
+  - Validates the single-use reset token, stores the new PBKDF2 password hash and revokes existing sessions.
 - `GET /api/auth/me`
-  - Hashes the incoming bearer token and reads the current unexpired session.
+  - Hashes the incoming bearer token or access cookie and reads the current unexpired session.
   - Returns active user information, including email verification and temporary-password requirement.
 - `PATCH /api/auth/me/profile`
   - Updates the current user's display name and email.
@@ -38,10 +50,17 @@
   - If SMTP delivery fails, the verification code is not persisted.
 - `POST /api/auth/me/email-verification/confirm`
   - Confirms the code and marks the current user's email as verified.
+- `POST /api/auth/public-email-verification/start`
+  - Starts email verification for a known username/email without requiring login.
+  - This supports `PendingApproval` users who cannot sign in yet.
+- `POST /api/auth/public-email-verification/confirm`
+  - Confirms email verification before login while keeping admin approval as a separate access decision.
 
 `POST /api/auth/login` and `POST /api/auth/register` use ASP.NET Core rate limiting. Login also increments failed attempts and sets `LockedUntil` after the configured threshold.
 
-The project does not currently use JWT. It uses opaque bearer session tokens backed by the database. This is intentional for the current BPM scope because sessions can be expired and revoked centrally from the database. JWT would not remove the need for server-side state for pending approval, lockout, logout/revoke and active-session management. Future JWT support should be paired with refresh-token rotation and explicit revoke/session management instead of replacing the current flow blindly.
+The project does not currently use JWT. It uses opaque bearer session tokens backed by the database plus rotating refresh tokens for remembered devices. This is intentional for the current BPM scope because sessions can be expired and revoked centrally from the database. JWT would not remove the need for server-side state for pending approval, lockout, logout/revoke, refresh-token reuse detection and active-session management.
+
+Browser flows send cookies with `credentials: include`. Mutating cookie-authenticated requests include `X-CSRF-Token`; Swagger and local API debugging can still use the `Authorization: Bearer` header.
 
 ## Users And Access
 
@@ -200,4 +219,4 @@ The API reads email delivery settings from the `Email` configuration section:
 
 Default local mode is `Demo`, so the project runs without an external mail service. Mailtrap credentials should be set with .NET user secrets or environment variables. Tracked config files only contain placeholders.
 
-Mailtrap Sandbox credentials capture emails inside the Mailtrap inbox and do not deliver to real recipients. Real inbox delivery requires Gmail SMTP app password, Mailtrap Email Sending with a verified sending domain or another production mail provider. For a narrow real-delivery test, set `Email:AllowedRecipients=ufukzkn08@gmail.com` and `Email:AllowedUsernames=ufukzkn` before using live SMTP credentials.
+Mailtrap Sandbox credentials capture emails inside the Mailtrap inbox and do not deliver to real recipients. Real inbox delivery requires Gmail SMTP app password, Mailtrap Email Sending with a verified sending domain or another production mail provider. For a narrow real-delivery test, set `Email:AllowedRecipients` and `Email:AllowedUsernames` to a private allowlist before using live SMTP credentials.

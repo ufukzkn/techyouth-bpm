@@ -20,13 +20,17 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Restored API sessions are verified once through `/api/auth/me`; the app does not poll the user every second.
 - The shell schedules one timeout from the stored `expiresAt` value. Expired or unauthorized sessions return to login and show a confirmable alert dialog.
 - API session duration is read from `Auth:SessionDurationMinutes`; the normal local duration is currently 120 minutes.
-- `Beni hatirla` sends `rememberMe=true` during login and uses `Auth:RememberMeDurationMinutes` for a longer session.
+- `Beni hatirla` sends `rememberMe=true` during login and creates a longer-lived refresh token while the access session stays short.
+- Remember-me now creates a hashed, rotating refresh token tied to a remembered device. Access sessions remain opaque server-side sessions; refresh rotation replaces the old session/token pair and flags revoked-token reuse as a suspicious audit event.
+- Login responses still return a bearer token for Swagger/dev usage, but browser flows also receive an HttpOnly access cookie and a CSRF token for cookie-authenticated mutations.
+- If an access session expires and a valid refresh cookie exists, the shell attempts a silent refresh before showing the timeout dialog.
 - Long remember-me sessions are checked with capped browser timers so the timeout scheduler does not overflow for durations longer than the browser's maximum `setTimeout` delay.
 - Demo fallback sessions also respect the local expiry timer, but skip `/api/auth/me` because they do not exist in the API session table.
 - Passwords are verified through PBKDF2 hashes and session tokens are stored as SHA-256 hashes in the database.
 - Login/register endpoints are rate limited, and repeated failed login attempts temporarily lock the account.
 - Logout revokes the backend session instead of only clearing frontend state.
 - Settings now includes editable profile details, password change, email verification and active session management.
+- Login now includes password reset and public email verification flows. Pending-approval users can verify email before admin approval, and password reset completion revokes existing sessions. Password reset emails include a direct reset link generated from `Frontend:BaseUrl`; demo mode can expose the token in the response for local debugging.
 - Settings profile, password and active-session areas are collapsible disclosure cards. This keeps the account page compact while preserving the full workflows behind explicit user intent.
 - Settings action buttons are right-aligned inside their forms, and active-session lists are paginated to avoid long account pages.
 - Shared pagination controls support direct page-number entry as well as previous/next buttons, so long lists do not require stepping through pages one by one.
@@ -95,8 +99,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Mobile navigation should stay drawer-based with a fixed floating trigger so the dashboard/content remains the first visual focus on small screens.
 - Session-expiry behavior should stay centralized in `AppShell`/`sessionStore` instead of being duplicated in feature screens.
 - User-action traceability has two levels: `AuditLogs` for process state history and `SystemAuditLogs` for broader identity/access/form/process/task events.
-- The current remember-me option is useful for the project demo, but a stronger production version should move toward refresh-token rotation and explicit device/session management.
-- The current token model stays as opaque server-side sessions because pending approval, lockout and revoke all need server-side state. JWT can be considered later only with refresh-token rotation and explicit session/device management.
+- The current token model stays as opaque server-side sessions plus rotating refresh tokens because pending approval, lockout, refresh reuse detection and revoke all need server-side state. JWT can be considered later only if it keeps equivalent refresh-token rotation and explicit session/device management.
 - Theme ownership should stay centralized in `sessionStore`; feature screens should read the active theme only through shared styling tokens.
 - Static shell/login/dashboard/process text should use the shared i18n dictionary instead of inline copy.
 
