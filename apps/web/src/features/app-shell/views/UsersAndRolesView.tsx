@@ -698,8 +698,12 @@ export function UsersAndRolesView({
                   />
                 ) : null}
               </section>
-              {isLoadingUserLogs ? <p className="status-line">{t("common.loading")}</p> : null}
-              <SystemAuditTimeline logs={selectedUserLogs} language={language} emptyText={t("users.noUserLogs")} />
+              <SystemAuditTimeline
+                logs={selectedUserLogs}
+                language={language}
+                emptyText={t("users.noUserLogs")}
+                isLoading={isLoadingUserLogs}
+              />
               <div className="detail-danger-action">
                 <button
                   className="danger-button strong-danger-button"
