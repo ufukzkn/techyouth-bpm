@@ -30,6 +30,12 @@ The scope includes:
 - Added select/checkbox option management in the form designer.
 - Added move up/down ordering for form fields.
 - Added drag/drop field ordering with the existing dnd-kit dependency set.
+- Added a right-side sticky field palette for drag/drop field creation in the designer.
+- Added icon-led palette cards with Turkish field descriptions and visible insertion preview while dragging.
+- Added Text Area and Radio Button support. The Radio Button type is shown to Turkish users as `Seçenek düğmesi`.
+- Hardened field key generation and saved payload keys so visible Turkish labels can stay localized while technical keys remain ASCII-safe.
+- Tightened designer option validation so empty option values and duplicate option values block save for option-based fields.
+- Added minimum backend form-type and form-data validation support for Text Area and Radio Button without changing process/task/audit/auth/dashboard/app shell business rules.
 - Added designer-side dependent `RequiredWhen` validation UI.
 - Strengthened form runner loading, empty, error, submitting, success and backend-error states.
 - Made the process-start payload easier to inspect as `formDefinitionId` plus `formData`.
@@ -48,19 +54,22 @@ The scope includes:
 - Existing field `key`, `label`, `type` and `required` values can be edited.
 - Supported field types are managed from a shared frontend list:
   - `Text`
+  - `TextArea` / Text Area / Uzun metin
   - `Number`
   - `Email`
   - `Select`
+  - `Radio` / Radio Button / Seçenek düğmesi
   - `Checkbox`
   - `Date`
-- Select and checkbox fields support option add, remove and edit behavior.
-- Designer validation prevents empty field keys, empty labels, duplicate keys and empty option sets for option-based fields.
+- Select and radio fields keep option add, remove and edit behavior.
+- Designer validation prevents empty field keys, empty labels, duplicate keys, empty option sets, empty option values and duplicate option values for option-based fields.
 - Dependent `RequiredWhen` rules can be configured per field without changing backend models.
 - The JSON preview reflects the same form model that is sent to the API, including ordering, options and validation rules.
 - UI guidance now shows the demo path: add fields, edit properties, manage options/rules, reorder, inspect JSON and save.
 - When a saved form is selected, save calls `PUT /api/forms/{id}`; otherwise save calls `POST /api/forms`.
 - The designer layout uses two control panels at the top, then a full-width field list on desktop. Field editors spread key, label, type and required controls across the available width, then collapse to fewer columns on smaller screens.
 - Checkbox controls are styled separately from text inputs so required toggles stay compact while still using the app accent color.
+- The dependent validation editor keeps the rule controls visible without extra explanatory copy inside every field card.
 
 ## Current Form Runner Capabilities
 
@@ -88,6 +97,10 @@ Frontend validation currently covers:
 - Select option membership.
 - Checkbox boolean values.
 - Dependent `RequiredWhen` rules.
+- Text Area values as strings.
+- Radio Button / `Seçenek düğmesi` option membership.
+- ASCII-safe technical field keys in the designer save payload.
+- Empty option values and duplicate option values in option-based designer fields.
 
 The manual API check confirmed:
 
@@ -105,8 +118,8 @@ The designer can define this rule shape:
 {
   "ruleType": "RequiredWhen",
   "dependsOnFieldKey": "requestType",
-  "expectedValue": "Satinalma",
-  "message": "Satinalma taleplerinde onay aciklamasi zorunludur."
+  "expectedValue": "Satın Alma",
+  "message": "Satın Alma taleplerinde onay açıklaması zorunludur."
 }
 ```
 
@@ -116,13 +129,32 @@ The designer prevents a field from depending on itself, requires a dependent fie
 
 The runner reads the same `validationRules` array and blocks submit before calling the API when a dependent validation rule fails. Field-level errors remain visible next to the related dynamic field.
 
-## Drag And Drop / Ordering
+## Field Palette / Drag and Drop
 
-- Drag/drop ordering uses the existing `@dnd-kit/core`, `@dnd-kit/sortable` and `@dnd-kit/utilities` dependencies.
-- No new dependency was added for ordering.
+- Drag/drop behavior uses the existing `@dnd-kit/core`, `@dnd-kit/sortable` and `@dnd-kit/utilities` dependencies.
+- No new dependency was added for ordering or field creation.
+- The Form Designer includes a sticky right-side field palette on wide screens. On narrower screens the palette falls back into the normal page flow.
+- Palette items use field-specific icons, localized field names and short Turkish descriptions.
+- Palette items do not create fields on click. A real drag/drop gesture is required before a new field is inserted.
+- While dragging from the palette, the field list shows an insertion indicator so users can see where the field will be added.
+- Dropping on an existing field inserts the new field at that visible position. Dropping on the general canvas/drop zone falls back to appending the field to the end.
+- Text Area and Radio Button field creation use the same default field helper as the manual fallback.
 - Move up/down controls remain available as a fallback and accessibility-friendly ordering path.
 - After drag/drop, move up/down or remove operations, the field list is normalized so `sortOrder` stays sequential.
 - JSON preview and save payload are generated from the current field order, so persisted form definitions follow the visible order.
+
+## Supported Field Types
+
+- `Text`: single-line text input.
+- `TextArea`: multi-line text input, shown as Uzun metin in Turkish UI.
+- `Number`: numeric input with number conversion before process start.
+- `Email`: email input with format validation.
+- `Select`: option-based dropdown, shown with corrected Turkish copy such as Açılır seçim listesi.
+- `Radio`: option-based single-choice field, shown to Turkish users as Seçenek düğmesi.
+- `Checkbox`: boolean input that remains a boolean in submitted payloads.
+- `Date`: date input with date validation.
+
+Every palette card has an icon from the existing lucide-react dependency. The UI can show localized Turkish labels, while generated field keys and technical payload keys stay ASCII-safe.
 
 ## UI/UX Notes
 
@@ -130,6 +162,9 @@ The runner reads the same `validationRules` array and blocks submit before calli
 - Checkbox controls were adjusted to stay normal-sized and aligned with other inputs.
 - Dependent validation and option areas were made more readable with scoped layout polish.
 - Drag handles are visibly labeled so ordering is easier to discover during a demo.
+- The field palette uses a polished right rail on desktop and no longer squeezes the field editor area.
+- Turkish UI copy was corrected for terms such as Satın Alma, Seçenek düğmesi and Açılır seçim listesi.
+- RequiredWhen helper text was removed from every field card to keep the dependent validation area quieter while preserving the rule UI.
 - Runner states now explain loading, empty list, validation-blocked submit, success and backend-error outcomes.
 - The process-start payload panel is labeled for demo review and keeps submitted JSON visible.
 - CSS changes were scoped to form designer/form runner classes and did not intentionally change global app behavior.
@@ -144,13 +179,16 @@ Frontend form-flow files:
 - `apps/web/src/features/forms/fieldRenderer.tsx`
 - `apps/web/src/features/forms/formValidation.ts`
 - `apps/web/src/features/forms/formValues.ts`
+- `apps/web/src/features/i18n/translations.ts`
 - `apps/web/src/app/globals.css`
 
 Backend form-flow files:
 
 - `apps/api/src/TechYouthBpm.Api/Controllers/FormsController.cs`
 - `apps/api/src/TechYouthBpm.Application/Services/IFormService.cs`
+- `apps/api/src/TechYouthBpm.Domain/Enums/FieldType.cs`
 - `apps/api/src/TechYouthBpm.Infrastructure/Services/FormService.cs`
+- `apps/api/src/TechYouthBpm.Infrastructure/Services/FormDataValidator.cs`
 - `apps/api/tests/TechYouthBpm.Tests/Forms/FormServiceTests.cs`
 
 Documentation files:
@@ -178,12 +216,12 @@ These areas were intentionally not changed:
 - Run a short smoke test before final merge.
 - Check integration with the process/task/audit flow after the teammate-owned process/task/audit work is complete.
 - Decide whether form definitions should become immutable once processes are started. The current demo behavior updates the form definition in place so form editing is easy to demonstrate.
-- Prepare a demo scenario if needed, for example: if request type is purchase, approval note becomes required.
+- Prepare a demo scenario if needed, for example: if request type is Satın Alma, approval note becomes required.
 - Do final documentation and final test verification.
 
 ## Verification
 
-The frontend checks passed after the form foundation, designer editing, dependent validation, saved-form update, runner state, drag/drop ordering and UI polish work:
+The frontend checks passed after the form foundation, designer editing, dependent validation, saved-form update, runner state, drag/drop ordering, field palette insertion behavior, new field types and UI polish work:
 
 ```bash
 cd apps/web

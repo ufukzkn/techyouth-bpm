@@ -1,13 +1,34 @@
 "use client";
 
-import { ChevronDown, ChevronUp, GripVertical, Plus, Save, Trash2 } from "lucide-react";
+import {
+  AlignLeft,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  CircleDot,
+  GripVertical,
+  Hash,
+  List,
+  Mail,
+  Plus,
+  Save,
+  SquareCheck,
+  Trash2,
+  Type,
+  type LucideIcon,
+} from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   closestCenter,
   DndContext,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
   KeyboardSensor,
   PointerSensor,
+  useDraggable,
+  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -22,6 +43,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   createDefaultField,
   createDefaultOptions,
+  createFieldKey,
   fieldTypeLabel,
   fieldTypeUsesOptions,
   supportedFieldTypes,
@@ -35,11 +57,25 @@ type DesignerField = Omit<FormFieldDefinition, "id"> & {
   id: string;
 };
 
+const fieldPalettePrefix = "palette:";
+const fieldCanvasDropId = "field-canvas";
+const paletteDragDistanceThreshold = 8;
+const fieldTypeIcons: Record<FieldType, LucideIcon> = {
+  Text: Type,
+  TextArea: AlignLeft,
+  Number: Hash,
+  Email: Mail,
+  Select: List,
+  Radio: CircleDot,
+  Checkbox: SquareCheck,
+  Date: Calendar,
+};
+
 const initialFields: DesignerField[] = [
   {
     id: "customerName",
     key: "customerName",
-    label: "Musteri adi",
+    label: "Müşteri adı",
     type: "Text",
     required: true,
     sortOrder: 1,
@@ -53,13 +89,13 @@ const initialFields: DesignerField[] = [
     type: "Select",
     required: true,
     sortOrder: 2,
-    options: ["Izin", "Masraf", "Satinalma"],
+    options: ["İzin", "Masraf", "Satın Alma"],
     validationRules: [],
   },
   {
     id: "approvalNote",
     key: "approvalNote",
-    label: "Onay aciklamasi",
+    label: "Onay açıklaması",
     type: "Text",
     required: false,
     sortOrder: 3,
@@ -68,8 +104,8 @@ const initialFields: DesignerField[] = [
       {
         ruleType: "RequiredWhen",
         dependsOnFieldKey: "requestType",
-        expectedValue: "Satinalma",
-        message: "Satinalma taleplerinde onay aciklamasi zorunludur.",
+        expectedValue: "Satın Alma",
+        message: "Satın Alma taleplerinde onay açıklaması zorunludur.",
       },
     ],
   },
@@ -83,8 +119,8 @@ export function FormDesignerDraft() {
     [language],
   );
   const [fields, setFields] = useState<DesignerField[]>(initialFields);
-  const [formName, setFormName] = useState("Demo Surec Formu");
-  const [description, setDescription] = useState("Frontend tarafinda tasarlanan form modeli");
+  const [formName, setFormName] = useState("Demo Süreç Formu");
+  const [description, setDescription] = useState("Frontend tarafında tasarlanan form modeli");
   const [savedForms, setSavedForms] = useState<FormDefinition[]>([]);
   const [selectedFormId, setSelectedFormId] = useState("");
   const [isLoadingForms, setIsLoadingForms] = useState(false);
@@ -93,11 +129,17 @@ export function FormDesignerDraft() {
   const [required, setRequired] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
+  const [highlightedFieldId, setHighlightedFieldId] = useState("");
+  const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: paletteDragDistanceThreshold,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
@@ -108,7 +150,7 @@ export function FormDesignerDraft() {
       name: formName,
       description,
       fields: fields.map((field, index) => ({
-        key: field.key.trim(),
+        key: createDesignerFieldKey(field.key, index + 1),
         label: field.label.trim(),
         type: field.type,
         required: field.required,
@@ -116,7 +158,7 @@ export function FormDesignerDraft() {
         options: fieldTypeUsesOptions(field.type) ? field.options.map((option) => option.trim()).filter(Boolean) : [],
         validationRules: field.validationRules.map((rule) => ({
           ruleType: rule.ruleType,
-          dependsOnFieldKey: rule.dependsOnFieldKey.trim(),
+          dependsOnFieldKey: createDesignerFieldKey(rule.dependsOnFieldKey, 1),
           expectedValue: rule.expectedValue.trim(),
           message: rule.message.trim(),
         })),
@@ -158,10 +200,54 @@ export function FormDesignerDraft() {
     };
   }, [token, language, t]);
 
+  useEffect(() => {
+    if (!highlightedFieldId) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setHighlightedFieldId(""), 1800);
+    return () => window.clearTimeout(timeoutId);
+  }, [highlightedFieldId]);
+
+  function handleDragStart(event: DragStartEvent) {
+    if (isPaletteDragId(event.active.id)) {
+      setPaletteInsertIndex(fields.length);
+    }
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    if (!isPaletteDragId(event.active.id)) {
+      return;
+    }
+
+    setPaletteInsertIndex(resolvePaletteInsertIndex(event, fields));
+  }
+
+  function handleDragCancel(event: DragCancelEvent) {
+    if (isPaletteDragId(event.active.id)) {
+      setPaletteInsertIndex(null);
+    }
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (!over || active.id === over.id) {
+    if (!over) {
+      setPaletteInsertIndex(null);
+      return;
+    }
+
+    if (isPaletteDragId(active.id)) {
+      const fieldType = active.data.current?.fieldType;
+      const insertIndex = resolvePaletteInsertIndex(event, fields);
+      if (insertIndex !== null && hasPaletteDragDistance(event.delta) && isSupportedFieldType(fieldType)) {
+        addFieldFromPalette(fieldType, insertIndex);
+      }
+      setPaletteInsertIndex(null);
+      return;
+    }
+
+    if (active.id === over.id) {
       return;
     }
 
@@ -176,6 +262,39 @@ export function FormDesignerDraft() {
       return normalizeSortOrder(arrayMove(current, oldIndex, newIndex));
     });
     markUnsaved();
+  }
+
+  function addFieldFromPalette(fieldType: FieldType, insertIndex: number) {
+    const defaultLabel = getPaletteFieldDefaultLabel(language, fieldType);
+    const addedFieldId = `palette-${fieldType}-${Date.now()}`;
+
+    setFields((current) => {
+      const safeInsertIndex = Math.min(Math.max(insertIndex, 0), current.length);
+      const field = createDefaultField({
+        label: defaultLabel,
+        type: fieldType,
+        required: false,
+        sortOrder: safeInsertIndex + 1,
+        language,
+      });
+      const nextField: DesignerField = {
+        ...field,
+        id: addedFieldId,
+      };
+      const nextFields = [...current];
+      nextFields.splice(safeInsertIndex, 0, nextField);
+
+      return normalizeSortOrder(nextFields);
+    });
+    setSaveState("idle");
+    setMessage(t("form.designer.fieldAddedFromPalette", { label: defaultLabel }));
+    setHighlightedFieldId(addedFieldId);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`designer-field-${addedFieldId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
   }
 
   function addField() {
@@ -405,8 +524,8 @@ export function FormDesignerDraft() {
 
   function resetDesigner() {
     setSelectedFormId("");
-    setFormName("Demo Surec Formu");
-    setDescription("Frontend tarafinda tasarlanan form modeli");
+    setFormName("Demo Süreç Formu");
+    setDescription("Frontend tarafında tasarlanan form modeli");
     setFields(initialFields);
     setSaveState("idle");
     setMessage(t("form.designer.draftReady"));
@@ -455,104 +574,126 @@ export function FormDesignerDraft() {
         <p>{t("form.designer.description")}</p>
       </div>
 
-      <div className="designer-grid">
-        <div className="tool-panel">
-          <h3>{t("form.designer.formInfo")}</h3>
-          <label>
-            {t("form.designer.savedForm")}
-            <select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}>
-              <option value="">{isLoadingForms ? t("form.designer.loadingForms") : t("form.designer.newDraft")}</option>
-              {savedForms.map((form) => (
-                <option key={form.id} value={form.id}>
-                  {form.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            {t("form.designer.formName")}
-            <input
-              value={formName}
-              onChange={(event) => {
-                setFormName(event.target.value);
-                markUnsaved();
-              }}
-            />
-          </label>
-          <label>
-            {t("form.designer.descriptionLabel")}
-            <input
-              value={description}
-              onChange={(event) => {
-                setDescription(event.target.value);
-                markUnsaved();
-              }}
-            />
-          </label>
-          <p className="helper-copy">
-            {selectedFormId
-              ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
-              : t("form.designer.createOnSave")}
-          </p>
-          <button className="secondary-button" disabled={saveState === "saving"} type="button" onClick={resetDesigner}>
-            <Plus size={18} />
-            {t("form.designer.newForm")}
-          </button>
-          <button className="primary-button" disabled={saveState === "saving"} type="button" onClick={saveForm}>
-            <Save size={18} />
-            {saveState === "saving"
-              ? t("form.designer.saving")
-              : selectedFormId
-                ? t("form.designer.updateForm")
-                : t("form.designer.saveForm")}
-          </button>
-          {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
-          <p className={`status-line status-line-${saveState}`}>{message}</p>
-          <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
-            <li>{t("form.designer.demoStepEdit")}</li>
-            <li>{t("form.designer.demoStepOptions")}</li>
-            <li>{t("form.designer.demoStepRequiredWhen")}</li>
-            <li>{t("form.designer.demoStepOrdering")}</li>
-          </ol>
-        </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragCancel={handleDragCancel}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+        onDragStart={handleDragStart}
+      >
+        <div className="designer-grid">
+          <div className="tool-panel">
+            <h3>{t("form.designer.formInfo")}</h3>
+            <label>
+              {t("form.designer.savedForm")}
+              <select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}>
+                <option value="">{isLoadingForms ? t("form.designer.loadingForms") : t("form.designer.newDraft")}</option>
+                {savedForms.map((form) => (
+                  <option key={form.id} value={form.id}>
+                    {form.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {t("form.designer.formName")}
+              <input
+                value={formName}
+                onChange={(event) => {
+                  setFormName(event.target.value);
+                  markUnsaved();
+                }}
+              />
+            </label>
+            <label>
+              {t("form.designer.descriptionLabel")}
+              <input
+                value={description}
+                onChange={(event) => {
+                  setDescription(event.target.value);
+                  markUnsaved();
+                }}
+              />
+            </label>
+            <p className="helper-copy">
+              {selectedFormId
+                ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
+                : t("form.designer.createOnSave")}
+            </p>
+            <button className="secondary-button" disabled={saveState === "saving"} type="button" onClick={resetDesigner}>
+              <Plus size={18} />
+              {t("form.designer.newForm")}
+            </button>
+            <button className="primary-button" disabled={saveState === "saving"} type="button" onClick={saveForm}>
+              <Save size={18} />
+              {saveState === "saving"
+                ? t("form.designer.saving")
+                : selectedFormId
+                  ? t("form.designer.updateForm")
+                  : t("form.designer.saveForm")}
+            </button>
+            {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
+            <p className={`status-line status-line-${saveState}`} aria-live="polite">
+              {message}
+            </p>
+            <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
+              <li>{t("form.designer.demoStepEdit")}</li>
+              <li>{t("form.designer.demoStepOptions")}</li>
+              <li>{t("form.designer.demoStepRequiredWhen")}</li>
+              <li>{t("form.designer.demoStepOrdering")}</li>
+            </ol>
+          </div>
 
-        <div className="tool-panel">
-          <h3>{t("form.designer.addFieldTitle")}</h3>
-          <label>
-            {t("form.designer.label")}
-            <input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("form.designer.labelPlaceholder")} />
-          </label>
-          <label>
-            {t("form.designer.type")}
-            <select value={type} onChange={(event) => setType(event.target.value as FieldType)}>
-              {supportedFieldTypes.map((fieldType) => (
-                <option key={fieldType} value={fieldType}>
-                  {fieldTypeLabel(language, fieldType)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="checkbox-row">
-            <input checked={required} onChange={(event) => setRequired(event.target.checked)} type="checkbox" />
-            {t("form.designer.requiredField")}
-          </label>
-          <button className="secondary-button" type="button" onClick={addField}>
-            <Plus size={18} />
-            {t("form.designer.addField")}
-          </button>
-        </div>
+          <div className="tool-panel">
+            <h3>{t("form.designer.addFieldTitle")}</h3>
+            <label>
+              {t("form.designer.label")}
+              <input
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder={t("form.designer.labelPlaceholder")}
+              />
+            </label>
+            <label>
+              {t("form.designer.type")}
+              <select value={type} onChange={(event) => setType(event.target.value as FieldType)}>
+                {supportedFieldTypes.map((fieldType) => (
+                  <option key={fieldType} value={fieldType}>
+                    {fieldTypeLabel(language, fieldType)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="checkbox-row">
+              <input checked={required} onChange={(event) => setRequired(event.target.checked)} type="checkbox" />
+              {t("form.designer.requiredField")}
+            </label>
+            <button className="secondary-button" type="button" onClick={addField}>
+              <Plus size={18} />
+              {t("form.designer.addField")}
+            </button>
+          </div>
 
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={fields.map((field) => field.id)} strategy={verticalListSortingStrategy}>
-            <div className="field-list" aria-label={t("form.designer.fieldListAria")}>
+            <FieldCanvasDropZone label={t("form.designer.fieldListAria")}>
               <div className="designer-help-panel">
-                <strong>{t("form.designer.fieldListHelpTitle")}</strong>
-                <span>{t("form.designer.fieldListHelpDescription")}</span>
+                <strong>{t("form.designer.dropZoneTitle")}</strong>
+                <span>
+                  {t("form.designer.fieldListHelpDescription")} {t("form.designer.dropZoneDescription")}
+                </span>
               </div>
               {fields.map((field, index) => (
                 <SortableFieldCard id={field.id} key={field.id}>
                   {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
-                    <article className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}`}>
+                    <>
+                      {paletteInsertIndex === index ? <div className="field-insert-indicator" /> : null}
+                      <article
+                        className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
+                          highlightedFieldId === field.id ? " field-editor-highlighted" : ""
+                        }`}
+                        id={`designer-field-${field.id}`}
+                      >
                       <div className="field-editor-header">
                         <div>
                           <strong>{field.label || t("form.designer.untitledField")}</strong>
@@ -605,7 +746,11 @@ export function FormDesignerDraft() {
                       <div className="field-editor-grid">
                         <label>
                           Key
-                          <input value={field.key} onChange={(event) => updateField(field.id, { key: event.target.value })} />
+                          <input
+                            value={field.key}
+                            onBlur={(event) => updateField(field.id, { key: createDesignerFieldKey(event.target.value, index + 1) })}
+                            onChange={(event) => updateField(field.id, { key: event.target.value })}
+                          />
                           {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
                         </label>
                         <label>
@@ -668,7 +813,6 @@ export function FormDesignerDraft() {
                         <div className="rule-editor-header">
                           <div>
                             <strong>{t("form.designer.dependentValidation")}</strong>
-                            <span>{t("form.designer.requiredWhenDescription")}</span>
                           </div>
                           <button
                             className="secondary-button"
@@ -738,24 +882,89 @@ export function FormDesignerDraft() {
                           })}
                         </div>
                       </div>
-                    </article>
+                      </article>
+                    </>
                   )}
                 </SortableFieldCard>
               ))}
-            </div>
+              {paletteInsertIndex === fields.length ? <div className="field-insert-indicator" /> : null}
+            </FieldCanvasDropZone>
           </SortableContext>
-        </DndContext>
 
-        <div className="json-preview-panel">
-          <div>
-            <span className="eyebrow">{t("form.designer.jsonPreviewEyebrow")}</span>
-            <h3>{t("form.designer.jsonPreviewTitle")}</h3>
-            <p>{t("form.designer.jsonPreviewDescription")}</p>
+          <div className="json-preview-panel">
+            <div>
+              <span className="eyebrow">{t("form.designer.jsonPreviewEyebrow")}</span>
+              <h3>{t("form.designer.jsonPreviewTitle")}</h3>
+              <p>{t("form.designer.jsonPreviewDescription")}</p>
+            </div>
+            <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
           </div>
-          <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
+
+          <aside className="field-palette-rail" aria-label={t("form.designer.fieldPaletteStickyTitle")}>
+            <div className="field-palette">
+              <div className="field-palette-header">
+                <strong>{t("form.designer.fieldPaletteStickyTitle")}</strong>
+                <span>{t("form.designer.fieldPaletteStickyDescription")}</span>
+              </div>
+              <div className="field-palette-grid">
+                {supportedFieldTypes.map((fieldType) => (
+                  <PaletteFieldTypeCard fieldType={fieldType} key={fieldType} language={language} />
+                ))}
+              </div>
+            </div>
+          </aside>
         </div>
-      </div>
+      </DndContext>
     </section>
+  );
+}
+
+function PaletteFieldTypeCard({
+  fieldType,
+  language,
+}: {
+  fieldType: FieldType;
+  language: Language;
+}) {
+  const label = fieldTypeLabel(language, fieldType);
+  const description = translate(language, `form.designer.fieldType${fieldType}Description` as TranslationKey);
+  const FieldTypeIcon = fieldTypeIcons[fieldType];
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `${fieldPalettePrefix}${fieldType}`,
+    data: { fieldType },
+  });
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`field-palette-item${isDragging ? " field-palette-item-dragging" : ""}`}
+      style={style}
+      aria-label={translate(language, "form.designer.dragFieldType", { type: label })}
+      {...attributes}
+      {...listeners}
+    >
+      <span className="field-palette-icon" aria-hidden="true">
+        <FieldTypeIcon size={18} />
+      </span>
+      <span className="field-palette-item-copy">
+        <strong>{label}</strong>
+        <span>{description}</span>
+      </span>
+      <GripVertical className="field-palette-grip" size={16} aria-hidden="true" />
+    </div>
+  );
+}
+
+function FieldCanvasDropZone({ children, label }: { children: ReactNode; label: string }) {
+  const { isOver, setNodeRef } = useDroppable({ id: fieldCanvasDropId });
+
+  return (
+    <div ref={setNodeRef} className={`field-list${isOver ? " field-list-drop-active" : ""}`} aria-label={label}>
+      {children}
+    </div>
   );
 }
 
@@ -788,6 +997,51 @@ function normalizeSortOrder(fields: DesignerField[]) {
   return fields.map((field, index) => ({ ...field, sortOrder: index + 1 }));
 }
 
+function createDesignerFieldKey(value: string, fallbackIndex: number) {
+  return createFieldKey(value, fallbackIndex);
+}
+
+function isPaletteDragId(id: DragEndEvent["active"]["id"]) {
+  return String(id).startsWith(fieldPalettePrefix);
+}
+
+function hasPaletteDragDistance(delta: DragEndEvent["delta"]) {
+  return Math.hypot(delta.x, delta.y) >= paletteDragDistanceThreshold;
+}
+
+function resolvePaletteInsertIndex(event: DragOverEvent | DragEndEvent, fields: DesignerField[]) {
+  const over = event.over;
+  if (!over) {
+    return null;
+  }
+
+  if (over.id === fieldCanvasDropId) {
+    return fields.length;
+  }
+
+  const overFieldIndex = fields.findIndex((field) => field.id === over.id);
+  if (overFieldIndex < 0) {
+    return null;
+  }
+
+  const translatedRect = event.active.rect.current.translated;
+  if (!translatedRect) {
+    return overFieldIndex;
+  }
+
+  const activeCenterY = translatedRect.top + translatedRect.height / 2;
+  const overMiddleY = over.rect.top + over.rect.height / 2;
+  return activeCenterY > overMiddleY ? overFieldIndex + 1 : overFieldIndex;
+}
+
+function isSupportedFieldType(value: unknown): value is FieldType {
+  return supportedFieldTypes.includes(value as FieldType);
+}
+
+function getPaletteFieldDefaultLabel(language: Language, fieldType: FieldType) {
+  return translate(language, `form.designer.fieldType${fieldType}Label` as TranslationKey);
+}
+
 function toDesignerFields(form: FormDefinition) {
   return normalizeSortOrder(
     form.fields.map((field, index) => ({
@@ -814,7 +1068,7 @@ type DesignerFieldErrors = Record<string, { key?: string; label?: string; option
 function validateDesignerFields(fields: DesignerField[], language: Language) {
   const errors: DesignerFieldErrors = {};
   const keyCounts = fields.reduce<Record<string, number>>((current, field) => {
-    const key = field.key.trim().toLowerCase();
+    const key = createDesignerFieldKey(field.key, field.sortOrder).toLowerCase();
     if (key) {
       current[key] = (current[key] ?? 0) + 1;
     }
@@ -824,7 +1078,7 @@ function validateDesignerFields(fields: DesignerField[], language: Language) {
 
   for (const field of fields) {
     const fieldError: DesignerFieldErrors[string] = {};
-    const key = field.key.trim();
+    const key = createDesignerFieldKey(field.key, field.sortOrder);
 
     if (!key) {
       fieldError.key = translate(language, "form.validation.fieldKeyRequired");
@@ -840,11 +1094,17 @@ function validateDesignerFields(fields: DesignerField[], language: Language) {
       const filledOptions = field.options.map((option) => option.trim()).filter(Boolean);
       if (filledOptions.length === 0) {
         fieldError.options = translate(language, "form.validation.optionsRequired");
+      } else if (field.options.some((option) => option.trim().length === 0)) {
+        fieldError.options = translate(language, "form.validation.optionValueRequired");
+      } else if (new Set(filledOptions.map((option) => option.toLocaleLowerCase("tr"))).size !== filledOptions.length) {
+        fieldError.options = translate(language, "form.validation.optionValueUnique");
       }
     }
 
     for (const [ruleIndex, rule] of field.validationRules.entries()) {
-      const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey.trim());
+      const dependency = fields.find(
+        (candidate) => createDesignerFieldKey(candidate.key, candidate.sortOrder) === createDesignerFieldKey(rule.dependsOnFieldKey, 1),
+      );
       const ruleError = validateRequiredWhenRule(field, rule, dependency, language);
       if (ruleError) {
         fieldError.rules = { ...fieldError.rules, [ruleIndex]: ruleError };
@@ -872,7 +1132,7 @@ function getDefaultExpectedValue(field: DesignerField) {
     return "true";
   }
 
-  if (field.type === "Select") {
+  if (field.type === "Select" || field.type === "Radio") {
     return field.options.map((option) => option.trim()).find(Boolean) ?? "";
   }
 
@@ -900,7 +1160,7 @@ function validateRequiredWhenRule(field: DesignerField, rule: ValidationRule, de
     return translate(language, "form.validation.expectedValueRequired");
   }
 
-  if (dependency.type === "Select") {
+  if (dependency.type === "Select" || dependency.type === "Radio") {
     const options = dependency.options.map((option) => option.trim()).filter(Boolean);
     if (!options.includes(rule.expectedValue.trim())) {
       return translate(language, "form.validation.expectedSelectOption");
@@ -928,7 +1188,7 @@ function ExpectedValueInput({
   const label = translate(language, "form.designer.expectedValue");
   const selectValue = translate(language, "form.designer.selectValue");
 
-  if (dependency?.type === "Select") {
+  if (dependency?.type === "Select" || dependency?.type === "Radio") {
     const options = dependency.options.map((option) => option.trim()).filter(Boolean);
 
     return (

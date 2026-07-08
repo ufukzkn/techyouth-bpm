@@ -29,8 +29,12 @@ export function validateFormValues(form: FormDefinition, values: FormValues, lan
         nextErrors[field.key] = translate(language, "form.validation.date");
       }
 
-      if (field.type === "Select" && typeof value === "string" && !field.options.includes(value)) {
+      if ((field.type === "Select" || field.type === "Radio") && (typeof value !== "string" || !field.options.includes(value))) {
         nextErrors[field.key] = translate(language, "form.validation.select");
+      }
+
+      if (field.type === "TextArea" && typeof value !== "string") {
+        nextErrors[field.key] = translate(language, "form.validation.required", { label: field.label });
       }
 
       if (field.type === "Checkbox" && typeof value !== "boolean") {
