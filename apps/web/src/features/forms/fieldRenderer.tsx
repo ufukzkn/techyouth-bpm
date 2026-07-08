@@ -14,6 +14,16 @@ type FieldRendererProps = {
 };
 
 export function FieldRenderer({ field, value, error, language, onChange }: FieldRendererProps) {
+  if (field.type === "Radio") {
+    return (
+      <fieldset className="runner-radio-group">
+        <legend>{field.label}</legend>
+        <FieldInput field={field} value={value} language={language} onChange={onChange} />
+        {error ? <span className="field-error">{error}</span> : null}
+      </fieldset>
+    );
+  }
+
   const labelClassName = field.type === "Checkbox" ? "checkbox-row runner-checkbox" : undefined;
 
   return (
@@ -59,6 +69,35 @@ function FieldInput({
           </option>
         ))}
       </select>
+    );
+  }
+
+  if (field.type === "Radio") {
+    return (
+      <div className="runner-radio-options">
+        {field.options.map((option) => (
+          <label className="checkbox-row runner-radio-option" key={option}>
+            <input
+              checked={String(value ?? "") === option}
+              name={field.key}
+              onChange={() => onChange(field.key, option)}
+              type="radio"
+              value={option}
+            />
+            {option}
+          </label>
+        ))}
+      </div>
+    );
+  }
+
+  if (field.type === "TextArea") {
+    return (
+      <textarea
+        value={String(value ?? "")}
+        onChange={(event) => onChange(field.key, event.target.value)}
+        rows={4}
+      />
     );
   }
 

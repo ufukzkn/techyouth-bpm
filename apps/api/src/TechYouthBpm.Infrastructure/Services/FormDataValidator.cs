@@ -79,10 +79,14 @@ internal static class FormDataValidator
             case FieldType.Email when value.ValueKind != JsonValueKind.String || !value.GetString()!.Contains('@'):
                 errors.Add($"{field.Label} must be a valid email.");
                 break;
+            case FieldType.TextArea when value.ValueKind != JsonValueKind.String:
+                errors.Add($"{field.Label} must be text.");
+                break;
             case FieldType.Checkbox when value.ValueKind is not JsonValueKind.True and not JsonValueKind.False:
                 errors.Add($"{field.Label} must be true or false.");
                 break;
-            case FieldType.Select when value.ValueKind == JsonValueKind.String && !field.Options.Contains(value.GetString()):
+            case FieldType.Select when value.ValueKind != JsonValueKind.String || !field.Options.Contains(value.GetString()):
+            case FieldType.Radio when value.ValueKind != JsonValueKind.String || !field.Options.Contains(value.GetString()):
                 errors.Add($"{field.Label} must be one of the defined options.");
                 break;
         }
