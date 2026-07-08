@@ -18,6 +18,9 @@ public static class DatabaseSeeder
     private static readonly Guid AtibaId = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid AlexId = Guid.Parse("77777777-7777-7777-7777-777777777777");
     private static readonly Guid FatihTerimId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+    private static readonly Guid SergenYalcinId = Guid.Parse("99999999-1111-1111-1111-111111111111");
+    private static readonly Guid TuncaySanliId = Guid.Parse("99999999-2222-2222-2222-222222222222");
+    private static readonly Guid VolkanDemirelId = Guid.Parse("99999999-3333-3333-3333-333333333333");
 
     public static async Task SeedAsync(AppDbContext db, bool seedMockData = true, CancellationToken cancellationToken = default)
     {
@@ -57,6 +60,52 @@ public static class DatabaseSeeder
                     cancellationToken);
             }
 
+            if (!await SqliteColumnExistsAsync(db, "UserSessions", "RememberedDevice", cancellationToken))
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE UserSessions ADD COLUMN RememberedDevice INTEGER NOT NULL DEFAULT 0",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync(db, "Users", "PasswordResetToken", cancellationToken))
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE Users ADD COLUMN PasswordResetToken TEXT NULL",
+                    cancellationToken);
+            }
+
+            if (!await SqliteColumnExistsAsync(db, "Users", "PasswordResetTokenExpiresAt", cancellationToken))
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE Users ADD COLUMN PasswordResetTokenExpiresAt TEXT NULL",
+                    cancellationToken);
+            }
+
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS RefreshTokens (
+                    Id TEXT NOT NULL CONSTRAINT PK_RefreshTokens PRIMARY KEY,
+                    Token TEXT NOT NULL,
+                    UserId TEXT NOT NULL,
+                    UserSessionId TEXT NOT NULL,
+                    CreatedAt TEXT NOT NULL,
+                    ExpiresAt TEXT NOT NULL,
+                    RevokedAt TEXT NULL,
+                    ReplacedByRefreshTokenId TEXT NULL,
+                    CreatedByIpAddress TEXT NULL,
+                    CreatedByUserAgent TEXT NULL,
+                    CONSTRAINT FK_RefreshTokens_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE,
+                    CONSTRAINT FK_RefreshTokens_UserSessions_UserSessionId FOREIGN KEY (UserSessionId) REFERENCES UserSessions (Id) ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE UNIQUE INDEX IF NOT EXISTS IX_RefreshTokens_Token ON RefreshTokens (Token)",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE INDEX IF NOT EXISTS IX_RefreshTokens_UserSessionId ON RefreshTokens (UserSessionId)",
+                cancellationToken);
+
             return;
         }
 
@@ -70,6 +119,39 @@ public static class DatabaseSeeder
                 cancellationToken);
             await db.Database.ExecuteSqlRawAsync(
                 """ALTER TABLE "UserSessions" ADD COLUMN IF NOT EXISTS "UserAgent" text NULL""",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "UserSessions" ADD COLUMN IF NOT EXISTS "RememberedDevice" boolean NOT NULL DEFAULT false""",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "PasswordResetToken" text NULL""",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "PasswordResetTokenExpiresAt" timestamp with time zone NULL""",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE IF NOT EXISTS "RefreshTokens" (
+                    "Id" uuid NOT NULL CONSTRAINT "PK_RefreshTokens" PRIMARY KEY,
+                    "Token" text NOT NULL,
+                    "UserId" uuid NOT NULL,
+                    "UserSessionId" uuid NOT NULL,
+                    "CreatedAt" timestamp with time zone NOT NULL,
+                    "ExpiresAt" timestamp with time zone NOT NULL,
+                    "RevokedAt" timestamp with time zone NULL,
+                    "ReplacedByRefreshTokenId" uuid NULL,
+                    "CreatedByIpAddress" text NULL,
+                    "CreatedByUserAgent" text NULL,
+                    CONSTRAINT "FK_RefreshTokens_Users_UserId" FOREIGN KEY ("UserId") REFERENCES "Users" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_RefreshTokens_UserSessions_UserSessionId" FOREIGN KEY ("UserSessionId") REFERENCES "UserSessions" ("Id") ON DELETE CASCADE
+                )
+                """,
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """CREATE UNIQUE INDEX IF NOT EXISTS "IX_RefreshTokens_Token" ON "RefreshTokens" ("Token")""",
+                cancellationToken);
+            await db.Database.ExecuteSqlRawAsync(
+                """CREATE INDEX IF NOT EXISTS "IX_RefreshTokens_UserSessionId" ON "RefreshTokens" ("UserSessionId")""",
                 cancellationToken);
         }
     }
@@ -97,13 +179,21 @@ public static class DatabaseSeeder
 
     private static async Task SeedUsersAsync(AppDbContext db, CancellationToken cancellationToken)
     {
+        var seedUsers = BuildSeedUsers();
         if (await db.Users.AnyAsync(cancellationToken))
         {
             await UpgradePlainTextPasswordsAsync(db, cancellationToken);
+            await AddMissingSeedUsersAsync(db, seedUsers, cancellationToken);
             return;
         }
 
-        db.Users.AddRange(
+        db.Users.AddRange(seedUsers);
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static IReadOnlyList<User> BuildSeedUsers() =>
+        [
             new User
             {
                 Id = AdminId,
@@ -199,9 +289,67 @@ public static class DatabaseSeeder
                 Status = UserStatus.PendingApproval,
                 IsEmailVerified = false,
                 CreatedAt = DateTime.UtcNow.AddDays(-3)
-            });
+            },
+            new User
+            {
+                Id = SergenYalcinId,
+                Username = "sergen.yalcin",
+                DisplayName = "Sergen Yalcin",
+                Email = "sergen.yalcin@techyouth.local",
+                Password = PasswordHasher.Hash("sergen123"),
+                Role = Role.Approver,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-7)
+            },
+            new User
+            {
+                Id = TuncaySanliId,
+                Username = "tuncay.sanli",
+                DisplayName = "Tuncay Sanli",
+                Email = "tuncay.sanli@techyouth.local",
+                Password = PasswordHasher.Hash("tuncay123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-5)
+            },
+            new User
+            {
+                Id = VolkanDemirelId,
+                Username = "volkan.demirel",
+                DisplayName = "Volkan Demirel",
+                Email = "volkan.demirel@techyouth.local",
+                Password = PasswordHasher.Hash("volkan123"),
+                Role = Role.User,
+                Status = UserStatus.Rejected,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-4)
+            }
+        ];
 
-        await db.SaveChangesAsync(cancellationToken);
+    private static async Task AddMissingSeedUsersAsync(
+        AppDbContext db,
+        IReadOnlyList<User> seedUsers,
+        CancellationToken cancellationToken)
+    {
+        var existingUsernames = await db.Users
+            .Select(user => user.Username)
+            .ToListAsync(cancellationToken);
+        var existingEmails = await db.Users
+            .Select(user => user.Email)
+            .ToListAsync(cancellationToken);
+        var usernameSet = existingUsernames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var emailSet = existingEmails.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missingUsers = seedUsers
+            .Where(user => !usernameSet.Contains(user.Username) && !emailSet.Contains(user.Email))
+            .ToArray();
+
+        if (missingUsers.Length > 0)
+        {
+            db.Users.AddRange(missingUsers);
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static async Task UpgradePlainTextPasswordsAsync(AppDbContext db, CancellationToken cancellationToken)
@@ -223,11 +371,6 @@ public static class DatabaseSeeder
 
     private static async Task SeedMockWorkflowDataAsync(AppDbContext db, CancellationToken cancellationToken)
     {
-        if (await db.FormDefinitions.AnyAsync(form => form.Name == "Transfer Talep Formu", cancellationToken))
-        {
-            return;
-        }
-
         var transferForm = new FormDefinition
         {
             Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001"),
@@ -282,9 +425,39 @@ public static class DatabaseSeeder
             ]
         };
 
-        db.FormDefinitions.AddRange(transferForm, campForm);
-        db.ProcessInstances.AddRange(BuildMockProcesses(transferForm.Id, campForm.Id));
-        db.SystemAuditLogs.AddRange(BuildMockSystemAuditLogs());
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == transferForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(transferForm);
+        }
+
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == campForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(campForm);
+        }
+
+        var existingProcessIds = await db.ProcessInstances
+            .Select(process => process.Id)
+            .ToListAsync(cancellationToken);
+        var existingProcessIdSet = existingProcessIds.ToHashSet();
+        var missingProcesses = BuildMockProcesses(transferForm.Id, campForm.Id)
+            .Where(process => !existingProcessIdSet.Contains(process.Id))
+            .ToArray();
+        if (missingProcesses.Length > 0)
+        {
+            db.ProcessInstances.AddRange(missingProcesses);
+        }
+
+        var existingSystemLogIds = await db.SystemAuditLogs
+            .Select(log => log.Id)
+            .ToListAsync(cancellationToken);
+        var existingSystemLogIdSet = existingSystemLogIds.ToHashSet();
+        var missingSystemLogs = BuildMockSystemAuditLogs()
+            .Where(log => !existingSystemLogIdSet.Contains(log.Id))
+            .ToArray();
+        if (missingSystemLogs.Length > 0)
+        {
+            db.SystemAuditLogs.AddRange(missingSystemLogs);
+        }
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -444,6 +617,70 @@ public static class DatabaseSeeder
                     bonservis = 1000000,
                     acilMi = false,
                     gerekce = "Denge lazim."
+                }),
+            Process(
+                "cccccccc-0000-0000-0000-000000000009",
+                transferFormId,
+                ProcessStatus.Completed,
+                now.AddHours(-6),
+                new
+                {
+                    talepSahibi = "Sergen Yalcin",
+                    oyuncuAdi = "Cenk Tosun",
+                    kulup = "Besiktas",
+                    pozisyon = "Forvet",
+                    bonservis = 3200000,
+                    acilMi = false,
+                    gerekce = "Rotasyon gucu artirilsin."
+                },
+                completedAt: now.AddHours(-4),
+                completedByUserId: SergenYalcinId,
+                completedNote: "Forvet rotasyonu icin onaylandi."),
+            Process(
+                "cccccccc-0000-0000-0000-000000000010",
+                campFormId,
+                ProcessStatus.InProgress,
+                now.AddHours(-5),
+                new
+                {
+                    sorumlu = "Tuncay Sanli",
+                    hedefKisi = "Arda Guler",
+                    kategori = "Saglik",
+                    tarih = now.AddDays(2).ToString("yyyy-MM-dd"),
+                    iletisim = "tuncay.sanli@example.com",
+                    not = "Genc oyuncu takip ve saglik kontrol listesi."
+                }),
+            Process(
+                "cccccccc-0000-0000-0000-000000000011",
+                transferFormId,
+                ProcessStatus.Rejected,
+                now.AddHours(-3),
+                new
+                {
+                    talepSahibi = "Volkan Demirel",
+                    oyuncuAdi = "Demba Ba",
+                    kulup = "Serbest",
+                    pozisyon = "Forvet",
+                    bonservis = 5000000,
+                    acilMi = true,
+                    gerekce = "Acil gol katkisi beklentisi."
+                },
+                completedAt: now.AddHours(-2),
+                completedByUserId: ApproverId,
+                completedNote: "Acil talep gerekcesi yeterli bulunmadi."),
+            Process(
+                "cccccccc-0000-0000-0000-000000000012",
+                campFormId,
+                ProcessStatus.InProgress,
+                now.AddMinutes(-90),
+                new
+                {
+                    sorumlu = "Ali Koc",
+                    hedefKisi = "Jose Mourinho",
+                    kategori = "Basina Aciklama",
+                    tarih = now.AddDays(1).ToString("yyyy-MM-dd"),
+                    iletisim = "ali.koc@example.com",
+                    not = "Basina aciklama taslagi icin onay bekleniyor."
                 })
         ];
     }
@@ -588,7 +825,55 @@ public static class DatabaseSeeder
                 "User",
                 FatihTerimId.ToString(),
                 "Fatih Terim requested Admin-level access and is waiting for approval.",
-                now.AddHours(-8))
+                now.AddHours(-8)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000009",
+                AdminId,
+                "User.CreatedByAdmin",
+                "User",
+                SergenYalcinId.ToString(),
+                "Admin created Sergen Yalcin as an Approver demo user.",
+                now.AddHours(-7)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000010",
+                SergenYalcinId,
+                "Auth.LoginSucceeded",
+                "Session",
+                "demo-sergen-session",
+                "Sergen Yalcin signed in to review transfer requests.",
+                now.AddHours(-6)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000011",
+                TuncaySanliId,
+                "Process.Started",
+                "ProcessInstance",
+                "cccccccc-0000-0000-0000-000000000010",
+                "Tuncay Sanli started a health follow-up process.",
+                now.AddHours(-5)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000012",
+                SergenYalcinId,
+                "Task.Approve",
+                "ProcessTask",
+                "dddddddd-0000-0000-0000-000000000009",
+                "Sergen Yalcin approved a transfer rotation process.",
+                now.AddHours(-4)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000013",
+                VolkanDemirelId,
+                "Auth.LoginFailed",
+                "User",
+                VolkanDemirelId.ToString(),
+                "Rejected demo user Volkan Demirel attempted to sign in.",
+                now.AddHours(-3)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000014",
+                ApproverId,
+                "Task.Reject",
+                "ProcessTask",
+                "dddddddd-0000-0000-0000-000000000011",
+                "Process Approver rejected a late urgent transfer request.",
+                now.AddHours(-2))
         ];
     }
 

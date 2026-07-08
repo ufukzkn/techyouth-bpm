@@ -17,5 +17,7 @@ public class User
     public DateTime? LockedUntil { get; set; }
     public string? EmailVerificationCode { get; set; }
     public DateTime? EmailVerificationCodeExpiresAt { get; set; }
+    public string? PasswordResetToken { get; set; }
+    public DateTime? PasswordResetTokenExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

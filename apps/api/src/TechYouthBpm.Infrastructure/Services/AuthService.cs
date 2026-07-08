@@ -24,6 +24,9 @@ public class AuthService(
     private const int DefaultLockoutMinutes = 10;
     private const int DefaultEmailVerificationMinutes = 1440;
     private const int DefaultEmailVerificationResendCooldownMinutes = 5;
+    private const int DefaultRefreshTokenDurationMinutes = 43200;
+    private const int DefaultPasswordResetMinutes = 30;
+    private const string GenericForgotPasswordMessage = "If the account exists, a password reset email was sent.";
 
     public AuthService(AppDbContext db, IConfiguration configuration)
         : this(db, configuration, new SystemAuditService(db), new OtpService(), new DemoEmailSender())
@@ -155,18 +158,37 @@ public class AuthService(
         user.LockedUntil = null;
 
         var rawToken = SessionTokenHasher.CreateToken();
+        var csrfToken = SessionTokenHasher.CreateToken();
+        var rawRefreshToken = request.RememberMe ? SessionTokenHasher.CreateToken() : string.Empty;
+        var refreshTokenExpiresAt = DateTime.UtcNow.AddMinutes(GetRefreshTokenDurationMinutes());
         var session = new UserSession
         {
             Id = Guid.NewGuid(),
             Token = SessionTokenHasher.Hash(rawToken),
             UserId = user.Id,
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes(request.RememberMe)),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes(rememberMe: false)),
             IpAddress = TrimOrNull(ipAddress, 128),
-            UserAgent = TrimOrNull(userAgent, 512)
+            UserAgent = TrimOrNull(userAgent, 512),
+            RememberedDevice = request.RememberMe
         };
 
         db.UserSessions.Add(session);
+        if (request.RememberMe)
+        {
+            db.RefreshTokens.Add(new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                Token = SessionTokenHasher.Hash(rawRefreshToken),
+                UserId = user.Id,
+                UserSessionId = session.Id,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = refreshTokenExpiresAt,
+                CreatedByIpAddress = TrimOrNull(ipAddress, 128),
+                CreatedByUserAgent = TrimOrNull(userAgent, 512)
+            });
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
             user.Id,
@@ -176,7 +198,112 @@ public class AuthService(
             $"User '{user.Username}' signed in.",
             cancellationToken);
 
-        return Result<LoginResponse>.Success(new LoginResponse(rawToken, user.ToDto(), session.ExpiresAt));
+        return Result<LoginResponse>.Success(new LoginResponse(
+            rawToken,
+            user.ToDto(),
+            session.ExpiresAt,
+            csrfToken,
+            rawRefreshToken,
+            request.RememberMe ? refreshTokenExpiresAt : null));
+    }
+
+    public async Task<Result<LoginResponse>> RefreshSessionAsync(
+        string refreshToken,
+        string? ipAddress = null,
+        string? userAgent = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return Result<LoginResponse>.Failure("A valid refresh token is required.");
+        }
+
+        var refreshTokenHash = SessionTokenHasher.Hash(refreshToken);
+        var storedRefreshToken = await db.RefreshTokens
+            .Include(token => token.User)
+            .Include(token => token.UserSession)
+            .SingleOrDefaultAsync(token => token.Token == refreshTokenHash, cancellationToken);
+
+        if (storedRefreshToken is null)
+        {
+            return Result<LoginResponse>.Failure("A valid refresh token is required.");
+        }
+
+        if (storedRefreshToken.RevokedAt is not null)
+        {
+            await RevokeAllSessionsForUserAsync(storedRefreshToken.UserId, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+            await auditService.LogAsync(
+                storedRefreshToken.UserId,
+                "Auth.RefreshReuseDetected",
+                "Session",
+                storedRefreshToken.UserSessionId.ToString(),
+                "A revoked refresh token was reused; active sessions were revoked.",
+                cancellationToken);
+            return Result<LoginResponse>.Failure("Refresh session is no longer valid.");
+        }
+
+        if (storedRefreshToken.ExpiresAt <= DateTime.UtcNow
+            || storedRefreshToken.User is null
+            || storedRefreshToken.UserSession is null
+            || storedRefreshToken.User.Status != UserStatus.Active)
+        {
+            storedRefreshToken.RevokedAt ??= DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+            return Result<LoginResponse>.Failure("Refresh session is no longer valid.");
+        }
+
+        var user = storedRefreshToken.User;
+        var previousSession = storedRefreshToken.UserSession;
+        previousSession.RevokedAt = DateTime.UtcNow;
+        storedRefreshToken.RevokedAt = DateTime.UtcNow;
+
+        var rawToken = SessionTokenHasher.CreateToken();
+        var rawRefreshToken = SessionTokenHasher.CreateToken();
+        var csrfToken = SessionTokenHasher.CreateToken();
+        var refreshTokenExpiresAt = DateTime.UtcNow.AddMinutes(GetRefreshTokenDurationMinutes());
+        var newSession = new UserSession
+        {
+            Id = Guid.NewGuid(),
+            Token = SessionTokenHasher.Hash(rawToken),
+            UserId = user.Id,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(GetSessionDurationMinutes(rememberMe: false)),
+            IpAddress = TrimOrNull(ipAddress, 128),
+            UserAgent = TrimOrNull(userAgent, 512),
+            RememberedDevice = true
+        };
+        var newRefreshToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            Token = SessionTokenHasher.Hash(rawRefreshToken),
+            UserId = user.Id,
+            UserSessionId = newSession.Id,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = refreshTokenExpiresAt,
+            CreatedByIpAddress = TrimOrNull(ipAddress, 128),
+            CreatedByUserAgent = TrimOrNull(userAgent, 512)
+        };
+        storedRefreshToken.ReplacedByRefreshTokenId = newRefreshToken.Id;
+        db.UserSessions.Add(newSession);
+        db.RefreshTokens.Add(newRefreshToken);
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user.Id,
+            "Auth.Refresh",
+            "Session",
+            newSession.Id.ToString(),
+            $"Remembered session for '{user.Username}' was refreshed.",
+            cancellationToken);
+
+        return Result<LoginResponse>.Success(new LoginResponse(
+            rawToken,
+            user.ToDto(),
+            newSession.ExpiresAt,
+            csrfToken,
+            rawRefreshToken,
+            refreshTokenExpiresAt));
     }
 
     public async Task<UserDto?> GetUserByTokenAsync(string token, CancellationToken cancellationToken = default)
@@ -297,6 +424,95 @@ public class AuthService(
             cancellationToken);
 
         return Result<UserDto>.Success(user.ToDto());
+    }
+
+    public async Task<Result<ForgotPasswordResponse>> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindUserByUsernameOrEmailAsync(request.UsernameOrEmail, cancellationToken);
+        if (user is null)
+        {
+            return Result<ForgotPasswordResponse>.Success(GenericForgotPasswordResponse());
+        }
+
+        var rawResetToken = SessionTokenHasher.CreateToken();
+        var expiresAt = DateTime.UtcNow.AddMinutes(GetInt("Auth:PasswordResetMinutes", DefaultPasswordResetMinutes));
+        user.PasswordResetToken = SessionTokenHasher.Hash(rawResetToken);
+        user.PasswordResetTokenExpiresAt = expiresAt;
+        var resetUrl = BuildPasswordResetUrl(user, rawResetToken);
+
+        try
+        {
+            await emailSender.SendAsync(
+                new EmailMessage(
+                    user.Email,
+                    "TechYouth BPM sifre sifirlama kodu",
+                    BuildPasswordResetBody(user.DisplayName, user.Username, rawResetToken, resetUrl, expiresAt),
+                    user.Username,
+                    true),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
+        {
+            return Result<ForgotPasswordResponse>.Success(GenericForgotPasswordResponse());
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user.Id,
+            "Auth.PasswordResetRequested",
+            "User",
+            user.Id.ToString(),
+            $"Password reset was requested for '{user.Username}'.",
+            cancellationToken);
+
+        return Result<ForgotPasswordResponse>.Success(new ForgotPasswordResponse(
+            GenericForgotPasswordMessage,
+            emailSender.ExposesVerificationCode ? rawResetToken : string.Empty,
+            expiresAt));
+    }
+
+    public async Task<Result> ResetPasswordAsync(
+        ResetPasswordRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindUserByUsernameOrEmailAsync(request.UsernameOrEmail, cancellationToken);
+        if (user is null
+            || string.IsNullOrWhiteSpace(user.PasswordResetToken)
+            || user.PasswordResetTokenExpiresAt is null
+            || user.PasswordResetTokenExpiresAt <= DateTime.UtcNow
+            || !string.Equals(
+                SessionTokenHasher.Hash(request.Token.Trim()),
+                user.PasswordResetToken,
+                StringComparison.Ordinal))
+        {
+            return Result.Failure("Password reset token is invalid or expired.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+        {
+            return Result.Failure("Password must be at least 8 characters.");
+        }
+
+        user.Password = PasswordHasher.Hash(request.NewPassword);
+        user.MustChangePassword = false;
+        user.FailedLoginCount = 0;
+        user.LockedUntil = null;
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiresAt = null;
+        await RevokeAllSessionsForUserAsync(user.Id, cancellationToken);
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user.Id,
+            "Auth.PasswordResetCompleted",
+            "User",
+            user.Id.ToString(),
+            $"Password reset was completed for '{user.Username}' and active sessions were revoked.",
+            cancellationToken);
+
+        return Result.Success();
     }
 
     public async Task<Result<UserAdminDto>> CreateUserAsync(
@@ -538,7 +754,8 @@ public class AuthService(
                 session.LastSeenAt,
                 session.Token == currentTokenHash,
                 session.IpAddress,
-                session.UserAgent))
+                session.UserAgent,
+                session.RememberedDevice))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
@@ -572,7 +789,8 @@ public class AuthService(
                 session.LastSeenAt,
                 session.Token == currentTokenHash,
                 session.IpAddress,
-                session.UserAgent))
+                session.UserAgent,
+                session.RememberedDevice))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyList<UserSessionDto>>.Success(sessions);
@@ -593,6 +811,7 @@ public class AuthService(
         if (session is not null)
         {
             session.RevokedAt = DateTime.UtcNow;
+            await RevokeRefreshTokensForSessionAsync(session.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
             await auditService.LogAsync(
                 session.UserId,
@@ -622,6 +841,7 @@ public class AuthService(
         }
 
         session.RevokedAt = DateTime.UtcNow;
+        await RevokeRefreshTokensForSessionAsync(session.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
             currentUser,
@@ -654,6 +874,7 @@ public class AuthService(
         }
 
         session.RevokedAt = DateTime.UtcNow;
+        await RevokeRefreshTokensForSessionAsync(session.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
             currentUser,
@@ -675,67 +896,7 @@ public class AuthService(
             return Result<EmailVerificationStartResponse>.Failure("User not found.");
         }
 
-        if (user.IsEmailVerified)
-        {
-            return Result<EmailVerificationStartResponse>.Failure("Email is already verified.");
-        }
-
-        var verificationMinutes = GetInt("Auth:EmailVerificationMinutes", DefaultEmailVerificationMinutes);
-        var resendCooldownMinutes = GetInt(
-            "Auth:EmailVerificationResendCooldownMinutes",
-            DefaultEmailVerificationResendCooldownMinutes);
-        if (user.EmailVerificationCodeExpiresAt is { } currentExpiry)
-        {
-            var lastIssuedAt = currentExpiry.AddMinutes(-verificationMinutes);
-            if (lastIssuedAt.AddMinutes(resendCooldownMinutes) > DateTime.UtcNow)
-            {
-                return Result<EmailVerificationStartResponse>.Failure(
-                    "Verification code was sent recently. Please wait before requesting another code.");
-            }
-        }
-
-        var otp = otpService.IssueEmailVerificationCode(
-            user,
-            verificationMinutes);
-
-        try
-        {
-            await emailSender.SendAsync(
-                new EmailMessage(
-                    user.Email,
-                    "TechYouth BPM e-posta dogrulama kodu",
-                    BuildEmailVerificationBody(
-                        user.DisplayName,
-                        otp.DemoCode,
-                        otp.ExpiresAt,
-                        IsSandboxDelivery(user)),
-                    user.Username,
-                    true),
-                cancellationToken);
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
-        {
-            return Result<EmailVerificationStartResponse>.Failure(
-                exception.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase)
-                    ? "Email recipient is not allowed for SMTP delivery."
-                    : "Verification email could not be sent.");
-        }
-
-        await db.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(
-            currentUser,
-            "Auth.EmailVerificationRequested",
-            "User",
-            user.Id.ToString(),
-            $"Email verification requested for '{user.Email}'.",
-            cancellationToken);
-
-        return Result<EmailVerificationStartResponse>.Success(new EmailVerificationStartResponse(
-            emailSender.ExposesVerificationCode
-                ? "Verification code generated for local demo."
-                : "Verification code sent by email.",
-            emailSender.ExposesVerificationCode ? otp.DemoCode : string.Empty,
-            otp.ExpiresAt));
+        return await StartEmailVerificationForUserAsync(user, currentUser.Id, cancellationToken);
     }
 
     public async Task<Result<UserDto>> ConfirmEmailVerificationAsync(
@@ -775,6 +936,58 @@ public class AuthService(
         return Result<UserDto>.Success(user.ToDto());
     }
 
+    public async Task<Result<EmailVerificationStartResponse>> StartPublicEmailVerificationAsync(
+        PublicEmailVerificationStartRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindUserByUsernameOrEmailAsync(request.UsernameOrEmail, cancellationToken);
+        if (user is null)
+        {
+            return Result<EmailVerificationStartResponse>.Success(new EmailVerificationStartResponse(
+                "Verification code sent if the account exists.",
+                string.Empty,
+                DateTime.UtcNow));
+        }
+
+        var result = await StartEmailVerificationForUserAsync(user, user.Id, cancellationToken);
+        return result;
+    }
+
+    public async Task<Result<RegisterResponse>> ConfirmPublicEmailVerificationAsync(
+        PublicEmailVerificationConfirmRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await FindUserByUsernameOrEmailAsync(request.UsernameOrEmail, cancellationToken);
+        if (user is null)
+        {
+            return Result<RegisterResponse>.Failure("User not found.");
+        }
+
+        if (!user.IsEmailVerified)
+        {
+            var otpVerification = otpService.VerifyEmailVerificationCode(user, request.Code);
+            if (!otpVerification.IsSuccess)
+            {
+                return Result<RegisterResponse>.Failure(otpVerification.Errors);
+            }
+
+            user.IsEmailVerified = true;
+            user.EmailVerificationCode = null;
+            user.EmailVerificationCodeExpiresAt = null;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        await auditService.LogAsync(
+            user.Id,
+            "Auth.EmailVerified",
+            "User",
+            user.Id.ToString(),
+            $"Email '{user.Email}' was verified before sign-in.",
+            cancellationToken);
+
+        return Result<RegisterResponse>.Success(new RegisterResponse(user.Id, user.Username, user.Email, user.Status));
+    }
+
     private static bool PasswordMatches(string password, string storedPassword) =>
         PasswordHasher.IsHashed(storedPassword)
             ? PasswordHasher.Verify(password, storedPassword)
@@ -788,6 +1001,15 @@ public class AuthService(
         return int.TryParse(configuredDuration, out var minutes) && minutes > 0
             ? minutes
             : FallbackSessionDurationMinutes;
+    }
+
+    private int GetRefreshTokenDurationMinutes()
+    {
+        var configuredDuration = configuration["Auth:RefreshTokenDurationMinutes"]
+            ?? configuration["Auth:RememberMeDurationMinutes"];
+        return int.TryParse(configuredDuration, out var minutes) && minutes > 0
+            ? minutes
+            : DefaultRefreshTokenDurationMinutes;
     }
 
     private int GetInt(string key, int fallback)
@@ -917,6 +1139,80 @@ public class AuthService(
             .ToArray();
     }
 
+    private Task<User?> FindUserByUsernameOrEmailAsync(string value, CancellationToken cancellationToken)
+    {
+        var lookup = value.Trim().ToLowerInvariant();
+        return db.Users.SingleOrDefaultAsync(
+            user => user.Username.ToLower() == lookup || user.Email.ToLower() == lookup,
+            cancellationToken);
+    }
+
+    private async Task<Result<EmailVerificationStartResponse>> StartEmailVerificationForUserAsync(
+        User user,
+        Guid actorUserId,
+        CancellationToken cancellationToken)
+    {
+        if (user.IsEmailVerified)
+        {
+            return Result<EmailVerificationStartResponse>.Failure("Email is already verified.");
+        }
+
+        var verificationMinutes = GetInt("Auth:EmailVerificationMinutes", DefaultEmailVerificationMinutes);
+        var resendCooldownMinutes = GetInt(
+            "Auth:EmailVerificationResendCooldownMinutes",
+            DefaultEmailVerificationResendCooldownMinutes);
+        if (user.EmailVerificationCodeExpiresAt is { } currentExpiry)
+        {
+            var lastIssuedAt = currentExpiry.AddMinutes(-verificationMinutes);
+            if (lastIssuedAt.AddMinutes(resendCooldownMinutes) > DateTime.UtcNow)
+            {
+                return Result<EmailVerificationStartResponse>.Failure(
+                    "Verification code was sent recently. Please wait before requesting another code.");
+            }
+        }
+
+        var otp = otpService.IssueEmailVerificationCode(user, verificationMinutes);
+
+        try
+        {
+            await emailSender.SendAsync(
+                new EmailMessage(
+                    user.Email,
+                    "TechYouth BPM e-posta dogrulama kodu",
+                    BuildEmailVerificationBody(
+                        user.DisplayName,
+                        otp.DemoCode,
+                        otp.ExpiresAt,
+                        IsSandboxDelivery(user)),
+                    user.Username,
+                    true),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
+        {
+            return Result<EmailVerificationStartResponse>.Failure(
+                exception.Message.Contains("not allowed", StringComparison.OrdinalIgnoreCase)
+                    ? "Email recipient is not allowed for SMTP delivery."
+                    : "Verification email could not be sent.");
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            actorUserId,
+            "Auth.EmailVerificationRequested",
+            "User",
+            user.Id.ToString(),
+            $"Email verification requested for '{user.Email}'.",
+            cancellationToken);
+
+        return Result<EmailVerificationStartResponse>.Success(new EmailVerificationStartResponse(
+            emailSender.ExposesVerificationCode
+                ? "Verification code generated for local demo."
+                : "Verification code sent by email.",
+            emailSender.ExposesVerificationCode ? otp.DemoCode : string.Empty,
+            otp.ExpiresAt));
+    }
+
     private static string BuildEmailVerificationBody(
         string displayName,
         string code,
@@ -1011,6 +1307,69 @@ public class AuthService(
             """;
     }
 
+    private static ForgotPasswordResponse GenericForgotPasswordResponse() =>
+        new(GenericForgotPasswordMessage);
+
+    private string BuildPasswordResetUrl(User user, string resetToken)
+    {
+        var configuredBaseUrl = configuration["Frontend:BaseUrl"] ?? "http://localhost:3000";
+        var baseUrl = configuredBaseUrl.TrimEnd('/');
+        return $"{baseUrl}/?auth=reset&usernameOrEmail={Uri.EscapeDataString(user.Username)}&token={Uri.EscapeDataString(resetToken)}";
+    }
+
+    private static string BuildPasswordResetBody(
+        string displayName,
+        string username,
+        string resetToken,
+        string resetUrl,
+        DateTime expiresAt)
+    {
+        var safeName = WebUtility.HtmlEncode(displayName);
+        var safeUsername = WebUtility.HtmlEncode(username);
+        var safeToken = WebUtility.HtmlEncode(resetToken);
+        var safeResetUrl = WebUtility.HtmlEncode(resetUrl);
+        var expiry = WebUtility.HtmlEncode(FormatTurkeyTime(expiresAt));
+
+        return $"""
+            <!doctype html>
+            <html lang="tr">
+            <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;color:#18243a;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;padding:28px 12px;">
+                <tr>
+                  <td align="center">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #d8deea;border-radius:12px;overflow:hidden;">
+                      <tr>
+                        <td style="background:#18243a;color:#ffffff;padding:22px 26px;">
+                          <div style="font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#ffb06a;">TechYouth BPM</div>
+                          <h1 style="margin:8px 0 0;font-size:24px;line-height:1.25;">Sifre sifirlama kodu</h1>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding:26px;">
+                          <p style="margin:0 0 14px;font-size:15px;line-height:1.6;">Merhaba <strong>{safeName}</strong>,</p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;"><strong>{safeUsername}</strong> kullanicisi icin sifre sifirlama istegi alindi.</p>
+                          <p style="margin:0 0 18px;font-size:15px;line-height:1.6;">Sifreyi sifirlamak icin asagidaki butona tiklayabilirsin.</p>
+                          <div style="margin:20px 0;text-align:center;">
+                            <a href="{safeResetUrl}" style="display:inline-block;padding:13px 18px;border-radius:10px;background:#f26a21;color:#ffffff;text-decoration:none;font-weight:800;">Sifreyi sifirla</a>
+                          </div>
+                          <div style="margin:20px 0;padding:18px 20px;border-radius:10px;background:#fff0e3;border:1px solid #ffd1aa;text-align:center;">
+                            <div style="font-size:12px;color:#647187;text-transform:uppercase;letter-spacing:.08em;">Sifre sifirlama token'i</div>
+                            <div style="margin-top:8px;font-size:18px;line-height:1.4;font-weight:800;word-break:break-all;color:#d95f05;">{safeToken}</div>
+                          </div>
+                          <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#647187;">Buton calismazsa token'i login ekranindaki sifre sifirlama alanina elle yapistirabilirsin.</p>
+                          <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#647187;">Gecerlilik: <strong>{expiry}</strong></p>
+                          <p style="margin:0;font-size:13px;line-height:1.6;color:#647187;">Bu istegi sen baslatmadiysan e-postayi yok sayabilir veya yoneticiye haber verebilirsin.</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """;
+    }
+
     private static string FormatTurkeyTime(DateTime value)
     {
         var utcValue = value.Kind == DateTimeKind.Utc ? value : DateTime.SpecifyKind(value, DateTimeKind.Utc);
@@ -1040,6 +1399,27 @@ public class AuthService(
         foreach (var session in sessions)
         {
             session.RevokedAt = DateTime.UtcNow;
+        }
+
+        var refreshTokens = await db.RefreshTokens
+            .Where(token => token.UserId == userId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var refreshToken in refreshTokens)
+        {
+            refreshToken.RevokedAt = DateTime.UtcNow;
+        }
+    }
+
+    private async Task RevokeRefreshTokensForSessionAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var refreshTokens = await db.RefreshTokens
+            .Where(token => token.UserSessionId == sessionId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var refreshToken in refreshTokens)
+        {
+            refreshToken.RevokedAt = DateTime.UtcNow;
         }
     }
 }

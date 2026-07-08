@@ -11,6 +11,11 @@ public interface IAuthService
         string? ipAddress = null,
         string? userAgent = null,
         CancellationToken cancellationToken = default);
+    Task<Result<LoginResponse>> RefreshSessionAsync(
+        string refreshToken,
+        string? ipAddress = null,
+        string? userAgent = null,
+        CancellationToken cancellationToken = default);
     Task<UserDto?> GetUserByTokenAsync(string token, CancellationToken cancellationToken = default);
     Task<Result<UserDto>> UpdateProfileAsync(
         UpdateProfileRequest request,
@@ -19,6 +24,12 @@ public interface IAuthService
     Task<Result<UserDto>> ChangePasswordAsync(
         ChangePasswordRequest request,
         UserDto currentUser,
+        CancellationToken cancellationToken = default);
+    Task<Result<ForgotPasswordResponse>> ForgotPasswordAsync(
+        ForgotPasswordRequest request,
+        CancellationToken cancellationToken = default);
+    Task<Result> ResetPasswordAsync(
+        ResetPasswordRequest request,
         CancellationToken cancellationToken = default);
     Task<Result<UserAdminDto>> CreateUserAsync(
         CreateUserRequest request,
@@ -63,5 +74,11 @@ public interface IAuthService
     Task<Result<UserDto>> ConfirmEmailVerificationAsync(
         EmailVerificationConfirmRequest request,
         UserDto currentUser,
+        CancellationToken cancellationToken = default);
+    Task<Result<EmailVerificationStartResponse>> StartPublicEmailVerificationAsync(
+        PublicEmailVerificationStartRequest request,
+        CancellationToken cancellationToken = default);
+    Task<Result<RegisterResponse>> ConfirmPublicEmailVerificationAsync(
+        PublicEmailVerificationConfirmRequest request,
         CancellationToken cancellationToken = default);
 }

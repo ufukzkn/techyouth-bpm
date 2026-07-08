@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using TechYouthBpm.Domain.Enums;
 
 namespace TechYouthBpm.Application.Auth;
@@ -9,6 +10,16 @@ public record RegisterRequest(string Username, string DisplayName, string Email,
 public record UpdateProfileRequest(string DisplayName, string Email);
 
 public record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+public record ForgotPasswordRequest(string UsernameOrEmail);
+
+public record ForgotPasswordResponse(string Message, string DemoToken = "", DateTime? ExpiresAt = null);
+
+public record ResetPasswordRequest(string UsernameOrEmail, string Token, string NewPassword);
+
+public record PublicEmailVerificationStartRequest(string UsernameOrEmail);
+
+public record PublicEmailVerificationConfirmRequest(string UsernameOrEmail, string Code);
 
 public record CreateUserRequest(
     string Username,
@@ -40,7 +51,15 @@ public record UserDto(
     }
 }
 
-public record LoginResponse(string Token, UserDto User, DateTime ExpiresAt);
+public record LoginResponse(
+    string Token,
+    UserDto User,
+    DateTime ExpiresAt,
+    string CsrfToken = "",
+    [property: JsonIgnore] string RefreshToken = "",
+    [property: JsonIgnore] DateTime? RefreshTokenExpiresAt = null);
+
+public record RefreshSessionRequest(string CsrfToken = "");
 
 public record RegisterResponse(Guid Id, string Username, string Email, UserStatus Status);
 
@@ -66,7 +85,8 @@ public record UserSessionDto(
     DateTime? LastSeenAt,
     bool IsCurrent,
     string? IpAddress = null,
-    string? UserAgent = null);
+    string? UserAgent = null,
+    bool RememberedDevice = false);
 
 public record EmailVerificationStartResponse(string Message, string DemoCode, DateTime ExpiresAt);
 

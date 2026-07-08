@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Primitives;
+using System.Text.RegularExpressions;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Domain.Entities;
@@ -80,7 +81,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_Uses_Long_Duration_When_Remember_Me_Is_Selected()
+    public async Task LoginAsync_Keeps_Access_Session_Short_When_Remember_Me_Is_Selected()
     {
         await using var db = TestDbFactory.Create();
         db.Users.Add(new User
@@ -98,7 +99,92 @@ public class AuthServiceTests
         var result = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value!.ExpiresAt > DateTime.UtcNow.AddDays(20));
+        Assert.True(result.Value!.ExpiresAt < DateTime.UtcNow.AddMinutes(2));
+        Assert.True(db.RefreshTokens.Single().ExpiresAt > DateTime.UtcNow.AddDays(20));
+    }
+
+    [Fact]
+    public async Task LoginAsync_RememberMe_Creates_Hashed_Refresh_Token_And_Remembered_Session()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.Value!.RefreshToken);
+        Assert.NotEmpty(result.Value.CsrfToken);
+        var storedRefreshToken = Assert.Single(db.RefreshTokens);
+        var storedSession = Assert.Single(db.UserSessions);
+        Assert.True(storedSession.RememberedDevice);
+        Assert.NotEqual(result.Value.RefreshToken, storedRefreshToken.Token);
+        Assert.Equal(64, storedRefreshToken.Token.Length);
+    }
+
+    [Fact]
+    public async Task RefreshSessionAsync_Rotates_Refresh_Token_And_Replaces_Access_Session()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var login = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
+
+        var refresh = await service.RefreshSessionAsync(login.Value!.RefreshToken);
+
+        Assert.True(refresh.IsSuccess);
+        Assert.NotEqual(login.Value.Token, refresh.Value!.Token);
+        Assert.NotEqual(login.Value.RefreshToken, refresh.Value.RefreshToken);
+        Assert.Equal(2, db.UserSessions.Count());
+        Assert.Equal(2, db.RefreshTokens.Count());
+        Assert.NotNull(db.UserSessions.OrderBy(session => session.CreatedAt).First().RevokedAt);
+        Assert.NotNull(db.RefreshTokens.OrderBy(token => token.CreatedAt).First().RevokedAt);
+    }
+
+    [Fact]
+    public async Task RefreshSessionAsync_Reused_Refresh_Token_Revokes_Active_Sessions()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var login = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
+        var firstRefresh = await service.RefreshSessionAsync(login.Value!.RefreshToken);
+
+        var reuse = await service.RefreshSessionAsync(login.Value.RefreshToken);
+
+        Assert.True(firstRefresh.IsSuccess);
+        Assert.False(reuse.IsSuccess);
+        Assert.All(db.UserSessions, session => Assert.NotNull(session.RevokedAt));
     }
 
     [Fact]
@@ -666,7 +752,91 @@ public class AuthServiceTests
         Assert.Single(emailSender.Messages);
     }
 
+    [Fact]
+    public async Task PublicEmailVerification_Allows_Pending_User_To_Verify_Email()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "pending",
+            DisplayName = "Pending User",
+            Email = "pending@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.PendingApproval,
+            IsEmailVerified = false
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var start = await service.StartPublicEmailVerificationAsync(new PublicEmailVerificationStartRequest("pending"));
+        var confirm = await service.ConfirmPublicEmailVerificationAsync(
+            new PublicEmailVerificationConfirmRequest("pending", start.Value!.DemoCode));
+
+        Assert.True(start.IsSuccess);
+        Assert.True(confirm.IsSuccess);
+        Assert.True(db.Users.Single().IsEmailVerified);
+        Assert.Equal(UserStatus.PendingApproval, confirm.Value!.Status);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_Changes_Password_And_Revokes_Active_Sessions()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+        var login = await service.LoginAsync(new LoginRequest("user", "password123", true));
+
+        var forgot = await service.ForgotPasswordAsync(new ForgotPasswordRequest("user@test.local"));
+        var token = ExtractSecurityToken(emailSender.Messages.Single().Body);
+        var reset = await service.ResetPasswordAsync(new ResetPasswordRequest("user", token, "new-password-123"));
+        var oldSessionUser = await service.GetUserByTokenAsync(login.Value!.Token);
+        var newLogin = await service.LoginAsync(new LoginRequest("user", "new-password-123"));
+
+        Assert.True(forgot.IsSuccess);
+        Assert.True(reset.IsSuccess);
+        Assert.Null(oldSessionUser);
+        Assert.True(newLogin.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_Does_Not_Reveal_Unknown_User()
+    {
+        await using var db = TestDbFactory.Create();
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+
+        var result = await service.ForgotPasswordAsync(new ForgotPasswordRequest("missing@test.local"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(emailSender.Messages);
+    }
+
     private static IConfiguration CreateTestConfiguration() => new TestConfiguration();
+
+    private static string ExtractSecurityToken(string htmlBody)
+    {
+        var match = Regex.Matches(htmlBody, "[A-Za-z0-9_-]{40,}")
+            .Select(item => item.Value)
+            .FirstOrDefault();
+
+        Assert.False(string.IsNullOrWhiteSpace(match));
+        return match!;
+    }
 
     private sealed class TestConfiguration : IConfiguration
     {

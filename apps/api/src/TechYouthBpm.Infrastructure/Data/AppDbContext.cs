@@ -8,6 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 {
     public DbSet<User> Users => Set<User>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
     public DbSet<FormFieldDefinition> FormFieldDefinitions => Set<FormFieldDefinition>();
     public DbSet<FieldValidationRule> FieldValidationRules => Set<FieldValidationRule>();
@@ -24,6 +25,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<User>().HasIndex(user => user.Email).IsUnique();
         modelBuilder.Entity<UserSession>().HasKey(session => session.Id);
         modelBuilder.Entity<UserSession>().HasIndex(session => session.Token).IsUnique();
+        modelBuilder.Entity<RefreshToken>().HasKey(token => token.Id);
+        modelBuilder.Entity<RefreshToken>().HasIndex(token => token.Token).IsUnique();
+        modelBuilder.Entity<RefreshToken>()
+            .HasOne(token => token.User)
+            .WithMany()
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<RefreshToken>()
+            .HasOne(token => token.UserSession)
+            .WithMany()
+            .HasForeignKey(token => token.UserSessionId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<FormDefinition>()
             .HasOne(form => form.UpdatedByUser)
