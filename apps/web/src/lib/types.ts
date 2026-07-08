@@ -16,6 +16,7 @@ export type LoginResponse = {
   token: string;
   user: User;
   expiresAt: string;
+  csrfToken: string;
 };
 
 export type RegisterResponse = {
@@ -46,6 +47,7 @@ export type UserSession = {
   isCurrent: boolean;
   ipAddress?: string | null;
   userAgent?: string | null;
+  rememberedDevice: boolean;
 };
 
 export type UpdateProfileRequest = {
@@ -71,6 +73,22 @@ export type EmailVerificationStartResponse = {
   message: string;
   demoCode: string;
   expiresAt: string;
+};
+
+export type ForgotPasswordRequest = {
+  usernameOrEmail: string;
+};
+
+export type ForgotPasswordResponse = {
+  message: string;
+  demoToken: string;
+  expiresAt?: string | null;
+};
+
+export type ResetPasswordRequest = {
+  usernameOrEmail: string;
+  token: string;
+  newPassword: string;
 };
 
 export type ThemeMode = "light" | "dark";

@@ -33,6 +33,7 @@ export function AppShell() {
     hasHydrated,
     expireSession,
     logout,
+    setSession,
     setUser,
     syncSystemTheme,
     toggleLanguage,
@@ -74,8 +75,26 @@ export function AppShell() {
     const sessionToken = token;
     const expiresAtTime = expiresAt ? Date.parse(expiresAt) : null;
 
+    async function refreshOrExpire(message: string) {
+      if (sessionToken.startsWith("demo-")) {
+        expireSession(message);
+        return;
+      }
+
+      try {
+        const refreshedSession = await api.refreshSession();
+        if (!ignore) {
+          setSession(refreshedSession);
+        }
+      } catch {
+        if (!ignore) {
+          expireSession(message);
+        }
+      }
+    }
+
     if (expiresAtTime && expiresAtTime <= Date.now()) {
-      expireSession(t("session.expired"));
+      void refreshOrExpire(t("session.expired"));
       return;
     }
 
@@ -86,7 +105,7 @@ export function AppShell() {
 
       const remainingMs = expiresAtTime - Date.now();
       if (remainingMs <= 0) {
-        expireSession(t("session.expired"));
+        void refreshOrExpire(t("session.expired"));
         return;
       }
 
@@ -110,7 +129,7 @@ export function AppShell() {
         }
 
         if (error instanceof ApiError && error.statusCode === 401) {
-          expireSession(t("session.unverified"));
+          await refreshOrExpire(t("session.unverified"));
         }
       }
     }
@@ -123,7 +142,7 @@ export function AppShell() {
         window.clearTimeout(expiryTimer);
       }
     };
-  }, [expiresAt, expireSession, hasHydrated, t, token, user]);
+  }, [expiresAt, expireSession, hasHydrated, setSession, t, token, user]);
 
   useEffect(() => {
     function syncViewFromUrl() {

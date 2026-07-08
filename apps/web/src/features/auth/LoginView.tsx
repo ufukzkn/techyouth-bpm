@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { LogIn, UserPlus } from "lucide-react";
+import { FormEvent, useEffect, useState } from "react";
+import { KeyRound, LogIn, MailCheck, UserPlus } from "lucide-react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
@@ -11,19 +11,53 @@ import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 
+type InitialAuthState = {
+  mode: "login" | "register" | "forgotPassword" | "verifyEmail";
+  username: string;
+  resetToken: string;
+  successMessage: string | null;
+};
+
+function getInitialAuthState(language: "tr" | "en"): InitialAuthState {
+  if (typeof window === "undefined") {
+    return { mode: "login", username: "", resetToken: "", successMessage: null };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("auth") !== "reset") {
+    return { mode: "login", username: "", resetToken: "", successMessage: null };
+  }
+
+  return {
+    mode: "forgotPassword",
+    username: params.get("usernameOrEmail") ?? "",
+    resetToken: params.get("token") ?? "",
+    successMessage: translate(language, "login.resetLinkLoaded"),
+  };
+}
+
 export function LoginView() {
   const { clearSessionNotice, language, sessionNotice, setSession, theme, toggleLanguage, toggleTheme } =
     useSessionStore();
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
-  const [username, setUsername] = useState("");
+  const [initialAuthState] = useState(() => getInitialAuthState(language));
+  const [username, setUsername] = useState(initialAuthState.username);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [resetToken, setResetToken] = useState(initialAuthState.resetToken);
+  const [verificationCode, setVerificationCode] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const [mode, setMode] = useState<"login" | "register" | "forgotPassword" | "verifyEmail">(initialAuthState.mode);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(initialAuthState.successMessage);
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (window.location.search.includes("auth=reset")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   function updateUsername(value: string) {
     setUsername(value);
@@ -42,10 +76,12 @@ export function LoginView() {
     clearSessionNotice();
   }
 
-  function switchMode(nextMode: "login" | "register") {
+  function switchMode(nextMode: "login" | "register" | "forgotPassword" | "verifyEmail") {
     setMode(nextMode);
     setError(null);
     setSuccessMessage(null);
+    setResetToken("");
+    setVerificationCode("");
     clearSessionNotice();
   }
 
@@ -60,6 +96,8 @@ export function LoginView() {
     const submittedDisplayName = String(formData.get("displayName") ?? "").trim();
     const submittedEmail = String(formData.get("email") ?? "").trim();
     const submittedPassword = String(formData.get("password") ?? "");
+    const submittedResetToken = String(formData.get("resetToken") ?? "").trim();
+    const submittedVerificationCode = String(formData.get("verificationCode") ?? "").trim();
     const submittedRememberMe = formData.get("rememberMe") === "on";
 
     if (mode === "register") {
@@ -81,6 +119,72 @@ export function LoginView() {
         setPassword("");
       } catch (apiError) {
         setError(localizeApiError(apiError, language, t("login.registerFailed")));
+      } finally {
+        setIsLoading(false);
+      }
+
+      return;
+    }
+
+    if (mode === "forgotPassword") {
+      if (!submittedUsername) {
+        setIsLoading(false);
+        setError(t("login.forgotRequired"));
+        return;
+      }
+
+      try {
+        if (!submittedResetToken) {
+          const response = await api.forgotPassword({ usernameOrEmail: submittedUsername });
+          setSuccessMessage(response.demoToken ? t("login.resetRequestedWithDemoToken", { token: response.demoToken }) : t("login.resetRequested"));
+          if (response.demoToken) {
+            setResetToken(response.demoToken);
+          }
+          return;
+        }
+
+        if (!submittedPassword) {
+          setError(t("login.resetPasswordRequired"));
+          return;
+        }
+
+        await api.resetPassword({
+          usernameOrEmail: submittedUsername,
+          token: submittedResetToken,
+          newPassword: submittedPassword,
+        });
+        setSuccessMessage(t("login.resetCompleted"));
+        setMode("login");
+        setPassword("");
+        setResetToken("");
+      } catch (apiError) {
+        setError(localizeApiError(apiError, language, t("login.resetFailed")));
+      } finally {
+        setIsLoading(false);
+      }
+
+      return;
+    }
+
+    if (mode === "verifyEmail") {
+      if (!submittedUsername) {
+        setIsLoading(false);
+        setError(t("login.verificationRequired"));
+        return;
+      }
+
+      try {
+        if (!submittedVerificationCode) {
+          await api.startPublicEmailVerification(submittedUsername);
+          setSuccessMessage(t("login.verificationSent"));
+        } else {
+          await api.confirmPublicEmailVerification(submittedUsername, submittedVerificationCode);
+          setSuccessMessage(t("login.verificationCompleted"));
+          setMode("login");
+          setVerificationCode("");
+        }
+      } catch (apiError) {
+        setError(localizeApiError(apiError, language, t("login.verificationFailed")));
       } finally {
         setIsLoading(false);
       }
@@ -143,7 +247,7 @@ export function LoginView() {
 
         <form className="login-form" onSubmit={handleSubmit}>
           <label>
-            {t("login.username")}
+            {mode === "forgotPassword" || mode === "verifyEmail" ? t("login.usernameOrEmail") : t("login.username")}
             <input
               name="username"
               value={username}
@@ -180,16 +284,45 @@ export function LoginView() {
               </label>
             </>
           ) : null}
-          <label>
-            {t("login.password")}
-            <input
-              name="password"
-              value={password}
-              onChange={(event) => updatePassword(event.target.value)}
-              type="password"
-              autoComplete="current-password"
-            />
-          </label>
+          {mode === "verifyEmail" ? (
+            <label>
+              {t("login.verificationCode")}
+              <input
+                name="verificationCode"
+                value={verificationCode}
+                onChange={(event) => {
+                  setVerificationCode(event.target.value);
+                  setSuccessMessage(null);
+                }}
+                inputMode="numeric"
+              />
+            </label>
+          ) : null}
+          {mode === "forgotPassword" ? (
+            <label>
+              {t("login.resetToken")}
+              <input
+                name="resetToken"
+                value={resetToken}
+                onChange={(event) => {
+                  setResetToken(event.target.value);
+                  setSuccessMessage(null);
+                }}
+              />
+            </label>
+          ) : null}
+          {mode !== "verifyEmail" && (mode !== "forgotPassword" || resetToken || successMessage) ? (
+            <label>
+              {mode === "forgotPassword" ? t("login.newPassword") : t("login.password")}
+              <input
+                name="password"
+                value={password}
+                onChange={(event) => updatePassword(event.target.value)}
+                type="password"
+                autoComplete={mode === "forgotPassword" ? "new-password" : "current-password"}
+              />
+            </label>
+          ) : null}
           {mode === "login" ? (
             <label className="checkbox-row remember-row">
               <input
@@ -204,16 +337,34 @@ export function LoginView() {
           {error ? <div className="form-error">{error}</div> : null}
           {successMessage ? <div className="form-success">{successMessage}</div> : null}
           <button className="primary-button" type="submit" disabled={isLoading}>
-            {mode === "login" ? <LogIn size={18} /> : <UserPlus size={18} />}
-            {isLoading
-              ? mode === "login"
-                ? t("login.signingIn")
-                : t("login.registering")
-              : mode === "login"
-                ? t("login.signIn")
-                : t("login.createAccount")}
+            {mode === "login" ? <LogIn size={18} /> : null}
+            {mode === "register" ? <UserPlus size={18} /> : null}
+            {mode === "forgotPassword" ? <KeyRound size={18} /> : null}
+            {mode === "verifyEmail" ? <MailCheck size={18} /> : null}
+            {isLoading ? t("common.loading") : null}
+            {!isLoading && mode === "login" ? t("login.signIn") : null}
+            {!isLoading && mode === "register" ? t("login.createAccount") : null}
+            {!isLoading && mode === "forgotPassword"
+              ? resetToken
+                ? t("login.resetPassword")
+                : t("login.sendResetToken")
+              : null}
+            {!isLoading && mode === "verifyEmail"
+              ? verificationCode
+                ? t("login.confirmVerification")
+                : t("login.sendVerification")
+              : null}
           </button>
         </form>
+
+        <div className="login-secondary-actions">
+          <button type="button" onClick={() => switchMode(mode === "forgotPassword" ? "login" : "forgotPassword")}>
+            {mode === "forgotPassword" ? t("login.backToSignIn") : t("login.forgotPassword")}
+          </button>
+          <button type="button" onClick={() => switchMode(mode === "verifyEmail" ? "login" : "verifyEmail")}>
+            {mode === "verifyEmail" ? t("login.backToSignIn") : t("login.verifyEmail")}
+          </button>
+        </div>
 
         {sessionNotice ? (
           <div className="session-dialog-backdrop" role="presentation">

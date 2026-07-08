@@ -480,6 +480,7 @@ export function SettingsView({
                 <small>{t("settings.createdAt", { value: formatSessionExpiry(session.createdAt, language) })}</small>
                 <small>{t("settings.device", { value: summarizeUserAgent(session.userAgent, language) })}</small>
                 <small>{t("settings.ipAddress", { value: formatIpAddress(session.ipAddress, language) })}</small>
+                <small>{t(session.rememberedDevice ? "settings.rememberedDevice" : "settings.standardSession")}</small>
               </div>
               <button
                 className="secondary-button danger-button"

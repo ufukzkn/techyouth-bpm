@@ -51,6 +51,8 @@ export function UsersAndRolesView({
   const [detailSessionPage, setDetailSessionPage] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<StatusTone>("info");
+  const [createUserMessage, setCreateUserMessage] = useState<string | null>(null);
+  const [createUserMessageTone, setCreateUserMessageTone] = useState<StatusTone>("info");
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoadedUsers, setHasLoadedUsers] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -62,10 +64,17 @@ export function UsersAndRolesView({
   const pageSize = 4;
   const userMessageClassName =
     messageTone === "error" ? "form-error" : messageTone === "success" ? "form-success" : "form-info";
+  const createUserMessageClassName =
+    createUserMessageTone === "error" ? "form-error" : createUserMessageTone === "success" ? "form-success" : "form-info";
 
   const showUserMessage = useCallback((nextMessage: string | null, tone: StatusTone = "info") => {
     setMessage(nextMessage);
     setMessageTone(tone);
+  }, []);
+
+  const showCreateUserMessage = useCallback((nextMessage: string | null, tone: StatusTone = "info") => {
+    setCreateUserMessage(nextMessage);
+    setCreateUserMessageTone(tone);
   }, []);
 
   useEffect(() => {
@@ -256,6 +265,7 @@ export function UsersAndRolesView({
     };
 
     setIsCreatingUser(true);
+    showCreateUserMessage(null);
     try {
       const createdUser = await api.createUser(token, payload);
       setCreateUserDraft({
@@ -269,9 +279,9 @@ export function UsersAndRolesView({
       setUsesCustomTemporaryPassword(false);
       await loadUsers();
       setSelectedUserId(createdUser.id);
-      showUserMessage(t("users.userCreated", { username: createdUser.username }), "success");
+      showCreateUserMessage(t("users.userCreated", { username: createdUser.username }), "success");
     } catch (error) {
-      showUserMessage(localizeApiError(error, language, t("users.userCreateFailed")), "error");
+      showCreateUserMessage(localizeApiError(error, language, t("users.userCreateFailed")), "error");
     } finally {
       setIsCreatingUser(false);
     }
@@ -473,9 +483,12 @@ export function UsersAndRolesView({
               <h3>{t("users.createTitle")}</h3>
             </div>
             <button
-              className={isCreateUserOpen ? "secondary-button" : "primary-button"}
+              className={isCreateUserOpen ? "secondary-button" : "success-button create-user-toggle-button"}
               type="button"
-              onClick={() => setIsCreateUserOpen((isOpen) => !isOpen)}
+              onClick={() => {
+                setIsCreateUserOpen((isOpen) => !isOpen);
+                showCreateUserMessage(null);
+              }}
             >
               <UserPlus size={17} />
               {isCreateUserOpen ? t("common.close") : t("users.createUser")}
@@ -548,10 +561,11 @@ export function UsersAndRolesView({
                   />
                   <span>{t("users.useCustomTemporaryPassword")}</span>
                 </label>
-                <button className="primary-button" type="button" disabled={isCreatingUser} onClick={createUser}>
+                <button className="success-button create-user-submit-button" type="button" disabled={isCreatingUser} onClick={createUser}>
                   {isCreatingUser ? t("users.creatingUser") : t("users.createUser")}
                 </button>
               </div>
+              {createUserMessage ? <div className={createUserMessageClassName}>{createUserMessage}</div> : null}
             </div>
           ) : null}
         </section>
@@ -657,6 +671,7 @@ export function UsersAndRolesView({
                         <small>{t("settings.createdAt", { value: formatSessionExpiry(session.createdAt, language) })}</small>
                         <small>{t("settings.device", { value: summarizeUserAgent(session.userAgent, language) })}</small>
                         <small>{t("settings.ipAddress", { value: formatIpAddress(session.ipAddress, language) })}</small>
+                        <small>{t(session.rememberedDevice ? "settings.rememberedDevice" : "settings.standardSession")}</small>
                       </div>
                       <button
                         className="secondary-button danger-button"

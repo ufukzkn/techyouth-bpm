@@ -2,6 +2,8 @@ import type {
   CreateFormRequest,
   CreateUserAdminRequest,
   EmailVerificationStartResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   FormDefinition,
   LoginResponse,
   PagedResult,
@@ -9,6 +11,7 @@ import type {
   ProcessSummary,
   ProcessTask,
   RegisterResponse,
+  ResetPasswordRequest,
   StartProcessRequest,
   SystemAuditCategoryCounts,
   SystemAuditLog,
@@ -37,6 +40,22 @@ export class ApiError extends Error {
   }
 }
 
+function getCookieValue(name: string) {
+  if (typeof document === "undefined") {
+    return "";
+  }
+
+  return document.cookie
+    .split(";")
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(`${name}=`))
+    ?.split("=")[1] ?? "";
+}
+
+function isMutation(method?: string) {
+  return ["POST", "PUT", "PATCH", "DELETE"].includes((method ?? "GET").toUpperCase());
+}
+
 async function request<T>(path: string, init?: RequestInit & { token?: string }): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
@@ -45,9 +64,15 @@ async function request<T>(path: string, init?: RequestInit & { token?: string })
     headers.set("Authorization", `Bearer ${init.token}`);
   }
 
+  const csrfToken = getCookieValue("techyouth_csrf");
+  if (csrfToken && isMutation(init?.method)) {
+    headers.set("X-CSRF-Token", decodeURIComponent(csrfToken));
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -91,11 +116,29 @@ export const api = {
       body: JSON.stringify({ username, password, rememberMe }),
     });
   },
+  refreshSession() {
+    return request<LoginResponse>("/api/auth/refresh", { method: "POST" });
+  },
   me(token: string) {
     return request<User>("/api/auth/me", { token });
   },
+  meFromCookie() {
+    return request<User>("/api/auth/me");
+  },
   logout(token: string) {
     return request<void>("/api/auth/logout", { method: "POST", token });
+  },
+  forgotPassword(payload: ForgotPasswordRequest) {
+    return request<ForgotPasswordResponse>("/api/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  resetPassword(payload: ResetPasswordRequest) {
+    return request<void>("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
   },
   updateProfile(token: string, payload: UpdateProfileRequest) {
     return request<User>("/api/auth/me/profile", {
@@ -125,6 +168,18 @@ export const api = {
       method: "POST",
       token,
       body: JSON.stringify({ code }),
+    });
+  },
+  startPublicEmailVerification(usernameOrEmail: string) {
+    return request<EmailVerificationStartResponse>("/api/auth/public-email-verification/start", {
+      method: "POST",
+      body: JSON.stringify({ usernameOrEmail }),
+    });
+  },
+  confirmPublicEmailVerification(usernameOrEmail: string, code: string) {
+    return request<RegisterResponse>("/api/auth/public-email-verification/confirm", {
+      method: "POST",
+      body: JSON.stringify({ usernameOrEmail, code }),
     });
   },
   listUsers(

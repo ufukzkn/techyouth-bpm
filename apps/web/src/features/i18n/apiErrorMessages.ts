@@ -5,6 +5,7 @@ import type { Language } from "@/lib/types";
 const apiErrorKeys: Record<string, TranslationKey> = {
   "A valid email is required.": "api.error.emailRequired",
   "A valid session token is required.": "api.error.sessionRequired",
+  "A valid refresh token is required.": "api.error.refreshRequired",
   "Account is not active.": "api.error.accountInactive",
   "Account is temporarily locked after multiple failed login attempts.": "api.error.accountLocked",
   "Account is waiting for admin approval.": "api.error.pendingApproval",
@@ -20,6 +21,9 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   "Only Admin users can view user sessions.": "api.error.adminSessionsOnly",
   "Only Admin users can revoke user sessions.": "api.error.adminRevokeOnly",
   "Password must be at least 8 characters.": "api.error.passwordLength",
+  "Password reset token is invalid or expired.": "api.error.resetInvalid",
+  "Refresh session is no longer valid.": "api.error.refreshInvalid",
+  "CSRF token is invalid.": "api.error.csrfInvalid",
   "Session not found.": "api.error.sessionNotFound",
   "Temporary password email could not be sent.": "api.error.temporaryPasswordEmailFailed",
   "User not found.": "api.error.userNotFound",

@@ -315,6 +315,27 @@ select:focus-visible {
   font-size: 14px;
 }
 
+.login-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.login-secondary-actions button {
+  min-height: 34px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 65%, transparent);
+  background: transparent;
+  color: var(--primary);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.login-secondary-actions button:hover {
+  color: var(--primary-strong);
+}
+
 .login-form input:not([type="checkbox"]),
 .tool-panel input:not([type="checkbox"]),
 .tool-panel select,
@@ -1694,7 +1715,7 @@ input[type="checkbox"] {
 }
 
 .audit-radio-item input[type="radio"]:checked + .audit-radio-option {
-  color: var(--foreground);
+  color: #ffffff;
 }
 
 .audit-radio-item input[type="radio"]:focus-visible + .audit-radio-option {
@@ -1707,12 +1728,12 @@ input[type="checkbox"] {
   z-index: 1;
   inset: var(--audit-gap);
   width: calc((100% - (var(--audit-gap) * 2)) / var(--audit-option-count));
-  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border: 1px solid color-mix(in srgb, var(--primary) 72%, var(--border));
   border-radius: calc(var(--audit-radius) - 4px);
-  background: var(--surface);
+  background: var(--primary);
   box-shadow:
-    0 1px 8px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 color-mix(in srgb, #fff 54%, transparent);
+    0 10px 24px color-mix(in srgb, var(--primary) 22%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #fff 26%, transparent);
   transform: translateX(calc(var(--audit-active-index) * 100%));
   transition:
     transform var(--audit-speed) var(--audit-ease),
@@ -1727,10 +1748,10 @@ input[type="checkbox"] {
 }
 
 [data-theme="dark"] .audit-radio-slider {
-  border-color: color-mix(in srgb, var(--focus-blue) 82%, #ffffff 8%);
-  background: var(--focus-blue);
+  border-color: color-mix(in srgb, var(--primary) 82%, #ffffff 8%);
+  background: var(--primary);
   box-shadow:
-    0 12px 28px color-mix(in srgb, var(--focus-blue) 34%, transparent),
+    0 12px 28px color-mix(in srgb, var(--primary) 34%, transparent),
     inset 0 1px 0 color-mix(in srgb, #fff 16%, transparent);
 }
 
@@ -2391,10 +2412,20 @@ input[type="checkbox"] {
   background: var(--teal);
 }
 
+.success-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+  transform: none;
+}
+
 .success-button:hover,
 .danger-button:hover,
 .secondary-button:hover {
   transform: translateY(-1px);
+}
+
+.success-button:disabled:hover {
+  transform: none;
 }
 
 .danger-button {

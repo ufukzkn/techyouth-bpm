@@ -18,6 +18,7 @@ export function loginWithDemoUser(username: string, password: string, rememberMe
 
   return {
     token: `demo-${user.username}`,
+    csrfToken: "",
     expiresAt: new Date(
       Date.now() + (rememberMe ? demoRememberMeDurationMinutes : demoSessionDurationMinutes) * 60 * 1000,
     ).toISOString(),
