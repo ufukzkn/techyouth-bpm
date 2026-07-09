@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
@@ -12,11 +13,13 @@ internal static class TestDbFactory
     public static readonly Guid AdminCommunityRoleId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
     public static readonly Guid UserCommunityRoleId = Guid.Parse("cccccccc-cccc-cccc-cccc-cccccccccccc");
     public static readonly Guid ApproverCommunityRoleId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    public static readonly Guid UnassignedCommunityRoleId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
 
     public static AppDbContext Create(string? dbName = null)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(dbName ?? Guid.NewGuid().ToString())
+            .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
 
         var context = new AppDbContext(options);
@@ -141,7 +144,7 @@ internal static class TestDbFactory
         return (process, task);
     }
 
-    private static void EnsureCommunityModel(AppDbContext db)
+    public static void EnsureCommunityModel(AppDbContext db)
     {
         if (!db.Communities.Any(item => item.Id == CommunityId))
         {
@@ -150,11 +153,17 @@ internal static class TestDbFactory
                 Id = CommunityId,
                 Name = "Test Community",
                 Description = "Unit test community",
+                InviteCode = "TEST1",
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             });
         }
 
+        EnsureRole(
+            db,
+            UnassignedCommunityRoleId,
+            "Atanmadi",
+            []);
         EnsureRole(
             db,
             AdminCommunityRoleId,
@@ -197,7 +206,7 @@ internal static class TestDbFactory
             CommunityId = CommunityId,
             Name = name,
             Description = $"{name} test role",
-            TemplateKey = name,
+            TemplateKey = name == "Atanmadi" ? "unassigned" : name,
             IsSystemRole = true,
             CreatedAt = DateTime.UtcNow,
             Permissions = permissions.Select(permission => new CommunityRolePermission
