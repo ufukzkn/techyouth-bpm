@@ -66,7 +66,8 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Role/status edits are staged locally and only sent after the Admin clicks `Degisikligi uygula` and confirms the critical access dialog.
 - Admin users can inspect a selected user's active sessions from the same detail panel, see session device/IP metadata and revoke a session after confirmation.
 - The authenticated shell filters menu items by role.
-- The authenticated shell is split into focused view/component/helper modules. `AppShell` now coordinates session, route, navigation and active view rendering, while dashboard, settings, user management, system logs, dialogs, pagination and audit helpers live in separate files.
+- The authenticated shell is split into focused view/component/helper modules. `WorkspaceShell` coordinates session, role guard, topbar/sidebar and route access, while dashboard, settings, management, system logs, dialogs, pagination and audit helpers live in separate files.
+- Each workspace route under `apps/web/src/app` imports its own view component. This uses the Next.js App Router more directly and avoids one giant active-view switch loading every screen from the shell.
 - Workspace navigation uses real route paths such as `/dashboard`, `/forms`, `/tasks` and `/settings` instead of hash-scroll sections or query-only views.
 - Desktop navigation stays fixed on the left while the workspace scrolls.
 - On tablet/mobile widths, workspace navigation is collapsed behind a fixed hamburger button and opens as a drawer with backdrop/escape-close behavior.
@@ -92,12 +93,12 @@ This work coordinates the user entry and navigation experience. It does not own 
 
 ## Extensibility Notes
 
-- Adding a new screen should update `navigation.ts`, the matching route page under `apps/web/src/app`, the shell view switch and any dashboard shortcuts that should point to it.
-- Admin-only access screens currently include `/users` for user/role management and `/logs` for categorized audit search.
+- Adding a new screen should update `navigation.ts`, the matching route page under `apps/web/src/app` and any dashboard shortcuts that should point to it.
+- Admin-only access screens currently include `/management` for user/role management and `/logs` for categorized audit search.
 - Adding a new role should update navigation visibility rules and dashboard shortcut availability together.
 - Desktop navigation should stay fixed because the menu is short and should remain available during long workflow screens.
 - Mobile navigation should stay drawer-based with a fixed floating trigger so the dashboard/content remains the first visual focus on small screens.
-- Session-expiry behavior should stay centralized in `AppShell`/`sessionStore` instead of being duplicated in feature screens.
+- Session-expiry behavior should stay centralized in `WorkspaceShell`/`sessionStore` instead of being duplicated in feature screens.
 - User-action traceability has two levels: `AuditLogs` for process state history and `SystemAuditLogs` for broader identity/access/form/process/task events.
 - The current token model stays as opaque server-side sessions plus rotating refresh tokens because pending approval, lockout, refresh reuse detection and revoke all need server-side state. JWT can be considered later only if it keeps equivalent refresh-token rotation and explicit session/device management.
 - Theme ownership should stay centralized in `sessionStore`; feature screens should read the active theme only through shared styling tokens.
@@ -107,6 +108,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 
 - `apps/web/src/features/auth/LoginView.tsx`
 - `apps/web/src/features/session/sessionStore.ts`
+- `apps/web/src/features/app-shell/WorkspaceShell.tsx`
 - `apps/web/src/features/app-shell/AppShell.tsx`
 - `apps/web/src/features/app-shell/navigation.ts`
 - `apps/web/src/app/*/page.tsx`

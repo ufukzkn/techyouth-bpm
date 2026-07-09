@@ -4,13 +4,13 @@
 
 The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, role-aware access, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
-The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, backend services own business rules, and documentation tracks feature ownership. The main remaining production gaps are operational hardening: EF migrations, explicit write transactions, API-level security integration tests, Docker onboarding and final responsive/accessibility QA.
+The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, backend services own business rules, EF Core migrations own schema evolution, and documentation tracks feature ownership. The main remaining production gaps are operational hardening: explicit write transactions, API-level security integration tests, Docker onboarding and final responsive/accessibility QA.
 
 ## PDF Compliance Matrix
 
 | Requirement | Current Evidence | Readiness | Gaps / Next Action |
 | --- | --- | --- | --- |
-| Next.js multi-screen frontend | Real routes exist for dashboard, forms, runner, processes, tasks, users, logs and settings. | Strong | Final mobile/tablet QA pass. |
+| Next.js multi-screen frontend | Real routes exist for dashboard, forms, runner, processes, tasks, management, logs and settings. | Strong | Final mobile/tablet QA pass. |
 | Login with global user/role state | Zustand session store, role-aware shell, register, password reset, remember-me and forced password change. | Strong | Finish full backend error i18n mapping. |
 | Authenticated layout | Header, fixed/collapsible sidebar, active session popover and role-filtered navigation. | Strong | ARIA checks for icon-only controls. |
 | Dashboard | API-backed metrics and role-aware shortcuts. | Strong | Optional security summary widget. |
@@ -20,13 +20,13 @@ The strongest defense is extensibility. Forms are data-driven, workflow transiti
 | Loading/success/error states | Implemented in auth, forms, dashboard refresh, process/task and management flows. | Good | Normalize every remaining backend error message. |
 | .NET 8 REST API | Layered API with controllers, services, EF Core and Swagger. | Strong | Add API integration tests. |
 | User/role storage and authorization | Users, roles, statuses, sessions, admin-only endpoints and role checks. | Strong | Add permission matrix screen/doc for demo. |
-| Form definition persistence | EF entities and create/update/list/detail endpoints. | Strong | Add migrations before production deployment. |
+| Form definition persistence | EF entities, migrations and create/update/list/detail endpoints. | Strong | Add migration review to release checklist. |
 | JSON submission data | Process start stores submitted form data as JSON and displays it in detail. | Strong | Consider JSON schema/versioning later. |
 | Process/task workflow | Start process, create task, list tasks, approve/reject and show details. | Strong | Add explicit transactions around state/audit writes. |
 | BPM state machine | `Pending -> InProgress -> Completed/Rejected` controlled by `ProcessStateMachine`. | Strong | Extend only through state-machine rules. |
 | Audit trail | Process audit and system audit show actor, action, target and timestamp. | Strong | Add export for filtered audit results. |
 | Swagger/OpenAPI | Development Swagger with Bearer token support. | Strong | Add OpenAPI examples for demo requests. |
-| EF Core + database | SQLite default, PostgreSQL/Neon optional via configuration. | Good | Replace `EnsureCreated` demo path with migrations. |
+| EF Core + database | SQLite default, PostgreSQL/Neon optional via configuration and EF Core migrations. | Strong | Reset/recreate old demo DBs created before migrations. |
 | Bonus: i18n/theme/responsive/drag-drop | TR/EN dictionary, dark/light theme, drawer nav, dnd-kit ordering. | Good | Final localization and accessibility pass. |
 
 ## User Scenario Review
@@ -79,6 +79,8 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 **How does the state machine work?** Allowed transitions are centralized: `Pending + Start`, `InProgress + Approve`, `InProgress + Reject`. Any missing transition fails.
 
+**How did you optimize process listing?** The process board uses a projected summary query and only loads id, form name, status and dates. Tasks, submitted JSON and audit history are loaded from the detail endpoint when the user opens a specific process. This avoids pulling large related graphs for every row.
+
 **Why audit logs?** Process audit explains BPM decisions. System audit explains identity/access/form/process/task actions. Together they satisfy traceability.
 
 **How is i18n handled?** The frontend uses a shared TR/EN dictionary and maps known API errors to localized messages. Remaining raw backend messages should be mapped before final demo.
@@ -90,7 +92,6 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 ### Must
 
 - Commit and merge the current access/security package after final lint/build/test checks.
-- Add EF Core migrations for SQLite/PostgreSQL and document migration commands.
 - Add explicit transactions around form update, process start, task action and audit writes.
 - Finish i18n mapping for backend auth/access errors.
 - Run final responsive and accessibility QA on form designer, management and logs.
@@ -116,4 +117,3 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 - Ozgun should present form modeling, designer, runner, validation and drag/drop.
 - Cagdas should present process start, tasks, state machine, approve/reject and process audit.
 - The final demo should follow one story: login -> design form -> run form -> approve task -> inspect process detail -> inspect system audit.
-

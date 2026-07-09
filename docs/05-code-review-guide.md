@@ -61,8 +61,8 @@ Use this file for the final code review presentation.
 - `sessionStore` keeps the active user, token, expiry and theme in Zustand so refresh does not reset the demo flow.
 - `AuthService` verifies PBKDF2 password hashes and stores only hashed session tokens, while the frontend receives the raw opaque token once at login.
 - `AuthService` keeps the current opaque-session model instead of JWT because logout, revoke, lockout and pending approval need server-side state anyway.
-- `AppShell` verifies restored API sessions once on load, schedules local expiry, and sends expired/unauthorized sessions back to login with a confirmable alert.
-- `AppShell` filters navigation items by user role and keeps the active screen in real route paths, which demonstrates role-based UI without scattering role checks across pages.
+- `WorkspaceShell` verifies restored API sessions once on load, schedules local expiry, and sends expired/unauthorized sessions back to login with a confirmable alert.
+- `WorkspaceShell` filters navigation items by user role while each Next.js route imports its own view component, which demonstrates role-based UI without scattering role checks across pages.
 - `DashboardView` reads process/task metrics from the API, then turns metric cards and BPM flow steps into role-aware workspace shortcuts.
 - Dashboard metrics keep the last loaded values while refreshing so quick navigation does not flash placeholder values.
 - The form runner uses skeleton rows on first load and keeps cached form definitions during quick navigation.

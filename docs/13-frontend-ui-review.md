@@ -8,7 +8,7 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 
 | Area | Current Fit | Notes |
 | --- | --- | --- |
-| Next.js multi-screen app | Strong | Real routes exist for dashboard, forms, runner, processes, tasks, users, logs and settings. Refresh/direct links keep the correct workspace view. |
+| Next.js multi-screen app | Strong | Real routes exist for dashboard, forms, runner, processes, tasks, management, logs and settings. Refresh/direct links keep the correct workspace view. |
 | Login and session state | Strong | Login, register, password reset, remember-me, forced password change, timeout handling and session refresh are implemented through centralized session state. |
 | Role-aware shell | Strong | Sidebar visibility is role-based. Admin-only screens are hidden from User/Approver roles. Must-change-password users are restricted to settings. |
 | Dashboard | Strong | Metrics come from API data, keep previous values during refresh and route users to relevant workspace areas. |
@@ -21,7 +21,7 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 ## Frontend Architecture Notes
 
 - `apps/web` uses Next.js App Router with TypeScript and feature folders.
-- `AppShell` coordinates session, route sync, role-aware navigation and active view rendering.
+- `WorkspaceShell` coordinates session, role-aware navigation and shared workspace chrome. Each route imports its own view component for clearer ownership and better App Router code-splitting.
 - Domain flows are separated into `features/auth`, `features/session`, `features/forms`, `features/form-designer`, `features/form-runner`, `features/processes` and `features/app-shell/views`.
 - API calls are centralized in `src/lib/api.ts`, so components do not directly scatter fetch URLs.
 - Zustand stores global session, theme and language preferences. Feature-specific UI state stays inside components.
@@ -41,7 +41,7 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 
 **Why a service/API layer?** `src/lib/api.ts` centralizes API base URL, bearer token support, cookie credentials, CSRF header handling and response normalization.
 
-**How does route-based navigation work?** `navigation.ts` defines each view, path, icon and allowed roles. `AppShell` syncs the active view with `window.location` and pushes real paths.
+**How does route-based navigation work?** `navigation.ts` defines each view, path, icon and allowed roles. `WorkspaceShell` uses the active pathname for menu state, while route pages such as `/dashboard`, `/management` and `/logs` render their own view components.
 
 **Which UI libraries are used?** Lucide React is used for icons. `@dnd-kit` is used for drag/drop field ordering. Most visual styling is custom CSS in `globals.css`.
 

@@ -53,7 +53,7 @@ Implemented frontend folders:
 - `src/features/form-runner`: saved-form runner that starts process instances.
 - `src/features/processes`: process list, task list, task action dialog, process detail, audit timeline and status badge components.
 
-`AppShell.tsx` is intentionally kept as the authenticated workspace coordinator. It owns session verification, route/view synchronization, topbar/sidebar behavior and active-view composition. Heavier UI flows are split into `views`, `components`, `auditUtils`, `sessionFormatters` and shared shell types so access, settings and audit work can evolve without turning the shell into a monolithic file again.
+`WorkspaceShell.tsx` is the authenticated workspace coordinator. It owns session verification, role guard, topbar/sidebar behavior and shared workspace context. Individual Next.js route files under `apps/web/src/app` import their own view components, so dashboard, forms, runner, processes, tasks, management, logs and settings can code-split naturally instead of being rendered through one giant active-view switch. `AppShell.tsx` remains a compatibility re-export.
 
 ## Extensibility Strategy
 

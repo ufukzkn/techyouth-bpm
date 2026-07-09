@@ -38,6 +38,7 @@ The scope includes:
 ### Process List
 
 - All processes are loaded from `GET /api/processes` with role-based visibility (User sees only their own, Admin/Approver see all).
+- The list endpoint returns summary DTOs through EF Core projection, so it does not load every task and audit log while rendering the board.
 - Status filter chips allow narrowing the list by Pending, InProgress, Completed or Rejected.
 - Filtered count and total count are shown in the card header.
 - Clicking a process loads its full detail from `GET /api/processes/{id}`.
@@ -48,6 +49,7 @@ The scope includes:
 - Displays submitted form data as formatted JSON.
 - Shows all tasks with their open/completed counts.
 - Renders the full audit timeline with chronological entries.
+- Full task and audit data is intentionally loaded at detail time, not during the process list query.
 
 ### My Tasks
 
@@ -135,7 +137,7 @@ Documentation files:
 
 These areas were intentionally not changed:
 
-- Backend process/task service logic (already working correctly).
+- Core process/task state-transition rules.
 - Backend state machine rules.
 - Form designer or form runner behavior.
 - Login/session flow.

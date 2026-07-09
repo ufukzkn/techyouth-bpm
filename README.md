@@ -194,7 +194,7 @@ API ayaga kalkinca Swagger acilir:
 http://localhost:5291/swagger
 ```
 
-Ilk calistirmada API, secili veritabani uzerinde demo kullanicilari ve mock BPM verisini seed eder. SQLite dosyasi localde olusur; PostgreSQL/Neon modunda tablolar secili uzak veritabaninda olusturulur.
+Ilk calistirmada API, secili veritabani uzerinde EF Core migration'larini uygular, sonra demo kullanicilari ve mock BPM verisini seed eder. SQLite dosyasi localde olusur; PostgreSQL/Neon modunda tablolar secili uzak veritabaninda migration ile olusturulur.
 
 SQLite ile local demo veritabanini sifirlamak icin:
 
@@ -202,7 +202,7 @@ SQLite ile local demo veritabanini sifirlamak icin:
 ./scripts/run-api-local.ps1 -ResetDb
 ```
 
-Identity veya schema alanlari degistiginde mevcut SQLite dosyasi yeni kolonlari otomatik alamayabilir. Boyle durumlarda local test icin reset onerilir:
+Migration oncesi `EnsureCreated` ile olusmus eski SQLite dosyalari migration history icermeyebilir. Boyle durumlarda local test icin reset onerilir:
 
 ```powershell
 ./scripts/run-api-local.ps1 -ResetDb -Force
@@ -235,9 +235,16 @@ Ana workspace route'lari:
 - `http://localhost:3000/runner`
 - `http://localhost:3000/processes`
 - `http://localhost:3000/tasks`
-- `http://localhost:3000/users`
+- `http://localhost:3000/management`
 - `http://localhost:3000/logs`
 - `http://localhost:3000/settings`
+
+EF Core migration komutlari:
+
+```powershell
+dotnet tool restore
+dotnet tool run dotnet-ef database update --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj
+```
 
 ## Stop Local Servers
 

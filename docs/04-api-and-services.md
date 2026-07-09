@@ -131,8 +131,11 @@ Process-specific history is still returned from `GET /api/processes/{id}` as `au
   - Stores `StartedByUserId`, writes process audit and writes system audit.
 - `GET /api/processes`
   - Lists processes visible to the active user.
+  - Uses a lightweight EF Core projection for summary fields instead of loading tasks and audit history for every row.
+  - This keeps remote PostgreSQL/Neon list screens fast; full task/audit data is loaded only from the detail endpoint.
 - `GET /api/processes/{id}`
   - Returns process status, dates, form data, tasks and audit history.
+  - Uses split loading for related tasks and audit users to avoid one oversized joined result set.
 
 ## Tasks
 
@@ -161,7 +164,7 @@ Controllers should stay thin. Services own decisions:
   - `RoutingEmailSender`: tries the primary live SMTP provider first, then falls back to Mailtrap Sandbox when the recipient or username is outside the live-send allowlist.
 - `SystemAuditService`: critical system-action logging, Admin-only paged/searchable audit list and category count queries.
 - `FormService`: form definition CRUD and field validation.
-- `ProcessService`: process start, detail and listing.
+- `ProcessService`: process start, detail and listing. List queries return projected summary DTOs; detail queries load the full process graph.
 - `TaskService`: task listing and action execution.
 - `ProcessStateMachine`: allowed transitions.
 - `DatabaseSeeder`: local demo users and optional mock workflow data.
@@ -214,9 +217,10 @@ The API reads email delivery settings from the `Email` configuration section:
 - `Email:FromName`: display name shown to the recipient.
 - `Email:AllowedRecipients`: optional comma-separated safety allowlist for real SMTP recipients.
 - `Email:AllowedUsernames`: optional comma-separated safety allowlist for usernames allowed to receive real SMTP emails.
+- `Email:SandboxDomains`: optional comma-separated domains that should always route to sandbox delivery. Default demo convention is `@techyouth.local`.
 - `Email:Smtp:Host`, `Email:Smtp:Port`, `Email:Smtp:Username`, `Email:Smtp:Password`, `Email:Smtp:EnableSsl`: SMTP delivery settings.
 - `Email:Sandbox:*`: fallback SMTP settings used by `Routing` mode for Mailtrap Sandbox capture delivery.
 
-Default local mode is `Demo`, so the project runs without an external mail service. Mailtrap credentials should be set with .NET user secrets or environment variables. Tracked config files only contain placeholders.
+Default local mode is `Demo`, so the project runs without an external mail service. `Routing` mode can use Gmail SMTP for real allowlisted users while sending `@techyouth.local` demo addresses to Mailtrap Sandbox. Mailtrap/Gmail credentials should be set with .NET user secrets or environment variables. Tracked config files only contain placeholders.
 
 Mailtrap Sandbox credentials capture emails inside the Mailtrap inbox and do not deliver to real recipients. Real inbox delivery requires Gmail SMTP app password, Mailtrap Email Sending with a verified sending domain or another production mail provider. For a narrow real-delivery test, set `Email:AllowedRecipients` and `Email:AllowedUsernames` to a private allowlist before using live SMTP credentials.

@@ -32,7 +32,7 @@ The project uses a clean four-layer split:
 
 This is a good code review story because controllers stay mostly orchestration-only while services own rules. The state machine is isolated, so adding new workflow statuses or actions should not require rewriting controllers. EF Core provider selection is also centralized, which keeps SQLite local development and PostgreSQL/Neon shared testing compatible.
 
-Main architectural risk: the project currently uses `EnsureCreated`/startup seeding style rather than a migration-first production path. This is acceptable for demo speed, but production-readiness would improve with EF migrations and a controlled migration command.
+The backend now uses EF Core migrations instead of `EnsureCreated`. Startup applies migrations through `Database.MigrateAsync`, then runs deterministic seed data. This gives a stronger production-readiness story while keeping SQLite local demos and PostgreSQL/Neon shared testing on the same EF model.
 
 ## Authentication and Security Review
 
@@ -79,6 +79,8 @@ Process start creates:
 - a system audit log
 
 Task execution checks task status, assigned role/admin override, available actions and state transition. Completed tasks store `CompletedByUserId`, and the parent process receives the final status.
+
+Process listing now uses EF Core projection to return only summary fields such as process id, form name, status and dates. Full tasks and audit logs are loaded only by the process detail endpoint, which prevents the board from pulling large related object graphs from PostgreSQL/Neon. Detail loading uses split queries so related collections do not create one oversized joined result set.
 
 Recommended BPM improvement: wrap process start and task action persistence plus system audit in explicit transactions. Today the main state save and system audit save are separate service calls, which can theoretically leave business data saved without the matching system audit if the second write fails.
 
