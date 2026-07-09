@@ -344,7 +344,8 @@ select:focus-visible {
 .rule-editor input:not([type="checkbox"]),
 .rule-editor select,
 .runner-form input:not([type="checkbox"]),
-.runner-form select {
+.runner-form select,
+.runner-form textarea {
   min-height: 44px;
   padding: 0 12px;
   border: 1px solid var(--border);
@@ -352,6 +353,13 @@ select:focus-visible {
   color: var(--foreground);
   background: var(--surface);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.runner-form textarea {
+  min-height: 112px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  resize: vertical;
 }
 
 input[type="checkbox"] {
@@ -2012,7 +2020,7 @@ input[type="checkbox"] {
 
 .designer-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 0.72fr) minmax(320px, 1fr);
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
   align-items: start;
   gap: 14px;
 }
@@ -2067,6 +2075,7 @@ input[type="checkbox"] {
 }
 
 .designer-help-panel span,
+.field-palette span,
 .json-preview-panel p,
 .runner-demo-guide span {
   color: var(--muted);
@@ -2085,6 +2094,147 @@ input[type="checkbox"] {
   grid-column: 1 / -1;
   display: grid;
   gap: 12px;
+  min-height: 160px;
+  padding: 2px;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.field-list-drop-active {
+  border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+.field-insert-indicator {
+  height: 0;
+  border-top: 3px solid var(--primary);
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+.field-palette-rail {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.field-palette {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.16);
+}
+
+.field-palette-header {
+  display: grid;
+  gap: 5px;
+}
+
+.field-palette-header strong {
+  line-height: 1.2;
+}
+
+.field-palette-header span {
+  line-height: 1.4;
+}
+
+.field-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.field-palette-item {
+  min-width: 0;
+  min-height: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: 7px;
+  color: var(--foreground);
+  background: var(--surface);
+  font-weight: 750;
+  cursor: grab;
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.06);
+}
+
+.field-palette-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 7px;
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary-soft) 72%, var(--surface));
+}
+
+.field-palette-item-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.field-palette-item-copy strong {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.field-palette-item-copy span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.field-palette-grip {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.field-palette-item:hover,
+.field-palette-item:focus-visible {
+  border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+
+.field-palette-item:active {
+  cursor: grabbing;
+}
+
+.field-palette-item-dragging {
+  opacity: 0.72;
+  box-shadow: 0 14px 30px rgba(24, 36, 58, 0.16);
+}
+
+.field-editor-highlighted {
+  border-color: color-mix(in srgb, var(--primary) 62%, var(--border));
+  background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+  box-shadow: 0 12px 28px rgba(24, 36, 58, 0.14);
+}
+
+@media (min-width: 1740px) {
+  .designer-section .field-palette-rail {
+    position: fixed;
+    top: 150px;
+    right: 24px;
+    z-index: 20;
+    width: 328px;
+  }
+
+  .designer-section .field-palette-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .field-card {
@@ -2467,6 +2617,34 @@ input[type="checkbox"] {
 .runner-checkbox {
   min-height: 44px;
   padding: 0 2px;
+  font-weight: 650;
+}
+
+.runner-radio-group {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-weight: 650;
+}
+
+.runner-radio-group legend {
+  padding: 0;
+}
+
+.runner-radio-options {
+  display: grid;
+  gap: 8px;
+}
+
+.runner-radio-option {
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
   font-weight: 650;
 }
 
@@ -2962,6 +3140,14 @@ input[type="checkbox"] {
 
   .session-danger-action .strong-danger-button {
     width: 100%;
+  }
+
+  .field-palette-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-palette-rail {
+    position: static;
   }
 
   .workspace-header,

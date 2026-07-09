@@ -185,9 +185,9 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
                 errors.Add($"Field '{field.Key}' needs a label.");
             }
 
-            if (field.Type == FieldType.Select && field.Options.Count == 0)
+            if ((field.Type == FieldType.Select || field.Type == FieldType.Radio) && field.Options.Count == 0)
             {
-                errors.Add($"Select field '{field.Key}' needs options.");
+                errors.Add($"Option field '{field.Key}' needs options.");
             }
         }
 

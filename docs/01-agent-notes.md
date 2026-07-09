@@ -77,6 +77,7 @@ These notes are the project memory. Update this file whenever an implementation 
 - Form designer drag/drop field ordering was added using the existing dnd-kit packages; no new dependency was added.
 - Move up/down ordering remains available as an accessibility and fallback control.
 - Field `sortOrder` values are normalized after drag/drop, move up/down and remove operations so JSON preview and saved payload stay aligned.
+- Ozgun's Form Designer now includes a right-side sticky field palette for drag/drop field creation. Palette cards are icon-led and localized, click-only add is blocked, drag insertion preview shows the target position, Text Area and Radio Button shown as `Seçenek düğmesi` are supported, technical keys are ASCII-safe, option validation blocks empty/duplicate values, and existing ordering, RequiredWhen, JSON preview and save/update behavior remain intact.
 - Form designer and runner UI copy, demo guidance and scoped layout polish were improved for presentation readiness.
 - Backend, login/session, dashboard, app shell, process/task and audit areas were not changed during these Ozgun form-flow updates.
 - Frontend `npm run lint` and `npm run build` passed after the runner, drag/drop and UI polish updates.
