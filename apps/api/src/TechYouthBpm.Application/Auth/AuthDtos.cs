@@ -27,11 +27,14 @@ public record CreateUserRequest(
     string Email,
     Role Role,
     UserStatus Status,
-    string TemporaryPassword);
+    string TemporaryPassword,
+    Guid? CommunityId = null,
+    Guid? CommunityRoleId = null);
 
 public record UserSearchRequest(
     string? Query = null,
     UserStatus? Status = null,
+    Guid? CommunityId = null,
     int Page = 1,
     int PageSize = 10);
 
@@ -43,7 +46,12 @@ public record UserDto(
     Role Role,
     UserStatus Status,
     bool IsEmailVerified,
-    bool MustChangePassword = false)
+    bool MustChangePassword = false,
+    Guid? CommunityId = null,
+    string CommunityName = "",
+    Guid? CommunityRoleId = null,
+    string CommunityRoleName = "",
+    IReadOnlyList<string>? Permissions = null)
 {
     public UserDto(Guid id, string username, string displayName, Role role)
         : this(id, username, displayName, string.Empty, role, UserStatus.Active, true)
@@ -74,9 +82,14 @@ public record UserAdminDto(
     int FailedLoginCount,
     DateTime? LockedUntil,
     DateTime CreatedAt,
-    bool MustChangePassword = false);
+    bool MustChangePassword = false,
+    Guid? CommunityId = null,
+    string CommunityName = "",
+    Guid? CommunityRoleId = null,
+    string CommunityRoleName = "",
+    IReadOnlyList<string>? Permissions = null);
 
-public record UpdateUserAccessRequest(Role Role, UserStatus Status);
+public record UpdateUserAccessRequest(Role Role, UserStatus Status, Guid? CommunityId = null, Guid? CommunityRoleId = null);
 
 public record UserSessionDto(
     Guid Id,

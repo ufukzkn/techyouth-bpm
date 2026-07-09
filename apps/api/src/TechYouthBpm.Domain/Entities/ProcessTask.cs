@@ -8,6 +8,9 @@ public class ProcessTask
     public Guid ProcessInstanceId { get; set; }
     public ProcessInstance? ProcessInstance { get; set; }
     public Role AssignedRole { get; set; }
+    public Guid? AssignedCommunityRoleId { get; set; }
+    public CommunityRole? AssignedCommunityRole { get; set; }
+    public string RequiredPermission { get; set; } = "Tasks.Act";
     public ProcessTaskStatus Status { get; set; }
     public string AvailableActionsJson { get; set; } = "[]";
     public DateTime CreatedAt { get; set; }

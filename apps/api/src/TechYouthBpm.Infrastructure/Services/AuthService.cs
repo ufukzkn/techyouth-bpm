@@ -75,6 +75,7 @@ public class AuthService(
             return Result<RegisterResponse>.Failure("Username or email is already registered.");
         }
 
+        var defaultMembership = await BuildDefaultMembershipAsync(Role.User, cancellationToken);
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -87,6 +88,10 @@ public class AuthService(
             IsEmailVerified = false,
             CreatedAt = DateTime.UtcNow
         };
+        if (defaultMembership is not null)
+        {
+            user.CommunityMemberships.Add(defaultMembership);
+        }
 
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
@@ -107,7 +112,7 @@ public class AuthService(
         string? userAgent = null,
         CancellationToken cancellationToken = default)
     {
-        var user = await db.Users
+        var user = await UserQuery()
             .SingleOrDefaultAsync(item => item.Username == request.Username, cancellationToken);
 
         if (user is null)
@@ -221,6 +226,12 @@ public class AuthService(
         var refreshTokenHash = SessionTokenHasher.Hash(refreshToken);
         var storedRefreshToken = await db.RefreshTokens
             .Include(token => token.User)
+            .ThenInclude(user => user!.CommunityMemberships)
+            .ThenInclude(membership => membership.Community)
+            .Include(token => token.User)
+            .ThenInclude(user => user!.CommunityMemberships)
+            .ThenInclude(membership => membership.CommunityRole)
+            .ThenInclude(role => role!.Permissions)
             .Include(token => token.UserSession)
             .SingleOrDefaultAsync(token => token.Token == refreshTokenHash, cancellationToken);
 
@@ -316,6 +327,12 @@ public class AuthService(
         var tokenHash = SessionTokenHasher.Hash(token);
         var session = await db.UserSessions
             .Include(item => item.User)
+            .ThenInclude(user => user!.CommunityMemberships)
+            .ThenInclude(membership => membership.Community)
+            .Include(item => item.User)
+            .ThenInclude(user => user!.CommunityMemberships)
+            .ThenInclude(membership => membership.CommunityRole)
+            .ThenInclude(role => role!.Permissions)
             .SingleOrDefaultAsync(
                 item => item.Token == tokenHash && item.ExpiresAt > DateTime.UtcNow && item.RevokedAt == null,
                 cancellationToken);
@@ -336,7 +353,7 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
         if (user is null)
         {
             return Result<UserDto>.Failure("User not found.");
@@ -390,7 +407,7 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
         if (user is null)
         {
             return Result<UserDto>.Failure("User not found.");
@@ -520,9 +537,9 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!CanManageUsers(currentUser, request.CommunityId))
         {
-            return Result<UserAdminDto>.Failure("Only Admin users can create users.");
+            return Result<UserAdminDto>.Failure("Current user cannot create users in this community.");
         }
 
         var username = request.Username.Trim();
@@ -556,6 +573,30 @@ public class AuthService(
             return Result<UserAdminDto>.Failure("Username or email is already registered.");
         }
 
+        var hasCommunities = await db.Communities.AnyAsync(cancellationToken);
+        var targetCommunityId = await ResolveTargetCommunityIdAsync(currentUser, request.CommunityId, cancellationToken);
+        if (targetCommunityId is null && hasCommunities)
+        {
+            return Result<UserAdminDto>.Failure("A community is required for the new user.");
+        }
+
+        var targetCommunityRoleId = targetCommunityId is null
+            ? null
+            : await ResolveTargetCommunityRoleIdAsync(
+                targetCommunityId.Value,
+                request.CommunityRoleId,
+                request.Role,
+                cancellationToken);
+        if (targetCommunityRoleId is null && hasCommunities)
+        {
+            return Result<UserAdminDto>.Failure("Community role was not found.");
+        }
+
+        if (request.Role == Role.SuperAdmin && !currentUser.IsSuperAdmin())
+        {
+            return Result<UserAdminDto>.Failure("Only SuperAdmin users can create SuperAdmin accounts.");
+        }
+
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -569,6 +610,17 @@ public class AuthService(
             MustChangePassword = true,
             CreatedAt = DateTime.UtcNow
         };
+        if (targetCommunityId is not null && targetCommunityRoleId is not null)
+        {
+            user.CommunityMemberships.Add(new UserCommunityMembership
+            {
+                Id = Guid.NewGuid(),
+                CommunityId = targetCommunityId.Value,
+                CommunityRoleId = targetCommunityRoleId.Value,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
 
         try
         {
@@ -596,7 +648,8 @@ public class AuthService(
             $"Admin '{currentUser.Username}' created user '{user.Username}' with role {user.Role}, status {user.Status} and temporary-password requirement.",
             cancellationToken);
 
-        return Result<UserAdminDto>.Success(user.ToAdminDto());
+        var saved = await UserQuery().SingleAsync(item => item.Id == user.Id, cancellationToken);
+        return Result<UserAdminDto>.Success(saved.ToAdminDto());
     }
 
     public async Task<Result> DeleteUserAsync(
@@ -604,7 +657,7 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!CanManageUsers(currentUser, null))
         {
             return Result.Failure("Only Admin users can delete users.");
         }
@@ -614,10 +667,20 @@ public class AuthService(
             return Result.Failure("Admin users cannot delete their own account.");
         }
 
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
         if (user is null)
         {
             return Result.Failure("User not found.");
+        }
+
+        if (user.Role == Role.SuperAdmin)
+        {
+            return Result.Failure("SuperAdmin users cannot be deleted.");
+        }
+
+        if (!CanManageUsers(currentUser, user.ToDto().CommunityId))
+        {
+            return Result.Failure("Current user cannot delete users in this community.");
         }
 
         var hasWorkflowHistory =
@@ -662,14 +725,26 @@ public class AuthService(
         UserSearchRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!CanManageUsers(currentUser, request.CommunityId))
         {
             return Result<PagedResult<UserAdminDto>>.Failure("Only Admin users can list users.");
         }
 
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
-        var query = db.Users.AsQueryable();
+        var query = UserQuery();
+
+        if (!currentUser.IsSuperAdmin())
+        {
+            query = query.Where(user => user.CommunityMemberships.Any(membership =>
+                membership.IsActive && membership.CommunityId == currentUser.CommunityId));
+        }
+
+        if (request.CommunityId is not null)
+        {
+            query = query.Where(user => user.CommunityMemberships.Any(membership =>
+                membership.IsActive && membership.CommunityId == request.CommunityId));
+        }
 
         if (request.Status is not null)
         {
@@ -706,21 +781,71 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!CanManageUsers(currentUser, request.CommunityId))
         {
             return Result<UserAdminDto>.Failure("Only Admin users can update access.");
         }
 
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
         if (user is null)
         {
             return Result<UserAdminDto>.Failure("User not found.");
+        }
+
+        var userDto = user.ToDto();
+        if (!CanManageUsers(currentUser, userDto.CommunityId))
+        {
+            return Result<UserAdminDto>.Failure("Current user cannot update users in this community.");
+        }
+
+        if (user.Role == Role.SuperAdmin && request.Status != UserStatus.Active)
+        {
+            return Result<UserAdminDto>.Failure("SuperAdmin users must stay active.");
+        }
+
+        if (request.Role == Role.SuperAdmin && !currentUser.IsSuperAdmin())
+        {
+            return Result<UserAdminDto>.Failure("Only SuperAdmin users can assign SuperAdmin role.");
         }
 
         var oldStatus = user.Status;
         var oldRole = user.Role;
         user.Role = request.Role;
         user.Status = request.Status;
+
+        if (request.CommunityId is not null || request.CommunityRoleId is not null)
+        {
+            var targetCommunityId = await ResolveTargetCommunityIdAsync(currentUser, request.CommunityId ?? userDto.CommunityId, cancellationToken);
+            if (targetCommunityId is null)
+            {
+                return Result<UserAdminDto>.Failure("A community is required.");
+            }
+
+            var targetCommunityRoleId = await ResolveTargetCommunityRoleIdAsync(
+                targetCommunityId.Value,
+                request.CommunityRoleId,
+                request.Role,
+                cancellationToken);
+            if (targetCommunityRoleId is null)
+            {
+                return Result<UserAdminDto>.Failure("Community role was not found.");
+            }
+
+            foreach (var membership in user.CommunityMemberships)
+            {
+                membership.IsActive = false;
+            }
+
+            user.CommunityMemberships.Add(new UserCommunityMembership
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                CommunityId = targetCommunityId.Value,
+                CommunityRoleId = targetCommunityRoleId.Value,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
 
         if (request.Status != UserStatus.Active)
         {
@@ -735,7 +860,8 @@ public class AuthService(
             user.Id.ToString(),
             $"User '{user.Username}' access changed from {oldRole}/{oldStatus} to {user.Role}/{user.Status}.",
             cancellationToken);
-        return Result<UserAdminDto>.Success(user.ToAdminDto());
+        var updated = await UserQuery().SingleAsync(item => item.Id == user.Id, cancellationToken);
+        return Result<UserAdminDto>.Success(updated.ToAdminDto());
     }
 
     public async Task<Result<IReadOnlyList<UserSessionDto>>> ListSessionsAsync(
@@ -767,15 +893,20 @@ public class AuthService(
         string currentToken,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!CanManageUsers(currentUser, null))
         {
             return Result<IReadOnlyList<UserSessionDto>>.Failure("Only Admin users can view user sessions.");
         }
 
-        var userExists = await db.Users.AnyAsync(user => user.Id == userId, cancellationToken);
-        if (!userExists)
+        var managedUser = await UserQuery().SingleOrDefaultAsync(user => user.Id == userId, cancellationToken);
+        if (managedUser is null)
         {
             return Result<IReadOnlyList<UserSessionDto>>.Failure("User not found.");
+        }
+
+        if (!CanManageUsers(currentUser, managedUser.ToDto().CommunityId))
+        {
+            return Result<IReadOnlyList<UserSessionDto>>.Failure("Current user cannot view sessions in this community.");
         }
 
         var currentTokenHash = SessionTokenHasher.Hash(currentToken);
@@ -859,9 +990,20 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!CanManageUsers(currentUser, null))
         {
             return Result.Failure("Only Admin users can revoke user sessions.");
+        }
+
+        var managedUser = await UserQuery().SingleOrDefaultAsync(user => user.Id == userId, cancellationToken);
+        if (managedUser is null)
+        {
+            return Result.Failure("User not found.");
+        }
+
+        if (!CanManageUsers(currentUser, managedUser.ToDto().CommunityId))
+        {
+            return Result.Failure("Current user cannot revoke sessions in this community.");
         }
 
         var session = await db.UserSessions.SingleOrDefaultAsync(
@@ -890,7 +1032,7 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
         if (user is null)
         {
             return Result<EmailVerificationStartResponse>.Failure("User not found.");
@@ -904,7 +1046,7 @@ public class AuthService(
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == currentUser.Id, cancellationToken);
         if (user is null)
         {
             return Result<UserDto>.Failure("User not found.");
@@ -1142,7 +1284,7 @@ public class AuthService(
     private Task<User?> FindUserByUsernameOrEmailAsync(string value, CancellationToken cancellationToken)
     {
         var lookup = value.Trim().ToLowerInvariant();
-        return db.Users.SingleOrDefaultAsync(
+        return UserQuery().SingleOrDefaultAsync(
             user => user.Username.ToLower() == lookup || user.Email.ToLower() == lookup,
             cancellationToken);
     }
@@ -1421,5 +1563,102 @@ public class AuthService(
         {
             refreshToken.RevokedAt = DateTime.UtcNow;
         }
+    }
+
+    private IQueryable<User> UserQuery() =>
+        db.Users
+            .Include(user => user.CommunityMemberships)
+            .ThenInclude(membership => membership.Community)
+            .Include(user => user.CommunityMemberships)
+            .ThenInclude(membership => membership.CommunityRole)
+            .ThenInclude(role => role!.Permissions);
+
+    private bool CanManageUsers(UserDto currentUser, Guid? targetCommunityId)
+    {
+        if (currentUser.IsSuperAdmin())
+        {
+            return true;
+        }
+
+        if (!currentUser.HasPermission(PermissionNames.CommunityManageUsers))
+        {
+            return false;
+        }
+
+        return targetCommunityId is null || currentUser.CommunityId == targetCommunityId;
+    }
+
+    private async Task<Guid?> ResolveTargetCommunityIdAsync(
+        UserDto currentUser,
+        Guid? requestedCommunityId,
+        CancellationToken cancellationToken)
+    {
+        var communityId = currentUser.IsSuperAdmin()
+            ? requestedCommunityId ?? currentUser.CommunityId
+            : currentUser.CommunityId;
+
+        if (communityId is null)
+        {
+            return null;
+        }
+
+        var exists = await db.Communities.AnyAsync(community => community.Id == communityId && community.IsActive, cancellationToken);
+        return exists ? communityId : null;
+    }
+
+    private async Task<Guid?> ResolveTargetCommunityRoleIdAsync(
+        Guid communityId,
+        Guid? requestedCommunityRoleId,
+        Role requestedPlatformRole,
+        CancellationToken cancellationToken)
+    {
+        if (requestedCommunityRoleId is not null)
+        {
+            var exists = await db.CommunityRoles.AnyAsync(
+                role => role.Id == requestedCommunityRoleId && role.CommunityId == communityId,
+                cancellationToken);
+            return exists ? requestedCommunityRoleId : null;
+        }
+
+        var templateKey = requestedPlatformRole switch
+        {
+            Role.Admin or Role.SuperAdmin => CommunityRoleTemplates.CommunityAdmin,
+            Role.Approver => CommunityRoleTemplates.Approver,
+            _ => CommunityRoleTemplates.ProcessStarter
+        };
+
+        return await db.CommunityRoles
+            .Where(role => role.CommunityId == communityId && role.TemplateKey == templateKey)
+            .Select(role => (Guid?)role.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<UserCommunityMembership?> BuildDefaultMembershipAsync(Role role, CancellationToken cancellationToken)
+    {
+        var communityId = await db.Communities
+            .Where(community => community.IsActive)
+            .OrderBy(community => community.Name == "Sportif Faaliyetler" ? 0 : 1)
+            .ThenBy(community => community.Name)
+            .Select(community => (Guid?)community.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (communityId is null)
+        {
+            return null;
+        }
+
+        var communityRoleId = await ResolveTargetCommunityRoleIdAsync(communityId.Value, null, role, cancellationToken);
+        if (communityRoleId is null)
+        {
+            return null;
+        }
+
+        return new UserCommunityMembership
+        {
+            Id = Guid.NewGuid(),
+            CommunityId = communityId.Value,
+            CommunityRoleId = communityRoleId.Value,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
     }
 }

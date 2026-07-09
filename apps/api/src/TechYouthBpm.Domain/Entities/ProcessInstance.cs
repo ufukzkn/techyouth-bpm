@@ -7,6 +7,8 @@ public class ProcessInstance
     public Guid Id { get; set; }
     public Guid FormDefinitionId { get; set; }
     public FormDefinition? FormDefinition { get; set; }
+    public Guid CommunityId { get; set; }
+    public Community? Community { get; set; }
     public Guid StartedByUserId { get; set; }
     public User? StartedByUser { get; set; }
     public ProcessStatus Status { get; set; }

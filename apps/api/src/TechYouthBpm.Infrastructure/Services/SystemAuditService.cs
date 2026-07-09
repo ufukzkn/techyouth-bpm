@@ -47,7 +47,7 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         SystemAuditSearchRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!currentUser.HasPermission(PermissionNames.AuditView))
         {
             return Result<PagedResult<SystemAuditLogDto>>.Failure("Only Admin users can view system audit logs.");
         }
@@ -56,9 +56,10 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
         var query = db.SystemAuditLogs
             .Include(log => log.ActorUser)
+            .ThenInclude(user => user!.CommunityMemberships)
             .AsQueryable();
 
-        query = ApplySearchFilter(ApplyCategoryFilter(query, request.Category), request.Query);
+        query = ApplySearchFilter(ApplyCategoryFilter(ApplyCommunityScope(query, currentUser), request.Category), request.Query);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var logs = await query
@@ -122,12 +123,12 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         string? query = null,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!currentUser.HasPermission(PermissionNames.AuditView))
         {
             return Result<SystemAuditCategoryCountsDto>.Failure("Only Admin users can view system audit logs.");
         }
 
-        var baseQuery = ApplySearchFilter(db.SystemAuditLogs.Include(log => log.ActorUser), query);
+        var baseQuery = ApplySearchFilter(ApplyCommunityScope(db.SystemAuditLogs.Include(log => log.ActorUser), currentUser), query);
         var counts = new SystemAuditCategoryCountsDto(
             await baseQuery.CountAsync(cancellationToken),
             await ApplyCategoryFilter(baseQuery, "identity").CountAsync(cancellationToken),
@@ -182,4 +183,22 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
             "tasks" => query.Where(log => log.Action.StartsWith("Task.") || log.EntityType == "ProcessTask"),
             _ => query
         };
+
+    private static IQueryable<SystemAuditLog> ApplyCommunityScope(IQueryable<SystemAuditLog> query, UserDto currentUser)
+    {
+        if (currentUser.IsSuperAdmin())
+        {
+            return query;
+        }
+
+        if (currentUser.CommunityId is null)
+        {
+            return query;
+        }
+
+        var communityId = currentUser.CommunityId.Value;
+        return query.Where(log =>
+            log.ActorUser != null
+            && log.ActorUser.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId));
+    }
 }

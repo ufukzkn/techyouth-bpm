@@ -41,7 +41,7 @@ public class FormServiceTests
         var result = await service.UpdateAsync(created.Value!.Id, CreateRequest("Guncel Form", "note", "Not"), userDto);
 
         Assert.False(result.IsSuccess);
-        Assert.Contains(result.Errors, error => error.Contains("Only Admin", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Errors, error => error.Contains("cannot update", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

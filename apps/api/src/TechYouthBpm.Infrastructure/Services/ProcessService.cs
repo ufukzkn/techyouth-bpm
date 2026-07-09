@@ -19,9 +19,19 @@ public class ProcessService(
 {
     public async Task<IReadOnlyList<ProcessSummaryDto>> ListAsync(UserDto user, CancellationToken cancellationToken = default)
     {
+        if (!user.HasPermission(PermissionNames.ProcessesView))
+        {
+            return [];
+        }
+
         var query = db.ProcessInstances.AsNoTracking();
 
-        if (user.Role == Role.User)
+        if (!user.IsSuperAdmin() && user.CommunityId is not null)
+        {
+            query = query.Where(process => process.CommunityId == user.CommunityId);
+        }
+
+        if (user.Role == Role.User && !user.HasPermission(PermissionNames.TasksView))
         {
             query = query.Where(process => process.StartedByUserId == user.Id);
         }
@@ -32,6 +42,8 @@ public class ProcessService(
                 process.Id,
                 process.FormDefinitionId,
                 process.FormDefinition != null ? process.FormDefinition.Name : "Unknown form",
+                process.CommunityId,
+                process.Community != null ? process.Community.Name : string.Empty,
                 process.Status,
                 process.StartedAt,
                 process.CompletedAt))
@@ -53,12 +65,12 @@ public class ProcessService(
 
     public async Task<Result<ProcessDetailDto>> StartAsync(StartProcessRequest request, UserDto user, CancellationToken cancellationToken = default)
     {
-        if (user.Role is not (Role.Admin or Role.User))
+        if (!user.HasPermission(PermissionNames.ProcessesStart))
         {
-            return Result<ProcessDetailDto>.Failure("Only Admin and User roles can start a process.");
+            return Result<ProcessDetailDto>.Failure("Current user cannot start processes.");
         }
 
-        var form = await formService.GetAsync(request.FormDefinitionId, cancellationToken);
+        var form = await formService.GetAsync(request.FormDefinitionId, user, cancellationToken);
         if (form is null)
         {
             return Result<ProcessDetailDto>.Failure("Form definition was not found.");
@@ -81,6 +93,7 @@ public class ProcessService(
         {
             Id = Guid.NewGuid(),
             FormDefinitionId = request.FormDefinitionId,
+            CommunityId = form.CommunityId,
             StartedByUserId = user.Id,
             Status = startResult.Value,
             FormDataJson = request.FormData.GetRawText(),
@@ -91,6 +104,7 @@ public class ProcessService(
                 {
                     Id = Guid.NewGuid(),
                     AssignedRole = Role.Approver,
+                    RequiredPermission = PermissionNames.TasksAct,
                     Status = ProcessTaskStatus.Open,
                     AvailableActionsJson = JsonHelpers.Serialize(new[] { WorkflowAction.Approve, WorkflowAction.Reject }),
                     CreatedAt = now
@@ -130,10 +144,16 @@ public class ProcessService(
             .AsNoTracking()
             .AsSplitQuery()
             .Include(process => process.FormDefinition)
+            .Include(process => process.Community)
             .Include(process => process.Tasks)
+            .ThenInclude(task => task.AssignedCommunityRole)
             .Include(process => process.AuditLogs)
             .ThenInclude(log => log.User);
 
     private static bool CanSeeProcess(ProcessInstance process, UserDto user) =>
-        user.Role is Role.Admin or Role.Approver || process.StartedByUserId == user.Id;
+        user.IsSuperAdmin()
+        || (user.CommunityId is null && (user.Role is Role.Admin or Role.Approver || process.StartedByUserId == user.Id))
+        || (process.CommunityId == user.CommunityId
+            && (user.HasPermission(PermissionNames.ProcessesView)
+                || process.StartedByUserId == user.Id));
 }

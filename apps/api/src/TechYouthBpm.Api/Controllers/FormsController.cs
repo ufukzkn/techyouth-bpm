@@ -17,7 +17,7 @@ public class FormsController(IFormService formService, IAuthService authService)
             return UnauthorizedProblem();
         }
 
-        return Ok(await formService.ListAsync(cancellationToken));
+        return Ok(await formService.ListAsync(user, cancellationToken));
     }
 
     [HttpGet("{id:guid}")]
@@ -29,7 +29,7 @@ public class FormsController(IFormService formService, IAuthService authService)
             return UnauthorizedProblem();
         }
 
-        var form = await formService.GetAsync(id, cancellationToken);
+        var form = await formService.GetAsync(id, user, cancellationToken);
         return form is null ? NotFound(new { errors = new[] { "Form was not found." } }) : Ok(form);
     }
 

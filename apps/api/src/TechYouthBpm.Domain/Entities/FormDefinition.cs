@@ -5,6 +5,8 @@ public class FormDefinition
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public Guid CommunityId { get; set; }
+    public Community? Community { get; set; }
     public Guid CreatedByUserId { get; set; }
     public User? CreatedByUser { get; set; }
     public DateTime CreatedAt { get; set; }

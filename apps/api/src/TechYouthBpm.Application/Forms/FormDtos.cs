@@ -32,6 +32,8 @@ public record FormDefinitionDto(
     Guid Id,
     string Name,
     string Description,
+    Guid CommunityId,
+    string CommunityName,
     Guid CreatedByUserId,
     DateTime CreatedAt,
     IReadOnlyList<FormFieldDto> Fields);
@@ -39,6 +41,7 @@ public record FormDefinitionDto(
 public record CreateFormRequest(
     string Name,
     string Description,
-    IReadOnlyList<CreateFormFieldRequest> Fields);
+    IReadOnlyList<CreateFormFieldRequest> Fields,
+    Guid? CommunityId = null);
 
 public record StartProcessRequest(Guid FormDefinitionId, JsonElement FormData);
