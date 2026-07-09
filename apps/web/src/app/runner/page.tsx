@@ -1,5 +1,8 @@
-import { AppShell } from "@/features/app-shell/AppShell";
+"use client";
+
+import { WorkspaceShell } from "@/features/app-shell/WorkspaceShell";
+import { FormRunnerDraft } from "@/features/form-runner/FormRunnerDraft";
 
 export default function RunnerPage() {
-  return <AppShell />;
+  return <WorkspaceShell viewId="runner">{() => <FormRunnerDraft />}</WorkspaceShell>;
 }

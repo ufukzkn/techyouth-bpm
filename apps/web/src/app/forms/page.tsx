@@ -1,5 +1,8 @@
-import { AppShell } from "@/features/app-shell/AppShell";
+"use client";
+
+import { WorkspaceShell } from "@/features/app-shell/WorkspaceShell";
+import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
 
 export default function FormsPage() {
-  return <AppShell />;
+  return <WorkspaceShell viewId="forms">{() => <FormDesignerDraft />}</WorkspaceShell>;
 }

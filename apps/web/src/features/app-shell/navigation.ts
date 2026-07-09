@@ -2,7 +2,7 @@ import { ClipboardList, FilePlus2, History, LayoutDashboard, Settings, UserCog, 
 import type { TranslationKey } from "@/features/i18n/translations";
 import type { Role } from "@/lib/types";
 
-export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "users" | "logs" | "settings";
+export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "management" | "logs" | "settings";
 
 export type NavItem = {
   labelKey: TranslationKey;
@@ -49,9 +49,9 @@ export const navItems: NavItem[] = [
     roles: ["Admin", "Approver"],
   },
   {
-    labelKey: "nav.users",
-    viewId: "users",
-    path: "/users",
+    labelKey: "nav.management",
+    viewId: "management",
+    path: "/management",
     icon: UserCog,
     roles: ["Admin"],
   },

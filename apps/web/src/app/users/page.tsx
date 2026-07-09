@@ -1,5 +1,5 @@
-import { AppShell } from "@/features/app-shell/AppShell";
+import { redirect } from "next/navigation";
 
 export default function UsersPage() {
-  return <AppShell />;
+  redirect("/management");
 }

@@ -1,5 +1,12 @@
-import { AppShell } from "@/features/app-shell/AppShell";
+"use client";
+
+import { WorkspaceShell } from "@/features/app-shell/WorkspaceShell";
+import { SystemLogsView } from "@/features/app-shell/views/SystemLogsView";
 
 export default function LogsPage() {
-  return <AppShell />;
+  return (
+    <WorkspaceShell viewId="logs">
+      {({ language, token }) => <SystemLogsView language={language} token={token} />}
+    </WorkspaceShell>
+  );
 }
