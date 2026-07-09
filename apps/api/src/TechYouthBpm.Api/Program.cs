@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using TechYouthBpm.Api;
 using TechYouthBpm.Infrastructure;
@@ -118,6 +119,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var seedMockData = app.Configuration.GetValue("Seed:MockData", true);
+    await db.Database.MigrateAsync();
     await DatabaseSeeder.SeedAsync(db, seedMockData);
 }
 

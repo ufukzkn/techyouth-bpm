@@ -19,18 +19,23 @@ public class ProcessService(
 {
     public async Task<IReadOnlyList<ProcessSummaryDto>> ListAsync(UserDto user, CancellationToken cancellationToken = default)
     {
-        var query = ProcessQuery();
+        var query = db.ProcessInstances.AsNoTracking();
 
         if (user.Role == Role.User)
         {
             query = query.Where(process => process.StartedByUserId == user.Id);
         }
 
-        var processes = await query
+        return await query
             .OrderByDescending(process => process.StartedAt)
+            .Select(process => new ProcessSummaryDto(
+                process.Id,
+                process.FormDefinitionId,
+                process.FormDefinition != null ? process.FormDefinition.Name : "Unknown form",
+                process.Status,
+                process.StartedAt,
+                process.CompletedAt))
             .ToListAsync(cancellationToken);
-
-        return processes.Select(process => process.ToSummaryDto()).ToArray();
     }
 
     public async Task<ProcessDetailDto?> GetAsync(Guid id, UserDto user, CancellationToken cancellationToken = default)
@@ -122,6 +127,8 @@ public class ProcessService(
 
     private IQueryable<ProcessInstance> ProcessQuery() =>
         db.ProcessInstances
+            .AsNoTracking()
+            .AsSplitQuery()
             .Include(process => process.FormDefinition)
             .Include(process => process.Tasks)
             .Include(process => process.AuditLogs)

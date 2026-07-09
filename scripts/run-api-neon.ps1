@@ -57,6 +57,8 @@ $Host.UI.RawUI.WindowTitle = "TechYouth BPM API - Neon"
 Set-Location $apiRoot
 Write-Host "Starting API with Neon PostgreSQL at $Url"
 Write-Host "Environment file: $EnvFile"
+Write-Host "EF Core migrations are applied on API startup, then demo seed data is added."
+Write-Host "Use a disposable Neon branch/database when testing migration resets."
 Write-Host "Mock workflow data: $($env:Seed__MockData)"
 Write-Host "Session duration: $SessionDurationMinutes minute(s)"
 Write-Host "Remember-me duration: $RememberMeDurationMinutes minute(s)"

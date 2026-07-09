@@ -54,7 +54,8 @@ $Host.UI.RawUI.WindowTitle = "TechYouth BPM API"
 
 Set-Location $apiRoot
 Write-Host "Starting API with SQLite at $Url"
-Write-Host "The database is created and seeded on API startup if it does not exist."
+Write-Host "EF Core migrations are applied on API startup, then demo seed data is added."
+Write-Host "If this is an old pre-migration SQLite DB, run with -ResetDb -Force once."
 Write-Host "Mock workflow data: $($env:Seed__MockData)"
 Write-Host "Session duration: $SessionDurationMinutes minute(s)"
 Write-Host "Remember-me duration: $RememberMeDurationMinutes minute(s)"
