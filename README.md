@@ -246,6 +246,27 @@ dotnet tool restore
 dotnet tool run dotnet-ef database update --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj
 ```
 
+## Docker
+
+Docker Desktop'ta iki ayri Compose uygulamasi kullanilir. `eczacibasi-local`, SQLite ile hizli local demo ortamidir. `eczacibasi-cloud`, gitignored `.env.neon.local` dosyasindaki Neon ayarlariyla uzak PostgreSQL'e baglanir. Ikisi ayni `3000` web ve `5291` API portlarini kullandigi icin ayni anda acilmamalidir.
+
+```powershell
+# SQLite local stack: cloud stack aciksa once kapatilir
+docker compose -f compose.cloud.yaml down
+docker compose up -d --build
+
+# Neon cloud stack: local stack aciksa once kapatilir
+docker compose down
+docker compose -f compose.cloud.yaml up -d --build
+```
+
+- Web: `http://localhost:3000`
+- API / Swagger: `http://localhost:5291/swagger`
+- Local stack'te DB, `sqlite-data` volume icinde tutulur.
+- Cloud stack'te schema ve mock veri Neon uzerinde API baslangicinda EF Core migration + seed ile olusur.
+
+Yalnizca containerlari olusturup Docker Desktop'tan baslatmak icin localde `docker compose create --build --force-recreate`, cloudda `docker compose -f compose.cloud.yaml create --build --force-recreate` kullanilir. Containerlari kapatmak icin local stack'te `docker compose down`, cloud stack'te `docker compose -f compose.cloud.yaml down` kullanilir. Local SQLite volume'unu sifirlamak icin `docker compose down -v` kullanilir. Neon veya SMTP secret'lari compose dosyasina yazilmaz. Ayrintili akis [docs/17-docker-and-deployment.md](docs/17-docker-and-deployment.md) dosyasindadir.
+
 ## Stop Local Servers
 
 Normal terminalde calistirildiysa ilgili terminalde `Ctrl + C` yeterlidir.
