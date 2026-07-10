@@ -62,9 +62,23 @@ public class AuthService(
             errors.Add("Password must be at least 8 characters.");
         }
 
+        if (string.IsNullOrWhiteSpace(request.CommunityCode))
+        {
+            errors.Add("Community code is required.");
+        }
+
         if (errors.Count > 0)
         {
             return Result<RegisterResponse>.Failure(errors);
+        }
+
+        var communityCode = request.CommunityCode.Trim().ToUpperInvariant();
+        var community = await db.Communities
+            .Include(item => item.Roles)
+            .SingleOrDefaultAsync(item => item.InviteCode == communityCode && item.IsActive, cancellationToken);
+        if (community is null)
+        {
+            return Result<RegisterResponse>.Failure("Community code is invalid.");
         }
 
         var exists = await db.Users.AnyAsync(
@@ -75,7 +89,15 @@ public class AuthService(
             return Result<RegisterResponse>.Failure("Username or email is already registered.");
         }
 
-        var defaultMembership = await BuildDefaultMembershipAsync(Role.User, cancellationToken);
+        var unassignedRoleId = await db.CommunityRoles
+            .Where(role => role.CommunityId == community.Id && role.TemplateKey == CommunityRoleTemplates.Unassigned)
+            .Select(role => (Guid?)role.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (unassignedRoleId is null)
+        {
+            return Result<RegisterResponse>.Failure("Community role was not found.");
+        }
+
         var user = new User
         {
             Id = Guid.NewGuid(),
@@ -88,13 +110,25 @@ public class AuthService(
             IsEmailVerified = false,
             CreatedAt = DateTime.UtcNow
         };
-        if (defaultMembership is not null)
+        user.CommunityMemberships.Add(new UserCommunityMembership
         {
-            user.CommunityMemberships.Add(defaultMembership);
-        }
+            Id = Guid.NewGuid(),
+            CommunityId = community.Id,
+            CommunityRoleId = unassignedRoleId.Value,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
 
         db.Users.Add(user);
         await db.SaveChangesAsync(cancellationToken);
+        await NotifyCommunityManagersAsync(
+            community.Id,
+            "User.PendingApproval",
+            "Yeni kayit onayi bekliyor",
+            $"{user.DisplayName} kullanicisi {community.Name} topluluguna katilmak icin onay bekliyor.",
+            "User",
+            user.Id.ToString(),
+            cancellationToken);
         await auditService.LogAsync(
             user.Id,
             "Auth.RegisterRequested",
@@ -152,6 +186,11 @@ public class AuthService(
             return Result<LoginResponse>.Failure(user.Status == UserStatus.PendingApproval
                 ? "Account is waiting for admin approval."
                 : "Account is not active.");
+        }
+
+        if (!HasActiveCommunityAccess(user))
+        {
+            return Result<LoginResponse>.Failure("The user's community is not active.");
         }
 
         if (!PasswordHasher.IsHashed(user.Password))
@@ -257,7 +296,8 @@ public class AuthService(
         if (storedRefreshToken.ExpiresAt <= DateTime.UtcNow
             || storedRefreshToken.User is null
             || storedRefreshToken.UserSession is null
-            || storedRefreshToken.User.Status != UserStatus.Active)
+            || storedRefreshToken.User.Status != UserStatus.Active
+            || !HasActiveCommunityAccess(storedRefreshToken.User))
         {
             storedRefreshToken.RevokedAt ??= DateTime.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
@@ -337,8 +377,15 @@ public class AuthService(
                 item => item.Token == tokenHash && item.ExpiresAt > DateTime.UtcNow && item.RevokedAt == null,
                 cancellationToken);
 
-        if (session?.User is null || session.User.Status != UserStatus.Active)
+        if (session?.User is null
+            || session.User.Status != UserStatus.Active
+            || !HasActiveCommunityAccess(session.User))
         {
+            if (session is not null)
+            {
+                session.RevokedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(cancellationToken);
+            }
             return null;
         }
 
@@ -532,11 +579,103 @@ public class AuthService(
         return Result.Success();
     }
 
+    public async Task<Result<AdminPasswordResetResponse>> ResetPasswordByAdminAsync(
+        Guid userId,
+        AdminPasswordResetRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (!currentUser.IsSuperAdmin())
+        {
+            return Result<AdminPasswordResetResponse>.Failure("Only SuperAdmin users can reset user passwords.");
+        }
+
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return Result<AdminPasswordResetResponse>.Failure("User not found.");
+        }
+
+        if (user.Role == Role.SuperAdmin && user.Id != currentUser.Id)
+        {
+            return Result<AdminPasswordResetResponse>.Failure("SuperAdmin passwords cannot be reset from management panel.");
+        }
+
+        var temporaryPassword = request.UseManualPassword
+            ? (request.TemporaryPassword ?? string.Empty).Trim()
+            : GenerateTemporaryPassword();
+        if (temporaryPassword.Length < 8)
+        {
+            return Result<AdminPasswordResetResponse>.Failure("Password must be at least 8 characters.");
+        }
+
+        user.Password = PasswordHasher.Hash(temporaryPassword);
+        user.MustChangePassword = true;
+        user.FailedLoginCount = 0;
+        user.LockedUntil = null;
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiresAt = null;
+        await RevokeAllSessionsForUserAsync(user.Id, cancellationToken);
+
+        try
+        {
+            await emailSender.SendAsync(
+                new EmailMessage(
+                    user.Email,
+                    "TechYouth BPM gecici sifre sifirlama",
+                    BuildTemporaryPasswordBody(user.DisplayName, user.Username, temporaryPassword),
+                    user.Username,
+                    true),
+                cancellationToken);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or SmtpException)
+        {
+            return Result<AdminPasswordResetResponse>.Failure("Temporary password email could not be sent.");
+        }
+
+        db.Notifications.Add(new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Type = "User.PasswordReset",
+            Title = "Sifreniz sifirlandi",
+            Message = "Gecici sifre e-posta adresinize gonderildi. Ilk giriste sifrenizi degistirmeniz gerekir.",
+            EntityType = "User",
+            EntityId = user.Id.ToString(),
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "User.PasswordResetByAdmin",
+            "User",
+            user.Id.ToString(),
+            $"SuperAdmin '{currentUser.Username}' reset password for user '{user.Username}'.",
+            cancellationToken);
+
+        return Result<AdminPasswordResetResponse>.Success(new AdminPasswordResetResponse("Temporary password was sent by email."));
+    }
+
     public async Task<Result<UserAdminDto>> CreateUserAsync(
         CreateUserRequest request,
         UserDto currentUser,
         CancellationToken cancellationToken = default)
     {
+        var platformRole = request.Role == Role.SuperAdmin ? Role.SuperAdmin : Role.User;
+        if (platformRole == Role.SuperAdmin)
+        {
+            if (!currentUser.IsSuperAdmin())
+            {
+                return Result<UserAdminDto>.Failure("Only SuperAdmin users can create SuperAdmin accounts.");
+            }
+
+            if (request.Status != UserStatus.Active)
+            {
+                return Result<UserAdminDto>.Failure("SuperAdmin users must stay active.");
+            }
+        }
+
         if (!CanManageUsers(currentUser, request.CommunityId))
         {
             return Result<UserAdminDto>.Failure("Current user cannot create users in this community.");
@@ -574,8 +713,10 @@ public class AuthService(
         }
 
         var hasCommunities = await db.Communities.AnyAsync(cancellationToken);
-        var targetCommunityId = await ResolveTargetCommunityIdAsync(currentUser, request.CommunityId, cancellationToken);
-        if (targetCommunityId is null && hasCommunities)
+        var targetCommunityId = platformRole == Role.SuperAdmin
+            ? null
+            : await ResolveTargetCommunityIdAsync(currentUser, request.CommunityId, cancellationToken);
+        if (targetCommunityId is null && hasCommunities && platformRole != Role.SuperAdmin)
         {
             return Result<UserAdminDto>.Failure("A community is required for the new user.");
         }
@@ -585,16 +726,11 @@ public class AuthService(
             : await ResolveTargetCommunityRoleIdAsync(
                 targetCommunityId.Value,
                 request.CommunityRoleId,
-                request.Role,
+                platformRole,
                 cancellationToken);
-        if (targetCommunityRoleId is null && hasCommunities)
+        if (targetCommunityRoleId is null && hasCommunities && platformRole != Role.SuperAdmin)
         {
             return Result<UserAdminDto>.Failure("Community role was not found.");
-        }
-
-        if (request.Role == Role.SuperAdmin && !currentUser.IsSuperAdmin())
-        {
-            return Result<UserAdminDto>.Failure("Only SuperAdmin users can create SuperAdmin accounts.");
         }
 
         var user = new User
@@ -604,7 +740,7 @@ public class AuthService(
             DisplayName = displayName,
             Email = email,
             Password = PasswordHasher.Hash(temporaryPassword),
-            Role = request.Role,
+            Role = platformRole,
             Status = request.Status,
             IsEmailVerified = false,
             MustChangePassword = true,
@@ -659,7 +795,7 @@ public class AuthService(
     {
         if (!CanManageUsers(currentUser, null))
         {
-            return Result.Failure("Only Admin users can delete users.");
+            return Result.Failure("Community management permission is required to delete users.");
         }
 
         if (currentUser.Id == userId)
@@ -727,7 +863,7 @@ public class AuthService(
     {
         if (!CanManageUsers(currentUser, request.CommunityId))
         {
-            return Result<PagedResult<UserAdminDto>>.Failure("Only Admin users can list users.");
+            return Result<PagedResult<UserAdminDto>>.Failure("Community management permission is required to list users.");
         }
 
         var page = Math.Max(1, request.Page);
@@ -744,6 +880,12 @@ public class AuthService(
         {
             query = query.Where(user => user.CommunityMemberships.Any(membership =>
                 membership.IsActive && membership.CommunityId == request.CommunityId));
+        }
+
+        if (request.CommunityRoleId is not null)
+        {
+            query = query.Where(user => user.CommunityMemberships.Any(membership =>
+                membership.IsActive && membership.CommunityRoleId == request.CommunityRoleId));
         }
 
         if (request.Status is not null)
@@ -783,7 +925,7 @@ public class AuthService(
     {
         if (!CanManageUsers(currentUser, request.CommunityId))
         {
-            return Result<UserAdminDto>.Failure("Only Admin users can update access.");
+            return Result<UserAdminDto>.Failure("Community management permission is required to update user access.");
         }
 
         var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
@@ -803,14 +945,27 @@ public class AuthService(
             return Result<UserAdminDto>.Failure("SuperAdmin users must stay active.");
         }
 
+        if (request.Role == Role.SuperAdmin && user.Role != Role.SuperAdmin)
+        {
+            return Result<UserAdminDto>.Failure("Existing users cannot be promoted to SuperAdmin.");
+        }
+
         if (request.Role == Role.SuperAdmin && !currentUser.IsSuperAdmin())
         {
             return Result<UserAdminDto>.Failure("Only SuperAdmin users can assign SuperAdmin role.");
         }
 
+        if (user.Role == Role.SuperAdmin && request.Role != Role.SuperAdmin)
+        {
+            return Result<UserAdminDto>.Failure("SuperAdmin users cannot be changed to a standard user.");
+        }
+
         var oldStatus = user.Status;
         var oldRole = user.Role;
-        user.Role = request.Role;
+        var oldCommunityRoleName = userDto.CommunityRoleName;
+        var updatedCommunityRoleName = oldCommunityRoleName;
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        user.Role = user.Role == Role.SuperAdmin ? Role.SuperAdmin : Role.User;
         user.Status = request.Status;
 
         if (request.CommunityId is not null || request.CommunityRoleId is not null)
@@ -824,19 +979,24 @@ public class AuthService(
             var targetCommunityRoleId = await ResolveTargetCommunityRoleIdAsync(
                 targetCommunityId.Value,
                 request.CommunityRoleId,
-                request.Role,
+                user.Role,
                 cancellationToken);
             if (targetCommunityRoleId is null)
             {
                 return Result<UserAdminDto>.Failure("Community role was not found.");
             }
+            updatedCommunityRoleName = await db.CommunityRoles
+                .Where(role => role.Id == targetCommunityRoleId.Value)
+                .Select(role => role.Name)
+                .SingleAsync(cancellationToken);
 
-            foreach (var membership in user.CommunityMemberships)
+            foreach (var membership in user.CommunityMemberships.Where(membership => membership.IsActive))
             {
                 membership.IsActive = false;
             }
 
-            user.CommunityMemberships.Add(new UserCommunityMembership
+            await db.SaveChangesAsync(cancellationToken);
+            db.UserCommunityMemberships.Add(new UserCommunityMembership
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
@@ -860,6 +1020,21 @@ public class AuthService(
             user.Id.ToString(),
             $"User '{user.Username}' access changed from {oldRole}/{oldStatus} to {user.Role}/{user.Status}.",
             cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        if (oldStatus != user.Status || !string.Equals(oldCommunityRoleName, updatedCommunityRoleName, StringComparison.Ordinal))
+        {
+            var accessMessage = !string.Equals(oldCommunityRoleName, updatedCommunityRoleName, StringComparison.Ordinal)
+                ? $"Size {updatedCommunityRoleName ?? "Atanmadi"} topluluk rolu atandi."
+                : $"Hesap durumunuz {user.Status} olarak guncellendi.";
+            await NotifyUserAsync(
+                user.Id,
+                "User.AccessUpdated",
+                "Yetki bilgileriniz guncellendi",
+                accessMessage,
+                "User",
+                user.Id.ToString(),
+                cancellationToken);
+        }
         var updated = await UserQuery().SingleAsync(item => item.Id == user.Id, cancellationToken);
         return Result<UserAdminDto>.Success(updated.ToAdminDto());
     }
@@ -895,7 +1070,7 @@ public class AuthService(
     {
         if (!CanManageUsers(currentUser, null))
         {
-            return Result<IReadOnlyList<UserSessionDto>>.Failure("Only Admin users can view user sessions.");
+            return Result<IReadOnlyList<UserSessionDto>>.Failure("Community management permission is required to view user sessions.");
         }
 
         var managedUser = await UserQuery().SingleOrDefaultAsync(user => user.Id == userId, cancellationToken);
@@ -992,7 +1167,7 @@ public class AuthService(
     {
         if (!CanManageUsers(currentUser, null))
         {
-            return Result.Failure("Only Admin users can revoke user sessions.");
+            return Result.Failure("Community management permission is required to revoke user sessions.");
         }
 
         var managedUser = await UserQuery().SingleOrDefaultAsync(user => user.Id == userId, cancellationToken);
@@ -1573,6 +1748,15 @@ public class AuthService(
             .ThenInclude(membership => membership.CommunityRole)
             .ThenInclude(role => role!.Permissions);
 
+    private static bool HasActiveCommunityAccess(User user) =>
+        user.Role == Role.SuperAdmin
+        || user.CommunityMemberships.Count == 0
+        || user.CommunityMemberships.Any(membership =>
+            membership.IsActive
+            && membership.CommunityRole is not null
+            && (membership.Community?.IsActive == true
+                || membership.CommunityRole.Permissions.Any(permission => permission.Permission == PermissionNames.CommunityManageAdmins)));
+
     private bool CanManageUsers(UserDto currentUser, Guid? targetCommunityId)
     {
         if (currentUser.IsSuperAdmin())
@@ -1620,12 +1804,9 @@ public class AuthService(
             return exists ? requestedCommunityRoleId : null;
         }
 
-        var templateKey = requestedPlatformRole switch
-        {
-            Role.Admin or Role.SuperAdmin => CommunityRoleTemplates.CommunityAdmin,
-            Role.Approver => CommunityRoleTemplates.Approver,
-            _ => CommunityRoleTemplates.ProcessStarter
-        };
+        var templateKey = requestedPlatformRole == Role.SuperAdmin
+            ? CommunityRoleTemplates.CommunityAdmin
+            : CommunityRoleTemplates.Unassigned;
 
         return await db.CommunityRoles
             .Where(role => role.CommunityId == communityId && role.TemplateKey == templateKey)
@@ -1660,5 +1841,68 @@ public class AuthService(
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
+    }
+
+    private async Task NotifyUserAsync(
+        Guid userId,
+        string type,
+        string title,
+        string message,
+        string? entityType,
+        string? entityId,
+        CancellationToken cancellationToken)
+    {
+        db.Notifications.Add(new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Type = type,
+            Title = title,
+            Message = message,
+            EntityType = entityType,
+            EntityId = entityId,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task NotifyCommunityManagersAsync(
+        Guid communityId,
+        string type,
+        string title,
+        string message,
+        string? entityType,
+        string? entityId,
+        CancellationToken cancellationToken)
+    {
+        var managerIds = await db.Users
+            .Where(user => user.Status == UserStatus.Active
+                && user.CommunityMemberships.Any(membership =>
+                    membership.IsActive
+                    && membership.CommunityId == communityId
+                    && membership.CommunityRole != null
+                    && membership.CommunityRole.Permissions.Any(permission => permission.Permission == PermissionNames.CommunityManageUsers)))
+            .Select(user => user.Id)
+            .ToListAsync(cancellationToken);
+
+        foreach (var managerId in managerIds)
+        {
+            db.Notifications.Add(new Notification
+            {
+                Id = Guid.NewGuid(),
+                UserId = managerId,
+                Type = type,
+                Title = title,
+                Message = message,
+                EntityType = entityType,
+                EntityId = entityId,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        if (managerIds.Count > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 }

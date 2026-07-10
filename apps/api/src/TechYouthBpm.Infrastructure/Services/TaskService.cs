@@ -30,7 +30,6 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             .Where(task =>
                 task.Status == ProcessTaskStatus.Open
                 && (user.IsSuperAdmin()
-                    || (user.CommunityId == null && (task.AssignedRole == user.Role || user.Role == Role.Admin))
                     || (task.ProcessInstance != null
                         && task.ProcessInstance.CommunityId == user.CommunityId
                         && user.HasPermission(task.RequiredPermission))))
@@ -58,8 +57,15 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             return Result<ProcessDetailDto>.Failure("Task is already closed.");
         }
 
+        var isCommunityActive = await db.Communities.AnyAsync(
+            community => community.Id == task.ProcessInstance.CommunityId && community.IsActive,
+            cancellationToken);
+        if (!isCommunityActive)
+        {
+            return Result<ProcessDetailDto>.Failure("The task community is not active.");
+        }
+
         if (!user.IsSuperAdmin()
-            && !(user.CommunityId is null && (task.AssignedRole == user.Role || user.Role == Role.Admin))
             && (task.ProcessInstance.CommunityId != user.CommunityId || !user.HasPermission(task.RequiredPermission)))
         {
             return Result<ProcessDetailDto>.Failure("Current user cannot execute this task.");
@@ -100,6 +106,21 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             CreatedAt = DateTime.UtcNow,
             Note = request.Note ?? string.Empty
         });
+
+        if (task.ProcessInstance.StartedByUserId != user.Id)
+        {
+            db.Notifications.Add(new Notification
+            {
+                Id = Guid.NewGuid(),
+                UserId = task.ProcessInstance.StartedByUserId,
+                Type = $"Process.{transition.Value}",
+                Title = "Surec durumunuz guncellendi",
+                Message = $"Baslattiginiz surec {transition.Value} durumuna gecti.",
+                EntityType = "ProcessInstance",
+                EntityId = processId.ToString(),
+                CreatedAt = DateTime.UtcNow
+            });
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(

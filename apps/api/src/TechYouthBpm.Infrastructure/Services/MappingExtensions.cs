@@ -83,7 +83,6 @@ internal static class MappingExtensions
         new(
             task.Id,
             task.ProcessInstanceId,
-            task.AssignedRole,
             task.AssignedCommunityRoleId,
             task.AssignedCommunityRole?.Name ?? string.Empty,
             task.RequiredPermission,
@@ -127,7 +126,7 @@ internal static class MappingExtensions
                 log.Note)).ToArray());
 
     public static CommunityDto ToDto(this Community community) =>
-        new(community.Id, community.Name, community.Description, community.IsActive, community.CreatedAt);
+        new(community.Id, community.Name, community.Description, community.InviteCode, community.IsActive, community.CreatedAt);
 
     public static CommunityRoleDto ToDto(this CommunityRole role) =>
         new(
@@ -138,6 +137,17 @@ internal static class MappingExtensions
             role.TemplateKey,
             role.IsSystemRole,
             role.Permissions.Select(permission => permission.Permission).Order().ToArray());
+
+    public static NotificationDto ToDto(this Notification notification) =>
+        new(
+            notification.Id,
+            notification.Type,
+            notification.Title,
+            notification.Message,
+            notification.EntityType,
+            notification.EntityId,
+            notification.CreatedAt,
+            notification.ReadAt);
 
     private static UserCommunityMembership? ActiveMembership(User user) =>
         user.CommunityMemberships.FirstOrDefault(membership => membership.IsActive);

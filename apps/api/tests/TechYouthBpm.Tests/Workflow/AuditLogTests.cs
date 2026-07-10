@@ -17,7 +17,7 @@ public class AuditLogTests
         var (process, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
 
         var service = new TaskService(db, new ProcessStateMachine());
-        var approverDto = new UserDto(approver.Id, approver.Username, approver.DisplayName, Role.Approver);
+        var approverDto = TestDbFactory.ToDto(approver);
 
         await service.ExecuteActionAsync(task.Id, new TaskActionRequest(WorkflowAction.Approve, "Looks good."), approverDto);
 
@@ -42,7 +42,7 @@ public class AuditLogTests
         var (process, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
 
         var service = new TaskService(db, new ProcessStateMachine());
-        var approverDto = new UserDto(approver.Id, approver.Username, approver.DisplayName, Role.Approver);
+        var approverDto = TestDbFactory.ToDto(approver);
 
         await service.ExecuteActionAsync(task.Id, new TaskActionRequest(WorkflowAction.Reject, "Not acceptable."), approverDto);
 
@@ -84,7 +84,7 @@ public class AuditLogTests
         var (process, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
 
         var service = new TaskService(db, new ProcessStateMachine());
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, Role.Admin);
+        var adminDto = TestDbFactory.ToDto(admin);
 
         await service.ExecuteActionAsync(task.Id, new TaskActionRequest(WorkflowAction.Approve, null), adminDto);
 
@@ -93,5 +93,25 @@ public class AuditLogTests
             .Single();
 
         Assert.Equal(string.Empty, approveLog.Note);
+    }
+
+    [Fact]
+    public async Task Approve_Notifies_Process_Starter_When_Another_User_Completes_Task()
+    {
+        await using var db = TestDbFactory.Create();
+        var starter = TestDbFactory.SeedUser(db, Role.Admin, "starter");
+        var approver = TestDbFactory.SeedUser(db, Role.Approver, "approver");
+        var (process, task) = TestDbFactory.SeedOpenApproverTask(db, starter);
+        var service = new TaskService(db, new ProcessStateMachine());
+
+        var result = await service.ExecuteActionAsync(
+            task.Id,
+            new TaskActionRequest(WorkflowAction.Approve, "Approved."),
+            TestDbFactory.ToDto(approver));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        var notification = Assert.Single(db.Notifications.Where(item => item.UserId == starter.Id));
+        Assert.Equal("Process.Completed", notification.Type);
+        Assert.Equal(process.Id.ToString(), notification.EntityId);
     }
 }

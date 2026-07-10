@@ -31,6 +31,11 @@ public interface IAuthService
     Task<Result> ResetPasswordAsync(
         ResetPasswordRequest request,
         CancellationToken cancellationToken = default);
+    Task<Result<AdminPasswordResetResponse>> ResetPasswordByAdminAsync(
+        Guid userId,
+        AdminPasswordResetRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default);
     Task<Result<UserAdminDto>> CreateUserAsync(
         CreateUserRequest request,
         UserDto currentUser,

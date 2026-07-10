@@ -8,11 +8,18 @@ internal static class CommunityRoleTemplates
     public const string FormDesigner = "form-designer";
     public const string ProcessStarter = "process-starter";
     public const string Approver = "approver";
-    public const string LogisticsOperator = "logistics-operator";
+    public const string StandardUser = "standard-user";
     public const string ReadOnly = "read-only";
+    public const string Unassigned = "unassigned";
+    public const string Custom = "custom";
 
     public static IReadOnlyList<RoleTemplateDto> All =>
     [
+        new(
+            Custom,
+            "Ozel",
+            "Bos baslar; izinler tek tek secilerek topluluga ozel rol olusturulur.",
+            []),
         new(
             CommunityAdmin,
             "Topluluk Admin",
@@ -34,15 +41,20 @@ internal static class CommunityRoleTemplates
             "Acik tasklari gorur, aksiyon alir ve surecleri izler.",
             [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
         new(
-            LogisticsOperator,
-            "Lojistik Gorevlisi",
-            "Lojistik tasklarini gorur, teslimat aksiyonu alir ve surec durumunu izler.",
-            [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
+            StandardUser,
+            "Standart Kullanici",
+            "Formlari gorur, surec baslatir, surecleri ve kendisine acik isleri izler.",
+            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart, PermissionNames.TasksView]),
         new(
             ReadOnly,
-            "Salt Okuyucu",
+            "Gozlemci",
             "Form, surec ve audit kayitlarini izler; degisiklik yapamaz.",
-            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.AuditView])
+            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.AuditView]),
+        new(
+            Unassigned,
+            "Atanmadi",
+            "Kullanici topluluga baglidir ancak henuz is yetkisi yoktur.",
+            [])
     ];
 
     public static IReadOnlyList<string> PermissionsFor(string templateKey) =>

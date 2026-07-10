@@ -49,7 +49,7 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
     {
         if (!currentUser.HasPermission(PermissionNames.AuditView))
         {
-            return Result<PagedResult<SystemAuditLogDto>>.Failure("Only Admin users can view system audit logs.");
+            return Result<PagedResult<SystemAuditLogDto>>.Failure("Community management permission is required to view system audit logs.");
         }
 
         var page = Math.Max(1, request.Page);
@@ -125,7 +125,7 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
     {
         if (!currentUser.HasPermission(PermissionNames.AuditView))
         {
-            return Result<SystemAuditCategoryCountsDto>.Failure("Only Admin users can view system audit logs.");
+            return Result<SystemAuditCategoryCountsDto>.Failure("Community management permission is required to view system audit logs.");
         }
 
         var baseQuery = ApplySearchFilter(ApplyCommunityScope(db.SystemAuditLogs.Include(log => log.ActorUser), currentUser), query);
@@ -184,7 +184,7 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
             _ => query
         };
 
-    private static IQueryable<SystemAuditLog> ApplyCommunityScope(IQueryable<SystemAuditLog> query, UserDto currentUser)
+    private IQueryable<SystemAuditLog> ApplyCommunityScope(IQueryable<SystemAuditLog> query, UserDto currentUser)
     {
         if (currentUser.IsSuperAdmin())
         {
@@ -193,12 +193,17 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
 
         if (currentUser.CommunityId is null)
         {
-            return query;
+            return query.Where(log => false);
         }
 
         var communityId = currentUser.CommunityId.Value;
         return query.Where(log =>
-            log.ActorUser != null
-            && log.ActorUser.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId));
+            (log.ActorUser != null
+                && log.ActorUser.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))
+            || (log.EntityType == "User"
+                && log.EntityId != null
+                && db.Users.Any(user =>
+                    user.Id.ToString() == log.EntityId
+                    && user.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))));
     }
 }

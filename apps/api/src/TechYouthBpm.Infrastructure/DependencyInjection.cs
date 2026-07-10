@@ -52,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ISystemAuditService, SystemAuditService>();
         services.AddScoped<ICommunityService, CommunityService>();
+        services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<ProcessStateMachine>();
 
         return services;

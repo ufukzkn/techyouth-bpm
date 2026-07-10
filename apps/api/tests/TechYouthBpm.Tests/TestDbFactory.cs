@@ -88,6 +88,22 @@ internal static class TestDbFactory
             },
             PermissionsFor(user.Role));
 
+    public static UserDto CommunityAdminDto(User user) =>
+        new(
+            user.Id,
+            user.Username,
+            user.DisplayName,
+            user.Email,
+            Role.User,
+            user.Status,
+            user.IsEmailVerified,
+            user.MustChangePassword,
+            CommunityId,
+            "Test Community",
+            AdminCommunityRoleId,
+            "Topluluk Admin",
+            PermissionNames.All);
+
     public static (ProcessInstance Process, ProcessTask Task) SeedOpenApproverTask(
         AppDbContext db,
         User startedByUser)
@@ -119,7 +135,7 @@ internal static class TestDbFactory
         {
             Id = Guid.NewGuid(),
             ProcessInstanceId = process.Id,
-            AssignedRole = Role.Approver,
+            AssignedRole = Role.User,
             AssignedCommunityRoleId = ApproverCommunityRoleId,
             RequiredPermission = PermissionNames.TasksAct,
             Status = ProcessTaskStatus.Open,

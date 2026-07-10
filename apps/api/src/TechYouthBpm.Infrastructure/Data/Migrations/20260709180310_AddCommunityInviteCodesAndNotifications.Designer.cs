@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TechYouthBpm.Infrastructure.Data;
@@ -11,15 +12,18 @@ using TechYouthBpm.Infrastructure.Data;
 namespace TechYouthBpm.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260709180310_AddCommunityInviteCodesAndNotifications")]
+    partial class AddCommunityInviteCodesAndNotifications
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn)
                 .HasAnnotation("ProductVersion", "8.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
+
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.AuditLog", b =>
                 {
@@ -55,7 +59,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("AuditLogs", (string)null);
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.Community", b =>
@@ -90,7 +94,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Communities", (string)null);
+                    b.ToTable("Communities");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.CommunityRole", b =>
@@ -125,7 +129,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.HasIndex("CommunityId", "Name")
                         .IsUnique();
 
-                    b.ToTable("CommunityRoles", (string)null);
+                    b.ToTable("CommunityRoles");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.CommunityRolePermission", b =>
@@ -146,7 +150,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.HasIndex("CommunityRoleId", "Permission")
                         .IsUnique();
 
-                    b.ToTable("CommunityRolePermissions", (string)null);
+                    b.ToTable("CommunityRolePermissions");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.FieldValidationRule", b =>
@@ -177,7 +181,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("FormFieldDefinitionId");
 
-                    b.ToTable("FieldValidationRules", (string)null);
+                    b.ToTable("FieldValidationRules");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormDefinition", b =>
@@ -217,7 +221,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("UpdatedByUserId");
 
-                    b.ToTable("FormDefinitions", (string)null);
+                    b.ToTable("FormDefinitions");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormFieldDefinition", b =>
@@ -254,7 +258,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("FormDefinitionId");
 
-                    b.ToTable("FormFieldDefinitions", (string)null);
+                    b.ToTable("FormFieldDefinitions");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.Notification", b =>
@@ -294,7 +298,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId", "ReadAt", "CreatedAt");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessInstance", b =>
@@ -333,7 +337,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("StartedByUserId");
 
-                    b.ToTable("ProcessInstances", (string)null);
+                    b.ToTable("ProcessInstances");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessTask", b =>
@@ -379,7 +383,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("ProcessInstanceId");
 
-                    b.ToTable("ProcessTasks", (string)null);
+                    b.ToTable("ProcessTasks");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.RefreshToken", b =>
@@ -425,7 +429,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserSessionId");
 
-                    b.ToTable("RefreshTokens", (string)null);
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.SystemAuditLog", b =>
@@ -459,7 +463,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("ActorUserId");
 
-                    b.ToTable("SystemAuditLogs", (string)null);
+                    b.ToTable("SystemAuditLogs");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.User", b =>
@@ -525,7 +529,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("Users", (string)null);
+                    b.ToTable("Users");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.UserCommunityMembership", b =>
@@ -557,7 +561,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId", "IsActive");
 
-                    b.ToTable("UserCommunityMemberships", (string)null);
+                    b.ToTable("UserCommunityMemberships");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.UserSession", b =>
@@ -601,7 +605,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserSessions", (string)null);
+                    b.ToTable("UserSessions");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.AuditLog", b =>

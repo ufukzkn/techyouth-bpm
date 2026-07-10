@@ -47,6 +47,32 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
+    [HttpPatch("{communityId:guid}/invite-code/regenerate")]
+    public async Task<IActionResult> RegenerateInviteCode(Guid communityId, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await communityService.RegenerateInviteCodeAsync(communityId, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpGet("{communityId:guid}/summary")]
+    public async Task<IActionResult> Summary(Guid communityId, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await communityService.GetSummaryAsync(communityId, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
     [HttpGet("role-templates")]
     public async Task<IActionResult> RoleTemplates(CancellationToken cancellationToken)
     {
@@ -97,6 +123,23 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
 
         var result = await communityService.UpdateRoleAsync(communityId, roleId, request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpDelete("{communityId:guid}/roles/{roleId:guid}")]
+    public async Task<IActionResult> DeleteRole(
+        Guid communityId,
+        Guid roleId,
+        DeleteCommunityRoleRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await communityService.DeleteRoleAsync(communityId, roleId, request, user, cancellationToken);
+        return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
     [HttpGet("{communityId:guid}/users")]

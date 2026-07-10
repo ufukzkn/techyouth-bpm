@@ -64,6 +64,11 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             return Result<FormDefinitionDto>.Failure("A community is required for form definitions.");
         }
 
+        if (!await IsCommunityActiveAsync(communityId.Value, cancellationToken))
+        {
+            return Result<FormDefinitionDto>.Failure("The form community is not active.");
+        }
+
         var form = new FormDefinition
         {
             Id = Guid.NewGuid(),
@@ -112,6 +117,11 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             return Result<FormDefinitionDto>.Failure("Form definition was not found.");
         }
 
+        if (!await IsCommunityActiveAsync(form.CommunityId, cancellationToken))
+        {
+            return Result<FormDefinitionDto>.Failure("The form community is not active.");
+        }
+
         var formId = form.Id;
         form.Name = request.Name.Trim();
         form.Description = request.Description.Trim();
@@ -154,6 +164,9 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             .Include(form => form.Community)
             .Include(form => form.Fields)
             .ThenInclude(field => field.ValidationRules);
+
+    private Task<bool> IsCommunityActiveAsync(Guid communityId, CancellationToken cancellationToken) =>
+        db.Communities.AnyAsync(community => community.Id == communityId && community.IsActive, cancellationToken);
 
     private static List<FormFieldDefinition> BuildFields(CreateFormRequest request, Guid formDefinitionId) =>
         request.Fields

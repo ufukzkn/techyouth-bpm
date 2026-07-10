@@ -4,6 +4,7 @@ using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Security;
+using TechYouthBpm.Infrastructure.Services;
 
 namespace TechYouthBpm.Infrastructure.Data;
 
@@ -22,15 +23,61 @@ public static class DatabaseSeeder
     private static readonly Guid SergenYalcinId = Guid.Parse("99999999-1111-1111-1111-111111111111");
     private static readonly Guid TuncaySanliId = Guid.Parse("99999999-2222-2222-2222-222222222222");
     private static readonly Guid VolkanDemirelId = Guid.Parse("99999999-3333-3333-3333-333333333333");
+    private static readonly Guid SenolGunesId = Guid.Parse("99999999-4444-4444-4444-444444444444");
+    private static readonly Guid AliKocId = Guid.Parse("99999999-5555-5555-5555-555555555555");
+    private static readonly Guid ArdaGulerId = Guid.Parse("99999999-6666-6666-6666-666666666666");
+    private static readonly Guid CenkTosunId = Guid.Parse("99999999-7777-7777-7777-777777777777");
+    private static readonly Guid JoseMourinhoId = Guid.Parse("12121212-0000-0000-0000-000000000001");
+    private static readonly Guid SalihUcanId = Guid.Parse("12121212-0000-0000-0000-000000000002");
+    private static readonly Guid TaliscaId = Guid.Parse("12121212-0000-0000-0000-000000000003");
+    private static readonly Guid FerdiKadiogluId = Guid.Parse("12121212-0000-0000-0000-000000000004");
+    private static readonly Guid MertGunokId = Guid.Parse("12121212-0000-0000-0000-000000000005");
+    private static readonly Guid BurakYilmazId = Guid.Parse("12121212-0000-0000-0000-000000000006");
+    private static readonly Guid OguzhanOzyakupId = Guid.Parse("12121212-0000-0000-0000-000000000007");
+    private static readonly Guid GokhanGonulId = Guid.Parse("12121212-0000-0000-0000-000000000008");
+    private static readonly Guid DembaBaId = Guid.Parse("12121212-0000-0000-0000-000000000009");
+    private static readonly Guid NecipUysalId = Guid.Parse("12121212-0000-0000-0000-000000000010");
+    private static readonly Guid RidvanYilmazId = Guid.Parse("12121212-0000-0000-0000-000000000011");
+    private static readonly Guid ZlatanIbrahimovicId = Guid.Parse("13131313-0000-0000-0000-000000000001");
+    private static readonly Guid OkanBurukId = Guid.Parse("13131313-0000-0000-0000-000000000002");
+    private static readonly Guid DiegoGodinId = Guid.Parse("13131313-0000-0000-0000-000000000003");
+    private static readonly Guid EmreBelozogluId = Guid.Parse("13131313-0000-0000-0000-000000000004");
+    private static readonly Guid DirkKuytId = Guid.Parse("13131313-0000-0000-0000-000000000005");
+    private static readonly Guid RobertoCarlosId = Guid.Parse("13131313-0000-0000-0000-000000000006");
+    private static readonly Guid CanerErkinId = Guid.Parse("13131313-0000-0000-0000-000000000007");
+    private static readonly Guid WesleySneijderId = Guid.Parse("13131313-0000-0000-0000-000000000008");
+    private static readonly Guid VanPersieId = Guid.Parse("13131313-0000-0000-0000-000000000009");
+    private static readonly Guid ArdaTuranId = Guid.Parse("13131313-0000-0000-0000-000000000010");
+    private static readonly Guid IlhanMansizId = Guid.Parse("13131313-0000-0000-0000-000000000011");
+    private static readonly Guid AlexTellesId = Guid.Parse("13131313-0000-0000-0000-000000000012");
+    private static readonly Guid NaniId = Guid.Parse("13131313-0000-0000-0000-000000000013");
+    private static readonly Guid RobinGosensId = Guid.Parse("13131313-0000-0000-0000-000000000014");
+    private static readonly Guid MoussaSowId = Guid.Parse("13131313-0000-0000-0000-000000000015");
     private static readonly Guid SportCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000001");
     private static readonly Guid LogisticsCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000002");
     private static readonly Guid ProductOrderCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000003");
+    private static readonly Guid HumanResourcesCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000004");
+    private static readonly Guid ProcurementCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000005");
     private static readonly Guid SportAdminRoleId = Guid.Parse("20202020-0000-0000-0000-000000000001");
+    private static readonly Guid SportUnassignedRoleId = Guid.Parse("20202020-0000-0000-0000-000000000010");
     private static readonly Guid SportStarterRoleId = Guid.Parse("20202020-0000-0000-0000-000000000002");
     private static readonly Guid SportApproverRoleId = Guid.Parse("20202020-0000-0000-0000-000000000003");
     private static readonly Guid LogisticsAdminRoleId = Guid.Parse("20202020-0000-0000-0000-000000000004");
-    private static readonly Guid LogisticsOperatorRoleId = Guid.Parse("20202020-0000-0000-0000-000000000005");
+    private static readonly Guid LogisticsUnassignedRoleId = Guid.Parse("20202020-0000-0000-0000-000000000011");
+    private static readonly Guid LogisticsApproverRoleId = Guid.Parse("20202020-0000-0000-0000-000000000005");
     private static readonly Guid ProductAdminRoleId = Guid.Parse("20202020-0000-0000-0000-000000000006");
+    private static readonly Guid ProductUnassignedRoleId = Guid.Parse("20202020-0000-0000-0000-000000000012");
+    private static readonly Guid HumanResourcesAdminRoleId = Guid.Parse("20202020-0000-0000-0000-000000000013");
+    private static readonly Guid HumanResourcesUnassignedRoleId = Guid.Parse("20202020-0000-0000-0000-000000000014");
+    private static readonly Guid HumanResourcesStarterRoleId = Guid.Parse("20202020-0000-0000-0000-000000000015");
+    private static readonly Guid HumanResourcesApproverRoleId = Guid.Parse("20202020-0000-0000-0000-000000000016");
+    private static readonly Guid ProcurementAdminRoleId = Guid.Parse("20202020-0000-0000-0000-000000000017");
+    private static readonly Guid ProcurementUnassignedRoleId = Guid.Parse("20202020-0000-0000-0000-000000000018");
+    private static readonly Guid ProcurementStarterRoleId = Guid.Parse("20202020-0000-0000-0000-000000000019");
+    private static readonly Guid ProcurementApproverRoleId = Guid.Parse("20202020-0000-0000-0000-000000000020");
+    private static readonly Guid LogisticsStarterRoleId = Guid.Parse("20202020-0000-0000-0000-000000000021");
+    private static readonly Guid ProductStarterRoleId = Guid.Parse("20202020-0000-0000-0000-000000000022");
+    private static readonly Guid ProductApproverRoleId = Guid.Parse("20202020-0000-0000-0000-000000000023");
 
     public static async Task SeedAsync(AppDbContext db, bool seedMockData = true, CancellationToken cancellationToken = default)
     {
@@ -51,29 +98,65 @@ public static class DatabaseSeeder
             await UpgradePlainTextPasswordsAsync(db, cancellationToken);
             await AddMissingSeedUsersAsync(db, seedUsers, cancellationToken);
             await EnsureMissingMembershipsAsync(db, cancellationToken);
+            await NormalizeLegacyPlatformRolesAsync(db, cancellationToken);
             return;
         }
 
         db.Users.AddRange(seedUsers);
 
         await db.SaveChangesAsync(cancellationToken);
+        await EnsureMissingMembershipsAsync(db, cancellationToken);
+        await NormalizeLegacyPlatformRolesAsync(db, cancellationToken);
     }
 
     private static async Task SeedCommunitiesAsync(AppDbContext db, CancellationToken cancellationToken)
     {
-        if (!await db.Communities.AnyAsync(cancellationToken))
+        var communitySeeds = new[]
         {
-            db.Communities.AddRange(
-                Community(SportCommunityId, "Sportif Faaliyetler", "Transfer, teknik ekip onayi ve sportif operasyon surecleri."),
-                Community(LogisticsCommunityId, "Lojistik", "Kargo, sevkiyat ve teslimat operasyon surecleri."),
-                Community(ProductOrderCommunityId, "Urun Siparisi", "Siparis talebi, stok kontrolu ve onay surecleri."));
+            Community(SportCommunityId, "Sportif Faaliyetler", "Transfer, teknik ekip onayi ve sportif operasyon surecleri."),
+            Community(LogisticsCommunityId, "Lojistik", "Kargo, sevkiyat ve teslimat operasyon surecleri."),
+            Community(ProductOrderCommunityId, "Urun Siparisi", "Siparis talebi, stok kontrolu ve onay surecleri."),
+            Community(HumanResourcesCommunityId, "Insan Kaynaklari", "Izin, uzaktan calisma ve ekip kapasitesi surecleri."),
+            Community(ProcurementCommunityId, "Satin Alma", "Tedarikci, butce ve satin alma talep surecleri.")
+        };
+        var existingCommunities = await db.Communities.ToListAsync(cancellationToken);
+        var existingCommunityIds = existingCommunities.Select(community => community.Id).ToHashSet();
+        var missingCommunities = communitySeeds.Where(community => !existingCommunityIds.Contains(community.Id)).ToArray();
+        if (missingCommunities.Length > 0)
+        {
+            db.Communities.AddRange(missingCommunities);
         }
 
-        var roleSeeds = BuildCommunityRoles();
-        var existingRoleIds = await db.CommunityRoles.Select(role => role.Id).ToListAsync(cancellationToken);
-        var existingRoleIdSet = existingRoleIds.ToHashSet();
-        db.CommunityRoles.AddRange(roleSeeds.Where(role => !existingRoleIdSet.Contains(role.Id)));
+        foreach (var community in existingCommunities)
+        {
+            var expectedInviteCode = community.Name switch
+            {
+                "Sportif Faaliyetler" => "SPOR1",
+                "Lojistik" => "LOG01",
+                "Urun Siparisi" => "URUN1",
+                "Insan Kaynaklari" => "IK001",
+                "Satin Alma" => "SAT01",
+                _ => string.IsNullOrWhiteSpace(community.InviteCode) ? GenerateInviteCode() : community.InviteCode
+            };
+            community.InviteCode = expectedInviteCode;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
+
+        var roleSeeds = BuildCommunityRoles();
+        var existingRoles = await db.CommunityRoles
+            .Select(role => new { role.Id, role.CommunityId, role.Name })
+            .ToListAsync(cancellationToken);
+        var existingRoleIdSet = existingRoles.Select(role => role.Id).ToHashSet();
+        var existingRoleNameSet = existingRoles
+            .Select(role => (role.CommunityId, role.Name))
+            .ToHashSet();
+        db.CommunityRoles.AddRange(roleSeeds.Where(role =>
+            !existingRoleIdSet.Contains(role.Id)
+            && !existingRoleNameSet.Contains((role.CommunityId, role.Name))));
+        await db.SaveChangesAsync(cancellationToken);
+        await EnsureSystemRoleTemplatesAsync(db, cancellationToken);
+        await RetireDuplicateLogisticsRoleAsync(db, cancellationToken);
     }
 
     private static Community Community(Guid id, string name, string description) =>
@@ -82,6 +165,15 @@ public static class DatabaseSeeder
             Id = id,
             Name = name,
             Description = description,
+            InviteCode = name switch
+            {
+                "Sportif Faaliyetler" => "SPOR1",
+                "Lojistik" => "LOG01",
+                "Urun Siparisi" => "URUN1",
+                "Insan Kaynaklari" => "IK001",
+                "Satin Alma" => "SAT01",
+                _ => "GEN01"
+            },
             IsActive = true,
             CreatedAt = DateTime.UtcNow.AddDays(-40)
         };
@@ -99,7 +191,7 @@ public static class DatabaseSeeder
                 Status = UserStatus.Active,
                 IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-30),
-                CommunityMemberships = [Membership(AdminId, SportCommunityId, SportAdminRoleId)]
+                CommunityMemberships = []
             },
             new User
             {
@@ -118,10 +210,10 @@ public static class DatabaseSeeder
             {
                 Id = ApproverId,
                 Username = "approver",
-                DisplayName = "Process Approver",
+                DisplayName = "Task Reviewer",
                 Email = "approver@techyouth.local",
                 Password = PasswordHasher.Hash("approver123"),
-                Role = Role.Approver,
+                Role = Role.User,
                 Status = UserStatus.Active,
                 IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-28),
@@ -138,7 +230,7 @@ public static class DatabaseSeeder
                 Status = UserStatus.PendingApproval,
                 IsEmailVerified = false,
                 CreatedAt = DateTime.UtcNow.AddDays(-6),
-                CommunityMemberships = [Membership(MarioGomezId, SportCommunityId, SportStarterRoleId)]
+                CommunityMemberships = [Membership(MarioGomezId, SportCommunityId, SportUnassignedRoleId)]
             },
             new User
             {
@@ -147,7 +239,7 @@ public static class DatabaseSeeder
                 DisplayName = "Ricardo Quaresma",
                 Email = "quaresma@techyouth.local",
                 Password = PasswordHasher.Hash("trivela123"),
-                Role = Role.Approver,
+                Role = Role.User,
                 Status = UserStatus.Active,
                 IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-14),
@@ -164,7 +256,7 @@ public static class DatabaseSeeder
                 Status = UserStatus.Active,
                 IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-11),
-                CommunityMemberships = [Membership(AtibaId, LogisticsCommunityId, LogisticsOperatorRoleId)]
+                CommunityMemberships = [Membership(AtibaId, LogisticsCommunityId, LogisticsApproverRoleId)]
             },
             new User
             {
@@ -174,7 +266,7 @@ public static class DatabaseSeeder
                 Email = "alex@techyouth.local",
                 Password = PasswordHasher.Hash("alex123"),
                 Role = Role.User,
-                Status = UserStatus.Rejected,
+                Status = UserStatus.Active,
                 IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-8),
                 CommunityMemberships = [Membership(AlexId, ProductOrderCommunityId, ProductAdminRoleId)]
@@ -186,9 +278,9 @@ public static class DatabaseSeeder
                 DisplayName = "Fatih Terim",
                 Email = "fatih.terim@techyouth.local",
                 Password = PasswordHasher.Hash("imparator123"),
-                Role = Role.Admin,
-                Status = UserStatus.PendingApproval,
-                IsEmailVerified = false,
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-3),
                 CommunityMemberships = [Membership(FatihTerimId, SportCommunityId, SportAdminRoleId)]
             },
@@ -199,11 +291,11 @@ public static class DatabaseSeeder
                 DisplayName = "Sergen Yalcin",
                 Email = "sergen.yalcin@techyouth.local",
                 Password = PasswordHasher.Hash("sergen123"),
-                Role = Role.Approver,
+                Role = Role.User,
                 Status = UserStatus.Active,
                 IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-7),
-                CommunityMemberships = [Membership(SergenYalcinId, LogisticsCommunityId, LogisticsOperatorRoleId)]
+                CommunityMemberships = [Membership(SergenYalcinId, LogisticsCommunityId, LogisticsApproverRoleId)]
             },
             new User
             {
@@ -229,9 +321,233 @@ public static class DatabaseSeeder
                 Status = UserStatus.Rejected,
                 IsEmailVerified = true,
                 CreatedAt = DateTime.UtcNow.AddDays(-4),
-                CommunityMemberships = [Membership(VolkanDemirelId, LogisticsCommunityId, LogisticsOperatorRoleId)]
-            }
+                CommunityMemberships = [Membership(VolkanDemirelId, LogisticsCommunityId, LogisticsApproverRoleId)]
+            },
+            new User
+            {
+                Id = SenolGunesId,
+                Username = "senol.gunes",
+                DisplayName = "Senol Gunes",
+                Email = "senol.gunes@techyouth.local",
+                Password = PasswordHasher.Hash("senol123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-10),
+                CommunityMemberships = [Membership(SenolGunesId, HumanResourcesCommunityId, HumanResourcesAdminRoleId)]
+            },
+            new User
+            {
+                Id = AliKocId,
+                Username = "ali.koc",
+                DisplayName = "Ali Koc",
+                Email = "ali.koc@techyouth.local",
+                Password = PasswordHasher.Hash("ali123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-9),
+                CommunityMemberships = [Membership(AliKocId, ProcurementCommunityId, ProcurementAdminRoleId)]
+            },
+            new User
+            {
+                Id = ArdaGulerId,
+                Username = "arda.guler",
+                DisplayName = "Arda Guler",
+                Email = "arda.guler@techyouth.local",
+                Password = PasswordHasher.Hash("arda123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-7),
+                CommunityMemberships = [Membership(ArdaGulerId, HumanResourcesCommunityId, HumanResourcesStarterRoleId)]
+            },
+            new User
+            {
+                Id = CenkTosunId,
+                Username = "cenk.tosun",
+                DisplayName = "Cenk Tosun",
+                Email = "cenk.tosun@techyouth.local",
+                Password = PasswordHasher.Hash("cenk123"),
+                Role = Role.User,
+                Status = UserStatus.PendingApproval,
+                IsEmailVerified = false,
+                CreatedAt = DateTime.UtcNow.AddDays(-2),
+                CommunityMemberships = [Membership(CenkTosunId, ProcurementCommunityId, ProcurementUnassignedRoleId)]
+            },
+            new User
+            {
+                Id = JoseMourinhoId,
+                Username = "jose.mourinho",
+                DisplayName = "Jose Mourinho",
+                Email = "jose.mourinho@techyouth.local",
+                Password = PasswordHasher.Hash("jose123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-6),
+                CommunityMemberships = [Membership(JoseMourinhoId, LogisticsCommunityId, LogisticsStarterRoleId)]
+            },
+            new User
+            {
+                Id = SalihUcanId,
+                Username = "salih.ucan",
+                DisplayName = "Salih Ucan",
+                Email = "salih.ucan@techyouth.local",
+                Password = PasswordHasher.Hash("salih123"),
+                Role = Role.User,
+                Status = UserStatus.PendingApproval,
+                IsEmailVerified = false,
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                CommunityMemberships = [Membership(SalihUcanId, LogisticsCommunityId, LogisticsUnassignedRoleId)]
+            },
+            new User
+            {
+                Id = TaliscaId,
+                Username = "talisca",
+                DisplayName = "Anderson Talisca",
+                Email = "talisca@techyouth.local",
+                Password = PasswordHasher.Hash("talisca123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-8),
+                CommunityMemberships = [Membership(TaliscaId, ProductOrderCommunityId, ProductStarterRoleId)]
+            },
+            new User
+            {
+                Id = FerdiKadiogluId,
+                Username = "ferdi.kadioglu",
+                DisplayName = "Ferdi Kadioglu",
+                Email = "ferdi.kadioglu@techyouth.local",
+                Password = PasswordHasher.Hash("ferdi123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-5),
+                CommunityMemberships = [Membership(FerdiKadiogluId, ProductOrderCommunityId, ProductApproverRoleId)]
+            },
+            new User
+            {
+                Id = MertGunokId,
+                Username = "mert.gunok",
+                DisplayName = "Mert Gunok",
+                Email = "mert.gunok@techyouth.local",
+                Password = PasswordHasher.Hash("mert123"),
+                Role = Role.User,
+                Status = UserStatus.PendingApproval,
+                IsEmailVerified = false,
+                CreatedAt = DateTime.UtcNow.AddDays(-2),
+                CommunityMemberships = [Membership(MertGunokId, ProductOrderCommunityId, ProductUnassignedRoleId)]
+            },
+            new User
+            {
+                Id = BurakYilmazId,
+                Username = "burak.yilmaz",
+                DisplayName = "Burak Yilmaz",
+                Email = "burak.yilmaz@techyouth.local",
+                Password = PasswordHasher.Hash("burak123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-6),
+                CommunityMemberships = [Membership(BurakYilmazId, HumanResourcesCommunityId, HumanResourcesApproverRoleId)]
+            },
+            new User
+            {
+                Id = OguzhanOzyakupId,
+                Username = "oguzhan.ozyakup",
+                DisplayName = "Oguzhan Ozyakup",
+                Email = "oguzhan.ozyakup@techyouth.local",
+                Password = PasswordHasher.Hash("oguzhan123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-4),
+                CommunityMemberships = [Membership(OguzhanOzyakupId, HumanResourcesCommunityId, HumanResourcesStarterRoleId)]
+            },
+            new User
+            {
+                Id = GokhanGonulId,
+                Username = "gokhan.gonul",
+                DisplayName = "Gokhan Gonul",
+                Email = "gokhan.gonul@techyouth.local",
+                Password = PasswordHasher.Hash("gokhan123"),
+                Role = Role.User,
+                Status = UserStatus.PendingApproval,
+                IsEmailVerified = false,
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                CommunityMemberships = [Membership(GokhanGonulId, HumanResourcesCommunityId, HumanResourcesUnassignedRoleId)]
+            },
+            new User
+            {
+                Id = DembaBaId,
+                Username = "demba.ba",
+                DisplayName = "Demba Ba",
+                Email = "demba.ba@techyouth.local",
+                Password = PasswordHasher.Hash("demba123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-6),
+                CommunityMemberships = [Membership(DembaBaId, ProcurementCommunityId, ProcurementStarterRoleId)]
+            },
+            new User
+            {
+                Id = NecipUysalId,
+                Username = "necip.uysal",
+                DisplayName = "Necip Uysal",
+                Email = "necip.uysal@techyouth.local",
+                Password = PasswordHasher.Hash("necip123"),
+                Role = Role.User,
+                Status = UserStatus.Active,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow.AddDays(-5),
+                CommunityMemberships = [Membership(NecipUysalId, ProcurementCommunityId, ProcurementApproverRoleId)]
+            },
+            new User
+            {
+                Id = RidvanYilmazId,
+                Username = "ridvan.yilmaz",
+                DisplayName = "Ridvan Yilmaz",
+                Email = "ridvan.yilmaz@techyouth.local",
+                Password = PasswordHasher.Hash("ridvan123"),
+                Role = Role.User,
+                Status = UserStatus.PendingApproval,
+                IsEmailVerified = false,
+                CreatedAt = DateTime.UtcNow.AddDays(-1),
+                CommunityMemberships = [Membership(RidvanYilmazId, ProcurementCommunityId, ProcurementUnassignedRoleId)]
+            },
+            SeedUser(ZlatanIbrahimovicId, "zlatan.ibrahimovic", "Zlatan Ibrahimovic", "zlatan123"),
+            SeedUser(OkanBurukId, "okan.buruk", "Okan Buruk", "okan123"),
+            SeedUser(DiegoGodinId, "diego.godin", "Diego Godin", "godin123"),
+            SeedUser(EmreBelozogluId, "emre.belozoglu", "Emre Belozoglu", "emre123"),
+            SeedUser(DirkKuytId, "dirk.kuyt", "Dirk Kuyt", "kuyt123"),
+            SeedUser(RobertoCarlosId, "roberto.carlos", "Roberto Carlos", "carlos123"),
+            SeedUser(CanerErkinId, "caner.erkin", "Caner Erkin", "caner123"),
+            SeedUser(WesleySneijderId, "wesley.sneijder", "Wesley Sneijder", "wesley123"),
+            SeedUser(VanPersieId, "van.persie", "Robin van Persie", "robin123"),
+            SeedUser(ArdaTuranId, "arda.turan", "Arda Turan", "arda123"),
+            SeedUser(IlhanMansizId, "ilhan.mansiz", "Ilhan Mansiz", "ilhan123"),
+            SeedUser(AlexTellesId, "alex.telles", "Alex Telles", "telles123"),
+            SeedUser(NaniId, "nani", "Luis Nani", "nani123"),
+            SeedUser(RobinGosensId, "robin.gosens", "Robin Gosens", "gosens123"),
+            SeedUser(MoussaSowId, "moussa.sow", "Moussa Sow", "sow123")
         ];
+
+    private static User SeedUser(Guid id, string username, string displayName, string password) => new()
+    {
+        Id = id,
+        Username = username,
+        DisplayName = displayName,
+        Email = $"{username}@techyouth.local",
+        Password = PasswordHasher.Hash(password),
+        Role = Role.User,
+        Status = UserStatus.Active,
+        IsEmailVerified = true,
+        CreatedAt = DateTime.UtcNow.AddDays(-4),
+        CommunityMemberships = []
+    };
 
     private static UserCommunityMembership Membership(Guid userId, Guid communityId, Guid communityRoleId) =>
         new()
@@ -247,12 +563,109 @@ public static class DatabaseSeeder
     private static IReadOnlyList<CommunityRole> BuildCommunityRoles() =>
     [
         RoleSeed(SportAdminRoleId, SportCommunityId, "Topluluk Admin", "Sportif faaliyetler toplulugunu yonetir.", "community-admin", PermissionNames.All),
+        RoleSeed(SportUnassignedRoleId, SportCommunityId, "Atanmadi", "Onay bekleyen veya henuz yetki verilmeyen kullanici rolu.", "unassigned", []),
         RoleSeed(SportStarterRoleId, SportCommunityId, "Surec Baslatici", "Transfer talep sureclerini baslatir.", "process-starter", [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart]),
         RoleSeed(SportApproverRoleId, SportCommunityId, "Onay Sorumlusu", "Sportif tasklari onaylar veya reddeder.", "approver", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
         RoleSeed(LogisticsAdminRoleId, LogisticsCommunityId, "Topluluk Admin", "Lojistik toplulugunu yonetir.", "community-admin", PermissionNames.All),
-        RoleSeed(LogisticsOperatorRoleId, LogisticsCommunityId, "Lojistik Gorevlisi", "Kargo ve teslimat tasklarini isler.", "logistics-operator", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
-        RoleSeed(ProductAdminRoleId, ProductOrderCommunityId, "Topluluk Admin", "Urun siparisi toplulugunu yonetir.", "community-admin", PermissionNames.All)
+        RoleSeed(LogisticsUnassignedRoleId, LogisticsCommunityId, "Atanmadi", "Onay bekleyen veya henuz yetki verilmeyen kullanici rolu.", "unassigned", []),
+        RoleSeed(LogisticsStarterRoleId, LogisticsCommunityId, "Surec Baslatici", "Lojistik taleplerini baslatir.", "process-starter", [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart]),
+        RoleSeed(LogisticsApproverRoleId, LogisticsCommunityId, "Onay Sorumlusu", "Lojistik tasklarini onaylar veya reddeder.", "approver", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
+        RoleSeed(ProductAdminRoleId, ProductOrderCommunityId, "Topluluk Admin", "Urun siparisi toplulugunu yonetir.", "community-admin", PermissionNames.All),
+        RoleSeed(ProductUnassignedRoleId, ProductOrderCommunityId, "Atanmadi", "Onay bekleyen veya henuz yetki verilmeyen kullanici rolu.", "unassigned", []),
+        RoleSeed(ProductStarterRoleId, ProductOrderCommunityId, "Surec Baslatici", "Urun siparisi taleplerini baslatir.", "process-starter", [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart]),
+        RoleSeed(ProductApproverRoleId, ProductOrderCommunityId, "Onay Sorumlusu", "Urun siparisi tasklarini onaylar veya reddeder.", "approver", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
+        RoleSeed(HumanResourcesAdminRoleId, HumanResourcesCommunityId, "Topluluk Admin", "Insan kaynaklari toplulugunu yonetir.", "community-admin", PermissionNames.All),
+        RoleSeed(HumanResourcesUnassignedRoleId, HumanResourcesCommunityId, "Atanmadi", "Onay bekleyen veya henuz yetki verilmeyen kullanici rolu.", "unassigned", []),
+        RoleSeed(HumanResourcesStarterRoleId, HumanResourcesCommunityId, "Surec Baslatici", "Izin ve calisma duzeni taleplerini baslatir.", "process-starter", [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart]),
+        RoleSeed(HumanResourcesApproverRoleId, HumanResourcesCommunityId, "Onay Sorumlusu", "Insan kaynaklari tasklarini onaylar veya reddeder.", "approver", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
+        RoleSeed(ProcurementAdminRoleId, ProcurementCommunityId, "Topluluk Admin", "Satin alma toplulugunu yonetir.", "community-admin", PermissionNames.All),
+        RoleSeed(ProcurementUnassignedRoleId, ProcurementCommunityId, "Atanmadi", "Onay bekleyen veya henuz yetki verilmeyen kullanici rolu.", "unassigned", []),
+        RoleSeed(ProcurementStarterRoleId, ProcurementCommunityId, "Surec Baslatici", "Satin alma taleplerini baslatir.", "process-starter", [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart]),
+        RoleSeed(ProcurementApproverRoleId, ProcurementCommunityId, "Onay Sorumlusu", "Satin alma tasklarini onaylar veya reddeder.", "approver", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct])
     ];
+
+    private static async Task EnsureSystemRoleTemplatesAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var communityIds = await db.Communities.Select(community => community.Id).ToListAsync(cancellationToken);
+        var roles = await db.CommunityRoles
+            .Include(role => role.Permissions)
+            .ToListAsync(cancellationToken);
+        var permissionsToReplace = new List<(Guid RoleId, IReadOnlyList<string> Permissions)>();
+
+        foreach (var communityId in communityIds)
+        {
+            foreach (var template in CommunityRoleTemplates.All.Where(template => template.Key != CommunityRoleTemplates.Custom))
+            {
+                var role = roles.SingleOrDefault(item => item.CommunityId == communityId && item.TemplateKey == template.Key)
+                    ?? roles.SingleOrDefault(item => item.CommunityId == communityId && item.IsSystemRole && item.Name == template.Name);
+                if (role is null)
+                {
+                    role = RoleSeed(Guid.NewGuid(), communityId, template.Name, template.Description, template.Key, []);
+                    db.CommunityRoles.Add(role);
+                    roles.Add(role);
+                }
+                else if (!role.IsSystemRole)
+                {
+                    continue;
+                }
+
+                role.Name = template.Name;
+                role.Description = template.Description;
+                db.CommunityRolePermissions.RemoveRange(role.Permissions);
+                permissionsToReplace.Add((role.Id, template.Permissions));
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        foreach (var (roleId, permissions) in permissionsToReplace)
+        {
+            db.CommunityRolePermissions.AddRange(permissions.Select(permission => new CommunityRolePermission
+            {
+                Id = Guid.NewGuid(),
+                CommunityRoleId = roleId,
+                Permission = permission
+            }));
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task RetireDuplicateLogisticsRoleAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var legacyRoles = await db.CommunityRoles
+            .Where(role => role.IsSystemRole && role.TemplateKey == "logistics-operator")
+            .ToListAsync(cancellationToken);
+
+        foreach (var legacyRole in legacyRoles)
+        {
+            var replacementRole = await db.CommunityRoles.SingleOrDefaultAsync(
+                role => role.CommunityId == legacyRole.CommunityId && role.TemplateKey == CommunityRoleTemplates.Approver,
+                cancellationToken);
+            if (replacementRole is null)
+            {
+                legacyRole.Name = "Onay Sorumlusu";
+                legacyRole.Description = "Topluluktaki tasklari onaylar veya reddeder.";
+                legacyRole.TemplateKey = CommunityRoleTemplates.Approver;
+                continue;
+            }
+
+            var memberships = await db.UserCommunityMemberships
+                .Where(membership => membership.CommunityRoleId == legacyRole.Id)
+                .ToListAsync(cancellationToken);
+            foreach (var membership in memberships)
+            {
+                membership.CommunityRoleId = replacementRole.Id;
+            }
+
+            db.CommunityRoles.Remove(legacyRole);
+        }
+
+        if (legacyRoles.Count > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
 
     private static CommunityRole RoleSeed(
         Guid id,
@@ -296,51 +709,141 @@ public static class DatabaseSeeder
 
         if (missingUsers.Length > 0)
         {
+            // Existing databases can contain system roles with different IDs. Add users first,
+            // then resolve their membership through the current community template keys below.
+            foreach (var user in missingUsers)
+            {
+                user.CommunityMemberships.Clear();
+            }
+
             db.Users.AddRange(missingUsers);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static async Task NormalizeLegacyPlatformRolesAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var users = await db.Users
+            .Where(user => user.Role != Role.SuperAdmin && user.Role != Role.User)
+            .ToListAsync(cancellationToken);
+        foreach (var user in users)
+        {
+            user.Role = Role.User;
+        }
+
+        if (users.Count > 0)
+        {
             await db.SaveChangesAsync(cancellationToken);
         }
     }
 
     private static async Task EnsureMissingMembershipsAsync(AppDbContext db, CancellationToken cancellationToken)
     {
-        var desiredMemberships = new Dictionary<Guid, (Guid CommunityId, Guid RoleId)>
+        var desiredMemberships = new Dictionary<Guid, (Guid CommunityId, string TemplateKey)>
         {
-            [AdminId] = (SportCommunityId, SportAdminRoleId),
-            [UserId] = (SportCommunityId, SportStarterRoleId),
-            [ApproverId] = (SportCommunityId, SportApproverRoleId),
-            [MarioGomezId] = (SportCommunityId, SportStarterRoleId),
-            [QuaresmaId] = (SportCommunityId, SportApproverRoleId),
-            [AtibaId] = (LogisticsCommunityId, LogisticsOperatorRoleId),
-            [AlexId] = (ProductOrderCommunityId, ProductAdminRoleId),
-            [FatihTerimId] = (SportCommunityId, SportAdminRoleId),
-            [SergenYalcinId] = (LogisticsCommunityId, LogisticsOperatorRoleId),
-            [TuncaySanliId] = (ProductOrderCommunityId, ProductAdminRoleId),
-            [VolkanDemirelId] = (LogisticsCommunityId, LogisticsOperatorRoleId)
+            [UserId] = (SportCommunityId, CommunityRoleTemplates.ProcessStarter),
+            [ApproverId] = (SportCommunityId, CommunityRoleTemplates.Approver),
+            [MarioGomezId] = (SportCommunityId, CommunityRoleTemplates.Unassigned),
+            [QuaresmaId] = (SportCommunityId, CommunityRoleTemplates.Approver),
+            [AtibaId] = (LogisticsCommunityId, CommunityRoleTemplates.Approver),
+            [AlexId] = (ProductOrderCommunityId, CommunityRoleTemplates.CommunityAdmin),
+            [FatihTerimId] = (SportCommunityId, CommunityRoleTemplates.CommunityAdmin),
+            [SergenYalcinId] = (LogisticsCommunityId, CommunityRoleTemplates.Approver),
+            [TuncaySanliId] = (ProductOrderCommunityId, CommunityRoleTemplates.CommunityAdmin),
+            [VolkanDemirelId] = (LogisticsCommunityId, CommunityRoleTemplates.Approver),
+            [SenolGunesId] = (HumanResourcesCommunityId, CommunityRoleTemplates.CommunityAdmin),
+            [AliKocId] = (ProcurementCommunityId, CommunityRoleTemplates.CommunityAdmin),
+            [ArdaGulerId] = (HumanResourcesCommunityId, CommunityRoleTemplates.ProcessStarter),
+            [CenkTosunId] = (ProcurementCommunityId, CommunityRoleTemplates.Unassigned),
+            [JoseMourinhoId] = (LogisticsCommunityId, CommunityRoleTemplates.ProcessStarter),
+            [SalihUcanId] = (LogisticsCommunityId, CommunityRoleTemplates.Unassigned),
+            [TaliscaId] = (ProductOrderCommunityId, CommunityRoleTemplates.ProcessStarter),
+            [FerdiKadiogluId] = (ProductOrderCommunityId, CommunityRoleTemplates.Approver),
+            [MertGunokId] = (ProductOrderCommunityId, CommunityRoleTemplates.Unassigned),
+            [BurakYilmazId] = (HumanResourcesCommunityId, CommunityRoleTemplates.Approver),
+            [OguzhanOzyakupId] = (HumanResourcesCommunityId, CommunityRoleTemplates.ProcessStarter),
+            [GokhanGonulId] = (HumanResourcesCommunityId, CommunityRoleTemplates.Unassigned),
+            [DembaBaId] = (ProcurementCommunityId, CommunityRoleTemplates.ProcessStarter),
+            [NecipUysalId] = (ProcurementCommunityId, CommunityRoleTemplates.Approver),
+            [RidvanYilmazId] = (ProcurementCommunityId, CommunityRoleTemplates.Unassigned),
+            [ZlatanIbrahimovicId] = (SportCommunityId, CommunityRoleTemplates.FormDesigner),
+            [OkanBurukId] = (SportCommunityId, CommunityRoleTemplates.StandardUser),
+            [DiegoGodinId] = (SportCommunityId, CommunityRoleTemplates.ReadOnly),
+            [EmreBelozogluId] = (LogisticsCommunityId, CommunityRoleTemplates.FormDesigner),
+            [DirkKuytId] = (LogisticsCommunityId, CommunityRoleTemplates.StandardUser),
+            [RobertoCarlosId] = (LogisticsCommunityId, CommunityRoleTemplates.ReadOnly),
+            [CanerErkinId] = (ProductOrderCommunityId, CommunityRoleTemplates.FormDesigner),
+            [WesleySneijderId] = (ProductOrderCommunityId, CommunityRoleTemplates.StandardUser),
+            [VanPersieId] = (ProductOrderCommunityId, CommunityRoleTemplates.ReadOnly),
+            [ArdaTuranId] = (HumanResourcesCommunityId, CommunityRoleTemplates.FormDesigner),
+            [IlhanMansizId] = (HumanResourcesCommunityId, CommunityRoleTemplates.StandardUser),
+            [AlexTellesId] = (HumanResourcesCommunityId, CommunityRoleTemplates.ReadOnly),
+            [NaniId] = (ProcurementCommunityId, CommunityRoleTemplates.FormDesigner),
+            [RobinGosensId] = (ProcurementCommunityId, CommunityRoleTemplates.StandardUser),
+            [MoussaSowId] = (ProcurementCommunityId, CommunityRoleTemplates.ReadOnly)
         };
 
-        var users = await db.Users
-            .Include(user => user.CommunityMemberships)
-            .Where(user => desiredMemberships.Keys.Contains(user.Id))
+        var desiredCommunityIds = desiredMemberships.Values
+            .Select(desired => desired.CommunityId)
+            .Distinct()
+            .ToArray();
+        var roleIdsByTemplate = await db.CommunityRoles
+            .Where(role => desiredCommunityIds.Contains(role.CommunityId))
+            .Select(role => new { role.Id, role.CommunityId, role.TemplateKey })
             .ToListAsync(cancellationToken);
-
-        foreach (var user in users)
+        var admin = await db.Users.SingleOrDefaultAsync(user => user.Id == AdminId, cancellationToken);
+        if (admin is not null)
         {
-            if (user.Id == AdminId)
-            {
-                user.Role = Role.SuperAdmin;
-            }
+            admin.Role = Role.SuperAdmin;
+            admin.Status = UserStatus.Active;
+        }
 
-            if (user.CommunityMemberships.Any(membership => membership.IsActive))
+        var users = await db.Users
+            .AsNoTracking()
+            .Where(user => user.Id == AdminId || desiredMemberships.Keys.Contains(user.Id))
+            .Select(user => user.Id)
+            .ToListAsync(cancellationToken);
+        var activeMembershipsByUser = (await db.UserCommunityMemberships
+            .Where(membership => desiredMemberships.Keys.Contains(membership.UserId) && membership.IsActive)
+                .ToListAsync(cancellationToken))
+            .GroupBy(membership => membership.UserId)
+            .ToDictionary(group => group.Key, group => group.OrderByDescending(item => item.CreatedAt).First());
+
+        foreach (var userId in users)
+        {
+            if (userId == AdminId)
             {
                 continue;
             }
 
-            var desired = desiredMemberships[user.Id];
-            user.CommunityMemberships.Add(Membership(user.Id, desired.CommunityId, desired.RoleId));
+            var desired = desiredMemberships[userId];
+            var communityRole = roleIdsByTemplate.SingleOrDefault(role =>
+                role.CommunityId == desired.CommunityId
+                && role.TemplateKey.Equals(desired.TemplateKey, StringComparison.OrdinalIgnoreCase));
+            if (communityRole is null)
+            {
+                throw new InvalidOperationException($"Seed role '{desired.TemplateKey}' was not found for community '{desired.CommunityId}'.");
+            }
+
+            if (activeMembershipsByUser.TryGetValue(userId, out var activeMembership))
+            {
+                // Keep the deterministic mock accounts aligned with their documented demo roles,
+                // while leaving manually created users outside this seed map untouched.
+                activeMembership.CommunityId = desired.CommunityId;
+                activeMembership.CommunityRoleId = communityRole.Id;
+                continue;
+            }
+
+            db.UserCommunityMemberships.Add(Membership(userId, desired.CommunityId, communityRole.Id));
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        if (db.ChangeTracker.HasChanges())
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
+
+    private static string GenerateInviteCode() => Guid.NewGuid().ToString("N")[..5].ToUpperInvariant();
 
     private static async Task UpgradePlainTextPasswordsAsync(AppDbContext db, CancellationToken cancellationToken)
     {
@@ -417,6 +920,42 @@ public static class DatabaseSeeder
             ]
         };
 
+        var leaveForm = new FormDefinition
+        {
+            Id = Guid.Parse("eeeeeeee-0000-0000-0000-000000000001"),
+            Name = "Izin ve Uzaktan Calisma Talep Formu",
+            Description = "Izin, uzaktan calisma ve ekip planlama taleplerini insan kaynaklari surecine alir.",
+            CommunityId = HumanResourcesCommunityId,
+            CreatedByUserId = SenolGunesId,
+            CreatedAt = DateTime.UtcNow.AddDays(-8),
+            Fields =
+            [
+                Field("eeeeeeee-1000-0000-0000-000000000001", "calisan", "Calisan", FieldType.Text, true, 1),
+                Field("eeeeeeee-1000-0000-0000-000000000002", "talepTipi", "Talep Tipi", FieldType.Select, true, 2, ["Yillik Izin", "Uzaktan Calisma", "Ebeveyn Izni"]),
+                Field("eeeeeeee-1000-0000-0000-000000000003", "baslangicTarihi", "Baslangic Tarihi", FieldType.Date, true, 3),
+                Field("eeeeeeee-1000-0000-0000-000000000004", "gunSayisi", "Gun Sayisi", FieldType.Number, true, 4),
+                Field("eeeeeeee-1000-0000-0000-000000000005", "aciklama", "Aciklama", FieldType.Text, false, 5)
+            ]
+        };
+
+        var purchaseForm = new FormDefinition
+        {
+            Id = Guid.Parse("ffffffff-0000-0000-0000-000000000001"),
+            Name = "Satin Alma Talep Formu",
+            Description = "Urun veya hizmet taleplerini butce ve tedarikci onayina tasir.",
+            CommunityId = ProcurementCommunityId,
+            CreatedByUserId = AliKocId,
+            CreatedAt = DateTime.UtcNow.AddDays(-7),
+            Fields =
+            [
+                Field("ffffffff-1000-0000-0000-000000000001", "talepSahibi", "Talep Sahibi", FieldType.Text, true, 1),
+                Field("ffffffff-1000-0000-0000-000000000002", "kategori", "Kategori", FieldType.Select, true, 2, ["Ekipman", "Yazilim", "Hizmet"]),
+                Field("ffffffff-1000-0000-0000-000000000003", "tutar", "Tahmini Tutar", FieldType.Number, true, 3),
+                Field("ffffffff-1000-0000-0000-000000000004", "tedarikci", "Tercih Edilen Tedarikci", FieldType.Text, true, 4),
+                Field("ffffffff-1000-0000-0000-000000000005", "acil", "Acil Tedarik", FieldType.Checkbox, false, 5)
+            ]
+        };
+
         if (!await db.FormDefinitions.AnyAsync(form => form.Id == transferForm.Id, cancellationToken))
         {
             db.FormDefinitions.Add(transferForm);
@@ -427,13 +966,23 @@ public static class DatabaseSeeder
             db.FormDefinitions.Add(campForm);
         }
 
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == leaveForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(leaveForm);
+        }
+
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == purchaseForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(purchaseForm);
+        }
+
         await EnsureExistingWorkflowCommunityScopeAsync(db, cancellationToken);
 
         var existingProcessIds = await db.ProcessInstances
             .Select(process => process.Id)
             .ToListAsync(cancellationToken);
         var existingProcessIdSet = existingProcessIds.ToHashSet();
-        var missingProcesses = BuildMockProcesses(transferForm.Id, campForm.Id)
+        var missingProcesses = BuildMockProcesses(transferForm.Id, campForm.Id, leaveForm.Id, purchaseForm.Id)
             .Where(process => !existingProcessIdSet.Contains(process.Id))
             .ToArray();
         if (missingProcesses.Length > 0)
@@ -451,6 +1000,16 @@ public static class DatabaseSeeder
         if (missingSystemLogs.Length > 0)
         {
             db.SystemAuditLogs.AddRange(missingSystemLogs);
+        }
+
+        var existingNotificationIds = await db.Notifications.Select(notification => notification.Id).ToListAsync(cancellationToken);
+        var existingNotificationIdSet = existingNotificationIds.ToHashSet();
+        var missingNotifications = BuildMockNotifications()
+            .Where(notification => !existingNotificationIdSet.Contains(notification.Id))
+            .ToArray();
+        if (missingNotifications.Length > 0)
+        {
+            db.Notifications.AddRange(missingNotifications);
         }
 
         await db.SaveChangesAsync(cancellationToken);
@@ -506,7 +1065,11 @@ public static class DatabaseSeeder
             ValidationRules = validationRules?.ToList() ?? []
         };
 
-    private static IReadOnlyList<ProcessInstance> BuildMockProcesses(Guid transferFormId, Guid campFormId)
+    private static IReadOnlyList<ProcessInstance> BuildMockProcesses(
+        Guid transferFormId,
+        Guid campFormId,
+        Guid leaveFormId,
+        Guid purchaseFormId)
     {
         var now = DateTime.UtcNow;
 
@@ -704,7 +1267,38 @@ public static class DatabaseSeeder
                     tarih = now.AddDays(1).ToString("yyyy-MM-dd"),
                     iletisim = "ali.koc@example.com",
                     not = "Basina aciklama taslagi icin onay bekleniyor."
-                })
+                }),
+            Process(
+                "cccccccc-0000-0000-0000-000000000013",
+                leaveFormId,
+                ProcessStatus.InProgress,
+                now.AddHours(-14),
+                new
+                {
+                    calisan = "Arda Guler",
+                    talepTipi = "Uzaktan Calisma",
+                    baslangicTarihi = now.AddDays(3).ToString("yyyy-MM-dd"),
+                    gunSayisi = 2,
+                    aciklama = "Saha ziyareti sonrasi planli uzaktan calisma talebi."
+                },
+                startedByUserId: ArdaGulerId),
+            Process(
+                "cccccccc-0000-0000-0000-000000000014",
+                purchaseFormId,
+                ProcessStatus.Completed,
+                now.AddDays(-2),
+                new
+                {
+                    talepSahibi = "Ali Koc",
+                    kategori = "Yazilim",
+                    tutar = 48000,
+                    tedarikci = "BPM Analytics",
+                    acil = false
+                },
+                completedAt: now.AddDays(-1).AddHours(3),
+                completedByUserId: AliKocId,
+                completedNote: "Butce limiti icinde oldugu icin onaylandi.",
+                startedByUserId: AliKocId)
         ];
     }
 
@@ -716,7 +1310,8 @@ public static class DatabaseSeeder
         object formData,
         DateTime? completedAt = null,
         Guid? completedByUserId = null,
-        string? completedNote = null)
+        string? completedNote = null,
+        Guid? startedByUserId = null)
     {
         var processId = Guid.Parse(id);
         var taskId = Guid.Parse(id.Replace("cccccccc", "dddddddd"));
@@ -724,15 +1319,14 @@ public static class DatabaseSeeder
         var completedLogId = Guid.Parse(id.Replace("cccccccc", "ffffffff"));
 
         var taskStatus = status == ProcessStatus.InProgress ? ProcessTaskStatus.Open : ProcessTaskStatus.Completed;
+        var communityId = CommunityIdForForm(formDefinitionId);
 
         var process = new ProcessInstance
         {
             Id = processId,
             FormDefinitionId = formDefinitionId,
-            CommunityId = formDefinitionId == Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001")
-                ? SportCommunityId
-                : LogisticsCommunityId,
-            StartedByUserId = UserId,
+            CommunityId = communityId,
+            StartedByUserId = startedByUserId ?? UserId,
             Status = status,
             FormDataJson = Serialize(formData),
             StartedAt = startedAt,
@@ -742,7 +1336,8 @@ public static class DatabaseSeeder
                 new ProcessTask
                 {
                     Id = taskId,
-                    AssignedRole = Role.Approver,
+                    AssignedRole = Role.User,
+                    AssignedCommunityRoleId = ApproverRoleIdForCommunity(communityId),
                     RequiredPermission = PermissionNames.TasksAct,
                     Status = taskStatus,
                     AvailableActionsJson = Serialize(new[] { WorkflowAction.Approve, WorkflowAction.Reject }),
@@ -756,7 +1351,7 @@ public static class DatabaseSeeder
                 new AuditLog
                 {
                     Id = startLogId,
-                    UserId = UserId,
+                    UserId = startedByUserId ?? UserId,
                     Action = WorkflowAction.Start,
                     FromStatus = ProcessStatus.Pending,
                     ToStatus = ProcessStatus.InProgress,
@@ -783,6 +1378,24 @@ public static class DatabaseSeeder
         return process;
     }
 
+    private static Guid CommunityIdForForm(Guid formDefinitionId) => formDefinitionId switch
+    {
+        var id when id == Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001") => SportCommunityId,
+        var id when id == Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001") => LogisticsCommunityId,
+        var id when id == Guid.Parse("eeeeeeee-0000-0000-0000-000000000001") => HumanResourcesCommunityId,
+        var id when id == Guid.Parse("ffffffff-0000-0000-0000-000000000001") => ProcurementCommunityId,
+        _ => SportCommunityId
+    };
+
+    private static Guid ApproverRoleIdForCommunity(Guid communityId) => communityId switch
+    {
+        var id when id == SportCommunityId => SportApproverRoleId,
+        var id when id == LogisticsCommunityId => LogisticsApproverRoleId,
+        var id when id == HumanResourcesCommunityId => HumanResourcesApproverRoleId,
+        var id when id == ProcurementCommunityId => ProcurementApproverRoleId,
+        _ => SportApproverRoleId
+    };
+
     private static IReadOnlyList<SystemAuditLog> BuildMockSystemAuditLogs()
     {
         var now = DateTime.UtcNow;
@@ -795,7 +1408,7 @@ public static class DatabaseSeeder
                 "Auth.RegisterRequested",
                 "User",
                 MarioGomezId.ToString(),
-                "Mario Gomez registered and is waiting for admin approval.",
+                "Mario Gomez registered and is waiting for community approval.",
                 now.AddDays(-6)),
             SystemLog(
                 "99999999-0000-0000-0000-000000000002",
@@ -803,7 +1416,7 @@ public static class DatabaseSeeder
                 "User.AccessUpdated",
                 "User",
                 QuaresmaId.ToString(),
-                "Ricardo Quaresma was approved as Approver.",
+                "Ricardo Quaresma was assigned the Onay Sorumlusu community role.",
                 now.AddDays(-5).AddHours(2)),
             SystemLog(
                 "99999999-0000-0000-0000-000000000003",
@@ -835,7 +1448,7 @@ public static class DatabaseSeeder
                 "Task.Approve",
                 "ProcessTask",
                 "dddddddd-0000-0000-0000-000000000005",
-                "Process cccccccc-0000-0000-0000-000000000005 was approved by Process Approver.",
+                "Process cccccccc-0000-0000-0000-000000000005 was approved by the assigned community reviewer.",
                 now.AddDays(-2)),
             SystemLog(
                 "99999999-0000-0000-0000-000000000007",
@@ -851,7 +1464,7 @@ public static class DatabaseSeeder
                 "Auth.RegisterRequested",
                 "User",
                 FatihTerimId.ToString(),
-                "Fatih Terim requested Admin-level access and is waiting for approval.",
+                "Fatih Terim requested access to the Sportif Faaliyetler community.",
                 now.AddHours(-8)),
             SystemLog(
                 "99999999-0000-0000-0000-000000000009",
@@ -859,7 +1472,7 @@ public static class DatabaseSeeder
                 "User.CreatedByAdmin",
                 "User",
                 SergenYalcinId.ToString(),
-                "Admin created Sergen Yalcin as an Approver demo user.",
+                "SuperAdmin created Sergen Yalcin with the Onay Sorumlusu community role.",
                 now.AddHours(-7)),
             SystemLog(
                 "99999999-0000-0000-0000-000000000010",
@@ -899,8 +1512,89 @@ public static class DatabaseSeeder
                 "Task.Reject",
                 "ProcessTask",
                 "dddddddd-0000-0000-0000-000000000011",
-                "Process Approver rejected a late urgent transfer request.",
-                now.AddHours(-2))
+                "The assigned community reviewer rejected a late urgent transfer request.",
+                now.AddHours(-2)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000015",
+                SenolGunesId,
+                "Process.Started",
+                "ProcessInstance",
+                "cccccccc-0000-0000-0000-000000000013",
+                "Senol Gunes reviewed Arda Guler's remote work request.",
+                now.AddHours(-14)),
+            SystemLog(
+                "99999999-0000-0000-0000-000000000016",
+                AliKocId,
+                "Task.Approve",
+                "ProcessTask",
+                "dddddddd-0000-0000-0000-000000000014",
+                "Ali Koc approved a software purchase request in the Satin Alma community.",
+                now.AddDays(-1).AddHours(3))
+        ];
+    }
+
+    private static IReadOnlyList<Notification> BuildMockNotifications()
+    {
+        var now = DateTime.UtcNow;
+        return
+        [
+            new Notification
+            {
+                Id = Guid.Parse("dddddddd-0000-0000-0000-000000000001"),
+                UserId = ApproverId,
+                Type = "Task.Assigned",
+                Title = "Onay bekleyen is atandi",
+                Message = "Transfer Talep Formu icin yeni bir onay aksiyonu bekliyor.",
+                EntityType = "ProcessInstance",
+                EntityId = "cccccccc-0000-0000-0000-000000000001",
+                CreatedAt = now.AddHours(-3)
+            },
+            new Notification
+            {
+                Id = Guid.Parse("dddddddd-0000-0000-0000-000000000002"),
+                UserId = UserId,
+                Type = "Process.Completed",
+                Title = "Sureciniz tamamlandi",
+                Message = "Baslattiginiz transfer talebi onaylandi.",
+                EntityType = "ProcessInstance",
+                EntityId = "cccccccc-0000-0000-0000-000000000002",
+                CreatedAt = now.AddDays(-1),
+                ReadAt = now.AddHours(-20)
+            },
+            new Notification
+            {
+                Id = Guid.Parse("dddddddd-0000-0000-0000-000000000003"),
+                UserId = FatihTerimId,
+                Type = "User.AccessUpdated",
+                Title = "Topluluk yetkiniz guncellendi",
+                Message = "Sportif Faaliyetler toplulugunda admin yetkiniz aktif.",
+                EntityType = "User",
+                EntityId = FatihTerimId.ToString(),
+                CreatedAt = now.AddDays(-2)
+            },
+            new Notification
+            {
+                Id = Guid.Parse("dddddddd-0000-0000-0000-000000000004"),
+                UserId = SenolGunesId,
+                Type = "Task.Assigned",
+                Title = "Izin talebi onay bekliyor",
+                Message = "Arda Guler'in uzaktan calisma talebi icin aksiyon alinmasi gerekiyor.",
+                EntityType = "ProcessInstance",
+                EntityId = "cccccccc-0000-0000-0000-000000000013",
+                CreatedAt = now.AddHours(-14)
+            },
+            new Notification
+            {
+                Id = Guid.Parse("dddddddd-0000-0000-0000-000000000005"),
+                UserId = AliKocId,
+                Type = "Process.Completed",
+                Title = "Satin alma sureci tamamlandi",
+                Message = "Yazilim talebi butce siniri icinde onaylandi.",
+                EntityType = "ProcessInstance",
+                EntityId = "cccccccc-0000-0000-0000-000000000014",
+                CreatedAt = now.AddDays(-1).AddHours(3),
+                ReadAt = now.AddHours(-10)
+            }
         ];
     }
 

@@ -8,7 +8,6 @@ public static class UserAccessExtensions
 
     public static bool HasPermission(this UserDto user, string permission) =>
         user.IsSuperAdmin()
-        || user.Role == Role.Admin
         || (user.Permissions ?? []).Contains(permission, StringComparer.OrdinalIgnoreCase);
 
     public static bool SharesCommunityWith(this UserDto user, Guid? communityId) =>

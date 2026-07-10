@@ -31,7 +31,7 @@ public class ProcessService(
             query = query.Where(process => process.CommunityId == user.CommunityId);
         }
 
-        if (user.Role == Role.User && !user.HasPermission(PermissionNames.TasksView))
+        if (!user.HasPermission(PermissionNames.TasksView))
         {
             query = query.Where(process => process.StartedByUserId == user.Id);
         }
@@ -76,6 +76,14 @@ public class ProcessService(
             return Result<ProcessDetailDto>.Failure("Form definition was not found.");
         }
 
+        var isCommunityActive = await db.Communities.AnyAsync(
+            community => community.Id == form.CommunityId && community.IsActive,
+            cancellationToken);
+        if (!isCommunityActive)
+        {
+            return Result<ProcessDetailDto>.Failure("The process community is not active.");
+        }
+
         var validationErrors = FormDataValidator.Validate(form, request.FormData);
         if (validationErrors.Count > 0)
         {
@@ -103,7 +111,7 @@ public class ProcessService(
                 new ProcessTask
                 {
                     Id = Guid.NewGuid(),
-                    AssignedRole = Role.Approver,
+                    AssignedRole = Role.User,
                     RequiredPermission = PermissionNames.TasksAct,
                     Status = ProcessTaskStatus.Open,
                     AvailableActionsJson = JsonHelpers.Serialize(new[] { WorkflowAction.Approve, WorkflowAction.Reject }),
@@ -127,6 +135,11 @@ public class ProcessService(
 
         db.ProcessInstances.Add(process);
         await db.SaveChangesAsync(cancellationToken);
+        await NotifyTaskCandidatesAsync(
+            process.CommunityId,
+            process.Id,
+            form.Name,
+            cancellationToken);
         await auditService.LogAsync(
             user,
             "Process.Started",
@@ -152,8 +165,41 @@ public class ProcessService(
 
     private static bool CanSeeProcess(ProcessInstance process, UserDto user) =>
         user.IsSuperAdmin()
-        || (user.CommunityId is null && (user.Role is Role.Admin or Role.Approver || process.StartedByUserId == user.Id))
         || (process.CommunityId == user.CommunityId
             && (user.HasPermission(PermissionNames.ProcessesView)
                 || process.StartedByUserId == user.Id));
+
+    private async Task NotifyTaskCandidatesAsync(Guid communityId, Guid processId, string formName, CancellationToken cancellationToken)
+    {
+        var userIds = await db.Users
+            .Where(user => user.Status == UserStatus.Active
+                && user.CommunityMemberships.Any(membership =>
+                    membership.IsActive
+                    && membership.CommunityId == communityId
+                    && membership.CommunityRole != null
+                    && membership.CommunityRole.Permissions.Any(permission => permission.Permission == PermissionNames.TasksAct)))
+            .Select(user => user.Id)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        foreach (var userId in userIds)
+        {
+            db.Notifications.Add(new Notification
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                Type = "Task.Assigned",
+                Title = "Yeni onay gorevi",
+                Message = $"{formName} sureci icin onay bekleyen yeni bir task var.",
+                EntityType = "ProcessInstance",
+                EntityId = processId.ToString(),
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        if (userIds.Count > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
 }

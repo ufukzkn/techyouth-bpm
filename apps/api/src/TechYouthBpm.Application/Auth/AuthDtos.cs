@@ -5,7 +5,7 @@ namespace TechYouthBpm.Application.Auth;
 
 public record LoginRequest(string Username, string Password, bool RememberMe = false);
 
-public record RegisterRequest(string Username, string DisplayName, string Email, string Password);
+public record RegisterRequest(string Username, string DisplayName, string Email, string Password, string CommunityCode);
 
 public record UpdateProfileRequest(string DisplayName, string Email);
 
@@ -16,6 +16,10 @@ public record ForgotPasswordRequest(string UsernameOrEmail);
 public record ForgotPasswordResponse(string Message, string DemoToken = "", DateTime? ExpiresAt = null);
 
 public record ResetPasswordRequest(string UsernameOrEmail, string Token, string NewPassword);
+
+public record AdminPasswordResetRequest(bool UseManualPassword = false, string? TemporaryPassword = null);
+
+public record AdminPasswordResetResponse(string Message);
 
 public record PublicEmailVerificationStartRequest(string UsernameOrEmail);
 
@@ -35,6 +39,7 @@ public record UserSearchRequest(
     string? Query = null,
     UserStatus? Status = null,
     Guid? CommunityId = null,
+    Guid? CommunityRoleId = null,
     int Page = 1,
     int PageSize = 10);
 

@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CommunityRole> CommunityRoles => Set<CommunityRole>();
     public DbSet<CommunityRolePermission> CommunityRolePermissions => Set<CommunityRolePermission>();
     public DbSet<UserCommunityMembership> UserCommunityMemberships => Set<UserCommunityMembership>();
+    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
@@ -28,6 +29,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<User>().HasIndex(user => user.Username).IsUnique();
         modelBuilder.Entity<User>().HasIndex(user => user.Email).IsUnique();
         modelBuilder.Entity<Community>().HasIndex(community => community.Name).IsUnique();
+        modelBuilder.Entity<Community>().HasIndex(community => community.InviteCode).IsUnique();
         modelBuilder.Entity<CommunityRole>().HasIndex(role => new { role.CommunityId, role.Name }).IsUnique();
         modelBuilder.Entity<CommunityRolePermission>().HasIndex(permission => new { permission.CommunityRoleId, permission.Permission }).IsUnique();
         modelBuilder.Entity<UserCommunityMembership>().HasIndex(membership => new { membership.UserId, membership.IsActive });
@@ -61,6 +63,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(membership => membership.CommunityRoleId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(notification => notification.User)
+            .WithMany()
+            .HasForeignKey(notification => notification.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Notification>().HasIndex(notification => new { notification.UserId, notification.ReadAt, notification.CreatedAt });
 
         modelBuilder.Entity<UserSession>().HasKey(session => session.Id);
         modelBuilder.Entity<UserSession>().HasIndex(session => session.Token).IsUnique();

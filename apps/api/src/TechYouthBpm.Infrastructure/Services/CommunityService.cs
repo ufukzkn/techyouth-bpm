@@ -38,6 +38,11 @@ public class CommunityService(
         }
 
         var errors = ValidateCommunity(request.Name);
+        var inviteCode = await ResolveInviteCodeAsync(request.InviteCode, null, cancellationToken);
+        if (inviteCode is null)
+        {
+            errors.Add("Community code must be five uppercase letters or digits and unique.");
+        }
         if (errors.Count > 0)
         {
             return Result<CommunityDto>.Failure(errors);
@@ -54,6 +59,7 @@ public class CommunityService(
             Id = Guid.NewGuid(),
             Name = name,
             Description = request.Description.Trim(),
+            InviteCode = inviteCode ?? string.Empty,
             IsActive = request.IsActive,
             CreatedAt = DateTime.UtcNow
         };
@@ -66,11 +72,11 @@ public class CommunityService(
         return Result<CommunityDto>.Success(community.ToDto());
     }
 
-    public async Task<Result<CommunityDto>> UpdateAsync(Guid communityId, UpdateCommunityRequest request, UserDto currentUser, CancellationToken cancellationToken = default)
+    public async Task<Result<CommunityDto>> RegenerateInviteCodeAsync(Guid communityId, UserDto currentUser, CancellationToken cancellationToken = default)
     {
         if (!currentUser.IsSuperAdmin())
         {
-            return Result<CommunityDto>.Failure("Only SuperAdmin users can update communities.");
+            return Result<CommunityDto>.Failure("Only SuperAdmin users can regenerate community codes.");
         }
 
         var community = await db.Communities.SingleOrDefaultAsync(item => item.Id == communityId, cancellationToken);
@@ -79,19 +85,124 @@ public class CommunityService(
             return Result<CommunityDto>.Failure("Community was not found.");
         }
 
-        var errors = ValidateCommunity(request.Name);
+        community.InviteCode = await GenerateUniqueInviteCodeAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(currentUser, "Community.InviteCodeRegenerated", "Community", community.Id.ToString(), $"Community '{community.Name}' invite code was regenerated.", cancellationToken);
+
+        return Result<CommunityDto>.Success(community.ToDto());
+    }
+
+    public async Task<Result<CommunityDto>> UpdateAsync(Guid communityId, UpdateCommunityRequest request, UserDto currentUser, CancellationToken cancellationToken = default)
+    {
+        var community = await db.Communities.SingleOrDefaultAsync(item => item.Id == communityId, cancellationToken);
+        if (community is null)
+        {
+            return Result<CommunityDto>.Failure("Community was not found.");
+        }
+
+        var isCommunityAdminDeactivation = !currentUser.IsSuperAdmin()
+            && community.IsActive
+            && !request.IsActive
+            && currentUser.CommunityId == communityId
+            && currentUser.HasPermission(PermissionNames.CommunityManageAdmins)
+            && string.Equals(community.Name, request.Name.Trim(), StringComparison.Ordinal)
+            && string.Equals(community.Description, request.Description.Trim(), StringComparison.Ordinal)
+            && string.Equals(community.InviteCode, request.InviteCode?.Trim(), StringComparison.OrdinalIgnoreCase);
+        if (!currentUser.IsSuperAdmin() && !isCommunityAdminDeactivation)
+        {
+            return Result<CommunityDto>.Failure("Only SuperAdmin users can update community settings.");
+        }
+
+        var errors = isCommunityAdminDeactivation ? [] : ValidateCommunity(request.Name);
+        var inviteCode = isCommunityAdminDeactivation
+            ? community.InviteCode
+            : await ResolveInviteCodeAsync(request.InviteCode, communityId, cancellationToken);
+        if (inviteCode is null)
+        {
+            errors.Add("Community code must be five uppercase letters or digits and unique.");
+        }
         if (errors.Count > 0)
         {
             return Result<CommunityDto>.Failure(errors);
         }
 
+        var duplicateName = !isCommunityAdminDeactivation && await db.Communities.AnyAsync(
+            item => item.Id != communityId && item.Name == request.Name.Trim(),
+            cancellationToken);
+        if (duplicateName)
+        {
+            return Result<CommunityDto>.Failure("Community name is already used.");
+        }
+
+        var wasActive = community.IsActive;
         community.Name = request.Name.Trim();
         community.Description = request.Description.Trim();
+        community.InviteCode = inviteCode!;
         community.IsActive = request.IsActive;
+
+        if (wasActive && !community.IsActive)
+        {
+            var memberIds = await db.UserCommunityMemberships
+                .Where(membership => membership.CommunityId == communityId && membership.IsActive)
+                .Select(membership => membership.UserId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (memberIds.Count > 0)
+            {
+                var activeSessions = await db.UserSessions
+                    .Where(session => memberIds.Contains(session.UserId) && session.RevokedAt == null)
+                    .ToListAsync(cancellationToken);
+                foreach (var session in activeSessions)
+                {
+                    session.RevokedAt = DateTime.UtcNow;
+                }
+
+                var refreshTokens = await db.RefreshTokens
+                    .Where(refreshToken => memberIds.Contains(refreshToken.UserId) && refreshToken.RevokedAt == null)
+                    .ToListAsync(cancellationToken);
+                foreach (var refreshToken in refreshTokens)
+                {
+                    refreshToken.RevokedAt = DateTime.UtcNow;
+                }
+            }
+        }
+
         await db.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(currentUser, "Community.Updated", "Community", community.Id.ToString(), $"Community '{community.Name}' was updated.", cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            community.IsActive ? "Community.Updated" : "Community.Deactivated",
+            "Community",
+            community.Id.ToString(),
+            community.IsActive
+                ? $"Community '{community.Name}' was updated."
+                : $"Community '{community.Name}' was deactivated and active member sessions were revoked.",
+            cancellationToken);
 
         return Result<CommunityDto>.Success(community.ToDto());
+    }
+
+    public async Task<Result<CommunitySummaryDto>> GetSummaryAsync(Guid communityId, UserDto currentUser, CancellationToken cancellationToken = default)
+    {
+        if (!CanManageCommunity(currentUser, communityId, PermissionNames.CommunityManageRoles)
+            && !CanManageCommunity(currentUser, communityId, PermissionNames.CommunityManageUsers))
+        {
+            return Result<CommunitySummaryDto>.Failure("Current user cannot view community summary.");
+        }
+
+        var roleCounts = await db.CommunityRoles.AsNoTracking()
+            .Where(role => role.CommunityId == communityId)
+            .OrderBy(role => role.Name)
+            .Select(role => new CommunityRoleCountDto(
+                role.Id,
+                role.Name,
+                db.UserCommunityMemberships.Count(membership => membership.CommunityRoleId == role.Id && membership.IsActive)))
+            .ToListAsync(cancellationToken);
+        var memberCount = await db.UserCommunityMemberships.CountAsync(
+            membership => membership.CommunityId == communityId && membership.IsActive,
+            cancellationToken);
+
+        return Result<CommunitySummaryDto>.Success(new CommunitySummaryDto(communityId, memberCount, roleCounts));
     }
 
     public Task<Result<IReadOnlyList<RoleTemplateDto>>> ListRoleTemplatesAsync(UserDto currentUser, CancellationToken cancellationToken = default)
@@ -123,6 +234,9 @@ public class CommunityService(
             return Result<CommunityRoleDto>.Failure("Current user cannot create community roles.");
         }
 
+        var isReadyTemplate = CommunityRoleTemplates.All.Any(template =>
+            template.Key != CommunityRoleTemplates.Custom
+            && template.Key.Equals(request.TemplateKey.Trim(), StringComparison.OrdinalIgnoreCase));
         var permissions = NormalizePermissions(request.Permissions.Count > 0 ? request.Permissions : CommunityRoleTemplates.PermissionsFor(request.TemplateKey));
         var role = new CommunityRole
         {
@@ -130,7 +244,7 @@ public class CommunityService(
             CommunityId = communityId,
             Name = request.Name.Trim(),
             Description = request.Description.Trim(),
-            TemplateKey = request.TemplateKey.Trim(),
+            TemplateKey = isReadyTemplate ? CommunityRoleTemplates.Custom : request.TemplateKey.Trim(),
             IsSystemRole = false,
             CreatedAt = DateTime.UtcNow,
             Permissions = permissions.Select(permission => new CommunityRolePermission
@@ -173,11 +287,9 @@ public class CommunityService(
 
         role.Name = request.Name.Trim();
         role.Description = request.Description.Trim();
-        db.CommunityRolePermissions.RemoveRange(role.Permissions);
         role.Permissions.Clear();
-        role.Permissions = NormalizePermissions(request.Permissions)
-            .Select(permission => new CommunityRolePermission { Id = Guid.NewGuid(), CommunityRoleId = role.Id, Permission = permission })
-            .ToList();
+        role.Permissions.AddRange(NormalizePermissions(request.Permissions)
+            .Select(permission => new CommunityRolePermission { Id = Guid.NewGuid(), CommunityRoleId = role.Id, Permission = permission }));
 
         var errors = await ValidateRoleAsync(role, cancellationToken, role.Id);
         if (errors.Count > 0)
@@ -189,6 +301,64 @@ public class CommunityService(
         await auditService.LogAsync(currentUser, "CommunityRole.Updated", "CommunityRole", role.Id.ToString(), $"Community role '{role.Name}' was updated.", cancellationToken);
 
         return Result<CommunityRoleDto>.Success(role.ToDto());
+    }
+
+    public async Task<Result> DeleteRoleAsync(
+        Guid communityId,
+        Guid roleId,
+        DeleteCommunityRoleRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanManageCommunity(currentUser, communityId, PermissionNames.CommunityManageRoles))
+        {
+            return Result.Failure("Current user cannot delete community roles.");
+        }
+
+        var role = await RoleQuery().SingleOrDefaultAsync(item => item.Id == roleId && item.CommunityId == communityId, cancellationToken);
+        if (role is null)
+        {
+            return Result.Failure("Community role was not found.");
+        }
+
+        if (role.IsSystemRole)
+        {
+            return Result.Failure("System community roles cannot be deleted.");
+        }
+
+        if (request.ReplacementRoleId == roleId)
+        {
+            return Result.Failure("A role cannot replace itself.");
+        }
+
+        var replacementRole = await RoleQuery().SingleOrDefaultAsync(
+            item => item.Id == request.ReplacementRoleId && item.CommunityId == communityId,
+            cancellationToken);
+        if (replacementRole is null)
+        {
+            return Result.Failure("Replacement community role was not found.");
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var memberships = await db.UserCommunityMemberships
+            .Where(membership => membership.CommunityRoleId == roleId && membership.IsActive)
+            .ToListAsync(cancellationToken);
+        foreach (var membership in memberships)
+        {
+            membership.CommunityRoleId = replacementRole.Id;
+        }
+
+        db.CommunityRoles.Remove(role);
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "CommunityRole.Deleted",
+            "CommunityRole",
+            roleId.ToString(),
+            $"Community role '{role.Name}' was deleted; {memberships.Count} active memberships were moved to '{replacementRole.Name}'.",
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Result.Success();
     }
 
     public async Task<Result<PagedResult<UserAdminDto>>> ListUsersAsync(Guid communityId, UserDto currentUser, UserSearchRequest request, CancellationToken cancellationToken = default)
@@ -230,6 +400,12 @@ public class CommunityService(
             return Result<UserAdminDto>.Failure("User not found.");
         }
 
+        if (!currentUser.IsSuperAdmin()
+            && !user.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))
+        {
+            return Result<UserAdminDto>.Failure("Current user cannot update memberships outside this community.");
+        }
+
         var roleExists = await db.CommunityRoles.AnyAsync(role => role.Id == request.CommunityRoleId && role.CommunityId == communityId, cancellationToken);
         if (!roleExists)
         {
@@ -261,8 +437,28 @@ public class CommunityService(
     {
         foreach (var template in CommunityRoleTemplates.All)
         {
-            if (await db.CommunityRoles.AnyAsync(role => role.CommunityId == communityId && role.TemplateKey == template.Key, cancellationToken))
+            if (template.Key == CommunityRoleTemplates.Custom)
             {
+                continue;
+            }
+
+            var existingRole = await RoleQuery().SingleOrDefaultAsync(
+                role => role.CommunityId == communityId && role.TemplateKey == template.Key,
+                cancellationToken);
+            if (existingRole is not null)
+            {
+                if (existingRole.IsSystemRole)
+                {
+                    existingRole.Name = template.Name;
+                    existingRole.Description = template.Description;
+                    existingRole.Permissions.Clear();
+                    existingRole.Permissions.AddRange(template.Permissions.Select(permission => new CommunityRolePermission
+                    {
+                        Id = Guid.NewGuid(),
+                        CommunityRoleId = existingRole.Id,
+                        Permission = permission
+                    }));
+                }
                 continue;
             }
 
@@ -310,11 +506,6 @@ public class CommunityService(
             errors.Add("Community role name is required.");
         }
 
-        if (role.Permissions.Count == 0)
-        {
-            errors.Add("At least one permission is required.");
-        }
-
         var exists = await db.CommunityRoles.AnyAsync(
             item => item.CommunityId == role.CommunityId
                 && item.Name == role.Name
@@ -326,6 +517,42 @@ public class CommunityService(
         }
 
         return errors;
+    }
+
+    private async Task<string> GenerateUniqueInviteCodeAsync(CancellationToken cancellationToken)
+    {
+        string code;
+        do
+        {
+            code = Guid.NewGuid().ToString("N")[..5].ToUpperInvariant();
+        }
+        while (await db.Communities.AnyAsync(community => community.InviteCode == code, cancellationToken));
+
+        return code;
+    }
+
+    private async Task<string?> ResolveInviteCodeAsync(string? requestedCode, Guid? currentCommunityId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(requestedCode))
+        {
+            return currentCommunityId is null
+                ? await GenerateUniqueInviteCodeAsync(cancellationToken)
+                : await db.Communities
+                    .Where(community => community.Id == currentCommunityId)
+                    .Select(community => community.InviteCode)
+                    .SingleOrDefaultAsync(cancellationToken);
+        }
+
+        var normalized = requestedCode.Trim().ToUpperInvariant();
+        if (normalized.Length != 5 || normalized.Any(character => !char.IsAsciiLetterOrDigit(character)))
+        {
+            return null;
+        }
+
+        var alreadyUsed = await db.Communities.AnyAsync(
+            community => community.Id != currentCommunityId && community.InviteCode == normalized,
+            cancellationToken);
+        return alreadyUsed ? null : normalized;
     }
 
     private static List<string> ValidateCommunity(string name)

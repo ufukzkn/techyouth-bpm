@@ -17,7 +17,6 @@ public record AuditLogDto(
 public record ProcessTaskDto(
     Guid Id,
     Guid ProcessInstanceId,
-    Role AssignedRole,
     Guid? AssignedCommunityRoleId,
     string AssignedCommunityRoleName,
     string RequiredPermission,
