@@ -2,7 +2,7 @@
 
 ## Executive Assessment
 
-The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, role-aware access, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
+The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, permission-aware access, community/custom role management, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
 The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, backend services own business rules, EF Core migrations own schema evolution, and documentation tracks feature ownership. The main remaining production gaps are operational hardening: explicit write transactions, API-level security integration tests, Docker onboarding and final responsive/accessibility QA.
 
@@ -19,7 +19,7 @@ The strongest defense is extensibility. Forms are data-driven, workflow transiti
 | Required/type/dependent validation | Frontend helpers plus backend validation for process start. | Strong | Keep backend as final source of truth. |
 | Loading/success/error states | Implemented in auth, forms, dashboard refresh, process/task and management flows. | Good | Normalize every remaining backend error message. |
 | .NET 8 REST API | Layered API with controllers, services, EF Core and Swagger. | Strong | Add API integration tests. |
-| User/role storage and authorization | Users, roles, statuses, sessions, admin-only endpoints and role checks. | Strong | Add permission matrix screen/doc for demo. |
+| User/role storage and authorization | Users, roles, statuses, sessions, communities, custom roles, permissions and scope checks. | Strong | Add final permission matrix screen/doc for demo. |
 | Form definition persistence | EF entities, migrations and create/update/list/detail endpoints. | Strong | Add migration review to release checklist. |
 | JSON submission data | Process start stores submitted form data as JSON and displays it in detail. | Strong | Consider JSON schema/versioning later. |
 | Process/task workflow | Start process, create task, list tasks, approve/reject and show details. | Strong | Add explicit transactions around state/audit writes. |
@@ -51,7 +51,7 @@ Demo risk: mention that invalid transitions are rejected by the state machine, n
 
 ### Scenario 4: Admin Inspects Audit And Security
 
-Admin opens Management and Logs, searches users or actions, inspects related history, views active sessions, revokes sessions, approves pending accounts and reviews identity/process events. This proves "who did what" traceability.
+Admin opens Management and Logs, searches users or actions, inspects related history, views active sessions, revokes sessions, approves pending accounts, creates community roles and reviews identity/process events. This proves "who did what" traceability.
 
 Demo risk: avoid dumping every log; use search/filter to show production-aware paging.
 
@@ -72,6 +72,8 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 **How does Swagger auth work?** Login returns a Bearer token for development. Paste it into Swagger Authorize; browser flows can use HttpOnly cookies instead.
 
 **Why opaque sessions instead of JWT?** This BPM system needs central revoke, pending approval, lockout, session visibility and suspicious refresh reuse detection. Opaque DB-backed sessions make those direct. JWT would still need server-side state for these features.
+
+**Why community/custom roles?** Real BPM systems usually need team-specific permissions. `SuperAdmin` manages the platform, while `CommunityRolePermission` records let each community define roles such as form designer, process starter or logistics operator without new code.
 
 **How are passwords protected?** Passwords are stored as PBKDF2 hashes. Raw passwords are only used at verification time or as temporary admin-created credentials before forced change.
 
@@ -102,6 +104,7 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 - Add Docker Compose for web, API and PostgreSQL onboarding.
 - Add audit export for filtered logs.
 - Add a compact role/permission matrix for Admin, User and Approver.
+- Extend the compact matrix to include SuperAdmin, Topluluk Admin and custom community roles.
 - Add health checks for database and SMTP readiness.
 
 ### Could

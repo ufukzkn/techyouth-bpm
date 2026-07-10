@@ -60,6 +60,19 @@ Implemented frontend folders:
 - Adding a new field type should require a field renderer, validation rule and designer option, without rewriting the wizard.
 - Adding a new process action should be handled in the backend state machine and exposed to the frontend as available task actions.
 - Adding a new role should be centralized in auth/authorization rules and menu visibility logic.
+- Adding community-specific access should use `CommunityRolePermission` records instead of hardcoding every role in controllers or frontend screens.
 - Strengthening auth should preserve centralized session handling: password hashing, token hashing, session expiry and future remember-me/refresh-token behavior belong in the auth/session boundary.
 - Changing persistence provider should stay inside Infrastructure configuration and EF Core package setup.
 - Adding a new screen should update the navigation model, route/screen ownership and team presentation notes.
+
+## Authorization Model
+
+The first access model used fixed enum roles. The current model keeps enum roles for platform-level behavior and adds data-driven community roles for business permissions:
+
+- `SuperAdmin` is a platform role and can manage all communities.
+- `Community`, `CommunityRole`, `CommunityRolePermission` and `UserCommunityMembership` model team-specific authorization.
+- A user has one active community in v1, but the membership table keeps the model ready for multiple communities later.
+- Forms, process instances and tasks are scoped to a community.
+- Navigation reads `UserDto.permissions`; backend services still enforce the same permissions server-side.
+
+Detailed permission notes are tracked in `docs/16-community-permission-model.md`.

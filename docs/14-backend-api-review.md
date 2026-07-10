@@ -11,9 +11,10 @@ The backend satisfies the core PDF expectations well:
 - **.NET 8 REST API:** implemented under `apps/api` with thin controllers and service-driven business logic.
 - **Swagger/OpenAPI:** enabled in development through Swashbuckle with bearer token support.
 - **Authentication and user/role storage:** users, roles, statuses, password hashes, active sessions, refresh tokens and lockout fields are stored in EF Core entities.
-- **Authorization:** service methods enforce role checks for admin-only form/user operations, process visibility and task execution.
+- **Authorization:** service methods enforce platform role, community scope and operation permission checks for management, forms, process visibility and task execution.
 - **EF Core database layer:** `AppDbContext` supports SQLite by default and PostgreSQL through Npgsql for Neon/shared database testing.
 - **Form persistence:** form definitions, fields, options and validation rules are persisted.
+- **Community access model:** communities, custom community roles, role permissions and user memberships are persisted.
 - **Submission and process start:** submitted form data is validated and stored as JSON, then converted into a process instance with the first approver task.
 - **Task and BPM flow:** assigned tasks support approve/reject, and process status transitions are controlled by `ProcessStateMachine`.
 - **Audit traceability:** process audit logs and system audit logs record who performed key actions.
@@ -33,6 +34,8 @@ The project uses a clean four-layer split:
 This is a good code review story because controllers stay mostly orchestration-only while services own rules. The state machine is isolated, so adding new workflow statuses or actions should not require rewriting controllers. EF Core provider selection is also centralized, which keeps SQLite local development and PostgreSQL/Neon shared testing compatible.
 
 The backend now uses EF Core migrations instead of `EnsureCreated`. Startup applies migrations through `Database.MigrateAsync`, then runs deterministic seed data. This gives a stronger production-readiness story while keeping SQLite local demos and PostgreSQL/Neon shared testing on the same EF model.
+
+The authorization model is now split between platform role and community permission data. `SuperAdmin` handles platform-wide administration. Everyday BPM access is represented by `CommunityRolePermission` records such as `Forms.Create`, `Processes.Start` or `Tasks.Act`. This is more extensible than adding a new enum value for every business job title.
 
 ## Authentication and Security Review
 
@@ -80,6 +83,8 @@ Process start creates:
 
 Task execution checks task status, assigned role/admin override, available actions and state transition. Completed tasks store `CompletedByUserId`, and the parent process receives the final status.
 
+Task execution now also supports permission-based access. The v1 task still keeps legacy assigned-role compatibility, but the target direction is community scope plus required permission such as `Tasks.Act`.
+
 Process listing now uses EF Core projection to return only summary fields such as process id, form name, status and dates. Full tasks and audit logs are loaded only by the process detail endpoint, which prevents the board from pulling large related object graphs from PostgreSQL/Neon. Detail loading uses split queries so related collections do not create one oversized joined result set.
 
 Recommended BPM improvement: wrap process start and task action persistence plus system audit in explicit transactions. Today the main state save and system audit save are separate service calls, which can theoretically leave business data saved without the matching system audit if the second write fails.
@@ -115,6 +120,9 @@ Main gap: most tests are service-level with EF InMemory. Add API integration tes
 
 **Why opaque sessions instead of JWT?**  
 The project needs central revoke, account approval, lockout, active session view, logout and refresh-token reuse detection. Opaque DB-backed sessions make these behaviors direct. JWT would still need server-side state for these requirements.
+
+**Why custom community roles?**
+Fixed enum roles are too rigid for BPM teams. Community roles let a team create `Lojistik Gorevlisi` or `Form Tasarimcisi` by selecting permissions instead of changing code.
 
 **Why EF Core?**  
 EF Core gives strongly typed entities, LINQ queries, provider switching between SQLite/PostgreSQL and a migration path for production. It keeps persistence logic readable for code review.
@@ -152,6 +160,7 @@ Login returns a bearer token. In Swagger, paste it into Authorize as a bearer to
 - Add endpoint-specific rate limits for login, register, verification, reset password and admin mutations.
 - Add optimistic concurrency or row version checks for task approval to prevent double-submit races.
 - Add structured audit action enums/constants instead of free-form action strings.
+- Add API integration tests for community-admin boundary checks across users, forms, processes and tasks.
 
 ### Low
 

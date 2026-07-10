@@ -32,9 +32,13 @@ These notes are the project memory. Update this file whenever an implementation 
 
 ## Demo Users
 
-- `admin` / `admin123` / Admin
-- `user` / `user123` / User
-- `approver` / `approver123` / Approver
+- `admin` / `admin123` / SuperAdmin
+- `fatih.terim` / `imparator123` / Sportif Faaliyetler - Topluluk Admin
+- `alex` / `alex123` / Urun Siparisi - Topluluk Admin
+- `user` / `user123` / Sportif Faaliyetler - Surec Baslatici
+- `approver` / `approver123` / Sportif Faaliyetler - Onay Sorumlusu
+- `senol.gunes` / `senol123` / Insan Kaynaklari - Topluluk Admin
+- `ali.koc` / `ali123` / Satin Alma - Topluluk Admin
 
 ## Current Implementation Log
 
@@ -102,3 +106,20 @@ These notes are the project memory. Update this file whenever an implementation 
 - User and audit list pagination now uses single-page lazy loading. Do not reintroduce previous/next page prefetch unless there is a measured UX need; log category counts may stay query-cached and can be refreshed manually.
 - Access security now uses opaque access sessions plus hashed rotating refresh tokens for remembered devices. Browser flows receive HttpOnly access/refresh cookies and a CSRF token, while Swagger/dev flows can still use the returned bearer token.
 - Password reset and public email verification are part of Ufuk's identity flow. Pending-approval users can verify email before admin approval; password reset completion revokes existing sessions.
+- Community/custom role authorization is now part of the access model. `SuperAdmin` is the platform-level role; everyday BPM access uses `Community`, `CommunityRole`, `CommunityRolePermission` and `UserCommunityMembership`. Forms and processes are community-scoped, navigation reads `UserDto.permissions`, and backend services still enforce the same permissions server-side.
+- `Admin`, `User` and `Approver` are no longer selectable day-to-day authorization roles. Every non-SuperAdmin account is normalized to the standard platform user value; user creation first selects a community and then a role owned by that community. Do not reintroduce platform-role checks as permission shortcuts.
+- `ProcessTask.AssignedRole` is a database-compatibility field only. Do not use it in services, DTOs or frontend logic; task assignment is represented by `AssignedCommunityRoleId` and `RequiredPermission`.
+- Demo seed currently creates five populated communities: Sportif Faaliyetler, Lojistik, Urun Siparisi, Insan Kaynaklari and Satin Alma. Each seeded community has exactly eight active memberships distributed across admin, form tasarimcisi, surec baslatici, onay sorumlusu, standart kullanici, gozlemci and `Atanmadi` roles; every community retains a pending/unassigned user for approval demos. Local SQLite, Neon and Docker call this same deterministic seed.
+- Ready community-role templates remain directly selectable system roles. Creating a mutable copy is explicit: `Bu sablonu ozellestir` changes the draft to `Rol Adi*` and then enables role/permission edits.
+- Management UI standard: user and community management stay as separate route-level views. A view must not fetch another view's list just because it shares the same shell.
+- Loading standard: first load uses a matching skeleton, cached data remains visible during background refresh, and compact count/value slots use the shared inline loader. Do not render temporary `-` or `0` values while a real value is being requested.
+- Feedback standard: mutations use a reusable confirmation dialog when they create, change permissions, deactivate, revoke or delete. Success/error feedback belongs inside the card that initiated the action; fixed-position toast is reserved for page-level refresh feedback.
+- Cache standard: page/count caches are keyed by scope and filter. Mutating actions and explicit refresh invalidate the affected key; a route reload may obtain fresh data normally.
+- Session-expiry standard: a protected API request returning `401` clears the persisted session and routes to `/dashboard`, which renders the login flow. A successful login always routes to `/dashboard`; do not retain the previous protected route for a different user.
+- Community lifecycle: SuperAdmin can activate/deactivate and edit all community metadata. A Topluluk Admin may only deactivate its own active community; that revokes member sessions, including its own, and only SuperAdmin can reactivate it.
+- System role naming: `Standart Kullanici` can start and monitor processes plus view open work; `Gozlemci` is the user-facing name for the old read-only template. Keep technical template keys stable when changing display copy.
+- Community/identity test baseline is now 81 passing backend tests. It covers community-code registration and `Atanmadi` membership, SuperAdmin creation/promotion boundaries, SuperAdmin community-role assignment, community admin isolation, role reassignment on delete, seed-system-role upgrades, notification ownership/triggers, audit scope and deactivated-community access blocks. It also verifies that rerunning the deterministic mock seed does not duplicate users or memberships.
+- Notification coverage: community managers receive pending-registration notices; task candidates receive task-assigned notices; a process starter receives completion/rejection updates; and a user receives `User.AccessUpdated` when a manager changes the user's active status or community role. Password-reset delivery keeps its separate `User.PasswordReset` notification.
+- Inactive-community login rule: normal members cannot sign in or refresh a session for an inactive community. A `Topluluk Admin` may sign in again after deactivating its own community so it can inspect the scoped management state; form, process and task write operations remain blocked by their active-community checks. `SuperAdmin` can reactivate the community.
+- Docker Compose is an optional provider-compatibility environment, not a replacement for the SQLite local demo. `eczacibasi-local` runs SQLite API + web, while `eczacibasi-cloud` runs the same API + web against Neon using ignored `.env.neon.local`; both apply migrations and the same mock seed data. They share ports and must not run together.
+- System role policy: do not keep multiple default roles with the same permission set. `Lojistik Gorevlisi` was retired as a redundant system role; existing assignments migrate to `Onay Sorumlusu`. A ready template is always copied into a community-specific custom role before its permissions are changed.

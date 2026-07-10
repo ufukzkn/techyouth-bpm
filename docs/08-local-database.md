@@ -105,6 +105,11 @@ Current tables:
 - `Users`: demo users, emails, roles, approval status, email verification state, failed login counters, lockout timestamps and PBKDF2 password hashes.
 - `UserSessions`: session ids, hashed opaque bearer session tokens, expiry times, last-seen timestamps and revoke timestamps.
 - `RefreshTokens`: hashed rotating remember-me tokens tied to access sessions and devices.
+- `Communities`: BPM working groups such as Sportif Faaliyetler, Lojistik and Urun Siparisi.
+- `Notifications`: DB-backed user notifications for task/access/process events and read state.
+- `CommunityRoles`: custom roles inside one community.
+- `CommunityRolePermissions`: operation permissions attached to community roles.
+- `UserCommunityMemberships`: active user/community/role assignments.
 - `FormDefinitions`: saved dynamic form definitions.
 - `FormFieldDefinitions`: fields belonging to a form definition.
 - `FieldValidationRules`: dependent validation rules such as required-when.
@@ -117,18 +122,18 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 
 ## Seed Data
 
-`DatabaseSeeder` creates the demo users on startup if they do not already exist:
+`DatabaseSeeder` creates the demo users on startup if they do not already exist. The same deterministic seeder is used by local SQLite, Neon and both Docker stacks:
 
 | Username | Password | Role | Status | Email verified |
 | --- | --- | --- | --- | --- |
-| `admin` | `admin123` | Admin | Active | true |
+| `admin` | `admin123` | SuperAdmin | Active | true |
 | `user` | `user123` | User | Active | true |
 | `approver` | `approver123` | Approver | Active | true |
 | `mario.gomez` | `mario123` | User | PendingApproval | false |
 | `quaresma` | `trivela123` | Approver | Active | true |
 | `atiba` | `atiba123` | User | Active | true |
-| `alex` | `alex123` | User | Rejected | true |
-| `fatih.terim` | `imparator123` | Admin | PendingApproval | false |
+| `alex` | `alex123` | Admin | Active | true |
+| `fatih.terim` | `imparator123` | Admin | Active | true |
 | `sergen.yalcin` | `sergen123` | Approver | Active | true |
 | `tuncay.sanli` | `tuncay123` | User | Active | true |
 | `volkan.demirel` | `volkan123` | User | Rejected | true |
@@ -162,6 +167,11 @@ dotnet tool run dotnet-ef migrations add DescriptiveMigrationName --project apps
 
 When mock data is enabled, the seeder also creates:
 
+- Five demo communities: `Sportif Faaliyetler`, `Lojistik`, `Urun Siparisi`, `Insan Kaynaklari` and `Satin Alma`.
+- Registration codes: `SPOR1`, `LOG01`, `URUN1`, `IK001` and `SAT01`.
+- Eight active memberships in each community, distributed across community admin, form designer, process starter, approver, standard user, observer and unassigned roles. Each community includes an unassigned pending user for the approval demo.
+- Built-in community roles such as `Topluluk Admin`, `Form Tasarimcisi`, `Surec Baslatici`, `Onay Sorumlusu`, `Lojistik Gorevlisi` and `Salt Okuyucu`.
+- Blank `Atanmadi` roles for pending/new users.
 - `Transfer Talep Formu`
 - `Kamp Hazirlik Onay Formu`
 - 12 demo process instances.

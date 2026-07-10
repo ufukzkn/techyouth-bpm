@@ -16,6 +16,7 @@
 - `POST /api/auth/register`
   - Creates a new `User` account with `PendingApproval` status.
   - Stores a PBKDF2 password hash and starts with `IsEmailVerified=false`.
+  - Requires `communityCode`; the user is attached to that community with the blank `Atanmadi` role until a community admin approves/assigns access.
 - `POST /api/auth/forgot-password`
   - Sends a password reset token by email when the account exists.
   - Always returns a generic success response so unknown users are not revealed.
@@ -65,23 +66,29 @@ Browser flows send cookies with `credentials: include`. Mutating cookie-authenti
 ## Users And Access
 
 - `GET /api/users`
-  - Admin-only paged list of registered users, statuses, roles, verification state and lockout info.
-  - Supports `query`, `status`, `page` and `pageSize` query parameters.
+  - Admin/community-admin paged list of registered users, statuses, roles, community role, verification state and lockout info.
+  - Supports `query`, `status`, `communityId`, `page` and `pageSize` query parameters.
   - Returns `PagedResult<UserAdminDto>` so large user tables are searched and paged in the database instead of loaded fully into the browser.
 - `POST /api/users`
-  - Admin-only user creation with username, display name, email, role, status and temporary password.
+  - Admin/community-admin user creation with username, display name, email, platform role, community role, status and temporary password.
   - New admin-created users start with `MustChangePassword=true`.
   - If the request does not include a custom temporary password, the backend generates a strong temporary password.
   - Sends the temporary password to the created user's email through `IEmailSender`.
   - If the temporary-password email cannot be sent, the user is not persisted.
+  - `SuperAdmin` accounts can only be created as brand-new users by an existing `SuperAdmin`; existing users cannot be promoted to `SuperAdmin`.
+- `POST /api/users/{userId}/password-reset-by-admin`
+  - `SuperAdmin`-only password reset for non-SuperAdmin users.
+  - Default behavior generates a strong temporary password, emails it and sets `MustChangePassword=true`.
+  - Optional manual temporary password is supported for emergency recovery, but the UI marks it as not recommended.
+  - Revokes the selected user's active sessions and writes system audit.
 - `DELETE /api/users/{userId}`
   - Admin-only hard delete for users without workflow history.
   - Rejects deleting the current Admin account.
   - Rejects deleting users referenced by form, process, task or process-audit history.
   - Removes active sessions and writes `User.DeletedByAdmin` to system audit.
 - `PATCH /api/users/{userId}/access`
-  - Admin-only role/status update.
-  - Used for approving `PendingApproval` accounts, rejecting accounts or changing roles.
+  - Admin/community-admin role, status and community membership update.
+  - Used for approving `PendingApproval` accounts, rejecting accounts, changing platform roles or assigning a community role.
   - Moving a user out of `Active` revokes existing sessions.
   - Audit text records the previous role/status and the new role/status.
 - `GET /api/users/{userId}/sessions`
@@ -91,6 +98,45 @@ Browser flows send cookies with `credentials: include`. Mutating cookie-authenti
   - Admin-only session revoke for the selected user.
   - The frontend asks for confirmation before sending this request.
   - Writes a system audit log.
+
+## Communities And Permissions
+
+- `GET /api/communities`
+  - Lists communities visible to the current user.
+  - `SuperAdmin` sees all communities; community users see their own community.
+- `POST /api/communities`
+  - `SuperAdmin` creates a new community.
+- `PATCH /api/communities/{communityId}`
+  - `SuperAdmin` updates community name, description and active state.
+- `PATCH /api/communities/{communityId}/invite-code/regenerate`
+  - `SuperAdmin` regenerates the active 5-character registration code for a community.
+- `GET /api/communities/role-templates`
+  - Returns built-in role templates such as `Topluluk Admin`, `Form Tasarimcisi`, `Onay Sorumlusu` and `Lojistik Gorevlisi`.
+- `GET /api/communities/{communityId}/roles`
+  - Lists custom roles in a community.
+- `POST /api/communities/{communityId}/roles`
+  - Creates a community role with selected permissions.
+- `PATCH /api/communities/{communityId}/roles/{roleId}`
+  - Updates role name, description and permissions.
+- `GET /api/communities/{communityId}/users`
+  - Lists users in a community.
+- `POST /api/communities/{communityId}/users`
+  - Creates a user directly inside the community.
+- `PATCH /api/communities/{communityId}/users/{userId}/membership`
+  - Changes a user's community role or active membership state.
+
+`UserDto` now includes `communityId`, `communityName`, `communityRoleId`, `communityRoleName` and `permissions`. The frontend uses these fields for route visibility, but services still enforce permission checks on the backend.
+
+## Notifications
+
+- `GET /api/notifications`
+  - Lists the current user's latest DB-backed notifications.
+- `PATCH /api/notifications/{id}/read`
+  - Marks one notification as read.
+- `POST /api/notifications/read-all`
+  - Marks all current-user notifications as read.
+
+Notifications are created for events such as pending registration, assigned tasks, process outcome changes, password reset and access updates. V1 is database-backed polling/dropdown UI; WebSocket/SSE can be added later without changing the notification table.
 
 ## Audit
 
@@ -110,8 +156,10 @@ Process-specific history is still returned from `GET /api/processes/{id}` as `au
 
 - `GET /api/forms`
   - Lists saved form definitions.
+  - Non-SuperAdmin users only see forms in their active community.
 - `POST /api/forms`
   - Creates a form definition with fields and validation rules.
+  - Stores the form under the active user's community, or the selected community for SuperAdmin.
   - Stores `CreatedByUserId` and writes a system audit log.
 - `GET /api/forms/{id}`
   - Returns a single form definition.
@@ -131,6 +179,7 @@ Process-specific history is still returned from `GET /api/processes/{id}` as `au
   - Stores `StartedByUserId`, writes process audit and writes system audit.
 - `GET /api/processes`
   - Lists processes visible to the active user.
+  - Process visibility is scoped by community and `Processes.View`.
   - Uses a lightweight EF Core projection for summary fields instead of loading tasks and audit history for every row.
   - This keeps remote PostgreSQL/Neon list screens fast; full task/audit data is loaded only from the detail endpoint.
 - `GET /api/processes/{id}`
@@ -141,6 +190,7 @@ Process-specific history is still returned from `GET /api/processes/{id}` as `au
 
 - `GET /api/tasks/my`
   - Lists tasks assigned to the current user or role.
+  - V1 task visibility uses community scope plus `Tasks.View`; action execution also requires `Tasks.Act`.
 - `POST /api/tasks/{id}/actions`
   - Runs an action such as approve or reject.
   - Updates process status through the state machine.
@@ -166,6 +216,7 @@ Controllers should stay thin. Services own decisions:
 - `FormService`: form definition CRUD and field validation.
 - `ProcessService`: process start, detail and listing. List queries return projected summary DTOs; detail queries load the full process graph.
 - `TaskService`: task listing and action execution.
+- `NotificationService`: current-user notification list/read/read-all operations.
 - `ProcessStateMachine`: allowed transitions.
 - `DatabaseSeeder`: local demo users and optional mock workflow data.
 
@@ -174,13 +225,23 @@ Controllers should stay thin. Services own decisions:
 The frontend API client now exposes one method for each planned endpoint:
 
 - Auth: `register`, `login`, `me`, `logout`, `updateProfile`, `changePassword`, `listSessions`, `revokeSession`, `startEmailVerification`, `confirmEmailVerification`
-- Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`
+- Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`, `resetUserPasswordByAdmin`
+- Communities: `listCommunities`, `createCommunity`, `updateCommunity`, `regenerateCommunityInviteCode`, `getCommunitySummary`, `listRoleTemplates`, `listCommunityRoles`, `createCommunityRole`, `updateCommunityRole`, `deleteCommunityRole`
+- Notifications: `listNotifications`, `markNotificationRead`, `markAllNotificationsRead`
 - Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`
 - Processes: `startProcess`, `listProcesses`, `getProcess`
 - Tasks: `listMyTasks`, `executeTaskAction`
 
 Feature components should call these client methods through feature-level orchestration instead of calling `fetch` directly.
+
+## Community Management Additions
+
+- `PATCH /api/communities/{id}` updates name, description, invite code and active status. Invite codes are unique, uppercase five-character alphanumeric values; blank code on creation means the server generates one.
+- `GET /api/communities/{id}/summary` returns active member count and member counts grouped by community role. It avoids loading the whole user list merely to render dashboard-like counts.
+- `DELETE /api/communities/{id}/roles/{roleId}` receives `{ replacementRoleId }`. It moves active memberships to the target role and removes the role in one transaction. System roles, including `Atanmadi`, cannot be removed.
+- Deactivating a community revokes its active member sessions and refresh tokens. Future login, refresh, form creation/update, process start and task actions are denied until a SuperAdmin reactivates that community.
+- A Topluluk Admin with `Community.ManageAdmins` may submit only the active-to-inactive transition for its own community. It cannot edit name, description, invite code or reactivate the community.
 
 ## Implemented Backend Structure
 
