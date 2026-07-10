@@ -988,6 +988,31 @@ input[type="checkbox"] {
   max-width: 520px;
 }
 
+.dashboard-community-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.dashboard-community-label strong {
+  color: var(--foreground);
+}
+
+.dashboard-community-inactive {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--danger) 52%, var(--border));
+  border-radius: 7px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  font-size: 15px;
+  font-weight: 850;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -995,6 +1020,7 @@ input[type="checkbox"] {
 }
 
 .metric-card {
+  position: relative;
   display: grid;
   gap: 8px;
   padding: 18px;
@@ -1035,6 +1061,14 @@ input[type="checkbox"] {
   width: 22px;
   height: 22px;
   border-width: 3px;
+}
+
+.metric-card-icon {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  color: var(--primary);
+  opacity: 0.8;
 }
 
 .dashboard-insight-grid {
@@ -1080,30 +1114,13 @@ input[type="checkbox"] {
 .chart-segment-completed {
   cursor: pointer;
   pointer-events: stroke;
-  transform-box: fill-box;
-  transform-origin: center;
-  transition: transform 180ms ease, stroke-width 180ms ease, filter 180ms ease;
 }
 .chart-segment-open { stroke: var(--orange); }
 .chart-segment-progress { stroke: var(--primary); }
 .chart-segment-completed { stroke: var(--teal); }
 
-@media (hover: hover) {
-  .chart-segment-open:hover,
-  .chart-segment-progress:hover,
-  .chart-segment-completed:hover,
-  .dashboard-donut-svg circle[data-active="true"] {
-    stroke-width: 17;
-    transform: scale(1.055);
-    filter: drop-shadow(0 2px 4px color-mix(in srgb, currentColor 32%, transparent));
-  }
-}
-
 .dashboard-donut-svg circle:focus-visible {
   outline: none;
-  stroke-width: 17;
-  transform: scale(1.055);
-  filter: drop-shadow(0 2px 4px color-mix(in srgb, currentColor 32%, transparent));
 }
 
 .dashboard-donut-value {
@@ -1554,7 +1571,7 @@ input[type="checkbox"] {
   gap: 10px;
 }
 
-.community-deactivation-action {
+.community-status-action {
   justify-content: flex-end;
 }
 
@@ -1799,6 +1816,84 @@ input[type="checkbox"] {
   flex: 0 1 172px;
 }
 
+.status-checkbox-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.status-checkbox-filters legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.status-checkbox-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.status-checkbox-filters input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.users-scope-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workspace-loading-shell .sidebar,
+.workspace-loading-shell .topbar,
+.workspace-loading-content span,
+.workspace-loading-nav span,
+.workspace-loading-topbar span {
+  overflow: hidden;
+}
+
+.workspace-loading-nav,
+.workspace-loading-content {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-loading-nav { margin-top: 32px; }
+.workspace-loading-nav span,
+.workspace-loading-topbar span,
+.workspace-loading-content span {
+  display: block;
+  min-height: 34px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-muted), color-mix(in srgb, var(--surface-muted) 55%, var(--surface)), var(--surface-muted));
+  background-size: 200% 100%;
+  animation: workspace-skeleton 1.15s ease-in-out infinite;
+}
+
+.workspace-loading-topbar { display: flex; justify-content: flex-end; gap: 10px; }
+.workspace-loading-topbar span { width: 42px; min-height: 32px; }
+.workspace-loading-content { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.workspace-loading-content span { min-height: 156px; }
+
+@keyframes workspace-skeleton {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
 .user-community-scope {
   min-height: 42px;
   display: inline-flex;
@@ -1933,6 +2028,8 @@ input[type="checkbox"] {
 .community-role-skeleton .skeleton-input { min-height: 40px; }
 .community-role-skeleton .skeleton-chip-row { min-height: 52px; }
 .community-stat-card { position: relative; overflow: hidden; }
+.community-readonly-status { display: grid; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; font-weight: 800; text-align: center; }
+.community-readonly-status .status-pill { min-width: 72px; display: inline-flex; align-items: center; justify-content: center; padding: 6px 10px; }
 .community-stat-icon { position: absolute; top: 13px; right: 13px; color: var(--primary); opacity: 0.78; }
 .role-count-disclosure { display: grid; gap: 8px; }
 .role-count-disclosure .text-button { width: fit-content; display: inline-flex; align-items: center; gap: 6px; }
@@ -1956,6 +2053,18 @@ input[type="checkbox"] {
   gap: 12px;
   transform-origin: top right;
   animation: disclosure-enter 580ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.user-log-disclosure {
+  display: grid;
+  gap: 10px;
+}
+
+.user-log-disclosure > .text-button {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .password-reset-card {
@@ -2337,6 +2446,17 @@ input[type="checkbox"] {
 
 .access-confirm-dialog .action-dialog-header svg {
   color: var(--danger);
+}
+
+.audit-sort-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.audit-sort-controls .filter-select-field {
+  min-width: 156px;
 }
 
 .access-confirm-dialog .action-dialog-header svg.primary-dialog-icon {
@@ -3603,6 +3723,17 @@ input[type="checkbox"] {
   .access-confirm-grid,
   .rule-row {
     grid-template-columns: 1fr;
+  }
+
+  .status-checkbox-filters {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  .users-scope-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .system-audit-meta {

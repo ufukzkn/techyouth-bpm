@@ -10,7 +10,6 @@ import { SessionStatusButton } from "@/features/app-shell/SessionStatusButton";
 import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
 import { formatSessionExpiry } from "@/features/app-shell/sessionFormatters";
 import { ForcedPasswordChangeView } from "@/features/app-shell/views/ForcedPasswordChangeView";
-import { LoginView } from "@/features/auth/LoginView";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError, setUnauthorizedHandler } from "@/lib/api";
@@ -76,7 +75,7 @@ export function WorkspaceShell({
 
       hasHandledUnauthorized = true;
       expireSession(t("session.unverified"));
-      router.replace("/dashboard");
+      router.replace("/login");
     });
 
     return () => setUnauthorizedHandler(null);
@@ -95,6 +94,11 @@ export function WorkspaceShell({
     mediaQuery.addEventListener("change", syncTheme);
     return () => mediaQuery.removeEventListener("change", syncTheme);
   }, [syncSystemTheme]);
+
+  const endSession = useCallback(() => {
+    logout();
+    router.replace("/login");
+  }, [logout, router]);
 
   useEffect(() => {
     if (!hasHydrated || !token || !user) {
@@ -264,21 +268,18 @@ export function WorkspaceShell({
     router.replace(visibleNavItems[0]?.path ?? "/dashboard");
   }, [canAccessCurrentRoute, hasHydrated, router, user, visibleNavItems]);
 
+  useEffect(() => {
+    if (hasHydrated && !user) {
+      router.replace("/login");
+    }
+  }, [hasHydrated, router, user]);
+
   if (!hasHydrated) {
-    return (
-      <main className="login-page">
-        <section className="login-panel session-loading" aria-live="polite">
-          <PrototypeLogo size={44} />
-          <span className="eyebrow">{t("login.session")}</span>
-          <h1>{t("login.preparing")}</h1>
-          <p>{t("login.checkingStoredSession")}</p>
-        </section>
-      </main>
-    );
+    return <WorkspaceLoadingShell />;
   }
 
   if (!user) {
-    return <LoginView />;
+    return <LoginRedirectLoading />;
   }
 
   if (user.mustChangePassword) {
@@ -287,7 +288,7 @@ export function WorkspaceShell({
         language={language}
         token={token}
         user={user}
-        onLogout={logout}
+        onLogout={endSession}
         onUserUpdated={setUser}
         onToggleLanguage={toggleLanguage}
         onToggleTheme={toggleTheme}
@@ -297,16 +298,7 @@ export function WorkspaceShell({
   }
 
   if (!canAccessCurrentRoute) {
-    return (
-      <main className="login-page">
-        <section className="login-panel session-loading" aria-live="polite">
-          <PrototypeLogo size={44} />
-          <span className="eyebrow">{t("login.session")}</span>
-          <h1>{t("login.preparing")}</h1>
-          <p>{t("login.checkingStoredSession")}</p>
-        </section>
-      </main>
-    );
+    return <LoginRedirectLoading />;
   }
 
   return (
@@ -434,6 +426,12 @@ export function WorkspaceShell({
                     <span>{t("session.role")}</span>
                     <strong>{user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi")}</strong>
                   </div>
+                  {user.communityName ? (
+                    <div>
+                      <span>{t("session.community")}</span>
+                      <strong>{user.communityName}</strong>
+                    </div>
+                  ) : null}
                   <div>
                     <span>{t("session.activeUntil")}</span>
                     <strong>{formatSessionExpiry(expiresAt, language)}</strong>
@@ -492,11 +490,11 @@ export function WorkspaceShell({
               className="icon-button logout-button"
               onClick={() => {
                 if (token && !token.startsWith("demo-")) {
-                  void api.logout(token).finally(logout);
+                  void api.logout(token).finally(endSession);
                   return;
                 }
 
-                logout();
+                endSession();
               }}
               aria-label={t("common.logout")}
               title={t("common.logout")}
@@ -514,12 +512,36 @@ export function WorkspaceShell({
             language,
             visibleViewIds: visibleNavItems.map((item) => item.viewId),
             navigate,
-            logout,
+            logout: endSession,
             setUser,
           })}
         </main>
       </div>
     </div>
+  );
+}
+
+function WorkspaceLoadingShell() {
+  return (
+    <div className="app-shell workspace-loading-shell" aria-live="polite" aria-label="Calisma alani yukleniyor">
+      <aside className="sidebar workspace-loading-sidebar">
+        <div className="brand"><span className="brand-symbol"><PrototypeLogo size={34} /></span><div><strong>TechYouth BPM</strong><span>Workspace</span></div></div>
+        <div className="workspace-loading-nav"><span /><span /><span /><span /><span /></div>
+      </aside>
+      <div className="main-area"><header className="topbar workspace-loading-topbar"><span /><span /></header><main className="content"><div className="workspace-loading-content"><span /><span /><span /></div></main></div>
+    </div>
+  );
+}
+
+function LoginRedirectLoading() {
+  return (
+    <main className="login-page" aria-live="polite">
+      <section className="login-panel session-loading">
+        <PrototypeLogo size={44} />
+        <span className="eyebrow">Oturum</span>
+        <h1>Giris ekranina yonlendiriliyor</h1>
+      </section>
+    </main>
   );
 }
 

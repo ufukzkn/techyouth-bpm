@@ -49,6 +49,7 @@ public static class DependencyInjection
         });
         services.AddScoped<IFormService, FormService>();
         services.AddScoped<IProcessService, ProcessService>();
+        services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ISystemAuditService, SystemAuditService>();
         services.AddScoped<ICommunityService, CommunityService>();

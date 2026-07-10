@@ -25,6 +25,7 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   "Refresh session is no longer valid.": "api.error.refreshInvalid",
   "CSRF token is invalid.": "api.error.csrfInvalid",
   "Community code is invalid.": "api.error.communityCodeInvalid",
+  "The user's community is not active.": "api.error.communityInactive",
   "A community is required for the new user.": "api.error.communityRequired",
   "A community is required.": "api.error.communityRequired",
   "Only SuperAdmin users can create SuperAdmin accounts.": "api.error.superAdminCreateOnly",

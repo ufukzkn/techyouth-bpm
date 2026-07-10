@@ -62,8 +62,7 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         query = ApplySearchFilter(ApplyCategoryFilter(ApplyCommunityScope(query, currentUser), request.Category), request.Query);
 
         var totalCount = await query.CountAsync(cancellationToken);
-        var logs = await query
-            .OrderByDescending(log => log.CreatedAt)
+        var logs = await ApplySort(query, request.SortBy, request.SortDirection)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(log => new
@@ -183,6 +182,26 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
             "tasks" => query.Where(log => log.Action.StartsWith("Task.") || log.EntityType == "ProcessTask"),
             _ => query
         };
+
+    private static IQueryable<SystemAuditLog> ApplySort(
+        IQueryable<SystemAuditLog> query,
+        string? sortBy,
+        string? sortDirection)
+    {
+        var ascending = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        return sortBy?.Trim().ToLowerInvariant() switch
+        {
+            "action" => ascending
+                ? query.OrderBy(log => log.Action).ThenBy(log => log.CreatedAt)
+                : query.OrderByDescending(log => log.Action).ThenByDescending(log => log.CreatedAt),
+            "actor" => ascending
+                ? query.OrderBy(log => log.ActorUser == null ? string.Empty : log.ActorUser.Username).ThenBy(log => log.CreatedAt)
+                : query.OrderByDescending(log => log.ActorUser == null ? string.Empty : log.ActorUser.Username).ThenByDescending(log => log.CreatedAt),
+            _ => ascending
+                ? query.OrderBy(log => log.CreatedAt)
+                : query.OrderByDescending(log => log.CreatedAt)
+        };
+    }
 
     private IQueryable<SystemAuditLog> ApplyCommunityScope(IQueryable<SystemAuditLog> query, UserDto currentUser)
     {

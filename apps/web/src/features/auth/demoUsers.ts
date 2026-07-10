@@ -58,6 +58,7 @@ export function loginWithDemoUser(username: string, password: string, rememberMe
       permissions: user.role === "SuperAdmin"
         ? ["Community.ManageUsers", "Community.ManageRoles", "Community.ManageAdmins", "Forms.View", "Forms.Create", "Forms.Update", "Processes.View", "Processes.Start", "Tasks.View", "Tasks.Act", "Audit.View"]
         : user.permissions ?? [],
+      isCommunityActive: true,
     },
   };
 }

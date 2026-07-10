@@ -17,7 +17,9 @@ public record SystemAuditSearchRequest(
     string? Query = null,
     string? Category = null,
     int Page = 1,
-    int PageSize = 10);
+    int PageSize = 10,
+    string SortBy = "createdAt",
+    string SortDirection = "desc");
 
 public record SystemAuditCategoryCountsDto(
     int All,

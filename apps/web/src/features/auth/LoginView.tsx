@@ -6,7 +6,7 @@ import { KeyRound, LogIn, MailCheck, UserPlus } from "lucide-react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { demoUsers, loginWithDemoUser } from "@/features/auth/demoUsers";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
@@ -39,7 +39,7 @@ function getInitialAuthState(language: "tr" | "en"): InitialAuthState {
 
 export function LoginView() {
   const router = useRouter();
-  const { clearSessionNotice, language, sessionNotice, setSession, theme, toggleLanguage, toggleTheme } =
+  const { clearSessionNotice, hasHydrated, language, sessionNotice, setSession, theme, toggleLanguage, toggleTheme, user } =
     useSessionStore();
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const [initialAuthState] = useState(() => getInitialAuthState(language));
@@ -61,6 +61,12 @@ export function LoginView() {
       window.history.replaceState(null, "", window.location.pathname);
     }
   }, []);
+
+  useEffect(() => {
+    if (hasHydrated && user) {
+      router.replace("/dashboard");
+    }
+  }, [hasHydrated, router, user]);
 
   function updateUsername(value: string) {
     setUsername(value);
@@ -208,12 +214,14 @@ export function LoginView() {
       setSession(session);
       router.replace("/dashboard");
     } catch (apiError) {
-      const demoSession = loginWithDemoUser(submittedUsername, submittedPassword, submittedRememberMe);
+      if (!(apiError instanceof ApiError)) {
+        const demoSession = loginWithDemoUser(submittedUsername, submittedPassword, submittedRememberMe);
 
-      if (demoSession) {
-        setSession(demoSession);
-        router.replace("/dashboard");
-        return;
+        if (demoSession) {
+          setSession(demoSession);
+          router.replace("/dashboard");
+          return;
+        }
       }
 
       setError(localizeApiError(apiError, language, t("login.invalid")));

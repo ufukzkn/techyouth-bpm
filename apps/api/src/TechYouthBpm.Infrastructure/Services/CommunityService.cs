@@ -100,21 +100,19 @@ public class CommunityService(
             return Result<CommunityDto>.Failure("Community was not found.");
         }
 
-        var isCommunityAdminDeactivation = !currentUser.IsSuperAdmin()
-            && community.IsActive
-            && !request.IsActive
+        var isCommunityAdminStatusUpdate = !currentUser.IsSuperAdmin()
             && currentUser.CommunityId == communityId
             && currentUser.HasPermission(PermissionNames.CommunityManageAdmins)
             && string.Equals(community.Name, request.Name.Trim(), StringComparison.Ordinal)
             && string.Equals(community.Description, request.Description.Trim(), StringComparison.Ordinal)
             && string.Equals(community.InviteCode, request.InviteCode?.Trim(), StringComparison.OrdinalIgnoreCase);
-        if (!currentUser.IsSuperAdmin() && !isCommunityAdminDeactivation)
+        if (!currentUser.IsSuperAdmin() && !isCommunityAdminStatusUpdate)
         {
             return Result<CommunityDto>.Failure("Only SuperAdmin users can update community settings.");
         }
 
-        var errors = isCommunityAdminDeactivation ? [] : ValidateCommunity(request.Name);
-        var inviteCode = isCommunityAdminDeactivation
+        var errors = isCommunityAdminStatusUpdate ? [] : ValidateCommunity(request.Name);
+        var inviteCode = isCommunityAdminStatusUpdate
             ? community.InviteCode
             : await ResolveInviteCodeAsync(request.InviteCode, communityId, cancellationToken);
         if (inviteCode is null)
@@ -126,7 +124,7 @@ public class CommunityService(
             return Result<CommunityDto>.Failure(errors);
         }
 
-        var duplicateName = !isCommunityAdminDeactivation && await db.Communities.AnyAsync(
+        var duplicateName = !isCommunityAdminStatusUpdate && await db.Communities.AnyAsync(
             item => item.Id != communityId && item.Name == request.Name.Trim(),
             cancellationToken);
         if (duplicateName)
@@ -143,7 +141,9 @@ public class CommunityService(
         if (wasActive && !community.IsActive)
         {
             var memberIds = await db.UserCommunityMemberships
-                .Where(membership => membership.CommunityId == communityId && membership.IsActive)
+                .Where(membership => membership.CommunityId == communityId
+                    && membership.IsActive
+                    && membership.UserId != currentUser.Id)
                 .Select(membership => membership.UserId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
@@ -171,11 +171,15 @@ public class CommunityService(
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
             currentUser,
-            community.IsActive ? "Community.Updated" : "Community.Deactivated",
+            community.IsActive
+                ? (wasActive ? "Community.Updated" : "Community.Reactivated")
+                : "Community.Deactivated",
             "Community",
             community.Id.ToString(),
             community.IsActive
-                ? $"Community '{community.Name}' was updated."
+                ? (wasActive
+                    ? $"Community '{community.Name}' was updated."
+                    : $"Community '{community.Name}' was reactivated.")
                 : $"Community '{community.Name}' was deactivated and active member sessions were revoked.",
             cancellationToken);
 

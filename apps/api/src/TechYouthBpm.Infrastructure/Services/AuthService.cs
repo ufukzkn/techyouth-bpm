@@ -888,9 +888,11 @@ public class AuthService(
                 membership.IsActive && membership.CommunityRoleId == request.CommunityRoleId));
         }
 
-        if (request.Status is not null)
+        var requestedStatuses = request.Statuses?.Distinct().ToArray()
+            ?? (request.Status is { } status ? [status] : []);
+        if (requestedStatuses.Length > 0)
         {
-            query = query.Where(user => user.Status == request.Status);
+            query = query.Where(user => requestedStatuses.Contains(user.Status));
         }
 
         if (!string.IsNullOrWhiteSpace(request.Query))

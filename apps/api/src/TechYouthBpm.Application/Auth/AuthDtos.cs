@@ -38,6 +38,7 @@ public record CreateUserRequest(
 public record UserSearchRequest(
     string? Query = null,
     UserStatus? Status = null,
+    IReadOnlyList<UserStatus>? Statuses = null,
     Guid? CommunityId = null,
     Guid? CommunityRoleId = null,
     int Page = 1,
@@ -56,7 +57,8 @@ public record UserDto(
     string CommunityName = "",
     Guid? CommunityRoleId = null,
     string CommunityRoleName = "",
-    IReadOnlyList<string>? Permissions = null)
+    IReadOnlyList<string>? Permissions = null,
+    bool IsCommunityActive = true)
 {
     public UserDto(Guid id, string username, string displayName, Role role)
         : this(id, username, displayName, string.Empty, role, UserStatus.Active, true)
@@ -92,7 +94,8 @@ public record UserAdminDto(
     string CommunityName = "",
     Guid? CommunityRoleId = null,
     string CommunityRoleName = "",
-    IReadOnlyList<string>? Permissions = null);
+    IReadOnlyList<string>? Permissions = null,
+    bool IsCommunityActive = true);
 
 public record UpdateUserAccessRequest(Role Role, UserStatus Status, Guid? CommunityId = null, Guid? CommunityRoleId = null);
 

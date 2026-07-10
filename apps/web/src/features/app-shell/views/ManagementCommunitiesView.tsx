@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ChevronDown, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Users, UsersRound } from "lucide-react";
+import { BadgeCheck, Building2, ChevronDown, Landmark, Pencil, Plus, RefreshCw, Tags, Trash2, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActionFeedback, InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
@@ -33,7 +33,7 @@ const allPermissions: PermissionName[] = [
   "Audit.View",
 ];
 
-export function ManagementCommunitiesView({ activeUser, language, onLogout, token }: { activeUser: User; language: Language; onLogout: () => void; token: string | null }) {
+export function ManagementCommunitiesView({ activeUser, language, token }: { activeUser: User; language: Language; token: string | null }) {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [roles, setRoles] = useState<CommunityRole[]>([]);
   const [templates, setTemplates] = useState<RoleTemplate[]>([]);
@@ -57,26 +57,12 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
   const [codeFeedback, setCodeFeedback] = useState<Feedback>(null);
   const [roleFeedback, setRoleFeedback] = useState<Feedback>(null);
   const isSuperAdmin = activeUser.role === "SuperAdmin";
-  const canDeactivateOwnCommunity = !isSuperAdmin && activeUser.permissions.includes("Community.ManageAdmins");
-  const canDeactivateCommunity = isSuperAdmin || canDeactivateOwnCommunity;
+  const canToggleOwnCommunityStatus = !isSuperAdmin && activeUser.permissions.includes("Community.ManageAdmins");
   const initialCommunityIdRef = useRef<string | null>(activeUser.role === "SuperAdmin" ? null : activeUser.communityId ?? null);
   const selectedCommunity = communities.find((community) => community.id === selectedCommunityId) ?? null;
   const selectedRole = roles.find((role) => role.id === selectedRoleId) ?? null;
 
-  const roleOptions = useMemo(
-    () => [
-      ...templates,
-      ...roles
-        .filter((role) => !role.isSystemRole)
-        .map((role) => ({
-          key: `saved:${role.id}`,
-          name: `Mevcut rol: ${role.name}`,
-          description: role.description,
-          permissions: role.permissions,
-        })),
-    ],
-    [roles, templates],
-  );
+  const customRoles = useMemo(() => roles.filter((role) => !role.isSystemRole), [roles]);
 
   const loadSummary = useCallback(
     async (communityId: string, force = false) => {
@@ -178,12 +164,9 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (!selectedRole) {
-        setTemplateSourceKey("custom");
-        setIsCustomizingTemplate(false);
-        setRoleDraft({ name: "", description: "", templateKey: "custom", permissions: [] });
         return;
       }
-      setTemplateSourceKey("custom");
+      setTemplateSourceKey(`role:${selectedRole.id}`);
       setIsCustomizingTemplate(false);
       setRoleDraft({
         name: selectedRole.name,
@@ -210,6 +193,9 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
     setSummary(communitySummaryCache.get(communityId) ?? null);
     setRoles([]);
     setSelectedRoleId(null);
+    setTemplateSourceKey("custom");
+    setIsCustomizingTemplate(false);
+    setRoleDraft({ name: "", description: "", templateKey: "custom", permissions: [] });
     try {
       await loadCommunity(communityId);
     } catch (error) {
@@ -271,9 +257,6 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
           tone: "success",
           text: updated.isActive ? "Topluluk ayarlari kaydedildi." : "Topluluk pasife alindi ve oturumlar kapatildi.",
         });
-        if (!updated.isActive && !isSuperAdmin) {
-          window.setTimeout(onLogout, 350);
-        }
         return;
       }
 
@@ -310,6 +293,9 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
         setRoles((items) => items.filter((item) => item.id !== action.roleId));
         communitySummaryCache.delete(selectedCommunity.id);
         setSelectedRoleId(null);
+        setTemplateSourceKey("custom");
+        setIsCustomizingTemplate(false);
+        setRoleDraft({ name: "", description: "", templateKey: "custom", permissions: [] });
         await loadSummary(selectedCommunity.id, true);
         setRoleFeedback({ tone: "success", text: "Rol silindi; kullanicilar hedef role tasindi." });
       }
@@ -326,28 +312,46 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
   }
 
   function applyTemplate(templateKey: string) {
-    const template = roleOptions.find((item) => item.key === templateKey);
-    const baseName = template?.name.replace("Mevcut rol: ", "") ?? "";
+    const template = templates.find((item) => item.key === templateKey);
     setTemplateSourceKey(templateKey);
     setIsCustomizingTemplate(templateKey === "custom");
     setRoleDraft({
-      name: templateKey === "custom" ? "" : baseName,
+      name: templateKey === "custom" ? "" : template?.name ?? "",
       description: template?.description ?? "",
       templateKey,
       permissions: template?.permissions ?? [],
     });
   }
 
-  function startTemplateCustomization() {
-    if (templateSourceKey === "custom") {
+  function selectRoleSource(source: string) {
+    if (source.startsWith("role:")) {
+      setSelectedRoleId(source.slice("role:".length));
       return;
     }
 
-    setIsCustomizingTemplate(true);
+    setSelectedRoleId(null);
+    applyTemplate(source);
+  }
+
+  function toggleRolePermission(permission: PermissionName, checked: boolean) {
+    if (!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate) {
+      setIsCustomizingTemplate(true);
+      setRoleDraft((draft) => ({
+        ...draft,
+        name: draft.name.endsWith("*") ? draft.name : `${draft.name}*`,
+        templateKey: "custom",
+        permissions: checked
+          ? [...draft.permissions, permission]
+          : draft.permissions.filter((item) => item !== permission),
+      }));
+      return;
+    }
+
     setRoleDraft((draft) => ({
       ...draft,
-      name: draft.name.endsWith("*") ? draft.name : `${draft.name}*`,
-      templateKey: "custom",
+      permissions: checked
+        ? [...draft.permissions, permission]
+        : draft.permissions.filter((item) => item !== permission),
     }));
   }
 
@@ -385,7 +389,7 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
           ) : null}
 
           <section className="identity-section">
-            <div className="section-toolbar"><div><span className="eyebrow">Topluluk</span><h3>{selectedCommunity?.name ?? "Topluluk yukleniyor"}</h3></div><ShieldCheck size={22} /></div>
+            <div className="section-toolbar"><div><span className="eyebrow">Topluluk</span><h3>{selectedCommunity?.name ?? "Topluluk yukleniyor"}</h3></div><Landmark size={22} /></div>
             {isSuperAdmin ? (
               <label className="filter-select-field compact-filter-field">
                 <Building2 size={16} />
@@ -401,12 +405,16 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
                 <label><span>Topluluk adi</span><input value={communityDraft.name} disabled={!isSuperAdmin} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, name: event.target.value }))} /></label>
                 <label><span>Aciklama</span><input value={communityDraft.description} disabled={!isSuperAdmin} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, description: event.target.value }))} /></label>
                 <label><span>Kayit kodu</span><input value={communityDraft.inviteCode} disabled={!isSuperAdmin} maxLength={5} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, inviteCode: event.target.value.toUpperCase() }))} /></label>
-                <label><span>Durum</span><select value={communityDraft.isActive ? "active" : "inactive"} disabled={!isSuperAdmin} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, isActive: event.target.value === "active" }))}><option value="active">Aktif</option><option value="inactive">Pasif</option></select></label>
+                {isSuperAdmin ? (
+                  <label><span>Durum</span><select value={communityDraft.isActive ? "active" : "inactive"} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, isActive: event.target.value === "active" }))}><option value="active">Aktif</option><option value="inactive">Pasif</option></select></label>
+                ) : (
+                  <div className="community-readonly-status"><span>Durum</span><strong className={communityDraft.isActive ? "status-pill status-active" : "status-pill status-rejected"}>{communityDraft.isActive ? "Aktif" : "Pasif"}</strong></div>
+                )}
               </div>
             )}
             <div className="community-stat-grid">
               <article className="settings-row community-stat-card"><Users className="community-stat-icon" size={18} /><span>Uyeler</span><strong>{isLoading || isSummaryLoading || !summary ? <InlineValueLoader /> : summary.memberCount}</strong><small>Aktif topluluk uyeligi</small></article>
-              <article className="settings-row community-stat-card"><ShieldCheck className="community-stat-icon" size={18} /><span>Rol sayisi</span><strong>{isLoading || isRolesLoading ? <InlineValueLoader /> : roles.length}</strong><small>Tanimli topluluk rolu</small></article>
+              <article className="settings-row community-stat-card"><Tags className="community-stat-icon" size={18} /><span>Rol sayisi</span><strong>{isLoading || isRolesLoading ? <InlineValueLoader /> : roles.length}</strong><small>Tanimli topluluk rolu</small></article>
             </div>
             {summary ? <RoleCountDisclosure summary={summary} /> : null}
             {isSuperAdmin ? (
@@ -415,17 +423,17 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
                 <button className={communityDraft.isActive ? "primary-button" : "success-button"} type="button" onClick={() => setPendingAction({ type: "update-community" })}>Degisikligi uygula</button>
               </div>
             ) : null}
-            {canDeactivateCommunity && selectedCommunity?.isActive ? (
-              <div className="section-actions community-deactivation-action">
+            {canToggleOwnCommunityStatus && selectedCommunity ? (
+              <div className="section-actions community-status-action">
                 <button
-                  className="danger-button"
+                  className={selectedCommunity.isActive ? "danger-button" : "success-button"}
                   type="button"
                   onClick={() => {
-                    setCommunityDraft((draft) => ({ ...draft, isActive: false }));
+                    setCommunityDraft((draft) => ({ ...draft, isActive: !selectedCommunity.isActive }));
                     setPendingAction({ type: "update-community" });
                   }}
                 >
-                  Toplulugu pasife al
+                  {selectedCommunity.isActive ? "Toplulugu pasife al" : "Toplulugu aktif et"}
                 </button>
               </div>
             ) : null}
@@ -434,23 +442,20 @@ export function ManagementCommunitiesView({ activeUser, language, onLogout, toke
         </div>
 
         <section className="identity-section community-role-panel">
-          <div className="section-toolbar"><div><span className="eyebrow">Yetkiler</span><h3>{selectedCommunity ? `${selectedCommunity.name} rolleri` : "Topluluk rolleri"}</h3></div><UsersRound size={22} /></div>
+          <div className="section-toolbar"><div><span className="eyebrow">Yetkiler</span><h3>{selectedCommunity ? `${selectedCommunity.name} rolleri` : "Topluluk rolleri"}</h3></div><Tags size={22} /></div>
           {isLoading ? <CommunityRolePanelSkeleton /> : <>
-          <label className="filter-select-field compact-filter-field"><ShieldCheck size={16} /><select value={selectedRoleId ?? ""} onChange={(event) => setSelectedRoleId(event.target.value || null)}><option value="">Yeni rol olustur</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}{role.isSystemRole ? " (sistem)" : ""}</option>)}</select></label>
+          <label className="filter-select-field compact-filter-field"><BadgeCheck size={16} /><select value={templateSourceKey} onChange={(event) => selectRoleSource(event.target.value)}><option value="custom">Ozel rol olustur</option><optgroup label="Hazir roller">{templates.filter((template) => template.key !== "custom").map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}</optgroup>{customRoles.length ? <optgroup label="Topluluga ozel roller">{customRoles.map((role) => <option key={role.id} value={`role:${role.id}`}>{role.name}</option>)}</optgroup> : null}</select></label>
           {isRolesLoading ? <div className="role-panel-loading"><InlineValueLoader label="Roller yukleniyor" /></div> : null}
           {rolesError ? <ActionFeedback feedback={{ tone: "error", text: rolesError }} /> : null}
           {!isRolesLoading && !rolesError && selectedCommunity && !roles.length ? <p className="status-line">Bu toplulukta rol bulunamadi. Yenile ile tekrar deneyin.</p> : null}
           <div className="role-editor-grid">
-            <input value={roleDraft.name} onChange={(event) => setRoleDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Rol adi" disabled={selectedRole?.isSystemRole || (!isCustomizingTemplate && templateSourceKey !== "custom")} />
-            <input value={roleDraft.description} onChange={(event) => setRoleDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Rol aciklamasi" disabled={selectedRole?.isSystemRole || (!isCustomizingTemplate && templateSourceKey !== "custom")} />
-            <select value={templateSourceKey} disabled={selectedRole?.isSystemRole} onChange={(event) => applyTemplate(event.target.value)}>{roleOptions.map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}</select>
+            <input value={roleDraft.name} onChange={(event) => setRoleDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Rol adi" disabled={!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate} />
+            <input value={roleDraft.description} onChange={(event) => setRoleDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Rol aciklamasi" disabled={!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate} />
           </div>
-          {selectedRole?.isSystemRole ? <p className="helper-copy">Sistem rolu degistirilmez. Yeni rol olustur secip bu sablonu kopyalayarak yetkileri duzenleyebilirsiniz.</p> : null}
-          {!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate ? <p className="helper-copy">Hazir rol <strong>{roleDraft.name}</strong> bu toplulukta dogrudan kullanilabilir. Yeni bir varyant icin ozellestirin.</p> : null}
+          {!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate ? <p className="helper-copy">Hazir rol <strong>{roleDraft.name}</strong> sistemde tanimlidir. Bir izin degistirerek <strong>{roleDraft.name}*</strong> adli ozel kopya olusturabilirsiniz.</p> : null}
           {!selectedRole && isCustomizingTemplate ? <p className="helper-copy">Bu kopya <strong>{roleDraft.name}</strong> adiyla ozel rol olarak kaydedilecek.</p> : null}
-          {!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate ? <button className="secondary-button compact-template-action" type="button" onClick={startTemplateCustomization}>Bu sablonu ozellestir</button> : null}
           <div className="permission-chip-grid">
-            {allPermissions.map((permission) => <label className="checkbox-line compact-password-toggle" key={permission}><input type="checkbox" disabled={selectedRole?.isSystemRole || (!isCustomizingTemplate && templateSourceKey !== "custom")} checked={roleDraft.permissions.includes(permission)} onChange={(event) => setRoleDraft((draft) => ({ ...draft, permissions: event.target.checked ? [...draft.permissions, permission] : draft.permissions.filter((item) => item !== permission) }))} /><span>{permissionLabel(permission)}</span></label>)}
+            {allPermissions.map((permission) => <label className="checkbox-line compact-password-toggle" key={permission}><input type="checkbox" checked={roleDraft.permissions.includes(permission)} onChange={(event) => toggleRolePermission(permission, event.target.checked)} /><span>{permissionLabel(permission)}</span></label>)}
           </div>
           <div className="section-actions role-editor-actions">
             {!selectedRole && (templateSourceKey === "custom" || isCustomizingTemplate) ? <button className="success-button" disabled={!roleDraft.name.trim()} type="button" onClick={() => setPendingAction({ type: "create-role" })}><Plus size={16} /> Rol olustur</button> : null}
@@ -487,7 +492,7 @@ function ManagementConfirmation({ action, isDeactivating, selectedRole, roles, r
     return <ConfirmationDialog eyebrow="Rol silme" title={`${selectedRole?.name ?? "Rol"} silinsin mi?`} description="Bu roldeki aktif kullanicilar secilen hedef role tasinir; islem geri alinmaz." confirmLabel="Tasi ve sil" onCancel={onCancel} onConfirm={onConfirm}><label className="compact-form"><span>Hedef rol</span><select value={replacementRoleId} onChange={(event) => setReplacementRoleId(event.target.value)}>{roles.filter((role) => role.id !== selectedRole?.id).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label></ConfirmationDialog>;
   }
   const isDeactivate = action.type === "update-community" && isDeactivating;
-  const copy = action.type === "create-community" ? ["Topluluk olustur", "Yeni topluluk ve varsayilan sistem rolleri olusturulacak.", "Olustur"] : action.type === "regenerate-code" ? ["Davet kodu", "Eski kayit kodu gecersiz olur; yeni kodla kayit alinabilir.", "Kodu yenile"] : action.type === "create-role" ? ["Rol olustur", "Rol izinleri bu topluluk kapsaminda kullanilabilir olacak.", "Rolu olustur"] : action.type === "update-role" ? ["Rol guncelle", "Rol izinleri ve adi guncellenecek.", "Guncelle"] : ["Toplulugu pasife al", "Uyelerin oturumlari kapatilacak; giris ve yeni workflow islemleri engellenecek.", "Pasife al"];
+  const copy = action.type === "create-community" ? ["Topluluk olustur", "Yeni topluluk ve varsayilan sistem rolleri olusturulacak.", "Olustur"] : action.type === "regenerate-code" ? ["Davet kodu", "Eski kayit kodu gecersiz olur; yeni kodla kayit alinabilir.", "Kodu yenile"] : action.type === "create-role" ? ["Rol olustur", "Rol izinleri bu topluluk kapsaminda kullanilabilir olacak.", "Rolu olustur"] : action.type === "update-role" ? ["Rol guncelle", "Rol izinleri ve adi guncellenecek.", "Guncelle"] : action.type === "update-community" ? [isDeactivate ? "Toplulugu pasife al" : "Toplulugu aktif et", isDeactivate ? "Normal uyelerin oturumlari kapatilacak; giris ve yeni workflow islemleri engellenecek." : "Topluluk uyeleri yeniden giris yaparak calisma alanina devam edebilecek.", isDeactivate ? "Pasife al" : "Aktif et"] : ["Rol sil", "Rol kullanicilari hedef role tasinarak silinecek.", "Sil"];
   return <ConfirmationDialog eyebrow={copy[0]} title={`${copy[0]}?`} description={isDeactivate ? copy[1] : copy[1]} confirmLabel={copy[2]} tone={isDeactivate ? "danger" : "primary"} onCancel={onCancel} onConfirm={onConfirm} />;
 }
 

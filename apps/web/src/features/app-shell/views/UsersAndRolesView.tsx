@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Filter, History, RefreshCw, Search, ShieldCheck, Sparkles, UserCog, UserPlus, X } from "lucide-react";
+import { Building2, ChevronDown, History, Info, RefreshCw, Search, ShieldCheck, Sparkles, UserCog, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { sortAuditNewestFirst } from "@/features/app-shell/auditUtils";
 import { ActionFeedback, InlineValueLoader } from "@/features/app-shell/components/AsyncState";
@@ -50,7 +50,7 @@ export function UsersAndRolesView({
   const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<UserStatus | "All">("PendingApproval");
+  const [selectedStatuses, setSelectedStatuses] = useState<UserStatus[]>(["PendingApproval"]);
   const [communityRoleFilter, setCommunityRoleFilter] = useState<string | null>(null);
   const [accessDraft, setAccessDraft] = useState<AccessDraft | null>(null);
   const [pendingAccessChange, setPendingAccessChange] = useState<PendingAccessChange | null>(null);
@@ -83,6 +83,7 @@ export function UsersAndRolesView({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [isLoadingUserLogs, setIsLoadingUserLogs] = useState(false);
+  const [isUserLogHistoryOpen, setIsUserLogHistoryOpen] = useState(false);
   const [isLoadingUserSessions, setIsLoadingUserSessions] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [isCreateUserConfirmOpen, setIsCreateUserConfirmOpen] = useState(false);
@@ -121,7 +122,8 @@ export function UsersAndRolesView({
     const query = searchQuery.trim();
     const isManualRefresh = options.manual === true;
     const refreshStartedAt = Date.now();
-    const cacheKey = [selectedCommunityId ?? "all", communityRoleFilter ?? "all", statusFilter, query, page, pageSize].join("|");
+    const statusCacheKey = [...selectedStatuses].sort().join(",") || "all";
+    const cacheKey = [selectedCommunityId ?? "all", communityRoleFilter ?? "all", statusCacheKey, query, page, pageSize].join("|");
     const cached = userPageCache.get(cacheKey);
     if (cached && !isManualRefresh) {
       setUsers(cached.items);
@@ -138,7 +140,7 @@ export function UsersAndRolesView({
     try {
       const userResult = await api.listUsers(token, {
         query,
-        status: statusFilter,
+        statuses: selectedStatuses,
         communityId: selectedCommunityId,
         communityRoleId: communityRoleFilter,
         page,
@@ -168,7 +170,7 @@ export function UsersAndRolesView({
         setIsLoading(false);
       }
     }
-  }, [communityRoleFilter, language, page, pageSize, searchQuery, selectedCommunityId, showUserMessage, statusFilter, t, token]);
+  }, [communityRoleFilter, language, page, pageSize, searchQuery, selectedCommunityId, selectedStatuses, showUserMessage, t, token]);
 
   const loadCommunityContext = useCallback(async () => {
     if (!token || token.startsWith("demo-")) {
@@ -423,6 +425,7 @@ export function UsersAndRolesView({
         setAccessDraft(null);
         setSelectedUserSessions([]);
         setLogs([]);
+        setIsUserLogHistoryOpen(false);
         return;
       }
 
@@ -433,6 +436,7 @@ export function UsersAndRolesView({
         communityRoleId: selectedUser.communityRoleId,
       });
       setDetailSessionPage(1);
+      setIsUserLogHistoryOpen(false);
       void loadSelectedUserSessions(selectedUser.id);
       void loadSelectedUserLogs(selectedUser);
     }, 0);
@@ -709,21 +713,6 @@ export function UsersAndRolesView({
               placeholder={t("users.searchPlaceholder")}
             />
           </label>
-          <label className="filter-select-field">
-            <Filter size={16} />
-            <select
-              value={statusFilter}
-              onChange={(event) => {
-                setStatusFilter(event.target.value as UserStatus | "All");
-                setPage(1);
-              }}
-            >
-              <option value="PendingApproval">{t("settings.statusPending")}</option>
-              <option value="Active">{t("settings.statusActive")}</option>
-              <option value="Rejected">{t("settings.statusRejected")}</option>
-              <option value="All">{t("users.statusAll")}</option>
-            </select>
-          </label>
           <div className="user-community-scope">
             <Building2 aria-hidden="true" size={17} />
             <div>
@@ -783,8 +772,26 @@ export function UsersAndRolesView({
             </label>
           ) : null}
         </div>
-        <div className="status-line">
-          {selectedCommunity ? `${selectedCommunity.name} toplulugundaki kullanicilar` : activeUser.role === "SuperAdmin" ? "Tum topluluklardaki kullanicilar" : activeUser.communityName}
+        <div className="users-scope-summary">
+          <div className="status-line">
+            {selectedCommunity ? `${selectedCommunity.name} toplulugundaki kullanicilar` : activeUser.role === "SuperAdmin" ? "Tum topluluklardaki kullanicilar" : activeUser.communityName}
+          </div>
+          <fieldset className="status-checkbox-filters">
+            <legend>Durum</legend>
+            {(["Active", "PendingApproval", "Rejected"] as UserStatus[]).map((status) => (
+              <label key={status}>
+                <input
+                  checked={selectedStatuses.includes(status)}
+                  onChange={() => {
+                    setSelectedStatuses((current) => current.includes(status) ? current.filter((item) => item !== status) : [...current, status]);
+                    setPage(1);
+                  }}
+                  type="checkbox"
+                />
+                <span>{userStatusLabel(language, status)}</span>
+              </label>
+            ))}
+          </fieldset>
         </div>
         {message ? <div className={userMessageClassName}>{message}</div> : null}
       </div>
@@ -882,7 +889,7 @@ export function UsersAndRolesView({
                 <X size={18} />
               </button>
             ) : (
-              <History size={22} />
+              <Info size={22} />
             )}
           </div>
           {selectedUser ? (
@@ -1015,12 +1022,14 @@ export function UsersAndRolesView({
                   />
                 ) : null}
               </section>
-              <SystemAuditTimeline
-                logs={selectedUserLogs}
-                language={language}
-                emptyText={t("users.noUserLogs")}
-                isLoading={isLoadingUserLogs}
-              />
+              <div className="user-log-disclosure">
+                <button className="text-button" type="button" onClick={() => setIsUserLogHistoryOpen((isOpen) => !isOpen)}>
+                  <History size={16} />
+                  Kronolojik gecmis
+                  <ChevronDown className={isUserLogHistoryOpen ? "nav-group-chevron open" : "nav-group-chevron"} size={16} />
+                </button>
+                {isUserLogHistoryOpen ? <SystemAuditTimeline logs={selectedUserLogs} language={language} emptyText={t("users.noUserLogs")} isLoading={isLoadingUserLogs} /> : null}
+              </div>
               <div className="detail-danger-action">
                 <button
                   className="danger-button strong-danger-button"

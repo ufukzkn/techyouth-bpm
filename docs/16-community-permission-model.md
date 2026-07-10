@@ -80,7 +80,7 @@ The registration code is intentionally simple in v1. It blocks random public reg
 
 ## Lifecycle Safety
 
-SuperAdmin can edit every community setting and reactivate a community. A Topluluk Admin can only deactivate its own active community through a confirmation step. Deactivation revokes the community's sessions, logs that admin out too and blocks new workflow writes until SuperAdmin reactivates the community.
+SuperAdmin can edit every community setting. A Topluluk Admin can toggle only its own community's active status through a confirmation step; name, description and invite code remain platform-managed. Deactivation revokes normal member sessions and blocks their new workflow writes. The acting Topluluk Admin retains only its scoped management session so it can reactivate the community.
 
 ## Test Guarantees
 

@@ -1,11 +1,12 @@
+import { CircleCheckBig, ListTodo, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import type { ViewId } from "@/features/app-shell/navigation";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
-import type { Language, ProcessSummary, ProcessTask, User } from "@/lib/types";
+import type { DashboardSummary, Language, User } from "@/lib/types";
 
-let dashboardMetricsCache: { processes: ProcessSummary[]; tasks: ProcessTask[] } | null = null;
+const dashboardMetricsCache = new Map<string, DashboardSummary>();
 
 export function DashboardView({
   token,
@@ -24,10 +25,10 @@ export function DashboardView({
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
-  const [processes, setProcesses] = useState<ProcessSummary[]>(() => dashboardMetricsCache?.processes ?? []);
-  const [tasks, setTasks] = useState<ProcessTask[]>(() => dashboardMetricsCache?.tasks ?? []);
+  const dashboardCacheKey = `${user.id}:${user.communityId ?? "platform"}:${user.communityRoleId ?? user.role}`;
+  const [summary, setSummary] = useState<DashboardSummary | null>(() => dashboardMetricsCache.get(dashboardCacheKey) ?? null);
   const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "error">(
-    dashboardMetricsCache ? "refreshing" : "loading",
+    dashboardMetricsCache.has(dashboardCacheKey) ? "refreshing" : "loading",
   );
   const [hoveredChartSegment, setHoveredChartSegment] = useState<string | null>(null);
   const [chartTooltipPosition, setChartTooltipPosition] = useState<{ x: number; y: number } | null>(null);
@@ -37,17 +38,19 @@ export function DashboardView({
 
     async function loadMetrics() {
       if (!token || token.startsWith("demo-")) {
+        setSummary(null);
         setStatus("idle");
         return;
       }
 
       try {
-        setStatus(dashboardMetricsCache ? "refreshing" : "loading");
-        const [processResult, taskResult] = await Promise.all([api.listProcesses(token), api.listMyTasks(token)]);
+        const cached = dashboardMetricsCache.get(dashboardCacheKey);
+        setSummary(cached ?? null);
+        setStatus(cached ? "refreshing" : "loading");
+        const dashboardSummary = await api.getDashboardSummary(token);
         if (!ignore) {
-          dashboardMetricsCache = { processes: processResult, tasks: taskResult };
-          setProcesses(processResult);
-          setTasks(taskResult);
+          dashboardMetricsCache.set(dashboardCacheKey, dashboardSummary);
+          setSummary(dashboardSummary);
           setStatus("idle");
         }
       } catch {
@@ -62,11 +65,11 @@ export function DashboardView({
     return () => {
       ignore = true;
     };
-  }, [token]);
+  }, [dashboardCacheKey, token]);
 
-  const openTaskCount = tasks.filter((task) => task.status === "Open").length;
-  const inProgressCount = processes.filter((process) => process.status === "InProgress").length;
-  const completedCount = processes.filter((process) => process.status === "Completed").length;
+  const openTaskCount = summary?.openTaskCount ?? 0;
+  const inProgressCount = summary?.inProgressProcessCount ?? 0;
+  const completedCount = summary?.completedProcessCount ?? 0;
   const chartSegments = useMemo(() => {
     const circumference = 2 * Math.PI * 44;
     const total = Math.max(1, openTaskCount + inProgressCount + completedCount);
@@ -88,14 +91,14 @@ export function DashboardView({
     });
   }, [completedCount, inProgressCount, openTaskCount, t]);
   const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
-  const shouldShowMetricLoader = status === "loading" && !dashboardMetricsCache;
+  const shouldShowMetricLoader = status === "loading" && !summary;
   const activeChartSegment = chartSegments.find((segment) => segment.key === hoveredChartSegment);
   const currentAccessLabel = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
 
-  const metricCards: Array<{ label: string; value: number; viewId?: ViewId }> = [
-    { label: t("dashboard.pendingTasks"), value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined },
-    { label: t("dashboard.inProgress"), value: inProgressCount, viewId: canOpen("processes") ? "processes" : undefined },
-    { label: t("dashboard.completed"), value: completedCount, viewId: canOpen("processes") ? "processes" : undefined },
+  const metricCards: Array<{ label: string; value: number; viewId?: ViewId; icon: typeof ListTodo }> = [
+    { label: t("dashboard.pendingTasks"), value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined, icon: ListTodo },
+    { label: t("dashboard.inProgress"), value: inProgressCount, viewId: canOpen("processes") ? "processes" : undefined, icon: Workflow },
+    { label: t("dashboard.completed"), value: completedCount, viewId: canOpen("processes") ? "processes" : undefined, icon: CircleCheckBig },
   ];
 
   const flowSteps: Array<{ label: string; caption: string; viewId: ViewId }> = [
@@ -120,6 +123,7 @@ export function DashboardView({
         <div>
           <span className="eyebrow">{t("dashboard.eyebrow")}</span>
           <h1>{t("dashboard.title")}</h1>
+          {user.communityName ? <p className="dashboard-community-label"><span>{t("dashboard.communityLabel")}</span><strong>{user.communityName}</strong></p> : null}
         </div>
         <p>
           {status === "error"
@@ -130,6 +134,10 @@ export function DashboardView({
         </p>
       </section>
 
+      {user.communityId && user.isCommunityActive === false ? (
+        <p className="dashboard-community-inactive" role="status">{t("dashboard.communityInactive")}</p>
+      ) : null}
+
       <section className="metric-grid" aria-label="Process summary">
         {metricCards.map((card) =>
           card.viewId ? (
@@ -139,6 +147,7 @@ export function DashboardView({
               onClick={() => onNavigate(card.viewId!)}
               type="button"
             >
+              <card.icon className="metric-card-icon" size={20} aria-hidden="true" />
               <span>{card.label}</span>
               {shouldShowMetricLoader ? (
                 <span className="metric-inline-loader" aria-label={t("common.loading")}>
@@ -150,6 +159,7 @@ export function DashboardView({
             </button>
           ) : (
             <article className="metric-card" key={card.label}>
+              <card.icon className="metric-card-icon" size={20} aria-hidden="true" />
               <span>{card.label}</span>
               {shouldShowMetricLoader ? (
                 <span className="metric-inline-loader" aria-label={t("common.loading")}>

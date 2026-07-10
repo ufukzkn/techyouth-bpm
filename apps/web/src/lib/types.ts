@@ -17,6 +17,7 @@ export type User = {
   communityRoleId?: string | null;
   communityRoleName: string;
   permissions: PermissionName[];
+  isCommunityActive: boolean;
 };
 
 export type PermissionName =
@@ -241,6 +242,12 @@ export type StartProcessRequest = {
 export type TaskActionRequest = {
   action: WorkflowAction;
   note?: string;
+};
+
+export type DashboardSummary = {
+  openTaskCount: number;
+  inProgressProcessCount: number;
+  completedProcessCount: number;
 };
 
 export type Community = {

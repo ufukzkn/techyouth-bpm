@@ -12,6 +12,7 @@ import type {
   Community,
   CommunityRole,
   CommunitySummary,
+  DashboardSummary,
   LoginResponse,
   NotificationItem,
   PagedResult,
@@ -202,7 +203,7 @@ export const api = {
   },
   listUsers(
     token: string,
-    params: { query?: string; status?: UserStatus | "All"; communityId?: string | null; communityRoleId?: string | null; page?: number; pageSize?: number } = {},
+    params: { query?: string; status?: UserStatus | "All"; statuses?: UserStatus[]; communityId?: string | null; communityRoleId?: string | null; page?: number; pageSize?: number } = {},
   ) {
     const search = new URLSearchParams();
     if (params.query) {
@@ -210,6 +211,9 @@ export const api = {
     }
     if (params.status && params.status !== "All") {
       search.set("status", params.status);
+    }
+    for (const status of params.statuses ?? []) {
+      search.append("statuses", status);
     }
     if (params.communityId) {
       search.set("communityId", params.communityId);
@@ -332,7 +336,7 @@ export const api = {
   },
   listSystemAuditLogs(
     token: string,
-    params: { query?: string; category?: string; page?: number; pageSize?: number } = {},
+    params: { query?: string; category?: string; page?: number; pageSize?: number; sortBy?: "createdAt" | "action" | "actor"; sortDirection?: "asc" | "desc" } = {},
   ) {
     const search = new URLSearchParams();
     if (params.query) {
@@ -347,6 +351,12 @@ export const api = {
     if (params.pageSize) {
       search.set("pageSize", String(params.pageSize));
     }
+    if (params.sortBy) {
+      search.set("sortBy", params.sortBy);
+    }
+    if (params.sortDirection) {
+      search.set("sortDirection", params.sortDirection);
+    }
 
     return request<PagedResult<SystemAuditLog> | SystemAuditLog[]>(
       `/api/audit/system${search.size ? `?${search}` : ""}`,
@@ -360,6 +370,9 @@ export const api = {
     }
 
     return request<SystemAuditCategoryCounts>(`/api/audit/system/counts${search.size ? `?${search}` : ""}`, { token });
+  },
+  getDashboardSummary(token: string) {
+    return request<DashboardSummary>("/api/dashboard/summary", { token });
   },
   listForms(token: string) {
     return request<FormDefinition[]>("/api/forms", { token });

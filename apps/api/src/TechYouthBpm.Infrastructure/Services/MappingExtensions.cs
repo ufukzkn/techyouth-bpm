@@ -28,7 +28,8 @@ internal static class MappingExtensions
             membership?.Community?.Name ?? string.Empty,
             membership?.CommunityRoleId,
             membership?.CommunityRole?.Name ?? string.Empty,
-            permissions);
+            permissions,
+            membership?.Community?.IsActive ?? true);
     }
 
     public static UserAdminDto ToAdminDto(this User user)
@@ -50,7 +51,8 @@ internal static class MappingExtensions
             dto.CommunityName,
             dto.CommunityRoleId,
             dto.CommunityRoleName,
-            dto.Permissions);
+            dto.Permissions,
+            dto.IsCommunityActive);
     }
 
     public static FormDefinitionDto ToDto(this FormDefinition form) =>

@@ -312,6 +312,30 @@ public class AuthServiceTests
     }
 
     [Fact]
+    public async Task ListUsersAsync_Filters_By_Any_Selected_Status()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
+        var activeUser = TestDbFactory.SeedUser(db, Role.User, "active-user");
+        var pendingUser = TestDbFactory.SeedUser(db, Role.User, "pending-user");
+        var rejectedUser = TestDbFactory.SeedUser(db, Role.User, "rejected-user");
+        activeUser.Status = UserStatus.Active;
+        pendingUser.Status = UserStatus.PendingApproval;
+        rejectedUser.Status = UserStatus.Rejected;
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.ListUsersAsync(
+            TestDbFactory.ToDto(admin),
+            new UserSearchRequest(Statuses: [UserStatus.Active, UserStatus.Rejected], Page: 1, PageSize: 20));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        Assert.Contains(result.Value!.Items, user => user.Id == activeUser.Id);
+        Assert.Contains(result.Value.Items, user => user.Id == rejectedUser.Id);
+        Assert.DoesNotContain(result.Value.Items, user => user.Id == pendingUser.Id);
+    }
+
+    [Fact]
     public async Task LoginAsync_Locks_Account_After_Configured_Failed_Attempts()
     {
         await using var db = TestDbFactory.Create();

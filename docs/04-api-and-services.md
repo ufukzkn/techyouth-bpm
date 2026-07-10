@@ -240,8 +240,9 @@ Feature components should call these client methods through feature-level orches
 - `PATCH /api/communities/{id}` updates name, description, invite code and active status. Invite codes are unique, uppercase five-character alphanumeric values; blank code on creation means the server generates one.
 - `GET /api/communities/{id}/summary` returns active member count and member counts grouped by community role. It avoids loading the whole user list merely to render dashboard-like counts.
 - `DELETE /api/communities/{id}/roles/{roleId}` receives `{ replacementRoleId }`. It moves active memberships to the target role and removes the role in one transaction. System roles, including `Atanmadi`, cannot be removed.
-- Deactivating a community revokes its active member sessions and refresh tokens. Future login, refresh, form creation/update, process start and task actions are denied until a SuperAdmin reactivates that community.
-- A Topluluk Admin with `Community.ManageAdmins` may submit only the active-to-inactive transition for its own community. It cannot edit name, description, invite code or reactivate the community.
+- Deactivating a community revokes normal member sessions and refresh tokens. Normal-member login, refresh, form creation/update, process start and task actions are denied until the scoped Topluluk Admin or a SuperAdmin reactivates that community.
+- A Topluluk Admin with `Community.ManageAdmins` may toggle only its own community status. It cannot edit name, description or invite code; the acting admin session and normal permission-aware workspace navigation remain available.
+- `GET /api/users` accepts legacy `status` plus repeatable `statuses=Active&statuses=Rejected` query values. `statuses` uses OR matching and preserves server-side pagination.
 
 ## Implemented Backend Structure
 

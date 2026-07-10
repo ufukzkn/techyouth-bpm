@@ -97,4 +97,21 @@ public class SystemAuditServiceTests
         var log = Assert.Single(result.Value!.Items);
         Assert.Equal(communityAdmin.Id, log.ActorUserId);
     }
+
+    [Fact]
+    public async Task ListAsync_Sorts_By_Action_In_Ascending_Order()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "admin-sort");
+        var service = new SystemAuditService(db);
+        await service.LogAsync(admin.Id, "Zeta.Action", "TestEntity", "z", "Zeta");
+        await service.LogAsync(admin.Id, "Alpha.Action", "TestEntity", "a", "Alpha");
+
+        var result = await service.ListAsync(
+            TestDbFactory.ToDto(admin),
+            new SystemAuditSearchRequest(Page: 1, PageSize: 10, SortBy: "action", SortDirection: "asc"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(["Alpha.Action", "Zeta.Action"], result.Value!.Items.Select(item => item.Action));
+    }
 }

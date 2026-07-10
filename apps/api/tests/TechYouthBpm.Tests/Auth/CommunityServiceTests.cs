@@ -38,6 +38,14 @@ public class CommunityServiceTests
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.AddHours(1)
         });
+        db.UserSessions.Add(new UserSession
+        {
+            Id = Guid.NewGuid(),
+            Token = "community-admin-session-token",
+            UserId = admin.Id,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddHours(1)
+        });
         await db.SaveChangesAsync();
 
         var service = new CommunityService(db, null!, new SystemAuditService(db));
@@ -50,10 +58,11 @@ public class CommunityServiceTests
         Assert.True(result.IsSuccess);
         Assert.False(result.Value!.IsActive);
         Assert.NotNull(db.UserSessions.Single(session => session.UserId == member.Id).RevokedAt);
+        Assert.Null(db.UserSessions.Single(session => session.UserId == admin.Id).RevokedAt);
     }
 
     [Fact]
-    public async Task UpdateAsync_Rejects_Community_Admin_Reactivation()
+    public async Task UpdateAsync_Allows_Community_Admin_To_Reactivate_Own_Community()
     {
         await using var db = TestDbFactory.Create();
         var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
@@ -67,7 +76,8 @@ public class CommunityServiceTests
             new UpdateCommunityRequest("Test Community", "Unit test community", "TEST1", true),
             TestDbFactory.ToDto(admin));
 
-        Assert.False(result.IsSuccess);
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        Assert.True(result.Value!.IsActive);
     }
 
     [Fact]
