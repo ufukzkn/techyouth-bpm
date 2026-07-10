@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import type { ViewId } from "@/features/app-shell/navigation";
-import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
 import type { Language, ProcessSummary, ProcessTask, User } from "@/lib/types";
 
@@ -28,6 +29,8 @@ export function DashboardView({
   const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "error">(
     dashboardMetricsCache ? "refreshing" : "loading",
   );
+  const [hoveredChartSegment, setHoveredChartSegment] = useState<string | null>(null);
+  const [chartTooltipPosition, setChartTooltipPosition] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -64,8 +67,30 @@ export function DashboardView({
   const openTaskCount = tasks.filter((task) => task.status === "Open").length;
   const inProgressCount = processes.filter((process) => process.status === "InProgress").length;
   const completedCount = processes.filter((process) => process.status === "Completed").length;
+  const chartSegments = useMemo(() => {
+    const circumference = 2 * Math.PI * 44;
+    const total = Math.max(1, openTaskCount + inProgressCount + completedCount);
+    let offset = 0;
+    return [
+      { key: "open", label: t("dashboard.pendingTasks"), value: openTaskCount, className: "chart-segment-open" },
+      { key: "progress", label: t("dashboard.inProgress"), value: inProgressCount, className: "chart-segment-progress" },
+      { key: "completed", label: t("dashboard.completed"), value: completedCount, className: "chart-segment-completed" },
+    ].map((segment) => {
+      const length = (segment.value / total) * circumference;
+      const result = {
+        ...segment,
+        percentage: total === 1 && segment.value === 0 ? 0 : Math.round((segment.value / total) * 100),
+        dashArray: `${length} ${circumference - length}`,
+        dashOffset: -offset,
+      };
+      offset += length;
+      return result;
+    });
+  }, [completedCount, inProgressCount, openTaskCount, t]);
   const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
   const shouldShowMetricLoader = status === "loading" && !dashboardMetricsCache;
+  const activeChartSegment = chartSegments.find((segment) => segment.key === hoveredChartSegment);
+  const currentAccessLabel = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
 
   const metricCards: Array<{ label: string; value: number; viewId?: ViewId }> = [
     { label: t("dashboard.pendingTasks"), value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined },
@@ -101,7 +126,7 @@ export function DashboardView({
             ? t("dashboard.error")
             : status === "loading"
               ? t("dashboard.loading")
-              : t("dashboard.summary", { role: roleLabel(language, user.role) })}
+              : `${user.communityName || "Platform"} / ${currentAccessLabel} - ${t("dashboard.summary", { role: currentAccessLabel })}`}
         </p>
       </section>
 
@@ -136,6 +161,85 @@ export function DashboardView({
             </article>
           ),
         )}
+      </section>
+
+      <section className="dashboard-insight-grid">
+        <article className="dashboard-chart-card dashboard-chart-card-prominent">
+          <div>
+            <span className="eyebrow">Dagilim</span>
+            <h3>Surec ve is yogunlugu</h3>
+          </div>
+          <div
+            className={shouldShowMetricLoader ? "dashboard-donut is-loading" : "dashboard-donut"}
+            aria-label={activeChartSegment ? `${activeChartSegment.label}: %${activeChartSegment.percentage}` : "Surec dagilimi"}
+          >
+            <svg
+              aria-label={activeChartSegment ? `${activeChartSegment.label}: %${activeChartSegment.percentage}` : "Surec dagilimi"}
+              className="dashboard-donut-svg"
+              role="img"
+              viewBox="0 0 112 112"
+            >
+              <circle className="chart-track" cx="56" cy="56" r="44" />
+              {!shouldShowMetricLoader ? chartSegments.map((segment) => (
+                <circle
+                  className={segment.className}
+                  cx="56"
+                  cy="56"
+                  key={segment.key}
+                  r="44"
+                  strokeDasharray={segment.dashArray}
+                  strokeDashoffset={segment.dashOffset}
+                  tabIndex={0}
+                  aria-label={`${segment.label}: %${segment.percentage}`}
+                  data-active={activeChartSegment?.key === segment.key}
+                  onBlur={() => {
+                    setHoveredChartSegment(null);
+                    setChartTooltipPosition(null);
+                  }}
+                  onFocus={() => setHoveredChartSegment(segment.key)}
+                  onMouseEnter={() => setHoveredChartSegment(segment.key)}
+                  onMouseLeave={() => {
+                    setHoveredChartSegment(null);
+                    setChartTooltipPosition(null);
+                  }}
+                  onMouseMove={(event) => {
+                    const bounds = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                    if (bounds) {
+                      setChartTooltipPosition({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+                    }
+                  }}
+                />
+              )) : null}
+            </svg>
+            <span className="dashboard-donut-value" aria-live="polite">
+              {shouldShowMetricLoader
+                ? <InlineValueLoader label={t("common.loading")} />
+                : activeChartSegment
+                  ? activeChartSegment.value
+                  : openTaskCount + inProgressCount}
+            </span>
+            {activeChartSegment && chartTooltipPosition ? (
+              <span
+                className="chart-hover-tooltip"
+                role="tooltip"
+                style={{ left: chartTooltipPosition.x, top: chartTooltipPosition.y }}
+              >
+                %{activeChartSegment.percentage}
+              </span>
+            ) : null}
+          </div>
+          <div className="chart-legend">
+            <span><i className="legend-open" /> {t("dashboard.pendingTasks")}</span>
+            <span><i className="legend-progress" /> {t("dashboard.inProgress")}</span>
+            <span><i className="legend-completed" /> {t("dashboard.completed")}</span>
+          </div>
+        </article>
+        <article className="dashboard-context-card">
+          <span className="eyebrow">Baglam</span>
+          <h3>{user.communityName || "Platform yonetimi"}</h3>
+          <p>{currentAccessLabel}</p>
+          <small>Menuler ve kisa yollar aktif izinlere gore sadeleştirilir.</small>
+        </article>
       </section>
 
       <section className="flow-preview">

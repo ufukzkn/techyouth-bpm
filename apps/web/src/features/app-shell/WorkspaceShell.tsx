@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Menu, X } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, UsersRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { navItems, type ViewId } from "@/features/app-shell/navigation";
@@ -11,10 +11,10 @@ import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
 import { formatSessionExpiry } from "@/features/app-shell/sessionFormatters";
 import { ForcedPasswordChangeView } from "@/features/app-shell/views/ForcedPasswordChangeView";
 import { LoginView } from "@/features/auth/LoginView";
-import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
-import { api, ApiError } from "@/lib/api";
-import type { Language, User } from "@/lib/types";
+import { api, ApiError, setUnauthorizedHandler } from "@/lib/api";
+import type { Language, NotificationItem, User } from "@/lib/types";
 
 const maxBrowserTimeoutDelay = 2_147_483_647;
 
@@ -54,7 +54,10 @@ export function WorkspaceShell({
     toggleTheme,
   } = useSessionStore();
   const [isSessionDetailsOpen, setIsSessionDetailsOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isManagementOpen, setIsManagementOpen] = useState(() => pathname.startsWith("/management"));
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
@@ -63,6 +66,21 @@ export function WorkspaceShell({
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  useEffect(() => {
+    let hasHandledUnauthorized = false;
+    setUnauthorizedHandler(() => {
+      if (hasHandledUnauthorized) {
+        return;
+      }
+
+      hasHandledUnauthorized = true;
+      expireSession(t("session.unverified"));
+      router.replace("/dashboard");
+    });
+
+    return () => setUnauthorizedHandler(null);
+  }, [expireSession, router, t]);
 
   useEffect(() => {
     document.documentElement.lang = language;
@@ -157,6 +175,31 @@ export function WorkspaceShell({
     };
   }, [expiresAt, expireSession, hasHydrated, setSession, t, token, user]);
 
+  const loadNotifications = useCallback(async () => {
+    if (!token || token.startsWith("demo-")) {
+      setNotifications([]);
+      return;
+    }
+
+    try {
+      setNotifications(await api.listNotifications(token));
+    } catch {
+      setNotifications([]);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (!hasHydrated || !user) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void loadNotifications();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [hasHydrated, loadNotifications, user]);
+
   useEffect(() => {
     if (!isMobileNavOpen) {
       return;
@@ -184,7 +227,7 @@ export function WorkspaceShell({
   const visibleNavItems = useMemo(
     () =>
       navItems.filter((item) => {
-        if (!user || !item.roles.includes(user.role)) {
+        if (!user || !canUseNavItem(user.permissions ?? [], item.permissions)) {
           return false;
         }
 
@@ -193,6 +236,25 @@ export function WorkspaceShell({
     [user],
   );
   const canAccessCurrentRoute = visibleNavItems.some((item) => item.viewId === viewId);
+  const unreadNotificationCount = notifications.filter((notification) => !notification.readAt).length;
+
+  async function markNotificationRead(notificationId: string) {
+    if (!token || token.startsWith("demo-")) {
+      return;
+    }
+
+    await api.markNotificationRead(token, notificationId);
+    await loadNotifications();
+  }
+
+  async function markAllNotificationsRead() {
+    if (!token || token.startsWith("demo-")) {
+      return;
+    }
+
+    await api.markAllNotificationsRead(token);
+    await loadNotifications();
+  }
 
   useEffect(() => {
     if (!hasHydrated || !user || user.mustChangePassword || canAccessCurrentRoute) {
@@ -268,7 +330,49 @@ export function WorkspaceShell({
           <X size={18} />
         </button>
         <nav className="side-nav" aria-label="Main navigation">
-          {visibleNavItems.map((item) => {
+          {visibleNavItems.map((item, index) => {
+            if (item.group === "management") {
+              const isFirstManagementItem = !visibleNavItems.slice(0, index).some((previousItem) => previousItem.group === "management");
+              if (!isFirstManagementItem) {
+                return null;
+              }
+
+              const managementItems = visibleNavItems.filter((candidate) => candidate.group === "management");
+              const hasActiveManagementRoute = managementItems.some((candidate) => pathname === candidate.path);
+              return (
+                <div className="nav-disclosure" key="management">
+                  <button
+                    aria-expanded={isManagementOpen}
+                    className={hasActiveManagementRoute ? "nav-group-trigger active" : "nav-group-trigger"}
+                    onClick={() => setIsManagementOpen((isOpen) => !isOpen)}
+                    type="button"
+                  >
+                    <UsersRound size={18} />
+                    <span>Yonetim</span>
+                    <ChevronDown className={isManagementOpen ? "nav-group-chevron open" : "nav-group-chevron"} size={16} />
+                  </button>
+                  {isManagementOpen ? (
+                    <div className="nav-submenu">
+                      {managementItems.map((child) => {
+                        const ChildIcon = child.icon;
+                        return (
+                          <button
+                            aria-current={pathname === child.path ? "page" : undefined}
+                            className={pathname === child.path ? "active" : undefined}
+                            key={child.viewId}
+                            onClick={() => navigate(child.viewId)}
+                            type="button"
+                          >
+                            <ChildIcon size={16} />
+                            {t(child.labelKey)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            }
             const Icon = item.icon;
             return (
               <button
@@ -307,18 +411,14 @@ export function WorkspaceShell({
             <Menu size={18} />
           </button>
           <div className="topbar-user">
-            <div className="topbar-identity">
-              <span className="eyebrow">{t("session.activeUser")}</span>
-              <strong>{user.displayName}</strong>
-            </div>
-            <span className="role-pill">{roleLabel(language, user.role)}</span>
-          </div>
-          <div className="topbar-actions">
-            <div className="session-menu">
+            <div className="session-menu compact-session-menu">
               <SessionStatusButton
                 expanded={isSessionDetailsOpen}
                 label={t("session.details")}
-                onToggle={() => setIsSessionDetailsOpen((isOpen) => !isOpen)}
+                onToggle={() => {
+                  setIsSessionDetailsOpen((isOpen) => !isOpen);
+                  setIsNotificationsOpen(false);
+                }}
               />
               {isSessionDetailsOpen ? (
                 <div className="session-popover" role="dialog" aria-label={t("session.details")}>
@@ -332,11 +432,56 @@ export function WorkspaceShell({
                   </div>
                   <div>
                     <span>{t("session.role")}</span>
-                    <strong>{roleLabel(language, user.role)}</strong>
+                    <strong>{user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi")}</strong>
                   </div>
                   <div>
                     <span>{t("session.activeUntil")}</span>
                     <strong>{formatSessionExpiry(expiresAt, language)}</strong>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+            <div className="topbar-identity">
+              <span className="eyebrow">{t("session.activeUser")}</span>
+              <strong>{user.displayName}</strong>
+            </div>
+            <span className="role-pill">{user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi")}</span>
+          </div>
+          <div className="topbar-actions">
+            <div className="notification-menu">
+              <button
+                className="icon-button notification-button"
+                onClick={() => {
+                  setIsNotificationsOpen((isOpen) => !isOpen);
+                  setIsSessionDetailsOpen(false);
+                }}
+                title="Bildirimler"
+                type="button"
+              >
+                <Bell size={18} />
+                {unreadNotificationCount > 0 ? <span className="notification-badge">{unreadNotificationCount}</span> : null}
+              </button>
+              {isNotificationsOpen ? (
+                <div className="notification-popover" role="dialog" aria-label="Bildirimler">
+                  <div className="notification-popover-header">
+                    <strong>Bildirimler</strong>
+                    <button className="text-button" type="button" onClick={markAllNotificationsRead}>
+                      Tumunu okundu yap
+                    </button>
+                  </div>
+                  <div className="notification-list">
+                    {notifications.slice(0, 8).map((notification) => (
+                      <button
+                        className={notification.readAt ? "notification-item" : "notification-item is-unread"}
+                        key={notification.id}
+                        onClick={() => void markNotificationRead(notification.id)}
+                        type="button"
+                      >
+                        <strong>{notification.title}</strong>
+                        <span>{notification.message}</span>
+                      </button>
+                    ))}
+                    {!notifications.length ? <p className="status-line">Bildirim yok.</p> : null}
                   </div>
                 </div>
               ) : null}
@@ -376,4 +521,12 @@ export function WorkspaceShell({
       </div>
     </div>
   );
+}
+
+function canUseNavItem(userPermissions: string[], requiredPermissions?: string[]) {
+  if (!requiredPermissions?.length) {
+    return true;
+  }
+
+  return requiredPermissions.some((permission) => userPermissions.includes(permission));
 }

@@ -1,18 +1,25 @@
-import { Filter, History, RefreshCw, Search, ShieldCheck, Sparkles, UserCog, UserPlus, X } from "lucide-react";
+"use client";
+
+import { Building2, Filter, History, RefreshCw, Search, ShieldCheck, Sparkles, UserCog, UserPlus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { sortAuditNewestFirst } from "@/features/app-shell/auditUtils";
+import { ActionFeedback, InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { AccessChangeDialog, SessionRevokeDialog, UserDeleteDialog } from "@/features/app-shell/components/AccessDialogs";
+import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
 import { SystemAuditTimeline } from "@/features/app-shell/components/SystemAuditTimeline";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
 import { formatIpAddress, formatSessionExpiry, summarizeUserAgent, userStatusLabel } from "@/features/app-shell/sessionFormatters";
 import type { AccessDraft, PendingAccessChange, PendingSessionRevoke, PendingUserDelete, StatusTone } from "@/features/app-shell/types";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
-import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
-import type { Language, Role, SystemAuditLog, User, UserAdmin, UserSession, UserStatus } from "@/lib/types";
+import type { Community, CommunityRole, CommunitySummary, Language, Role, SystemAuditLog, User, UserAdmin, UserSession, UserStatus } from "@/lib/types";
 
 const minimumRefreshDelayMs = 500;
+const userPageCache = new Map<string, { items: UserAdmin[]; totalCount: number }>();
+const userCommunitySummaryCache = new Map<string, CommunitySummary>();
+const allCommunitiesUserCountCache = new Map<string, number>();
 
 export function UsersAndRolesView({
   activeUser,
@@ -28,11 +35,23 @@ export function UsersAndRolesView({
     [language],
   );
   const [users, setUsers] = useState<UserAdmin[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [communityRoles, setCommunityRoles] = useState<CommunityRole[]>([]);
+  const [detailCommunityRoles, setDetailCommunityRoles] = useState<CommunityRole[]>([]);
+  const [createCommunityRoles, setCreateCommunityRoles] = useState<CommunityRole[]>([]);
+  const [selectedCommunitySummary, setSelectedCommunitySummary] = useState<CommunitySummary | null>(null);
+  const [isLoadingCommunitySummary, setIsLoadingCommunitySummary] = useState(false);
+  const [isLoadingCommunities, setIsLoadingCommunities] = useState(true);
+  const [isLoadingDetailCommunityRoles, setIsLoadingDetailCommunityRoles] = useState(false);
+  const [allCommunitiesUserCount, setAllCommunitiesUserCount] = useState<number | null>(null);
+  const [isLoadingAllCommunitiesUserCount, setIsLoadingAllCommunitiesUserCount] = useState(false);
+  const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(activeUser.role === "SuperAdmin" ? null : activeUser.communityId ?? null);
   const [logs, setLogs] = useState<SystemAuditLog[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<UserStatus | "All">("PendingApproval");
+  const [communityRoleFilter, setCommunityRoleFilter] = useState<string | null>(null);
   const [accessDraft, setAccessDraft] = useState<AccessDraft | null>(null);
   const [pendingAccessChange, setPendingAccessChange] = useState<PendingAccessChange | null>(null);
   const [selectedUserSessions, setSelectedUserSessions] = useState<UserSession[]>([]);
@@ -45,7 +64,13 @@ export function UsersAndRolesView({
     role: "User" as Role,
     status: "Active" as UserStatus,
     temporaryPassword: "",
+    communityId: activeUser.role === "SuperAdmin" ? "" : activeUser.communityId ?? "",
+    communityRoleId: "",
   });
+  const [passwordResetDraft, setPasswordResetDraft] = useState({ useManualPassword: false, temporaryPassword: "" });
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [isPasswordResetConfirmOpen, setIsPasswordResetConfirmOpen] = useState(false);
+  const [passwordResetFeedback, setPasswordResetFeedback] = useState<{ tone: "success" | "error" | "loading"; text: string } | null>(null);
   const [usesCustomTemporaryPassword, setUsesCustomTemporaryPassword] = useState(false);
   const [page, setPage] = useState(1);
   const [detailSessionPage, setDetailSessionPage] = useState(1);
@@ -60,8 +85,10 @@ export function UsersAndRolesView({
   const [isLoadingUserLogs, setIsLoadingUserLogs] = useState(false);
   const [isLoadingUserSessions, setIsLoadingUserSessions] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isCreateUserConfirmOpen, setIsCreateUserConfirmOpen] = useState(false);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const pageSize = 4;
+  const selectedCommunity = communities.find((community) => community.id === selectedCommunityId) ?? null;
   const userMessageClassName =
     messageTone === "error" ? "form-error" : messageTone === "success" ? "form-success" : "form-info";
   const createUserMessageClassName =
@@ -94,6 +121,14 @@ export function UsersAndRolesView({
     const query = searchQuery.trim();
     const isManualRefresh = options.manual === true;
     const refreshStartedAt = Date.now();
+    const cacheKey = [selectedCommunityId ?? "all", communityRoleFilter ?? "all", statusFilter, query, page, pageSize].join("|");
+    const cached = userPageCache.get(cacheKey);
+    if (cached && !isManualRefresh) {
+      setUsers(cached.items);
+      setTotalUsers(cached.totalCount);
+      setHasLoadedUsers(true);
+      return;
+    }
     if (isManualRefresh) {
       setIsRefreshing(true);
     } else {
@@ -104,11 +139,14 @@ export function UsersAndRolesView({
       const userResult = await api.listUsers(token, {
         query,
         status: statusFilter,
+        communityId: selectedCommunityId,
+        communityRoleId: communityRoleFilter,
         page,
         pageSize,
       });
       setUsers(userResult.items ?? []);
       setTotalUsers(userResult.totalCount ?? 0);
+      userPageCache.set(cacheKey, { items: userResult.items ?? [], totalCount: userResult.totalCount ?? 0 });
       setHasLoadedUsers(true);
       if (isManualRefresh) {
         await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
@@ -130,11 +168,167 @@ export function UsersAndRolesView({
         setIsLoading(false);
       }
     }
-  }, [language, page, pageSize, searchQuery, showUserMessage, statusFilter, t, token]);
+  }, [communityRoleFilter, language, page, pageSize, searchQuery, selectedCommunityId, showUserMessage, statusFilter, t, token]);
+
+  const loadCommunityContext = useCallback(async () => {
+    if (!token || token.startsWith("demo-")) {
+      setIsLoadingCommunities(false);
+      return;
+    }
+
+    setIsLoadingCommunities(true);
+    try {
+      const communityResult = await api.listCommunities(token);
+      setCommunities(communityResult);
+      const nextCommunityId = activeUser.role === "SuperAdmin" ? selectedCommunityId : activeUser.communityId ?? null;
+      setSelectedCommunityId(nextCommunityId);
+      if (nextCommunityId) {
+        const roles = await api.listCommunityRoles(token, nextCommunityId);
+        setCommunityRoles(roles);
+        setCreateUserDraft((draft) => ({
+          ...draft,
+          communityRoleId: roles.some((role) => role.id === draft.communityRoleId)
+            ? draft.communityRoleId
+            : getUnassignedRoleId(roles) || roles[0]?.id || "",
+        }));
+      }
+    } catch (error) {
+      showUserMessage(localizeApiError(error, language, t("settings.loadFailed")), "error");
+    } finally {
+      setIsLoadingCommunities(false);
+    }
+  }, [activeUser.communityId, activeUser.role, language, selectedCommunityId, showUserMessage, t, token]);
+
+  const loadCommunitySummary = useCallback(async (force = false) => {
+    if (!token || token.startsWith("demo-") || !selectedCommunityId) {
+      setSelectedCommunitySummary(null);
+      setIsLoadingCommunitySummary(false);
+      return;
+    }
+
+    const cached = userCommunitySummaryCache.get(selectedCommunityId);
+    if (cached && !force) {
+      setSelectedCommunitySummary(cached);
+      return;
+    }
+
+    setIsLoadingCommunitySummary(true);
+    try {
+      const summary = await api.getCommunitySummary(token, selectedCommunityId);
+      userCommunitySummaryCache.set(selectedCommunityId, summary);
+      setSelectedCommunitySummary(summary);
+    } catch {
+      setSelectedCommunitySummary(null);
+    } finally {
+      setIsLoadingCommunitySummary(false);
+    }
+  }, [selectedCommunityId, token]);
+
+  const loadAllCommunitiesUserCount = useCallback(async (force = false) => {
+    const shouldLoad = activeUser.role === "SuperAdmin" && !selectedCommunityId;
+    if (!token || token.startsWith("demo-") || !shouldLoad) {
+      setAllCommunitiesUserCount(null);
+      setIsLoadingAllCommunitiesUserCount(false);
+      return;
+    }
+
+    const cached = allCommunitiesUserCountCache.get("all");
+    if (cached !== undefined && !force) {
+      setAllCommunitiesUserCount(cached);
+      return;
+    }
+
+    setIsLoadingAllCommunitiesUserCount(true);
+    try {
+      const result = await api.listUsers(token, { status: "All", page: 1, pageSize: 1 });
+      const count = result.totalCount ?? 0;
+      allCommunitiesUserCountCache.set("all", count);
+      setAllCommunitiesUserCount(count);
+    } finally {
+      setIsLoadingAllCommunitiesUserCount(false);
+    }
+  }, [activeUser.role, selectedCommunityId, token]);
 
   function refreshUsers() {
+    userPageCache.clear();
+    if (selectedCommunityId) {
+      userCommunitySummaryCache.delete(selectedCommunityId);
+      void loadCommunitySummary(true);
+    }
+    if (!selectedCommunityId) {
+      allCommunitiesUserCountCache.clear();
+      void loadAllCommunitiesUserCount(true);
+    }
     void loadUsers({ manual: true });
   }
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadCommunityContext();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [loadCommunityContext]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadCommunitySummary(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadCommunitySummary]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void loadAllCommunitiesUserCount(), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadAllCommunitiesUserCount]);
+
+  useEffect(() => {
+    async function loadRolesForCommunity() {
+      if (!token || token.startsWith("demo-") || !selectedCommunityId) {
+        setCommunityRoles([]);
+        setCommunityRoleFilter(null);
+        return;
+      }
+
+      try {
+        const roles = await api.listCommunityRoles(token, selectedCommunityId);
+        setCommunityRoles(roles);
+        setCreateUserDraft((draft) => ({
+          ...draft,
+          communityRoleId: roles.some((role) => role.id === draft.communityRoleId)
+            ? draft.communityRoleId
+            : getUnassignedRoleId(roles) || roles[0]?.id || "",
+        }));
+      } catch (error) {
+        showUserMessage(localizeApiError(error, language, t("settings.loadFailed")), "error");
+      }
+    }
+
+    void loadRolesForCommunity();
+  }, [language, selectedCommunityId, showUserMessage, t, token]);
+
+  useEffect(() => {
+    const communityId = activeUser.role === "SuperAdmin" ? createUserDraft.communityId : activeUser.communityId ?? "";
+    const timer = window.setTimeout(() => {
+      if (!token || token.startsWith("demo-") || !communityId) {
+        setCreateCommunityRoles([]);
+        return;
+      }
+
+      void api.listCommunityRoles(token, communityId)
+        .then((roles) => {
+          setCreateCommunityRoles(roles);
+          setCreateUserDraft((draft) => ({
+            ...draft,
+            communityId,
+            communityRoleId: roles.some((role) => role.id === draft.communityRoleId)
+              ? draft.communityRoleId
+              : getUnassignedRoleId(roles) || "",
+          }));
+        })
+        .catch((error) => showCreateUserMessage(localizeApiError(error, language, t("settings.loadFailed")), "error"));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeUser.communityId, activeUser.role, createUserDraft.communityId, language, showCreateUserMessage, t, token]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -147,7 +341,7 @@ export function UsersAndRolesView({
   const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visibleUsers = users;
-  const shouldShowUserSkeleton = !hasLoadedUsers || (isLoading && !visibleUsers.length);
+  const shouldShowUserSkeleton = !hasLoadedUsers || isLoading;
   const selectedUser = selectedUserId ? users.find((managedUser) => managedUser.id === selectedUserId) ?? null : null;
   const effectiveSelectedUserId = selectedUser?.id ?? null;
   const selectedUsername = selectedUser?.username.toLowerCase();
@@ -174,7 +368,8 @@ export function UsersAndRolesView({
     !!selectedUser &&
     !!accessDraft &&
     accessDraft.userId === selectedUser.id &&
-    (accessDraft.role !== selectedUser.role || accessDraft.status !== selectedUser.status);
+    (accessDraft.status !== selectedUser.status
+      || accessDraft.communityRoleId !== selectedUser.communityRoleId);
 
   const loadSelectedUserSessions = useCallback(
     async (userId: string) => {
@@ -231,7 +426,12 @@ export function UsersAndRolesView({
         return;
       }
 
-      setAccessDraft({ userId: selectedUser.id, role: selectedUser.role, status: selectedUser.status });
+      setAccessDraft({
+        userId: selectedUser.id,
+        status: selectedUser.status,
+        communityId: selectedUser.communityId,
+        communityRoleId: selectedUser.communityRoleId,
+      });
       setDetailSessionPage(1);
       void loadSelectedUserSessions(selectedUser.id);
       void loadSelectedUserLogs(selectedUser);
@@ -240,13 +440,65 @@ export function UsersAndRolesView({
     return () => window.clearTimeout(timer);
   }, [loadSelectedUserLogs, loadSelectedUserSessions, selectedUser]);
 
-  async function updateUserAccess(userId: string, role: Role, status: UserStatus) {
+  useEffect(() => {
+    let ignore = false;
+    const detailCommunityId = selectedUser?.communityId;
+    if (!token || token.startsWith("demo-") || !detailCommunityId) {
+      const timer = window.setTimeout(() => {
+        setDetailCommunityRoles([]);
+        setIsLoadingDetailCommunityRoles(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const timer = window.setTimeout(() => {
+      setIsLoadingDetailCommunityRoles(true);
+      void api.listCommunityRoles(token, detailCommunityId)
+        .then((roles) => {
+          if (!ignore) {
+            setDetailCommunityRoles(roles);
+          }
+        })
+        .catch((error) => {
+          if (!ignore) {
+            setDetailCommunityRoles([]);
+            showUserMessage(localizeApiError(error, language, t("settings.loadFailed")), "error");
+          }
+        })
+        .finally(() => {
+          if (!ignore) {
+            setIsLoadingDetailCommunityRoles(false);
+          }
+        });
+    }, 0);
+
+    return () => {
+      ignore = true;
+      window.clearTimeout(timer);
+    };
+  }, [language, selectedUser?.communityId, showUserMessage, t, token]);
+
+  async function updateUserAccess(
+    userId: string,
+    status: UserStatus,
+    communityId?: string | null,
+    communityRoleId?: string | null,
+  ) {
     if (!token) {
       return;
     }
 
     try {
-      await api.updateUserAccess(token, userId, role, status);
+      await api.updateUserAccess(token, userId, status, communityId, communityRoleId);
+      userPageCache.clear();
+      allCommunitiesUserCountCache.clear();
+      if (!selectedCommunityId) {
+        void loadAllCommunitiesUserCount(true);
+      }
+      if (communityId) {
+        userCommunitySummaryCache.delete(communityId);
+        await loadCommunitySummary(true);
+      }
       await loadUsers();
       showUserMessage(t("settings.userAccessUpdated"), "success");
     } catch (error) {
@@ -261,7 +513,10 @@ export function UsersAndRolesView({
 
     const payload = {
       ...createUserDraft,
+      role: "User" as Role,
       temporaryPassword: usesCustomTemporaryPassword ? createUserDraft.temporaryPassword : "",
+      communityId: createUserDraft.communityId || null,
+      communityRoleId: createUserDraft.communityRoleId || getUnassignedRoleId(createCommunityRoles),
     };
 
     setIsCreatingUser(true);
@@ -275,8 +530,15 @@ export function UsersAndRolesView({
         role: "User",
         status: "Active",
         temporaryPassword: "",
+        communityId: activeUser.role === "SuperAdmin" ? "" : activeUser.communityId ?? "",
+        communityRoleId: getUnassignedRoleId(createCommunityRoles),
       });
       setUsesCustomTemporaryPassword(false);
+      userPageCache.clear();
+      allCommunitiesUserCountCache.clear();
+      if (!selectedCommunityId) {
+        void loadAllCommunitiesUserCount(true);
+      }
       await loadUsers();
       setSelectedUserId(createdUser.id);
       showCreateUserMessage(t("users.userCreated", { username: createdUser.username }), "success");
@@ -287,8 +549,12 @@ export function UsersAndRolesView({
     }
   }
 
-  function requestUserAccessChange(managedUser: UserAdmin, role: Role, status: UserStatus) {
-    if (managedUser.role === role && managedUser.status === status) {
+  function selectUser(managedUser: UserAdmin) {
+    setSelectedUserId(managedUser.id);
+  }
+
+  function requestUserAccessChange(managedUser: UserAdmin, status: UserStatus, communityRoleId?: string | null) {
+    if (managedUser.status === status && managedUser.communityRoleId === communityRoleId) {
       return;
     }
 
@@ -297,10 +563,10 @@ export function UsersAndRolesView({
       userId: managedUser.id,
       displayName: managedUser.displayName,
       username: managedUser.username,
-      fromRole: managedUser.role,
-      toRole: role,
       fromStatus: managedUser.status,
       toStatus: status,
+      fromCommunityRoleName: managedUser.communityRoleName,
+      toCommunityRoleName: detailCommunityRoles.find((communityRole) => communityRole.id === communityRoleId)?.name,
     });
   }
 
@@ -309,7 +575,7 @@ export function UsersAndRolesView({
       return;
     }
 
-    requestUserAccessChange(selectedUser, accessDraft.role, accessDraft.status);
+    requestUserAccessChange(selectedUser, accessDraft.status, accessDraft.communityRoleId);
   }
 
   async function confirmUserAccessChange() {
@@ -319,7 +585,30 @@ export function UsersAndRolesView({
 
     const change = pendingAccessChange;
     setPendingAccessChange(null);
-    await updateUserAccess(change.userId, change.toRole, change.toStatus);
+    await updateUserAccess(change.userId, change.toStatus, accessDraft?.communityId ?? selectedUser?.communityId, accessDraft?.communityRoleId);
+  }
+
+  async function resetSelectedUserPassword() {
+    if (!token || !selectedUser || activeUser.role !== "SuperAdmin") {
+      return;
+    }
+
+    setIsResettingPassword(true);
+    setPasswordResetFeedback({ tone: "loading", text: "Gecici sifre hazirlaniyor..." });
+    try {
+      await api.resetUserPasswordByAdmin(token, selectedUser.id, {
+        useManualPassword: passwordResetDraft.useManualPassword,
+        temporaryPassword: passwordResetDraft.useManualPassword ? passwordResetDraft.temporaryPassword : null,
+      });
+      setPasswordResetDraft({ useManualPassword: false, temporaryPassword: "" });
+      userPageCache.clear();
+      await loadUsers();
+      setPasswordResetFeedback({ tone: "success", text: "Gecici sifre e-posta ile gonderildi." });
+    } catch (error) {
+      setPasswordResetFeedback({ tone: "error", text: localizeApiError(error, language, "Sifre sifirlanamadi.") });
+    } finally {
+      setIsResettingPassword(false);
+    }
   }
 
   function requestSessionRevoke(session: UserSession) {
@@ -347,6 +636,7 @@ export function UsersAndRolesView({
     try {
       await api.revokeUserSession(token, revoke.userId, revoke.sessionId);
       await loadSelectedUserSessions(revoke.userId);
+      userPageCache.clear();
       await loadUsers();
       showUserMessage(t("settings.sessionRevoked"), "success");
     } catch (error) {
@@ -373,6 +663,11 @@ export function UsersAndRolesView({
       await api.deleteUser(token, deletion.userId);
       setSelectedUserId(null);
       setSelectedUserSessions([]);
+      userPageCache.clear();
+      allCommunitiesUserCountCache.clear();
+      if (!selectedCommunityId) {
+        void loadAllCommunitiesUserCount(true);
+      }
       await loadUsers();
       showUserMessage(t("users.userDeleted", { username: deletion.username }), "success");
     } catch (error) {
@@ -402,7 +697,7 @@ export function UsersAndRolesView({
       </div>
 
       <div className="identity-section">
-        <div className="filter-toolbar">
+        <div className="filter-toolbar users-filter-toolbar">
           <label className="search-field">
             <Search size={16} />
             <input
@@ -429,6 +724,67 @@ export function UsersAndRolesView({
               <option value="All">{t("users.statusAll")}</option>
             </select>
           </label>
+          <div className="user-community-scope">
+            <Building2 aria-hidden="true" size={17} />
+            <div>
+              {activeUser.role === "SuperAdmin" ? (
+                <>
+                  <select
+                    value={selectedCommunityId ?? ""}
+                    onChange={(event) => {
+                      setSelectedCommunityId(event.target.value || null);
+                      setCommunityRoleFilter(null);
+                      setPage(1);
+                      setSelectedUserId(null);
+                    }}
+                  >
+                    <option value="">Tum topluluklar</option>
+                    {communities.map((community) => (
+                      <option key={community.id} value={community.id}>
+                        {community.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!selectedCommunityId ? (
+                    <small className="all-communities-summary">
+                      {isLoadingCommunities || isLoadingAllCommunitiesUserCount || allCommunitiesUserCount === null
+                        ? <InlineValueLoader label="Toplam kullanici sayisi yukleniyor" />
+                        : `${communities.length} topluluk · ${allCommunitiesUserCount} kullanici`}
+                    </small>
+                  ) : null}
+                </>
+              ) : (
+                <strong>{activeUser.communityName}</strong>
+              )}
+            </div>
+            {selectedCommunityId ? (
+              <span className="community-member-count">
+                {isLoadingCommunitySummary || !selectedCommunitySummary ? <InlineValueLoader label="Uye sayisi yukleniyor" /> : `${selectedCommunitySummary.memberCount} uye`}
+              </span>
+            ) : null}
+          </div>
+          {selectedCommunityId ? (
+            <label className="filter-select-field compact-filter-field">
+              <UserCog size={16} />
+              <select
+                value={communityRoleFilter ?? ""}
+                onChange={(event) => {
+                  setCommunityRoleFilter(event.target.value || null);
+                  setPage(1);
+                }}
+              >
+                <option value="">Tum roller</option>
+                {communityRoles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+        </div>
+        <div className="status-line">
+          {selectedCommunity ? `${selectedCommunity.name} toplulugundaki kullanicilar` : activeUser.role === "SuperAdmin" ? "Tum topluluklardaki kullanicilar" : activeUser.communityName}
         </div>
         {message ? <div className={userMessageClassName}>{message}</div> : null}
       </div>
@@ -459,7 +815,7 @@ export function UsersAndRolesView({
                 <button
                   className={`secondary-button context-button ${selectedUserId === managedUser.id ? "is-active" : ""}`}
                   type="button"
-                  onClick={() => setSelectedUserId(managedUser.id)}
+                  onClick={() => selectUser(managedUser)}
                 >
                   {t("users.viewDetail")}
                 </button>
@@ -476,7 +832,7 @@ export function UsersAndRolesView({
             totalPages={totalPages}
           />
         </section>
-        <section className="identity-section user-create-disclosure">
+        <section className="identity-section user-create-disclosure user-create-left-panel">
           <div className="section-toolbar">
             <div>
               <span className="eyebrow">{t("users.createEyebrow")}</span>
@@ -496,74 +852,18 @@ export function UsersAndRolesView({
           </div>
           {isCreateUserOpen ? (
             <div className="admin-create-panel">
-              <p className="helper-copy">{t("users.createDescription")}</p>
               <div className="admin-create-grid">
-                <input
-                  value={createUserDraft.username}
-                  onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, username: event.target.value }))}
-                  placeholder={t("login.username")}
-                />
-                <input
-                  value={createUserDraft.displayName}
-                  onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, displayName: event.target.value }))}
-                  placeholder={t("login.displayName")}
-                />
-                <input
-                  value={createUserDraft.email}
-                  onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, email: event.target.value }))}
-                  placeholder={t("login.email")}
-                  type="email"
-                />
-                {usesCustomTemporaryPassword ? (
-                  <input
-                    value={createUserDraft.temporaryPassword}
-                    onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: event.target.value }))}
-                    placeholder={t("users.temporaryPassword")}
-                    type="password"
-                  />
-                ) : (
-                  <div className="generated-password-placeholder">
-                    <Sparkles size={16} />
-                    <span>{t("users.autoTemporaryPassword")}</span>
-                  </div>
-                )}
-                <select
-                  value={createUserDraft.role}
-                  onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, role: event.target.value as Role }))}
-                >
-                  <option value="Admin">Admin</option>
-                  <option value="User">User</option>
-                  <option value="Approver">Approver</option>
-                </select>
-                <select
-                  value={createUserDraft.status}
-                  onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, status: event.target.value as UserStatus }))}
-                >
-                  <option value="PendingApproval">{t("settings.statusPending")}</option>
-                  <option value="Active">{t("settings.statusActive")}</option>
-                  <option value="Rejected">{t("settings.statusRejected")}</option>
-                </select>
-                <small className="admin-create-note">
-                  {usesCustomTemporaryPassword ? t("users.customTemporaryPasswordMailNote") : t("users.temporaryPasswordMailNote")}
-                </small>
+                <input value={createUserDraft.username} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, username: event.target.value }))} placeholder={t("login.username")} />
+                <input value={createUserDraft.displayName} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, displayName: event.target.value }))} placeholder={t("login.displayName")} />
+                <input value={createUserDraft.email} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, email: event.target.value }))} placeholder={t("login.email")} type="email" />
+                {usesCustomTemporaryPassword ? <input value={createUserDraft.temporaryPassword} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: event.target.value }))} placeholder={t("users.temporaryPassword")} type="password" /> : <div className="generated-password-placeholder"><Sparkles size={16} /><span>{t("users.autoTemporaryPassword")}</span></div>}
+                {activeUser.role === "SuperAdmin" ? <select value={createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityId: event.target.value, communityRoleId: "" }))}><option value="">Topluluk secin</option>{communities.map((community) => <option key={community.id} value={community.id}>{community.name}</option>)}</select> : null}
+                <select value={createUserDraft.communityRoleId} disabled={!createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityRoleId: event.target.value }))}><option value="">Topluluk rolu secin</option>{createCommunityRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
               </div>
+              {!createUserDraft.communityId ? <p className="helper-copy">Kullanicinin bagli olacagi toplulugu secin; ardindan topluluk rolunu atayin.</p> : null}
               <div className="admin-create-actions">
-                <label className="checkbox-line custom-password-toggle compact-password-toggle">
-                  <input
-                    checked={usesCustomTemporaryPassword}
-                    onChange={(event) => {
-                      setUsesCustomTemporaryPassword(event.target.checked);
-                      if (!event.target.checked) {
-                        setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: "" }));
-                      }
-                    }}
-                    type="checkbox"
-                  />
-                  <span>{t("users.useCustomTemporaryPassword")}</span>
-                </label>
-                <button className="success-button create-user-submit-button" type="button" disabled={isCreatingUser} onClick={createUser}>
-                  {isCreatingUser ? t("users.creatingUser") : t("users.createUser")}
-                </button>
+                <label className="checkbox-line custom-password-toggle compact-password-toggle"><input checked={usesCustomTemporaryPassword} onChange={(event) => { setUsesCustomTemporaryPassword(event.target.checked); if (!event.target.checked) setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: "" })); }} type="checkbox" /><span>{t("users.useCustomTemporaryPassword")}</span></label>
+                <button className="success-button create-user-submit-button" type="button" disabled={isCreatingUser || !createUserDraft.communityId || !createUserDraft.communityRoleId} onClick={() => setIsCreateUserConfirmOpen(true)}>{isCreatingUser ? t("users.creatingUser") : t("users.createUser")}</button>
               </div>
               {createUserMessage ? <div className={createUserMessageClassName}>{createUserMessage}</div> : null}
             </div>
@@ -593,8 +893,13 @@ export function UsersAndRolesView({
                   <strong>{selectedUser.username}</strong>
                 </article>
                 <article className="settings-row">
-                  <span>{t("session.role")}</span>
-                  <strong>{roleLabel(language, selectedUser.role)}</strong>
+                  <span>Topluluk rolu</span>
+                  <strong>{selectedUser.communityRoleName || "Atanmadi"}</strong>
+                  <small>{selectedUser.communityName || "Topluluk atanmadi"}</small>
+                </article>
+                <article className="settings-row">
+                  <span>Topluluk</span>
+                  <strong>{selectedUser.communityName || "-"}</strong>
                 </article>
                 <article className="settings-row">
                   <span>{t("settings.emailStatus")}</span>
@@ -612,26 +917,30 @@ export function UsersAndRolesView({
               </div>
               <div className="access-editor">
                 <select
-                  value={accessDraft?.role ?? selectedUser.role}
+                  value={accessDraft?.communityRoleId ?? selectedUser.communityRoleId ?? ""}
                   onChange={(event) =>
                     setAccessDraft({
                       userId: selectedUser.id,
-                      role: event.target.value as Role,
                       status: accessDraft?.status ?? selectedUser.status,
+                      communityId: selectedUser.communityId,
+                      communityRoleId: event.target.value,
                     })
                   }
                 >
-                  <option value="Admin">Admin</option>
-                  <option value="User">User</option>
-                  <option value="Approver">Approver</option>
+                  {detailCommunityRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
                 </select>
                 <select
                   value={accessDraft?.status ?? selectedUser.status}
                   onChange={(event) =>
                     setAccessDraft({
                       userId: selectedUser.id,
-                      role: accessDraft?.role ?? selectedUser.role,
                       status: event.target.value as UserStatus,
+                      communityId: selectedUser.communityId,
+                      communityRoleId: accessDraft?.communityRoleId ?? selectedUser.communityRoleId,
                     })
                   }
                 >
@@ -642,12 +951,20 @@ export function UsersAndRolesView({
                 <button
                   className="primary-button"
                   type="button"
-                  disabled={!hasDraftChanges}
+                  disabled={!hasDraftChanges || isLoadingDetailCommunityRoles}
                   onClick={requestDraftAccessChange}
                 >
                   {t("users.applyAccessChange")}
                 </button>
               </div>
+              {activeUser.role === "SuperAdmin" && selectedUser.role !== "SuperAdmin" ? (
+                <div className="password-reset-inline">
+                  <button className="danger-button" disabled={isResettingPassword} onClick={() => setIsPasswordResetConfirmOpen(true)} type="button">
+                    {isResettingPassword ? "Gonderiliyor" : "Sifreyi sifirla"}
+                  </button>
+                  <ActionFeedback feedback={passwordResetFeedback} />
+                </div>
+              ) : null}
               <section className="identity-section nested-identity-section">
                 <div className="section-toolbar">
                   <div>
@@ -744,6 +1061,46 @@ export function UsersAndRolesView({
           onConfirm={confirmUserDelete}
         />
       ) : null}
+      {isPasswordResetConfirmOpen && selectedUser ? (
+        <ConfirmationDialog
+          eyebrow="Sifre sifirlama"
+          title={`${selectedUser.displayName} icin gecici sifre gonderilsin mi?`}
+          description="Varsayilan akista guclu bir gecici sifre uretilir, e-posta ile gonderilir ve kullanici ilk giriste sifresini degistirmek zorunda kalir."
+          confirmLabel={passwordResetDraft.useManualPassword ? "Manuel sifreyi uygula" : "Gecici sifre gonder"}
+          onCancel={() => {
+            setIsPasswordResetConfirmOpen(false);
+            setPasswordResetDraft({ useManualPassword: false, temporaryPassword: "" });
+          }}
+          onConfirm={() => {
+            setIsPasswordResetConfirmOpen(false);
+            void resetSelectedUserPassword();
+          }}
+        >
+          <label className="checkbox-line custom-password-toggle compact-password-toggle">
+            <input
+              checked={passwordResetDraft.useManualPassword}
+              onChange={(event) => setPasswordResetDraft((draft) => ({ ...draft, useManualPassword: event.target.checked, temporaryPassword: event.target.checked ? draft.temporaryPassword : "" }))}
+              type="checkbox"
+            />
+            <span>Manuel sifre belirle (tavsiye edilmez)</span>
+          </label>
+          {passwordResetDraft.useManualPassword ? <input className="inline-password-input" value={passwordResetDraft.temporaryPassword} onChange={(event) => setPasswordResetDraft((draft) => ({ ...draft, temporaryPassword: event.target.value }))} placeholder="En az 8 karakter" type="password" /> : null}
+        </ConfirmationDialog>
+      ) : null}
+      {isCreateUserConfirmOpen ? (
+        <ConfirmationDialog
+          eyebrow="Kullanici olusturma"
+          title={`${createUserDraft.username || "Yeni kullanici"} olusturulsun mu?`}
+          description="Kullanici secilen topluluk ve role baglanir. Gecici sifre e-posta ile iletilir ve ilk giriste sifre degisimi zorunlu olur."
+          confirmLabel="Kullaniciyi olustur"
+          tone="primary"
+          onCancel={() => setIsCreateUserConfirmOpen(false)}
+          onConfirm={() => {
+            setIsCreateUserConfirmOpen(false);
+            void createUser();
+          }}
+        />
+      ) : null}
       {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
     </section>
   );
@@ -764,6 +1121,10 @@ function UserManagementSkeleton() {
       ))}
     </>
   );
+}
+
+function getUnassignedRoleId(roles: CommunityRole[]) {
+  return roles.find((role) => role.templateKey === "unassigned")?.id ?? roles.find((role) => role.name.toLowerCase() === "atanmadi")?.id ?? "";
 }
 
 function waitForMinimumDelay(startedAt: number, minimumDelayMs: number) {

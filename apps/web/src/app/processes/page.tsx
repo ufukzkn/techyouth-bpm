@@ -6,7 +6,7 @@ import { ProcessBoardDraft } from "@/features/processes/ProcessBoardDraft";
 export default function ProcessesPage() {
   return (
     <WorkspaceShell viewId="processes">
-      {({ user }) => <ProcessBoardDraft mode="processes" role={user.role} />}
+      {() => <ProcessBoardDraft mode="processes" />}
     </WorkspaceShell>
   );
 }

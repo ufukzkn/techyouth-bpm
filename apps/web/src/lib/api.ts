@@ -1,27 +1,36 @@
 import type {
   CreateFormRequest,
+  CreateCommunityRequest,
+  CreateCommunityRoleRequest,
   CreateUserAdminRequest,
+  AdminPasswordResetRequest,
+  AdminPasswordResetResponse,
   EmailVerificationStartResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   FormDefinition,
+  Community,
+  CommunityRole,
+  CommunitySummary,
   LoginResponse,
+  NotificationItem,
   PagedResult,
   ProcessDetail,
   ProcessSummary,
   ProcessTask,
   RegisterResponse,
+  RoleTemplate,
   ResetPasswordRequest,
   StartProcessRequest,
   SystemAuditCategoryCounts,
   SystemAuditLog,
   TaskActionRequest,
   UpdateProfileRequest,
+  UpdateCommunityRequest,
   User,
   UserAdmin,
   UserSession,
   UserStatus,
-  Role,
   ChangePasswordRequest,
 } from "@/lib/types";
 
@@ -30,6 +39,12 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5
 type ApiErrorPayload = {
   errors?: string[];
 };
+
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -77,6 +92,9 @@ async function request<T>(path: string, init?: RequestInit & { token?: string })
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    if (response.status === 401 && init?.token) {
+      unauthorizedHandler?.();
+    }
     throw new ApiError(payload.errors ?? ["Request failed."], response.status);
   }
 
@@ -104,10 +122,10 @@ function normalizePagedResult<T>(value: PagedResult<T> | T[], page = 1, pageSize
 }
 
 export const api = {
-  register(username: string, displayName: string, email: string, password: string) {
+  register(username: string, displayName: string, email: string, password: string, communityCode: string) {
     return request<RegisterResponse>("/api/auth/register", {
       method: "POST",
-      body: JSON.stringify({ username, displayName, email, password }),
+      body: JSON.stringify({ username, displayName, email, password, communityCode }),
     });
   },
   login(username: string, password: string, rememberMe = false) {
@@ -184,7 +202,7 @@ export const api = {
   },
   listUsers(
     token: string,
-    params: { query?: string; status?: UserStatus | "All"; page?: number; pageSize?: number } = {},
+    params: { query?: string; status?: UserStatus | "All"; communityId?: string | null; communityRoleId?: string | null; page?: number; pageSize?: number } = {},
   ) {
     const search = new URLSearchParams();
     if (params.query) {
@@ -192,6 +210,12 @@ export const api = {
     }
     if (params.status && params.status !== "All") {
       search.set("status", params.status);
+    }
+    if (params.communityId) {
+      search.set("communityId", params.communityId);
+    }
+    if (params.communityRoleId) {
+      search.set("communityRoleId", params.communityRoleId);
     }
     if (params.page) {
       search.set("page", String(params.page));
@@ -211,11 +235,74 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  updateUserAccess(token: string, userId: string, role: Role, status: UserStatus) {
+  updateUserAccess(
+    token: string,
+    userId: string,
+    status: UserStatus,
+    communityId?: string | null,
+    communityRoleId?: string | null,
+  ) {
     return request<UserAdmin>(`/api/users/${userId}/access`, {
       method: "PATCH",
       token,
-      body: JSON.stringify({ role, status }),
+      body: JSON.stringify({ role: "User", status, communityId, communityRoleId }),
+    });
+  },
+  listCommunities(token: string) {
+    return request<Community[]>("/api/communities", { token });
+  },
+  createCommunity(token: string, payload: CreateCommunityRequest) {
+    return request<Community>("/api/communities", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateCommunity(token: string, communityId: string, payload: UpdateCommunityRequest) {
+    return request<Community>(`/api/communities/${communityId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  regenerateCommunityInviteCode(token: string, communityId: string) {
+    return request<Community>(`/api/communities/${communityId}/invite-code/regenerate`, {
+      method: "PATCH",
+      token,
+    });
+  },
+  getCommunitySummary(token: string, communityId: string) {
+    return request<CommunitySummary>(`/api/communities/${communityId}/summary`, { token });
+  },
+  listRoleTemplates(token: string) {
+    return request<RoleTemplate[]>("/api/communities/role-templates", { token });
+  },
+  listCommunityRoles(token: string, communityId: string) {
+    return request<CommunityRole[]>(`/api/communities/${communityId}/roles`, { token });
+  },
+  createCommunityRole(token: string, communityId: string, payload: CreateCommunityRoleRequest) {
+    return request<CommunityRole>(`/api/communities/${communityId}/roles`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateCommunityRole(token: string, communityId: string, roleId: string, payload: CreateCommunityRoleRequest) {
+    return request<CommunityRole>(`/api/communities/${communityId}/roles/${roleId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({
+        name: payload.name,
+        description: payload.description,
+        permissions: payload.permissions,
+      }),
+    });
+  },
+  deleteCommunityRole(token: string, communityId: string, roleId: string, replacementRoleId: string) {
+    return request<void>(`/api/communities/${communityId}/roles/${roleId}`, {
+      method: "DELETE",
+      token,
+      body: JSON.stringify({ replacementRoleId }),
     });
   },
   deleteUser(token: string, userId: string) {
@@ -226,6 +313,22 @@ export const api = {
   },
   revokeUserSession(token: string, userId: string, sessionId: string) {
     return request<void>(`/api/users/${userId}/sessions/${sessionId}`, { method: "DELETE", token });
+  },
+  resetUserPasswordByAdmin(token: string, userId: string, payload: AdminPasswordResetRequest) {
+    return request<AdminPasswordResetResponse>(`/api/users/${userId}/password-reset-by-admin`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  listNotifications(token: string) {
+    return request<NotificationItem[]>("/api/notifications", { token });
+  },
+  markNotificationRead(token: string, notificationId: string) {
+    return request<void>(`/api/notifications/${notificationId}/read`, { method: "PATCH", token });
+  },
+  markAllNotificationsRead(token: string) {
+    return request<void>("/api/notifications/read-all", { method: "POST", token });
   },
   listSystemAuditLogs(
     token: string,

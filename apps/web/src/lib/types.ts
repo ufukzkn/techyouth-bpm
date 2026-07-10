@@ -1,4 +1,6 @@
-export type Role = "Admin" | "User" | "Approver";
+// Platform seviyesinde yalnizca SuperAdmin ayricaliklidir. Diger tum erisim,
+// kullanicinin aktif topluluk rolu ve onun izinlerinden gelir.
+export type Role = "SuperAdmin" | "User";
 export type UserStatus = "PendingApproval" | "Active" | "Rejected";
 
 export type User = {
@@ -10,7 +12,25 @@ export type User = {
   status: UserStatus;
   isEmailVerified: boolean;
   mustChangePassword: boolean;
+  communityId?: string | null;
+  communityName: string;
+  communityRoleId?: string | null;
+  communityRoleName: string;
+  permissions: PermissionName[];
 };
+
+export type PermissionName =
+  | "Community.ManageUsers"
+  | "Community.ManageRoles"
+  | "Community.ManageAdmins"
+  | "Forms.View"
+  | "Forms.Create"
+  | "Forms.Update"
+  | "Processes.View"
+  | "Processes.Start"
+  | "Tasks.View"
+  | "Tasks.Act"
+  | "Audit.View";
 
 export type LoginResponse = {
   token: string;
@@ -67,6 +87,17 @@ export type CreateUserAdminRequest = {
   role: Role;
   status: UserStatus;
   temporaryPassword: string;
+  communityId?: string | null;
+  communityRoleId?: string | null;
+};
+
+export type AdminPasswordResetRequest = {
+  useManualPassword: boolean;
+  temporaryPassword?: string | null;
+};
+
+export type AdminPasswordResetResponse = {
+  message: string;
 };
 
 export type EmailVerificationStartResponse = {
@@ -120,6 +151,8 @@ export type FormDefinition = {
   id: string;
   name: string;
   description: string;
+  communityId: string;
+  communityName: string;
   createdByUserId: string;
   createdAt: string;
   fields: FormFieldDefinition[];
@@ -129,6 +162,7 @@ export type CreateFormRequest = {
   name: string;
   description: string;
   fields: Omit<FormFieldDefinition, "id">[];
+  communityId?: string | null;
 };
 
 export type ProcessStatus = "Pending" | "InProgress" | "Completed" | "Rejected";
@@ -138,7 +172,9 @@ export type WorkflowAction = "Start" | "Approve" | "Reject";
 export type ProcessTask = {
   id: string;
   processInstanceId: string;
-  assignedRole: Role;
+  assignedCommunityRoleId?: string | null;
+  assignedCommunityRoleName: string;
+  requiredPermission: PermissionName;
   status: ProcessTaskStatus;
   availableActions: WorkflowAction[];
   createdAt: string;
@@ -184,6 +220,8 @@ export type ProcessSummary = {
   id: string;
   formDefinitionId: string;
   formName: string;
+  communityId: string;
+  communityName: string;
   status: ProcessStatus;
   startedAt: string;
   completedAt?: string | null;
@@ -203,4 +241,69 @@ export type StartProcessRequest = {
 export type TaskActionRequest = {
   action: WorkflowAction;
   note?: string;
+};
+
+export type Community = {
+  id: string;
+  name: string;
+  description: string;
+  inviteCode: string;
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type CommunityRole = {
+  id: string;
+  communityId: string;
+  name: string;
+  description: string;
+  templateKey: string;
+  isSystemRole: boolean;
+  permissions: PermissionName[];
+};
+
+export type RoleTemplate = {
+  key: string;
+  name: string;
+  description: string;
+  permissions: PermissionName[];
+};
+
+export type CreateCommunityRequest = {
+  name: string;
+  description: string;
+  inviteCode?: string;
+  isActive: boolean;
+};
+
+export type UpdateCommunityRequest = CreateCommunityRequest;
+
+export type CreateCommunityRoleRequest = {
+  name: string;
+  description: string;
+  templateKey: string;
+  permissions: PermissionName[];
+};
+
+export type CommunityRoleCount = {
+  communityRoleId: string;
+  communityRoleName: string;
+  userCount: number;
+};
+
+export type CommunitySummary = {
+  communityId: string;
+  memberCount: number;
+  roleCounts: CommunityRoleCount[];
+};
+
+export type NotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  entityType?: string | null;
+  entityId?: string | null;
+  createdAt: string;
+  readAt?: string | null;
 };

@@ -9,16 +9,15 @@ import { ProcessListView } from "@/features/processes/ProcessListView";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { actionLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { api, ApiError } from "@/lib/api";
-import type { ProcessDetail, ProcessSummary, ProcessTask, Role, WorkflowAction } from "@/lib/types";
+import type { ProcessDetail, ProcessSummary, ProcessTask, WorkflowAction } from "@/lib/types";
 
 type ProcessBoardDraftProps = {
   mode: "processes" | "tasks";
-  role: Role;
 };
 
 const minimumRefreshDelayMs = 500;
 
-export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
+export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const token = useSessionStore((state) => state.token);
   const language = useSessionStore((state) => state.language);
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
@@ -186,7 +185,6 @@ export function ProcessBoardDraft({ mode, role }: ProcessBoardDraftProps) {
               <MyTasksView
                 tasks={tasks}
                 language={language}
-                role={role}
                 status={status}
                 onExecuteTask={executeTask}
               />

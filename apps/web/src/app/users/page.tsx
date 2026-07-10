@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function UsersPage() {
-  redirect("/management");
+  redirect("/management/users");
 }

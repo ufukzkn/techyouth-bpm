@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { KeyRound, LogIn, MailCheck, UserPlus } from "lucide-react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
@@ -37,6 +38,7 @@ function getInitialAuthState(language: "tr" | "en"): InitialAuthState {
 }
 
 export function LoginView() {
+  const router = useRouter();
   const { clearSessionNotice, language, sessionNotice, setSession, theme, toggleLanguage, toggleTheme } =
     useSessionStore();
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
@@ -44,6 +46,7 @@ export function LoginView() {
   const [username, setUsername] = useState(initialAuthState.username);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
+  const [communityCode, setCommunityCode] = useState("");
   const [password, setPassword] = useState("");
   const [resetToken, setResetToken] = useState(initialAuthState.resetToken);
   const [verificationCode, setVerificationCode] = useState("");
@@ -95,13 +98,14 @@ export function LoginView() {
     const submittedUsername = String(formData.get("username") ?? "").trim();
     const submittedDisplayName = String(formData.get("displayName") ?? "").trim();
     const submittedEmail = String(formData.get("email") ?? "").trim();
+    const submittedCommunityCode = String(formData.get("communityCode") ?? "").trim();
     const submittedPassword = String(formData.get("password") ?? "");
     const submittedResetToken = String(formData.get("resetToken") ?? "").trim();
     const submittedVerificationCode = String(formData.get("verificationCode") ?? "").trim();
     const submittedRememberMe = formData.get("rememberMe") === "on";
 
     if (mode === "register") {
-      if (!submittedUsername || !submittedDisplayName || !submittedEmail || !submittedPassword) {
+      if (!submittedUsername || !submittedDisplayName || !submittedEmail || !submittedPassword || !submittedCommunityCode) {
         setIsLoading(false);
         setError(t("login.registerRequired"));
         return;
@@ -113,6 +117,7 @@ export function LoginView() {
           submittedDisplayName,
           submittedEmail,
           submittedPassword,
+          submittedCommunityCode,
         );
         setSuccessMessage(t("login.registerPending", { username: registration.username }));
         setMode("login");
@@ -201,11 +206,13 @@ export function LoginView() {
     try {
       const session = await api.login(submittedUsername, submittedPassword, submittedRememberMe);
       setSession(session);
+      router.replace("/dashboard");
     } catch (apiError) {
       const demoSession = loginWithDemoUser(submittedUsername, submittedPassword, submittedRememberMe);
 
       if (demoSession) {
         setSession(demoSession);
+        router.replace("/dashboard");
         return;
       }
 
@@ -280,6 +287,19 @@ export function LoginView() {
                   }}
                   autoComplete="email"
                   type="email"
+                />
+              </label>
+              <label>
+                {t("login.communityCode")}
+                <input
+                  name="communityCode"
+                  value={communityCode}
+                  onChange={(event) => {
+                    setCommunityCode(event.target.value.toUpperCase());
+                    setSuccessMessage(null);
+                  }}
+                  autoComplete="off"
+                  maxLength={5}
                 />
               </label>
             </>
