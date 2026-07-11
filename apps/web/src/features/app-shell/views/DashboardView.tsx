@@ -201,7 +201,7 @@ export function DashboardView({
                   strokeDashoffset={segment.dashOffset}
                   tabIndex={0}
                   aria-label={`${segment.label}: %${segment.percentage}`}
-                  data-active={activeChartSegment?.key === segment.key}
+                  data-active={activeChartSegment ? activeChartSegment.key === segment.key : undefined}
                   onBlur={() => {
                     setHoveredChartSegment(null);
                     setChartTooltipPosition(null);

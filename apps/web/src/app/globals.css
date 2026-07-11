@@ -1114,6 +1114,15 @@ input[type="checkbox"] {
 .chart-segment-completed {
   cursor: pointer;
   pointer-events: stroke;
+  transition: opacity 200ms ease, stroke-width 200ms ease;
+}
+.chart-segment-open[data-active="false"],
+.chart-segment-progress[data-active="false"],
+.chart-segment-completed[data-active="false"] {
+  opacity: 0.3;
+}
+.dashboard-donut-svg circle[data-active="true"] {
+  stroke-width: 18;
 }
 .chart-segment-open { stroke: var(--orange); }
 .chart-segment-progress { stroke: var(--primary); }
@@ -1131,6 +1140,7 @@ input[type="checkbox"] {
   pointer-events: none;
   font-size: 26px;
   font-weight: 900;
+  transition: none;
 }
 
 .dashboard-donut-value .inline-value-loader {
@@ -1141,6 +1151,7 @@ input[type="checkbox"] {
 }
 
 .dashboard-donut .chart-hover-tooltip {
+  position: absolute;
   z-index: 2;
   min-width: 42px;
   padding: 5px 7px;
@@ -1155,6 +1166,7 @@ input[type="checkbox"] {
   pointer-events: none;
   text-align: center;
   transform: translate(-50%, calc(-100% - 10px));
+  transition: none;
 }
 
 .dashboard-donut.is-loading {
