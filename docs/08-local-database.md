@@ -104,6 +104,12 @@ Current tables:
 
 - `Users`: demo users, emails, roles, approval status, email verification state, failed login counters, lockout timestamps and PBKDF2 password hashes.
 - `UserSessions`: session ids, hashed opaque bearer session tokens, expiry times, last-seen timestamps and revoke timestamps.
+- `RefreshTokens`: hashed rotating remember-me tokens tied to access sessions and devices.
+- `Communities`: BPM working groups such as Sportif Faaliyetler, Lojistik and Urun Siparisi.
+- `Notifications`: DB-backed user notifications for task/access/process events and read state.
+- `CommunityRoles`: custom roles inside one community.
+- `CommunityRolePermissions`: operation permissions attached to community roles.
+- `UserCommunityMemberships`: active user/community/role assignments.
 - `FormDefinitions`: saved dynamic form definitions.
 - `FormFieldDefinitions`: fields belonging to a form definition.
 - `FieldValidationRules`: dependent validation rules such as required-when.
@@ -116,41 +122,66 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 
 ## Seed Data
 
-`DatabaseSeeder` creates the demo users on startup if they do not already exist:
+`DatabaseSeeder` creates the demo users on startup if they do not already exist. The same deterministic seeder is used by local SQLite, Neon and both Docker stacks:
 
 | Username | Password | Role | Status | Email verified |
 | --- | --- | --- | --- | --- |
-| `admin` | `admin123` | Admin | Active | true |
+| `admin` | `admin123` | SuperAdmin | Active | true |
 | `user` | `user123` | User | Active | true |
 | `approver` | `approver123` | Approver | Active | true |
 | `mario.gomez` | `mario123` | User | PendingApproval | false |
 | `quaresma` | `trivela123` | Approver | Active | true |
 | `atiba` | `atiba123` | User | Active | true |
-| `alex` | `alex123` | User | Rejected | true |
-| `fatih.terim` | `imparator123` | Admin | PendingApproval | false |
+| `alex` | `alex123` | Admin | Active | true |
+| `fatih.terim` | `imparator123` | Admin | Active | true |
+| `sergen.yalcin` | `sergen123` | Approver | Active | true |
+| `tuncay.sanli` | `tuncay123` | User | Active | true |
+| `volkan.demirel` | `volkan123` | User | Rejected | true |
 
 Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
 
-Session tokens are stored as SHA-256 hashes. Active sessions include created time, last seen time, IP address and user agent, then can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`.
+Session tokens are stored as SHA-256 hashes. Active sessions include created time, last seen time, IP address, user agent and remembered-device state, then can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`. Remember-me sessions also create hashed rows in `RefreshTokens`; refresh tokens are rotated when used and revoked together with their access session.
 
-The current local setup uses `EnsureCreated`, not formal migrations. Identity schema additions for `Users.MustChangePassword`, `UserSessions.IpAddress` and `UserSessions.UserAgent` are patched idempotently by `DatabaseSeeder` on startup for SQLite and PostgreSQL. If a local database still behaves strangely after schema changes, reset local SQLite before testing:
+The current setup uses formal EF Core migrations. API startup calls `Database.MigrateAsync()` first, then `DatabaseSeeder` adds deterministic demo users, forms, processes, tasks and audit rows. `DatabaseSeeder` should not create or patch tables anymore; schema changes belong in migrations under `apps/api/src/TechYouthBpm.Infrastructure/Data/Migrations`.
+
+Local demo still defaults to SQLite. PostgreSQL/Neon uses the same EF model and migration files, so provider-specific changes should be tested against PostgreSQL before the final shared demo. Existing databases created during the earlier `EnsureCreated` phase are disposable; reset/recreate them before relying on migrations:
 
 ```powershell
 ./scripts/run-api-local.ps1 -ResetDb -Force
 ```
 
+Migration commands:
+
+```powershell
+dotnet tool restore
+dotnet tool run dotnet-ef database update --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj
+```
+
+When adding a schema change:
+
+```powershell
+$env:Database__Provider = "PostgreSql"
+$env:ConnectionStrings__DefaultConnection = "Host=localhost;Port=5432;Database=techyouth_bpm;Username=postgres;Password=postgres"
+dotnet tool run dotnet-ef migrations add DescriptiveMigrationName --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj --output-dir Data/Migrations
+```
+
 When mock data is enabled, the seeder also creates:
 
+- Five demo communities: `Sportif Faaliyetler`, `Lojistik`, `Urun Siparisi`, `Insan Kaynaklari` and `Satin Alma`.
+- Registration codes: `SPOR1`, `LOG01`, `URUN1`, `IK001` and `SAT01`.
+- Eight active memberships in each community, distributed across community admin, form designer, process starter, approver, standard user, observer and unassigned roles. Each community includes an unassigned pending user for the approval demo.
+- Built-in community roles such as `Topluluk Admin`, `Form Tasarimcisi`, `Surec Baslatici`, `Onay Sorumlusu`, `Lojistik Gorevlisi` and `Salt Okuyucu`.
+- Blank `Atanmadi` roles for pending/new users.
 - `Transfer Talep Formu`
 - `Kamp Hazirlik Onay Formu`
-- 8 demo process instances.
-- 4 open approver tasks.
+- 12 demo process instances.
+- 6 open approver tasks.
 - completed/rejected examples with audit logs.
 - system audit examples for registration, login, role/status updates, form updates, process start and task approval.
 
 The seeded form/process data uses deterministic IDs and is idempotent, so restarting the API does not duplicate records. Resetting the SQLite database with `-ResetDb -Force` recreates the full demo scenario.
 
-Mock user, process and log names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim and Senol Gunes. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
+Mock user, process and log names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim, Senol Gunes, Sergen Yalcin, Tuncay Sanli and Volkan Demirel. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
 
 ## Maintenance Rule
 
@@ -158,7 +189,6 @@ Whenever the team adds a new entity, table, seed value, migration strategy or de
 
 - Update this file.
 - Update `docs/04-api-and-services.md` if an endpoint/service behavior changes.
+- Add or update an EF Core migration for schema changes.
 - Update `scripts/run-api-local.ps1` if local startup/reset behavior changes.
 - Keep real database files, credentials and connection strings out of git.
-
-For now the API uses `EnsureCreated` for fast demo setup. If the project moves to formal EF Core migrations, document the migration commands here and update the helper script accordingly.

@@ -6,9 +6,9 @@ The team split is flow-based. Each person owns one user journey end to end, incl
 
 | Owner | Flow | Main Outcome |
 | --- | --- | --- |
-| Ufuk | Access, shell and dashboard | User can enter the app, see role-aware navigation and understand the workspace. |
-| Ozgun Saz | Form design and form run | Admin can design a form model; user can fill it with validation. |
-| Cagdas Kaplan | Process, tasks and review | A submitted form becomes a process with tasks, actions, status and audit history. |
+| Ufuk | Access, shell, dashboard and management | User can enter the app, see permission-aware navigation and manage community access. |
+| Ozgun Saz | Form design and form run | Authorized users can design community-scoped forms and run them with validation. |
+| Cagdas Kaplan | Process, tasks and review | A submitted community-scoped form becomes a process with permission-aware tasks, actions, status and audit history. |
 
 ## Ufuk: Access, Shell And Dashboard Flow
 
@@ -19,7 +19,9 @@ Production tasks:
 - Protected app shell after login.
 - Header with active user information.
 - Left menu filtered by role.
+- Left menu filtered by active community permissions.
 - Dashboard cards for pending, in-progress and completed work.
+- Community name and community role context on the dashboard.
 - Dashboard shortcuts that route users to role-available workflow screens.
 - Session expiry visibility in the top bar and settings screen.
 - Settings page draft for theme and user preferences.
@@ -29,6 +31,8 @@ Backend/API touchpoints:
 - `POST /api/auth/login`
 - `GET /api/auth/me`
 - Role data returned from auth response.
+- Community and permission data returned from auth response.
+- Community and custom role APIs.
 
 Frontend files and areas:
 
@@ -42,13 +46,15 @@ Tests and review notes:
 
 - Login success and failure scenarios.
 - Role-based menu visibility.
+- Permission-based menu visibility.
 - Role-aware dashboard shortcut visibility.
+- SuperAdmin vs community-admin management visibility.
 - Theme/session persistence behavior.
 - Expired/invalid session handling.
 
 Presentation angle:
 
-How users enter the system and how role information shapes the interface.
+How users enter the system and how community permissions shape the interface.
 
 ## Ozgun Saz: Form Design And Form Run Flow
 
@@ -59,6 +65,7 @@ Production tasks:
 - Field properties: key, label, type, required, sort order and options.
 - Field ordering with drag/drop or simple move controls.
 - Form definition JSON preview.
+- Community-scoped form visibility and create/update permissions.
 - Dynamic form runner for filling a designed form.
 - Required, type-based and dependent validation.
 - Submit loading, success and error states.
@@ -69,6 +76,7 @@ Backend/API touchpoints:
 - `POST /api/forms`
 - `GET /api/forms/{id}`
 - Backend form data validation used when starting a process.
+- Form APIs now enforce `Forms.View`, `Forms.Create` and `Forms.Update`.
 
 Frontend files and areas:
 
@@ -87,6 +95,10 @@ Presentation angle:
 
 How a form is represented as data and rendered dynamically instead of being hardcoded.
 
+Current ownership note:
+
+Ozgun owns the form UX and validation story. The first community-scope API support exists, but the final form UI should make the active community explicit and keep permission-denied states clean.
+
 ## Cagdas Kaplan: Process, Tasks And Review Flow
 
 Production tasks:
@@ -95,6 +107,7 @@ Production tasks:
 - Process list and process detail.
 - My tasks list.
 - Approve/reject actions.
+- Task visibility/action permission checks.
 - Status display: pending, in progress, completed and rejected.
 - Audit log display.
 - Code review narrative around state machine and service boundaries.
@@ -123,12 +136,17 @@ Tests and review notes:
 - Valid state transitions.
 - Invalid state transitions.
 - Unauthorized task action.
+- Community/custom-role scoped task action.
 - Audit log entry after every process action.
 - Action notes are collected before approve/reject and persisted through audit logs.
 
 Presentation angle:
 
 How BPM is modeled with statuses, tasks, actions and traceable transitions.
+
+Current ownership note:
+
+Cagdas owns the final process/task permission story. The first backend permission checks are in place; the next refinement is process definition level assignment, such as a logistics step that requires a more specific task permission or community role.
 
 ## Integration Rules
 

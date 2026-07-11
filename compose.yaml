@@ -1,0 +1,33 @@
+name: eczacibasi-local
+
+services:
+  api:
+    image: techyouth-bpm-api:local
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__Provider: Sqlite
+      ConnectionStrings__DefaultConnection: Data Source=/data/techyouth-bpm.db
+      Frontend__BaseUrl: http://localhost:3000
+      Seed__MockData: "true"
+    volumes:
+      - sqlite-data:/data
+    ports:
+      - "5291:8080"
+
+  web:
+    image: techyouth-bpm-web:local
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:5291
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  sqlite-data:

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using TechYouthBpm.Api;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Services;
 
@@ -26,6 +27,35 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
             ResolveClientIpAddress(),
             Request.Headers.UserAgent.ToString(),
             cancellationToken);
+        if (result.IsSuccess)
+        {
+            AppendAuthCookies(result.Value!);
+        }
+
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [EnableRateLimiting("auth")]
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        var refreshToken = Request.Cookies.TryGetValue(AuthCookieNames.RefreshToken, out var cookieRefreshToken)
+            ? cookieRefreshToken
+            : string.Empty;
+        var result = await AuthService.RefreshSessionAsync(
+            refreshToken,
+            ResolveClientIpAddress(),
+            Request.Headers.UserAgent.ToString(),
+            cancellationToken);
+        if (result.IsSuccess)
+        {
+            AppendAuthCookies(result.Value!);
+        }
+        else
+        {
+            ClearAuthCookies();
+        }
+
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -40,6 +70,23 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
         var result = await AuthService.LogoutAsync(CurrentToken(), cancellationToken);
+        ClearAuthCookies();
+        return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
+    }
+
+    [EnableRateLimiting("auth")]
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await AuthService.ForgotPasswordAsync(request, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [EnableRateLimiting("auth")]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
+    {
+        var result = await AuthService.ResetPasswordAsync(request, cancellationToken);
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
@@ -121,6 +168,79 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
 
         var result = await AuthService.ConfirmEmailVerificationAsync(request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [EnableRateLimiting("auth")]
+    [HttpPost("public-email-verification/start")]
+    public async Task<IActionResult> StartPublicEmailVerification(
+        PublicEmailVerificationStartRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await AuthService.StartPublicEmailVerificationAsync(request, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [EnableRateLimiting("auth")]
+    [HttpPost("public-email-verification/confirm")]
+    public async Task<IActionResult> ConfirmPublicEmailVerification(
+        PublicEmailVerificationConfirmRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await AuthService.ConfirmPublicEmailVerificationAsync(request, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    private void AppendAuthCookies(LoginResponse session)
+    {
+        var accessOptions = BuildCookieOptions(session.ExpiresAt, httpOnly: true);
+        Response.Cookies.Append(AuthCookieNames.AccessToken, session.Token, accessOptions);
+
+        if (!string.IsNullOrWhiteSpace(session.RefreshToken))
+        {
+            Response.Cookies.Append(
+                AuthCookieNames.RefreshToken,
+                session.RefreshToken,
+                BuildCookieOptions(session.RefreshTokenExpiresAt ?? session.ExpiresAt, httpOnly: true));
+        }
+
+        if (!string.IsNullOrWhiteSpace(session.CsrfToken))
+        {
+            Response.Cookies.Append(
+                AuthCookieNames.CsrfToken,
+                session.CsrfToken,
+                BuildCookieOptions(session.ExpiresAt, httpOnly: false));
+        }
+    }
+
+    private void ClearAuthCookies()
+    {
+        var options = new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = SameSiteMode.Lax,
+            Secure = Request.IsHttps
+        };
+        Response.Cookies.Delete(AuthCookieNames.AccessToken, options);
+        Response.Cookies.Delete(AuthCookieNames.RefreshToken, options);
+        Response.Cookies.Delete(
+            AuthCookieNames.CsrfToken,
+            new CookieOptions
+            {
+                HttpOnly = false,
+                SameSite = SameSiteMode.Lax,
+                Secure = Request.IsHttps
+            });
+    }
+
+    private CookieOptions BuildCookieOptions(DateTime expiresAt, bool httpOnly)
+    {
+        return new CookieOptions
+        {
+            HttpOnly = httpOnly,
+            SameSite = SameSiteMode.Lax,
+            Secure = Request.IsHttps,
+            Expires = new DateTimeOffset(DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc))
+        };
     }
 
     private string? ResolveClientIpAddress()

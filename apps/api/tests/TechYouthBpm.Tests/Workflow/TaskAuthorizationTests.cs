@@ -33,7 +33,7 @@ public class TaskAuthorizationTests
         var (_, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
 
         var service = new TaskService(db, new ProcessStateMachine());
-        var approverDto = new UserDto(approver.Id, approver.Username, approver.DisplayName, Role.Approver);
+        var approverDto = TestDbFactory.ToDto(approver);
 
         var result = await service.ExecuteActionAsync(task.Id, new TaskActionRequest(WorkflowAction.Approve, "Approved."), approverDto);
 
@@ -49,7 +49,7 @@ public class TaskAuthorizationTests
         var (_, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
 
         var service = new TaskService(db, new ProcessStateMachine());
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, Role.Admin);
+        var adminDto = TestDbFactory.ToDto(admin);
 
         var result = await service.ExecuteActionAsync(task.Id, new TaskActionRequest(WorkflowAction.Reject, "Admin rejected."), adminDto);
 
@@ -66,7 +66,7 @@ public class TaskAuthorizationTests
         var (_, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
 
         var service = new TaskService(db, new ProcessStateMachine());
-        var approverDto = new UserDto(approver.Id, approver.Username, approver.DisplayName, Role.Approver);
+        var approverDto = TestDbFactory.ToDto(approver);
 
         // First action should succeed
         var first = await service.ExecuteActionAsync(task.Id, new TaskActionRequest(WorkflowAction.Approve, "Approved."), approverDto);
@@ -89,5 +89,26 @@ public class TaskAuthorizationTests
 
         Assert.False(result.IsSuccess);
         Assert.Contains(result.Errors, e => e.Contains("not found", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ExecuteActionAsync_Rejects_Task_When_Community_Is_Deactivated()
+    {
+        await using var db = TestDbFactory.Create();
+        var starter = TestDbFactory.SeedUser(db, Role.Admin, "starter");
+        var approver = TestDbFactory.SeedUser(db, Role.Approver, "approver");
+        var (_, task) = TestDbFactory.SeedOpenApproverTask(db, starter);
+        db.Communities.Single(community => community.Id == TestDbFactory.CommunityId).IsActive = false;
+        await db.SaveChangesAsync();
+        var service = new TaskService(db, new ProcessStateMachine());
+
+        var result = await service.ExecuteActionAsync(
+            task.Id,
+            new TaskActionRequest(WorkflowAction.Approve, "Should be blocked."),
+            TestDbFactory.ToDto(approver));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("community is not active", result.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ProcessTaskStatus.Open, db.ProcessTasks.Single(item => item.Id == task.Id).Status);
     }
 }

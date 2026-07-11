@@ -2,6 +2,7 @@ import { AlertTriangle, KeyRound, Save, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AllSessionsRevokeDialog, OwnSessionRevokeDialog } from "@/features/app-shell/components/AccessDialogs";
 import { DisclosureSection } from "@/features/app-shell/components/DisclosureSection";
+import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
 import { formatCountdown, formatIpAddress, formatSessionExpiry, summarizeUserAgent } from "@/features/app-shell/sessionFormatters";
 import type { PendingSessionRevoke, SettingsSectionId, StatusTone } from "@/features/app-shell/types";
@@ -50,6 +51,7 @@ export function SettingsView({
   const [isRequestingVerification, setIsRequestingVerification] = useState(false);
   const [pendingOwnSessionRevoke, setPendingOwnSessionRevoke] = useState<PendingSessionRevoke | null>(null);
   const [isAllSessionsRevokeOpen, setIsAllSessionsRevokeOpen] = useState(false);
+  const [isPasswordChangeConfirmOpen, setIsPasswordChangeConfirmOpen] = useState(false);
   const [sessionPage, setSessionPage] = useState(1);
   const [openSettingsSections, setOpenSettingsSections] = useState<Record<SettingsSectionId, boolean>>({
     profile: false,
@@ -397,7 +399,7 @@ export function SettingsView({
         </section>
       ) : null}
 
-      <div className="settings-disclosure-stack">
+      <div className="settings-action-grid">
         <DisclosureSection
           eyebrow={t("settings.profile")}
           icon={<Save size={20} />}
@@ -450,13 +452,15 @@ export function SettingsView({
               className={user.mustChangePassword ? "primary-button danger-button" : "primary-button"}
               type="button"
               disabled={!isApiSession || isChangingPassword || !currentPassword || !newPassword}
-              onClick={changePassword}
+              onClick={() => setIsPasswordChangeConfirmOpen(true)}
             >
               {isChangingPassword ? t("common.saving") : t("settings.changePassword")}
             </button>
           </div>
         </DisclosureSection>
+      </div>
 
+      <div className="settings-disclosure-stack">
         <DisclosureSection
           eyebrow={t("settings.sessions")}
           icon={<ShieldCheck size={22} />}
@@ -480,6 +484,7 @@ export function SettingsView({
                 <small>{t("settings.createdAt", { value: formatSessionExpiry(session.createdAt, language) })}</small>
                 <small>{t("settings.device", { value: summarizeUserAgent(session.userAgent, language) })}</small>
                 <small>{t("settings.ipAddress", { value: formatIpAddress(session.ipAddress, language) })}</small>
+                <small>{t(session.rememberedDevice ? "settings.rememberedDevice" : "settings.standardSession")}</small>
               </div>
               <button
                 className="secondary-button danger-button"
@@ -529,6 +534,20 @@ export function SettingsView({
           language={language}
           onCancel={() => setIsAllSessionsRevokeOpen(false)}
           onConfirm={confirmAllSessionsRevoke}
+        />
+      ) : null}
+      {isPasswordChangeConfirmOpen ? (
+        <ConfirmationDialog
+          eyebrow="Sifre degisikligi"
+          title="Sifreniz degistirilsin mi?"
+          description="Yeni sifre kaydedildikten sonra mevcut oturumunuz korunur; dilerseniz ayarlardan diger cihazlari ayrica kapatabilirsiniz."
+          confirmLabel="Sifreyi degistir"
+          tone="primary"
+          onCancel={() => setIsPasswordChangeConfirmOpen(false)}
+          onConfirm={() => {
+            setIsPasswordChangeConfirmOpen(false);
+            void changePassword();
+          }}
         />
       ) : null}
     </section>

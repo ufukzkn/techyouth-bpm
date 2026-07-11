@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Primitives;
+using System.Text.RegularExpressions;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Domain.Entities;
@@ -28,7 +29,7 @@ public class AuthServiceTests
 
         var result = await service.LoginAsync(new LoginRequest("admin", "admin123"));
 
-        Assert.True(result.IsSuccess);
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
         Assert.NotEmpty(result.Value!.Token);
         var storedSession = Assert.Single(db.UserSessions);
         Assert.NotEqual(result.Value.Token, storedSession.Token);
@@ -53,7 +54,7 @@ public class AuthServiceTests
 
         var result = await service.LoginAsync(new LoginRequest("user", "user123"));
 
-        Assert.True(result.IsSuccess);
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
         Assert.StartsWith("pbkdf2:v1:", db.Users.Single().Password, StringComparison.Ordinal);
     }
 
@@ -80,7 +81,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task LoginAsync_Uses_Long_Duration_When_Remember_Me_Is_Selected()
+    public async Task LoginAsync_Keeps_Access_Session_Short_When_Remember_Me_Is_Selected()
     {
         await using var db = TestDbFactory.Create();
         db.Users.Add(new User
@@ -98,26 +99,160 @@ public class AuthServiceTests
         var result = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value!.ExpiresAt > DateTime.UtcNow.AddDays(20));
+        Assert.True(result.Value!.ExpiresAt < DateTime.UtcNow.AddMinutes(2));
+        Assert.True(db.RefreshTokens.Single().ExpiresAt > DateTime.UtcNow.AddDays(20));
+    }
+
+    [Fact]
+    public async Task LoginAsync_RememberMe_Creates_Hashed_Refresh_Token_And_Remembered_Session()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEmpty(result.Value!.RefreshToken);
+        Assert.NotEmpty(result.Value.CsrfToken);
+        var storedRefreshToken = Assert.Single(db.RefreshTokens);
+        var storedSession = Assert.Single(db.UserSessions);
+        Assert.True(storedSession.RememberedDevice);
+        Assert.NotEqual(result.Value.RefreshToken, storedRefreshToken.Token);
+        Assert.Equal(64, storedRefreshToken.Token.Length);
+    }
+
+    [Fact]
+    public async Task RefreshSessionAsync_Rotates_Refresh_Token_And_Replaces_Access_Session()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var login = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
+
+        var refresh = await service.RefreshSessionAsync(login.Value!.RefreshToken);
+
+        Assert.True(refresh.IsSuccess);
+        Assert.NotEqual(login.Value.Token, refresh.Value!.Token);
+        Assert.NotEqual(login.Value.RefreshToken, refresh.Value.RefreshToken);
+        Assert.Equal(2, db.UserSessions.Count());
+        Assert.Equal(2, db.RefreshTokens.Count());
+        Assert.NotNull(db.UserSessions.OrderBy(session => session.CreatedAt).First().RevokedAt);
+        Assert.NotNull(db.RefreshTokens.OrderBy(token => token.CreatedAt).First().RevokedAt);
+    }
+
+    [Fact]
+    public async Task RefreshSessionAsync_Reused_Refresh_Token_Revokes_Active_Sessions()
+    {
+        await using var db = TestDbFactory.Create();
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "admin",
+            DisplayName = "Admin User",
+            Email = "admin@test.local",
+            Password = "admin123",
+            Role = Role.Admin,
+            Status = UserStatus.Active
+        });
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+        var login = await service.LoginAsync(new LoginRequest("admin", "admin123", true));
+        var firstRefresh = await service.RefreshSessionAsync(login.Value!.RefreshToken);
+
+        var reuse = await service.RefreshSessionAsync(login.Value.RefreshToken);
+
+        Assert.True(firstRefresh.IsSuccess);
+        Assert.False(reuse.IsSuccess);
+        Assert.All(db.UserSessions, session => Assert.NotNull(session.RevokedAt));
     }
 
     [Fact]
     public async Task RegisterAsync_Creates_Pending_Unverified_User()
     {
         await using var db = TestDbFactory.Create();
+        TestDbFactory.EnsureCommunityModel(db);
+        await db.SaveChangesAsync();
         var service = new AuthService(db, CreateTestConfiguration());
 
         var result = await service.RegisterAsync(new RegisterRequest(
             "newuser",
             "New User",
             "newuser@test.local",
-            "password123"));
+            "password123",
+            "TEST1"));
 
-        Assert.True(result.IsSuccess);
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
         var user = Assert.Single(db.Users);
         Assert.Equal(UserStatus.PendingApproval, user.Status);
         Assert.False(user.IsEmailVerified);
         Assert.StartsWith("pbkdf2:v1:", user.Password, StringComparison.Ordinal);
+        var membership = Assert.Single(db.UserCommunityMemberships);
+        Assert.Equal(TestDbFactory.CommunityId, membership.CommunityId);
+        Assert.Equal(TestDbFactory.UnassignedCommunityRoleId, membership.CommunityRoleId);
+        Assert.True(membership.IsActive);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_Rejects_Invalid_Community_Code_Without_Creating_User()
+    {
+        await using var db = TestDbFactory.Create();
+        TestDbFactory.EnsureCommunityModel(db);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.RegisterAsync(new RegisterRequest(
+            "outsider",
+            "Outside User",
+            "outsider@test.local",
+            "password123",
+            "WRONG"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Community code is invalid.", result.Errors);
+        Assert.Empty(db.Users);
+        Assert.Empty(db.UserCommunityMemberships);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_Notifies_Community_Managers_About_Pending_Approval()
+    {
+        await using var db = TestDbFactory.Create();
+        var manager = TestDbFactory.SeedUser(db, Role.Admin, "community-manager");
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.RegisterAsync(new RegisterRequest(
+            "pending-member",
+            "Pending Member",
+            "pending-member@test.local",
+            "password123",
+            "TEST1"));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        var notification = Assert.Single(db.Notifications.Where(item => item.UserId == manager.Id));
+        Assert.Equal("User.PendingApproval", notification.Type);
+        Assert.Equal("User", notification.EntityType);
+        Assert.Equal(result.Value!.Id.ToString(), notification.EntityId);
     }
 
     [Fact]
@@ -141,6 +276,63 @@ public class AuthServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.Empty(db.UserSessions);
+    }
+
+    [Fact]
+    public async Task LoginAsync_Rejects_User_From_Deactivated_Community()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = TestDbFactory.SeedUser(db, Role.User, "inactive-community-user");
+        user.Password = "password123";
+        db.Communities.Single(community => community.Id == TestDbFactory.CommunityId).IsActive = false;
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.LoginAsync(new LoginRequest(user.Username, "password123"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("community is not active", result.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(db.UserSessions);
+    }
+
+    [Fact]
+    public async Task LoginAsync_Allows_Community_Admin_To_Sign_In_To_A_Deactivated_Community()
+    {
+        await using var db = TestDbFactory.Create();
+        var communityAdmin = TestDbFactory.SeedUser(db, Role.Admin, "inactive-community-admin");
+        communityAdmin.Password = "password123";
+        db.Communities.Single(community => community.Id == TestDbFactory.CommunityId).IsActive = false;
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.LoginAsync(new LoginRequest(communityAdmin.Username, "password123"));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        Assert.Single(db.UserSessions);
+    }
+
+    [Fact]
+    public async Task ListUsersAsync_Filters_By_Any_Selected_Status()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
+        var activeUser = TestDbFactory.SeedUser(db, Role.User, "active-user");
+        var pendingUser = TestDbFactory.SeedUser(db, Role.User, "pending-user");
+        var rejectedUser = TestDbFactory.SeedUser(db, Role.User, "rejected-user");
+        activeUser.Status = UserStatus.Active;
+        pendingUser.Status = UserStatus.PendingApproval;
+        rejectedUser.Status = UserStatus.Rejected;
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.ListUsersAsync(
+            TestDbFactory.ToDto(admin),
+            new UserSearchRequest(Statuses: [UserStatus.Active, UserStatus.Rejected], Page: 1, PageSize: 20));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        Assert.Contains(result.Value!.Items, user => user.Id == activeUser.Id);
+        Assert.Contains(result.Value.Items, user => user.Id == rejectedUser.Id);
+        Assert.DoesNotContain(result.Value.Items, user => user.Id == pendingUser.Id);
     }
 
     [Fact]
@@ -223,7 +415,7 @@ public class AuthServiceTests
         var service = new AuthService(db, CreateTestConfiguration());
         var adminLogin = await service.LoginAsync(new LoginRequest("admin", "admin123"));
         await service.LoginAsync(new LoginRequest("user", "user123"));
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, admin.IsEmailVerified);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var sessions = await service.ListUserSessionsAsync(user.Id, adminDto, adminLogin.Value!.Token);
 
@@ -262,7 +454,7 @@ public class AuthServiceTests
         await service.LoginAsync(new LoginRequest("user", "user123"));
         var session = db.UserSessions.Single(item => item.UserId == user.Id);
 
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, admin.IsEmailVerified);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var revoke = await service.RevokeUserSessionAsync(user.Id, session.Id, adminDto);
 
@@ -271,7 +463,7 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task ListUserSessionsAsync_Rejects_Non_Admin()
+    public async Task ListUserSessionsAsync_Rejects_User_Without_Community_Management_Permission()
     {
         await using var db = TestDbFactory.Create();
         var user = new User
@@ -293,7 +485,7 @@ public class AuthServiceTests
         var sessions = await service.ListUserSessionsAsync(user.Id, userDto, "token");
 
         Assert.False(sessions.IsSuccess);
-        Assert.Contains("Only Admin users", sessions.Errors[0]);
+        Assert.Contains("Community management permission", sessions.Errors[0]);
     }
 
     [Fact]
@@ -338,7 +530,7 @@ public class AuthServiceTests
         db.Users.Add(admin);
         await db.SaveChangesAsync();
         var service = new AuthService(db, CreateTestConfiguration());
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var result = await service.CreateUserAsync(
             new CreateUserRequest("newuser", "New User", "new@test.local", Role.Approver, UserStatus.Active, "password123"),
@@ -350,6 +542,32 @@ public class AuthServiceTests
         Assert.False(created.IsEmailVerified);
         Assert.StartsWith("pbkdf2:v1:", created.Password, StringComparison.Ordinal);
         Assert.Contains(db.SystemAuditLogs, log => log.Action == "User.CreatedByAdmin");
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_Normalizes_Legacy_Platform_Role_And_Uses_Community_Role()
+    {
+        await using var db = TestDbFactory.Create();
+        var communityAdmin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.CreateUserAsync(
+            new CreateUserRequest(
+                "community-approver",
+                "Community Approver",
+                "community-approver@test.local",
+                Role.Approver,
+                UserStatus.Active,
+                "TempPass123!",
+                TestDbFactory.CommunityId,
+                TestDbFactory.ApproverCommunityRoleId),
+            TestDbFactory.ToDto(communityAdmin));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        var created = db.Users.Single(user => user.Username == "community-approver");
+        var membership = db.UserCommunityMemberships.Single(item => item.UserId == created.Id && item.IsActive);
+        Assert.Equal(Role.User, created.Role);
+        Assert.Equal(TestDbFactory.ApproverCommunityRoleId, membership.CommunityRoleId);
     }
 
     [Fact]
@@ -370,7 +588,7 @@ public class AuthServiceTests
         await db.SaveChangesAsync();
         var emailSender = new CapturingEmailSender();
         var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var result = await service.CreateUserAsync(
             new CreateUserRequest("newuser", "New User", "new@test.local", Role.User, UserStatus.Active, "TempPass123!"),
@@ -400,7 +618,7 @@ public class AuthServiceTests
         db.Users.Add(admin);
         await db.SaveChangesAsync();
         var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), new FailingEmailSender());
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var result = await service.CreateUserAsync(
             new CreateUserRequest("newuser", "New User", "new@test.local", Role.User, UserStatus.Active, "TempPass123!"),
@@ -429,7 +647,7 @@ public class AuthServiceTests
         await db.SaveChangesAsync();
         var emailSender = new CapturingEmailSender();
         var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var result = await service.CreateUserAsync(
             new CreateUserRequest("autouser", "Auto User", "auto@test.local", Role.User, UserStatus.Active, ""),
@@ -477,7 +695,7 @@ public class AuthServiceTests
         });
         await db.SaveChangesAsync();
         var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), new DemoEmailSender());
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var result = await service.DeleteUserAsync(user.Id, adminDto);
 
@@ -515,7 +733,7 @@ public class AuthServiceTests
         await db.SaveChangesAsync();
         TestDbFactory.SeedOpenApproverTask(db, user);
         var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), new DemoEmailSender());
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Email, admin.Role, admin.Status, true);
+        var adminDto = TestDbFactory.CommunityAdminDto(admin);
 
         var result = await service.DeleteUserAsync(user.Id, adminDto);
 
@@ -549,6 +767,95 @@ public class AuthServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.DoesNotContain(db.Users, item => item.Username == "newuser");
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_Allows_Only_SuperAdmin_To_Create_A_New_SuperAdmin()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+        var request = new CreateUserRequest(
+            "platform-admin",
+            "Platform Admin",
+            "platform-admin@test.local",
+            Role.SuperAdmin,
+            UserStatus.Active,
+            "TempPass123!");
+
+        var rejected = await service.CreateUserAsync(request, TestDbFactory.ToDto(admin));
+        var superAdmin = new UserDto(Guid.NewGuid(), "superadmin", "Super Admin", "superadmin@test.local", Role.SuperAdmin, UserStatus.Active, true);
+        var created = await service.CreateUserAsync(request, superAdmin);
+
+        Assert.False(rejected.IsSuccess);
+        Assert.True(created.IsSuccess, string.Join(" | ", created.Errors));
+        var newSuperAdmin = db.Users.Single(user => user.Username == "platform-admin");
+        Assert.Equal(Role.SuperAdmin, newSuperAdmin.Role);
+        Assert.Equal(UserStatus.Active, newSuperAdmin.Status);
+        Assert.Empty(db.UserCommunityMemberships.Where(membership => membership.UserId == newSuperAdmin.Id));
+    }
+
+    [Fact]
+    public async Task UpdateUserAccessAsync_Rejects_Promoting_Existing_User_To_SuperAdmin()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = TestDbFactory.SeedUser(db, Role.User, "existing-user");
+        var service = new AuthService(db, CreateTestConfiguration());
+        var superAdmin = new UserDto(Guid.NewGuid(), "superadmin", "Super Admin", "superadmin@test.local", Role.SuperAdmin, UserStatus.Active, true);
+
+        var result = await service.UpdateUserAccessAsync(
+            user.Id,
+            new UpdateUserAccessRequest(Role.SuperAdmin, UserStatus.Active),
+            superAdmin);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("cannot be promoted", result.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(Role.User, db.Users.Single(item => item.Id == user.Id).Role);
+    }
+
+    [Fact]
+    public async Task UpdateUserAccessAsync_Allows_SuperAdmin_To_Assign_A_Community_Role()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = TestDbFactory.SeedUser(db, Role.User, "role-target");
+        var service = new AuthService(db, CreateTestConfiguration());
+        var superAdmin = new UserDto(Guid.NewGuid(), "superadmin", "Super Admin", "superadmin@test.local", Role.SuperAdmin, UserStatus.Active, true);
+
+        var result = await service.UpdateUserAccessAsync(
+            user.Id,
+            new UpdateUserAccessRequest(
+                Role.User,
+                UserStatus.Active,
+                TestDbFactory.CommunityId,
+                TestDbFactory.ApproverCommunityRoleId),
+            superAdmin);
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        var activeMembership = db.UserCommunityMemberships.Single(membership => membership.UserId == user.Id && membership.IsActive);
+        Assert.Equal(TestDbFactory.CommunityId, activeMembership.CommunityId);
+        Assert.Equal(TestDbFactory.ApproverCommunityRoleId, activeMembership.CommunityRoleId);
+        Assert.Contains(db.UserCommunityMemberships, membership => membership.UserId == user.Id && !membership.IsActive);
+        var notification = Assert.Single(db.Notifications.Where(item => item.UserId == user.Id));
+        Assert.Equal("User.AccessUpdated", notification.Type);
+        Assert.Contains("Onay Sorumlusu", notification.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ResetPasswordByAdminAsync_Rejects_Community_Admin()
+    {
+        await using var db = TestDbFactory.Create();
+        var communityAdmin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
+        var member = TestDbFactory.SeedUser(db, Role.User, "community-member");
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var result = await service.ResetPasswordByAdminAsync(
+            member.Id,
+            new AdminPasswordResetRequest(),
+            TestDbFactory.ToDto(communityAdmin));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("Only SuperAdmin", result.Errors.Single(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -666,7 +973,91 @@ public class AuthServiceTests
         Assert.Single(emailSender.Messages);
     }
 
+    [Fact]
+    public async Task PublicEmailVerification_Allows_Pending_User_To_Verify_Email()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "pending",
+            DisplayName = "Pending User",
+            Email = "pending@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.PendingApproval,
+            IsEmailVerified = false
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var service = new AuthService(db, CreateTestConfiguration());
+
+        var start = await service.StartPublicEmailVerificationAsync(new PublicEmailVerificationStartRequest("pending"));
+        var confirm = await service.ConfirmPublicEmailVerificationAsync(
+            new PublicEmailVerificationConfirmRequest("pending", start.Value!.DemoCode));
+
+        Assert.True(start.IsSuccess);
+        Assert.True(confirm.IsSuccess);
+        Assert.True(db.Users.Single().IsEmailVerified);
+        Assert.Equal(UserStatus.PendingApproval, confirm.Value!.Status);
+    }
+
+    [Fact]
+    public async Task ResetPasswordAsync_Changes_Password_And_Revokes_Active_Sessions()
+    {
+        await using var db = TestDbFactory.Create();
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = "user",
+            DisplayName = "Regular User",
+            Email = "user@test.local",
+            Password = "password123",
+            Role = Role.User,
+            Status = UserStatus.Active
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+        var login = await service.LoginAsync(new LoginRequest("user", "password123", true));
+
+        var forgot = await service.ForgotPasswordAsync(new ForgotPasswordRequest("user@test.local"));
+        var token = ExtractSecurityToken(emailSender.Messages.Single().Body);
+        var reset = await service.ResetPasswordAsync(new ResetPasswordRequest("user", token, "new-password-123"));
+        var oldSessionUser = await service.GetUserByTokenAsync(login.Value!.Token);
+        var newLogin = await service.LoginAsync(new LoginRequest("user", "new-password-123"));
+
+        Assert.True(forgot.IsSuccess);
+        Assert.True(reset.IsSuccess);
+        Assert.Null(oldSessionUser);
+        Assert.True(newLogin.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_Does_Not_Reveal_Unknown_User()
+    {
+        await using var db = TestDbFactory.Create();
+        var emailSender = new CapturingEmailSender();
+        var service = new AuthService(db, CreateTestConfiguration(), new SystemAuditService(db), new OtpService(), emailSender);
+
+        var result = await service.ForgotPasswordAsync(new ForgotPasswordRequest("missing@test.local"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(emailSender.Messages);
+    }
+
     private static IConfiguration CreateTestConfiguration() => new TestConfiguration();
+
+    private static string ExtractSecurityToken(string htmlBody)
+    {
+        var match = Regex.Matches(htmlBody, "[A-Za-z0-9_-]{40,}")
+            .Select(item => item.Value)
+            .FirstOrDefault();
+
+        Assert.False(string.IsNullOrWhiteSpace(match));
+        return match!;
+    }
 
     private sealed class TestConfiguration : IConfiguration
     {

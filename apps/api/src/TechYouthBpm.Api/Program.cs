@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using TechYouthBpm.Api;
 using TechYouthBpm.Infrastructure;
 using TechYouthBpm.Infrastructure.Data;
 
@@ -58,7 +60,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins("http://localhost:3000")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -74,6 +77,40 @@ app.UseHttpsRedirection();
 
 app.UseCors("Web");
 app.UseRateLimiter();
+app.Use(async (context, next) =>
+{
+    var isApiMutation = context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+        && (HttpMethods.IsPost(context.Request.Method)
+            || HttpMethods.IsPut(context.Request.Method)
+            || HttpMethods.IsPatch(context.Request.Method)
+            || HttpMethods.IsDelete(context.Request.Method));
+    var isPublicAuthEndpoint = context.Request.Path.StartsWithSegments("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.StartsWithSegments("/api/auth/register", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.StartsWithSegments("/api/auth/refresh", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.StartsWithSegments("/api/auth/forgot-password", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.StartsWithSegments("/api/auth/reset-password", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.StartsWithSegments("/api/auth/public-email-verification", StringComparison.OrdinalIgnoreCase);
+    var hasBearerHeader = context.Request.Headers.Authorization.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+
+    if (isApiMutation
+        && !isPublicAuthEndpoint
+        && !hasBearerHeader
+        && context.Request.Cookies.ContainsKey(AuthCookieNames.AccessToken))
+    {
+        var csrfCookie = context.Request.Cookies[AuthCookieNames.CsrfToken];
+        var csrfHeader = context.Request.Headers[AuthCookieNames.CsrfHeader].ToString();
+        if (string.IsNullOrWhiteSpace(csrfCookie)
+            || string.IsNullOrWhiteSpace(csrfHeader)
+            || !string.Equals(csrfCookie, csrfHeader, StringComparison.Ordinal))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new { errors = new[] { "CSRF token is invalid." } });
+            return;
+        }
+    }
+
+    await next();
+});
 app.UseAuthorization();
 
 app.MapControllers();
@@ -82,6 +119,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var seedMockData = app.Configuration.GetValue("Seed:MockData", true);
+    await db.Database.MigrateAsync();
     await DatabaseSeeder.SeedAsync(db, seedMockData);
 }
 

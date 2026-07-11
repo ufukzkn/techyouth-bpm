@@ -2,20 +2,19 @@
 
 import { CheckCircle2, CircleDot, XCircle } from "lucide-react";
 import { useState } from "react";
-import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { TaskActionDialog } from "@/features/processes/TaskActionDialog";
 import { formatApiDateTime } from "@/lib/dateTime";
-import type { Language, ProcessTask, Role, WorkflowAction } from "@/lib/types";
+import type { Language, ProcessTask, WorkflowAction } from "@/lib/types";
 
 type MyTasksViewProps = {
   tasks: ProcessTask[];
   language: Language;
-  role: Role;
   status: "loading" | "refreshing" | "idle" | "acting" | "error";
   onExecuteTask: (taskId: string, action: Exclude<WorkflowAction, "Start">, note: string) => void;
 };
 
-export function MyTasksView({ tasks, language, role, status, onExecuteTask }: MyTasksViewProps) {
+export function MyTasksView({ tasks, language, status, onExecuteTask }: MyTasksViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const openTasks = tasks.filter((task) => task.status === "Open");
   const [pendingAction, setPendingAction] = useState<{
@@ -48,7 +47,7 @@ export function MyTasksView({ tasks, language, role, status, onExecuteTask }: My
                 <div>
                   <strong>{t("process.approvalTask")}</strong>
                   <span>
-                    {task.id.slice(0, 8)} - {roleLabel(language, task.assignedRole)}
+                    {task.id.slice(0, 8)} - {task.assignedCommunityRoleName || "Topluluk yetkisi"}
                   </span>
                   <small className="task-date">
                     {formatApiDateTime(task.createdAt, language)}
@@ -78,7 +77,7 @@ export function MyTasksView({ tasks, language, role, status, onExecuteTask }: My
             ))}
           </div>
         ) : (
-          <p className="empty-state">{t("process.noOpenTasks", { role: roleLabel(language, role) })}</p>
+          <p className="empty-state">{t("process.noOpenTasks", { role: language === "tr" ? "topluluk rolunuz" : "your community role" })}</p>
         )}
       </article>
 

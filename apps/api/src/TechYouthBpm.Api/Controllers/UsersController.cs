@@ -63,6 +63,22 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
+    [HttpPost("{userId:guid}/password-reset-by-admin")]
+    public async Task<IActionResult> ResetPasswordByAdmin(
+        Guid userId,
+        AdminPasswordResetRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await AuthService.ResetPasswordByAdminAsync(userId, request, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
     [HttpGet("{userId:guid}/sessions")]
     public async Task<IActionResult> Sessions(Guid userId, CancellationToken cancellationToken)
     {

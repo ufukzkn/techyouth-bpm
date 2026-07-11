@@ -19,8 +19,20 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
 
     public async Task<IReadOnlyList<ProcessTaskDto>> ListMyTasksAsync(UserDto user, CancellationToken cancellationToken = default)
     {
+        if (!user.HasPermission(PermissionNames.TasksView))
+        {
+            return [];
+        }
+
         var tasks = await db.ProcessTasks
-            .Where(task => task.Status == ProcessTaskStatus.Open && (task.AssignedRole == user.Role || user.Role == Role.Admin))
+            .Include(task => task.AssignedCommunityRole)
+            .Include(task => task.ProcessInstance)
+            .Where(task =>
+                task.Status == ProcessTaskStatus.Open
+                && (user.IsSuperAdmin()
+                    || (task.ProcessInstance != null
+                        && task.ProcessInstance.CommunityId == user.CommunityId
+                        && user.HasPermission(task.RequiredPermission))))
             .OrderByDescending(task => task.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -30,6 +42,7 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
     public async Task<Result<ProcessDetailDto>> ExecuteActionAsync(Guid taskId, TaskActionRequest request, UserDto user, CancellationToken cancellationToken = default)
     {
         var task = await db.ProcessTasks
+            .Include(item => item.AssignedCommunityRole)
             .Include(item => item.ProcessInstance)
             .ThenInclude(process => process!.FormDefinition)
             .SingleOrDefaultAsync(item => item.Id == taskId, cancellationToken);
@@ -44,7 +57,16 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             return Result<ProcessDetailDto>.Failure("Task is already closed.");
         }
 
-        if (user.Role != Role.Admin && task.AssignedRole != user.Role)
+        var isCommunityActive = await db.Communities.AnyAsync(
+            community => community.Id == task.ProcessInstance.CommunityId && community.IsActive,
+            cancellationToken);
+        if (!isCommunityActive)
+        {
+            return Result<ProcessDetailDto>.Failure("The task community is not active.");
+        }
+
+        if (!user.IsSuperAdmin()
+            && (task.ProcessInstance.CommunityId != user.CommunityId || !user.HasPermission(task.RequiredPermission)))
         {
             return Result<ProcessDetailDto>.Failure("Current user cannot execute this task.");
         }
@@ -55,6 +77,7 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             return Result<ProcessDetailDto>.Failure($"Action {request.Action} is not available for this task.");
         }
 
+        var processId = task.ProcessInstance.Id;
         var previousStatus = task.ProcessInstance.Status;
         var transition = stateMachine.Move(previousStatus, request.Action);
         if (!transition.IsSuccess)
@@ -84,21 +107,38 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             Note = request.Note ?? string.Empty
         });
 
+        if (task.ProcessInstance.StartedByUserId != user.Id)
+        {
+            db.Notifications.Add(new Notification
+            {
+                Id = Guid.NewGuid(),
+                UserId = task.ProcessInstance.StartedByUserId,
+                Type = $"Process.{transition.Value}",
+                Title = "Surec durumunuz guncellendi",
+                Message = $"Baslattiginiz surec {transition.Value} durumuna gecti.",
+                EntityType = "ProcessInstance",
+                EntityId = processId.ToString(),
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
             user,
             $"Task.{request.Action}",
             "ProcessTask",
             task.Id.ToString(),
-            $"Task action '{request.Action}' moved process '{task.ProcessInstance.Id}' from {previousStatus} to {transition.Value}.",
+            $"Task action '{request.Action}' moved process '{processId}' from {previousStatus} to {transition.Value}.",
             cancellationToken);
 
         var process = await db.ProcessInstances
             .Include(item => item.FormDefinition)
+            .Include(item => item.Community)
             .Include(item => item.Tasks)
+            .ThenInclude(task => task.AssignedCommunityRole)
             .Include(item => item.AuditLogs)
             .ThenInclude(log => log.User)
-            .SingleAsync(item => item.Id == task.ProcessInstanceId, cancellationToken);
+            .SingleAsync(item => item.Id == processId, cancellationToken);
 
         return Result<ProcessDetailDto>.Success(process.ToDetailDto());
     }

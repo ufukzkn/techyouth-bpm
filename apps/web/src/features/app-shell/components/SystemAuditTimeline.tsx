@@ -12,12 +12,14 @@ export function SystemAuditTimeline({
   emptyText,
   pageSize = 5,
   searchable = false,
+  isLoading = false,
 }: {
   logs: SystemAuditLog[];
   language: Language;
   emptyText: string;
   pageSize?: number;
   searchable?: boolean;
+  isLoading?: boolean;
 }) {
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
@@ -36,6 +38,14 @@ export function SystemAuditTimeline({
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visibleLogs = filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  if (isLoading) {
+    return (
+      <div className="timeline-reveal">
+        <p className="status-line">{t("common.loading")}</p>
+      </div>
+    );
+  }
 
   if (logs.length === 0) {
     return (

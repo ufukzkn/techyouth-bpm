@@ -11,9 +11,19 @@ public abstract class ApiControllerBase(IAuthService authService) : ControllerBa
     protected string CurrentToken()
     {
         var authorization = Request.Headers.Authorization.ToString();
-        return authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-            ? authorization["Bearer ".Length..].Trim()
-            : authorization;
+        if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            return authorization["Bearer ".Length..].Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(authorization))
+        {
+            return authorization;
+        }
+
+        return Request.Cookies.TryGetValue(AuthCookieNames.AccessToken, out var cookieToken)
+            ? cookieToken
+            : string.Empty;
     }
 
     protected async Task<UserDto?> CurrentUserAsync(CancellationToken cancellationToken)

@@ -47,22 +47,22 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         SystemAuditSearchRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!currentUser.HasPermission(PermissionNames.AuditView))
         {
-            return Result<PagedResult<SystemAuditLogDto>>.Failure("Only Admin users can view system audit logs.");
+            return Result<PagedResult<SystemAuditLogDto>>.Failure("Community management permission is required to view system audit logs.");
         }
 
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 100);
         var query = db.SystemAuditLogs
             .Include(log => log.ActorUser)
+            .ThenInclude(user => user!.CommunityMemberships)
             .AsQueryable();
 
-        query = ApplySearchFilter(ApplyCategoryFilter(query, request.Category), request.Query);
+        query = ApplySearchFilter(ApplyCategoryFilter(ApplyCommunityScope(query, currentUser), request.Category), request.Query);
 
         var totalCount = await query.CountAsync(cancellationToken);
-        var logs = await query
-            .OrderByDescending(log => log.CreatedAt)
+        var logs = await ApplySort(query, request.SortBy, request.SortDirection)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(log => new
@@ -122,12 +122,12 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         string? query = null,
         CancellationToken cancellationToken = default)
     {
-        if (currentUser.Role != Role.Admin)
+        if (!currentUser.HasPermission(PermissionNames.AuditView))
         {
-            return Result<SystemAuditCategoryCountsDto>.Failure("Only Admin users can view system audit logs.");
+            return Result<SystemAuditCategoryCountsDto>.Failure("Community management permission is required to view system audit logs.");
         }
 
-        var baseQuery = ApplySearchFilter(db.SystemAuditLogs.Include(log => log.ActorUser), query);
+        var baseQuery = ApplySearchFilter(ApplyCommunityScope(db.SystemAuditLogs.Include(log => log.ActorUser), currentUser), query);
         var counts = new SystemAuditCategoryCountsDto(
             await baseQuery.CountAsync(cancellationToken),
             await ApplyCategoryFilter(baseQuery, "identity").CountAsync(cancellationToken),
@@ -182,4 +182,47 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
             "tasks" => query.Where(log => log.Action.StartsWith("Task.") || log.EntityType == "ProcessTask"),
             _ => query
         };
+
+    private static IQueryable<SystemAuditLog> ApplySort(
+        IQueryable<SystemAuditLog> query,
+        string? sortBy,
+        string? sortDirection)
+    {
+        var ascending = string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        return sortBy?.Trim().ToLowerInvariant() switch
+        {
+            "action" => ascending
+                ? query.OrderBy(log => log.Action).ThenBy(log => log.CreatedAt)
+                : query.OrderByDescending(log => log.Action).ThenByDescending(log => log.CreatedAt),
+            "actor" => ascending
+                ? query.OrderBy(log => log.ActorUser == null ? string.Empty : log.ActorUser.Username).ThenBy(log => log.CreatedAt)
+                : query.OrderByDescending(log => log.ActorUser == null ? string.Empty : log.ActorUser.Username).ThenByDescending(log => log.CreatedAt),
+            _ => ascending
+                ? query.OrderBy(log => log.CreatedAt)
+                : query.OrderByDescending(log => log.CreatedAt)
+        };
+    }
+
+    private IQueryable<SystemAuditLog> ApplyCommunityScope(IQueryable<SystemAuditLog> query, UserDto currentUser)
+    {
+        if (currentUser.IsSuperAdmin())
+        {
+            return query;
+        }
+
+        if (currentUser.CommunityId is null)
+        {
+            return query.Where(log => false);
+        }
+
+        var communityId = currentUser.CommunityId.Value;
+        return query.Where(log =>
+            (log.ActorUser != null
+                && log.ActorUser.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))
+            || (log.EntityType == "User"
+                && log.EntityId != null
+                && db.Users.Any(user =>
+                    user.Id.ToString() == log.EntityId
+                    && user.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))));
+    }
 }

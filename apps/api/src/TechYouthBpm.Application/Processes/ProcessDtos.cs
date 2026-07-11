@@ -17,7 +17,9 @@ public record AuditLogDto(
 public record ProcessTaskDto(
     Guid Id,
     Guid ProcessInstanceId,
-    Role AssignedRole,
+    Guid? AssignedCommunityRoleId,
+    string AssignedCommunityRoleName,
+    string RequiredPermission,
     ProcessTaskStatus Status,
     IReadOnlyList<WorkflowAction> AvailableActions,
     DateTime CreatedAt,
@@ -27,6 +29,8 @@ public record ProcessSummaryDto(
     Guid Id,
     Guid FormDefinitionId,
     string FormName,
+    Guid CommunityId,
+    string CommunityName,
     ProcessStatus Status,
     DateTime StartedAt,
     DateTime? CompletedAt);
@@ -35,6 +39,8 @@ public record ProcessDetailDto(
     Guid Id,
     Guid FormDefinitionId,
     string FormName,
+    Guid CommunityId,
+    string CommunityName,
     ProcessStatus Status,
     JsonElement FormData,
     DateTime StartedAt,

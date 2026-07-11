@@ -1,4 +1,4 @@
-import type { Role, UserStatus } from "@/lib/types";
+import type { UserStatus } from "@/lib/types";
 
 export type AuditCategory = "all" | "identity" | "access" | "forms" | "processes" | "tasks";
 
@@ -6,10 +6,10 @@ export type PendingAccessChange = {
   userId: string;
   displayName: string;
   username: string;
-  fromRole: Role;
-  toRole: Role;
   fromStatus: UserStatus;
   toStatus: UserStatus;
+  fromCommunityRoleName?: string;
+  toCommunityRoleName?: string;
 };
 
 export type PendingSessionRevoke = {
@@ -38,8 +38,9 @@ export type SelectedAuditHistory = {
 
 export type AccessDraft = {
   userId: string;
-  role: Role;
   status: UserStatus;
+  communityId?: string | null;
+  communityRoleId?: string | null;
 };
 
 export const auditCategories: AuditCategory[] = ["all", "identity", "access", "forms", "processes", "tasks"];

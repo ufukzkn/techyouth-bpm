@@ -1,8 +1,9 @@
-import { History, RefreshCw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, History, RefreshCw, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { auditCategories, type AuditCategory, type AuditHistoryMode, type SelectedAuditHistory } from "@/features/app-shell/types";
-import { getAuditCategory, getAuditCountCacheKey, getAuditHistoryTitle, getAuditTargetLabel, getFocusedAuditLogs, formatAuditAction } from "@/features/app-shell/auditUtils";
+import { getAuditCategory, getAuditHistoryTitle, getAuditTargetLabel, getFocusedAuditLogs, formatAuditAction } from "@/features/app-shell/auditUtils";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
+import { SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { SystemAuditTimeline } from "@/features/app-shell/components/SystemAuditTimeline";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
 import { formatSessionExpiry } from "@/features/app-shell/sessionFormatters";
@@ -28,9 +29,10 @@ export function SystemLogsView({ language, token }: { language: Language; token:
     processes: null,
     tasks: null,
   });
-  const [categoryCountsQuery, setCategoryCountsQuery] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<AuditCategory>("all");
+  const [sortBy, setSortBy] = useState<"createdAt" | "action" | "actor">("createdAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [selectedHistory, setSelectedHistory] = useState<SelectedAuditHistory | null>(null);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,17 +49,15 @@ export function SystemLogsView({ language, token }: { language: Language; token:
         return;
       }
 
-      const query = searchQuery.trim();
-      const cacheKey = getAuditCountCacheKey(query);
+      const cacheKey = "global";
       const cachedCounts = options.force ? undefined : auditCountCache.current.get(cacheKey);
       if (cachedCounts) {
         setCategoryCounts(cachedCounts);
-        setCategoryCountsQuery(query);
         return;
       }
 
       try {
-        const counts = await api.listSystemAuditCounts(token, query);
+        const counts = await api.listSystemAuditCounts(token);
         const nextCounts = {
           all: counts.all,
           identity: counts.identity,
@@ -68,7 +68,6 @@ export function SystemLogsView({ language, token }: { language: Language; token:
         };
         auditCountCache.current.set(cacheKey, nextCounts);
         setCategoryCounts(nextCounts);
-        setCategoryCountsQuery(query);
       } catch {
         if (options.force) {
           setCategoryCounts({
@@ -79,11 +78,10 @@ export function SystemLogsView({ language, token }: { language: Language; token:
             processes: null,
             tasks: null,
           });
-          setCategoryCountsQuery(query);
         }
       }
     },
-    [searchQuery, token],
+    [token],
   );
 
   useEffect(() => {
@@ -130,6 +128,8 @@ export function SystemLogsView({ language, token }: { language: Language; token:
           category: selectedCategory,
           page,
           pageSize,
+          sortBy,
+          sortDirection,
         });
         setLogs(auditResult.items ?? []);
         setTotalLogs(auditResult.totalCount ?? 0);
@@ -153,7 +153,7 @@ export function SystemLogsView({ language, token }: { language: Language; token:
         }
       }
     },
-    [language, loadAuditCounts, page, pageSize, searchQuery, selectedCategory, shouldQueryLogs, t, token],
+    [language, loadAuditCounts, page, pageSize, searchQuery, selectedCategory, shouldQueryLogs, sortBy, sortDirection, t, token],
   );
 
   function refreshLogs() {
@@ -180,9 +180,7 @@ export function SystemLogsView({ language, token }: { language: Language; token:
   const totalPages = Math.max(1, Math.ceil(totalLogs / pageSize));
   const currentPage = Math.min(page, totalPages);
   const visibleLogs = shouldQueryLogs ? logs : [];
-  const canUseCategoryCounts = categoryCountsQuery === searchQuery.trim();
-  const hasReadyCategoryCount = canUseCategoryCounts && categoryCounts[selectedCategory] !== null;
-  const resultSummaryCount = canUseCategoryCounts ? categoryCounts[selectedCategory] ?? totalLogs : totalLogs;
+  const resultSummaryCount = trimmedQuery ? totalLogs : categoryCounts[selectedCategory] ?? totalLogs;
   const selectedLog = selectedHistory ? logs.find((log) => log.id === selectedHistory.logId) ?? null : null;
   const selectedLogCategory = selectedLog ? getAuditCategory(selectedLog) : null;
   const selectedHistoryTitle =
@@ -215,6 +213,7 @@ export function SystemLogsView({ language, token }: { language: Language; token:
 
     return getFocusedAuditLogs(logs, selectedLog, selectedLogCategory, selectedHistory.mode);
   }, [logs, selectedHistory, selectedLog, selectedLogCategory]);
+  const shouldShowLogSkeleton = isLoading && shouldQueryLogs;
   const activeHistoryOptionIndex = Math.max(
     0,
     historyFilterOptions.findIndex((option) => option.mode === selectedHistory?.mode),
@@ -277,9 +276,17 @@ export function SystemLogsView({ language, token }: { language: Language; token:
             placeholder={t("logs.searchPlaceholder")}
           />
         </label>
-        {isLoading && !visibleLogs.length && !hasReadyCategoryCount ? (
-          <p className="status-line">{t("common.loading")}</p>
-        ) : null}
+        <div className="audit-sort-controls">
+          <label className="filter-select-field compact-filter-field">
+            <ArrowUpDown size={16} />
+            <select value={sortBy} onChange={(event) => { setSortBy(event.target.value as "createdAt" | "action" | "actor"); setPage(1); }}>
+              <option value="createdAt">{t("logs.sort.createdAt")}</option>
+              <option value="action">{t("logs.sort.action")}</option>
+              <option value="actor">{t("logs.sort.actor")}</option>
+            </select>
+          </label>
+          <button className="icon-button" type="button" onClick={() => { setSortDirection((value) => value === "asc" ? "desc" : "asc"); setPage(1); }} title={t("logs.sort.direction")}>{sortDirection === "asc" ? <ArrowUp size={17} /> : <ArrowDown size={17} />}</button>
+        </div>
         {trimmedQuery.length < 2 && selectedCategory === "all" ? (
           <p className="helper-copy">{t("logs.searchFirst")}</p>
         ) : null}
@@ -296,7 +303,8 @@ export function SystemLogsView({ language, token }: { language: Language; token:
       <div className="management-layout">
         <section className="identity-section">
           <div className="system-audit-list">
-            {visibleLogs.map((log) => (
+            {shouldShowLogSkeleton ? <SystemAuditSkeleton /> : null}
+            {!shouldShowLogSkeleton ? visibleLogs.map((log) => (
               <article className="settings-row system-audit-row" key={log.id}>
                 <div className="system-audit-content">
                   <div className="audit-label-row">
@@ -322,8 +330,8 @@ export function SystemLogsView({ language, token }: { language: Language; token:
                   </button>
                 </div>
               </article>
-            ))}
-            {trimmedQuery.length >= 2 && !visibleLogs.length && !isLoading ? (
+            )) : null}
+            {trimmedQuery.length >= 2 && !visibleLogs.length && !shouldShowLogSkeleton ? (
               <p className="status-line">{t("logs.empty")}</p>
             ) : null}
           </div>
@@ -395,6 +403,10 @@ export function SystemLogsView({ language, token }: { language: Language; token:
       {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
     </section>
   );
+}
+
+function SystemAuditSkeleton() {
+  return <>{Array.from({ length: 5 }, (_, index) => <article className="settings-row system-audit-row system-audit-skeleton" key={index}><div className="system-audit-content"><SkeletonBlock /><SkeletonBlock /><SkeletonBlock /></div><div className="system-audit-meta"><SkeletonBlock /><SkeletonBlock /></div></article>)}</>;
 }
 
 function waitForMinimumDelay(startedAt: number, minimumDelayMs: number) {

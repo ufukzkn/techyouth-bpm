@@ -1,15 +1,25 @@
-import { ClipboardList, FilePlus2, History, LayoutDashboard, Settings, UserCog, Workflow } from "lucide-react";
+import { Building2, ClipboardList, FilePlus2, History, LayoutDashboard, Settings, UsersRound, Workflow } from "lucide-react";
 import type { TranslationKey } from "@/features/i18n/translations";
-import type { Role } from "@/lib/types";
+import type { PermissionName } from "@/lib/types";
 
-export type ViewId = "dashboard" | "forms" | "runner" | "processes" | "tasks" | "users" | "logs" | "settings";
+export type ViewId =
+  | "dashboard"
+  | "forms"
+  | "runner"
+  | "processes"
+  | "tasks"
+  | "managementUsers"
+  | "managementCommunities"
+  | "logs"
+  | "settings";
 
 export type NavItem = {
   labelKey: TranslationKey;
   viewId: ViewId;
   path: string;
   icon: typeof LayoutDashboard;
-  roles: Role[];
+  permissions?: PermissionName[];
+  group?: "management";
 };
 
 export const navItems: NavItem[] = [
@@ -18,56 +28,63 @@ export const navItems: NavItem[] = [
     viewId: "dashboard",
     path: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["Admin", "User", "Approver"],
   },
   {
     labelKey: "nav.forms",
     viewId: "forms",
     path: "/forms",
     icon: FilePlus2,
-    roles: ["Admin"],
+    permissions: ["Forms.Create", "Forms.Update"],
   },
   {
     labelKey: "nav.runner",
     viewId: "runner",
     path: "/runner",
     icon: FilePlus2,
-    roles: ["Admin", "User"],
+    permissions: ["Forms.View", "Processes.Start"],
   },
   {
     labelKey: "nav.processes",
     viewId: "processes",
     path: "/processes",
     icon: Workflow,
-    roles: ["Admin", "User", "Approver"],
+    permissions: ["Processes.View"],
   },
   {
     labelKey: "nav.tasks",
     viewId: "tasks",
     path: "/tasks",
     icon: ClipboardList,
-    roles: ["Admin", "Approver"],
+    permissions: ["Tasks.View"],
   },
   {
-    labelKey: "nav.users",
-    viewId: "users",
-    path: "/users",
-    icon: UserCog,
-    roles: ["Admin"],
+    labelKey: "nav.managementUsers",
+    viewId: "managementUsers",
+    path: "/management/users",
+    icon: UsersRound,
+    permissions: ["Community.ManageUsers"],
+    group: "management",
+  },
+  {
+    labelKey: "nav.managementCommunities",
+    viewId: "managementCommunities",
+    path: "/management/communities",
+    icon: Building2,
+    permissions: ["Community.ManageRoles"],
+    group: "management",
   },
   {
     labelKey: "nav.logs",
     viewId: "logs",
     path: "/logs",
     icon: History,
-    roles: ["Admin"],
+    permissions: ["Audit.View"],
   },
   {
     labelKey: "nav.settings",
     viewId: "settings",
     path: "/settings",
     icon: Settings,
-    roles: ["Admin", "User", "Approver"],
   },
 ];
 

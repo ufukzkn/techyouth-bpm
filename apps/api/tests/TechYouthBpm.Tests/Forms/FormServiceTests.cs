@@ -14,7 +14,7 @@ public class FormServiceTests
         var admin = TestDbFactory.SeedUser(db, Role.Admin);
         var service = new FormService(db);
 
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Role);
+        var adminDto = TestDbFactory.ToDto(admin);
         var created = await service.CreateAsync(CreateRequest("Masraf Formu", "amount", "Tutar"), adminDto);
         var update = CreateRequest("Guncel Masraf Formu", "department", "Departman");
 
@@ -34,14 +34,14 @@ public class FormServiceTests
         var user = TestDbFactory.SeedUser(db, Role.User);
         var service = new FormService(db);
 
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Role);
-        var userDto = new UserDto(user.Id, user.Username, user.DisplayName, user.Role);
+        var adminDto = TestDbFactory.ToDto(admin);
+        var userDto = TestDbFactory.ToDto(user);
         var created = await service.CreateAsync(CreateRequest("Masraf Formu", "amount", "Tutar"), adminDto);
 
         var result = await service.UpdateAsync(created.Value!.Id, CreateRequest("Guncel Form", "note", "Not"), userDto);
 
         Assert.False(result.IsSuccess);
-        Assert.Contains(result.Errors, error => error.Contains("Only Admin", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Errors, error => error.Contains("cannot update", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public class FormServiceTests
         var admin = TestDbFactory.SeedUser(db, Role.Admin);
         var service = new FormService(db);
 
-        var adminDto = new UserDto(admin.Id, admin.Username, admin.DisplayName, admin.Role);
+        var adminDto = TestDbFactory.ToDto(admin);
         var created = await service.CreateAsync(CreateRequest("Talep Formu", "requestType", "Talep Tipi"), adminDto);
         var update = new CreateFormRequest(
             "Talep Formu",

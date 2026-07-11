@@ -16,26 +16,36 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
     {
     }
 
-    public async Task<IReadOnlyList<FormDefinitionDto>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<FormDefinitionDto>> ListAsync(UserDto user, CancellationToken cancellationToken = default)
     {
-        var forms = await FormQuery()
+        if (!user.HasPermission(PermissionNames.FormsView))
+        {
+            return [];
+        }
+
+        var forms = await ScopedFormQuery(user)
             .OrderByDescending(form => form.CreatedAt)
             .ToListAsync(cancellationToken);
 
         return forms.Select(form => form.ToDto()).ToArray();
     }
 
-    public async Task<FormDefinitionDto?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<FormDefinitionDto?> GetAsync(Guid id, UserDto user, CancellationToken cancellationToken = default)
     {
-        var form = await FormQuery().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (!user.HasPermission(PermissionNames.FormsView))
+        {
+            return null;
+        }
+
+        var form = await ScopedFormQuery(user).SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         return form?.ToDto();
     }
 
     public async Task<Result<FormDefinitionDto>> CreateAsync(CreateFormRequest request, UserDto user, CancellationToken cancellationToken = default)
     {
-        if (user.Role != Role.Admin)
+        if (!user.HasPermission(PermissionNames.FormsCreate))
         {
-            return Result<FormDefinitionDto>.Failure("Only Admin users can create form definitions.");
+            return Result<FormDefinitionDto>.Failure("Current user cannot create form definitions.");
         }
 
         var errors = ValidateDefinition(request);
@@ -44,11 +54,27 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             return Result<FormDefinitionDto>.Failure(errors);
         }
 
+        var userCommunityId = user.CommunityId ?? await db.UserCommunityMemberships
+            .Where(membership => membership.UserId == user.Id && membership.IsActive)
+            .Select(membership => (Guid?)membership.CommunityId)
+            .FirstOrDefaultAsync(cancellationToken);
+        var communityId = user.IsSuperAdmin() ? request.CommunityId ?? userCommunityId : userCommunityId;
+        if (communityId is null)
+        {
+            return Result<FormDefinitionDto>.Failure("A community is required for form definitions.");
+        }
+
+        if (!await IsCommunityActiveAsync(communityId.Value, cancellationToken))
+        {
+            return Result<FormDefinitionDto>.Failure("The form community is not active.");
+        }
+
         var form = new FormDefinition
         {
             Id = Guid.NewGuid(),
             Name = request.Name.Trim(),
             Description = request.Description.Trim(),
+            CommunityId = communityId.Value,
             CreatedByUserId = user.Id,
             CreatedAt = DateTime.UtcNow,
         };
@@ -64,7 +90,7 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             $"Form definition '{form.Name}' was created.",
             cancellationToken);
 
-        var saved = await GetAsync(form.Id, cancellationToken);
+        var saved = await GetAsync(form.Id, user, cancellationToken);
         return Result<FormDefinitionDto>.Success(saved!);
     }
 
@@ -74,9 +100,9 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
         UserDto user,
         CancellationToken cancellationToken = default)
     {
-        if (user.Role != Role.Admin)
+        if (!user.HasPermission(PermissionNames.FormsUpdate))
         {
-            return Result<FormDefinitionDto>.Failure("Only Admin users can update form definitions.");
+            return Result<FormDefinitionDto>.Failure("Current user cannot update form definitions.");
         }
 
         var errors = ValidateDefinition(request);
@@ -85,10 +111,15 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             return Result<FormDefinitionDto>.Failure(errors);
         }
 
-        var form = await FormQuery().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
+        var form = await ScopedFormQuery(user).SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (form is null)
         {
             return Result<FormDefinitionDto>.Failure("Form definition was not found.");
+        }
+
+        if (!await IsCommunityActiveAsync(form.CommunityId, cancellationToken))
+        {
+            return Result<FormDefinitionDto>.Failure("The form community is not active.");
         }
 
         var formId = form.Id;
@@ -116,14 +147,26 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             $"Form definition '{request.Name.Trim()}' was updated.",
             cancellationToken);
 
-        var saved = await GetAsync(formId, cancellationToken);
+        var saved = await GetAsync(formId, user, cancellationToken);
         return Result<FormDefinitionDto>.Success(saved!);
+    }
+
+    private IQueryable<FormDefinition> ScopedFormQuery(UserDto user)
+    {
+        var query = FormQuery();
+        return user.IsSuperAdmin() || user.CommunityId is null
+            ? query
+            : query.Where(form => form.CommunityId == user.CommunityId);
     }
 
     private IQueryable<FormDefinition> FormQuery() =>
         db.FormDefinitions
+            .Include(form => form.Community)
             .Include(form => form.Fields)
             .ThenInclude(field => field.ValidationRules);
+
+    private Task<bool> IsCommunityActiveAsync(Guid communityId, CancellationToken cancellationToken) =>
+        db.Communities.AnyAsync(community => community.Id == communityId && community.IsActive, cancellationToken);
 
     private static List<FormFieldDefinition> BuildFields(CreateFormRequest request, Guid formDefinitionId) =>
         request.Fields

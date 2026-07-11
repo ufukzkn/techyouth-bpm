@@ -25,11 +25,7 @@ This file tracks lightweight product and presentation ideas that are not ready t
 ## Access And Identity
 
 - Decide whether the final BPM product should allow self-registration. For a corporate BPM flow, admin-created users or admin-approved registrations are more realistic than open public signup.
-- Add email + OTP verification for registration.
-- Keep newly registered users in a `PendingApproval` state until an Admin approves access.
-- Add an Admin user-management panel for creating users, assigning roles, deactivating users and approving pending registrations.
-- Add profile settings for updating display name, email and password.
-- Consider JWT access tokens only together with a refresh-token or remember-me design; do not replace opaque sessions just for the label.
+- Consider a future production deployment review for cookie domain, `Secure=true` HTTPS settings and real SMTP/domain verification.
 
 ## Workflow
 

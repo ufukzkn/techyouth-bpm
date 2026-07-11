@@ -2,7 +2,7 @@ import { AlertTriangle } from "lucide-react";
 import { useCallback } from "react";
 import { formatSessionExpiry, userStatusLabel } from "@/features/app-shell/sessionFormatters";
 import type { PendingAccessChange, PendingSessionRevoke, PendingUserDelete } from "@/features/app-shell/types";
-import { roleLabel, translate, type TranslationKey } from "@/features/i18n/translations";
+import { translate, type TranslationKey } from "@/features/i18n/translations";
 import type { Language } from "@/lib/types";
 
 export function OwnSessionRevokeDialog({
@@ -108,7 +108,8 @@ export function AccessChangeDialog({
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
-  const isHighRisk = change.toRole === "Admin" || change.fromRole === "Admin" || change.toStatus !== change.fromStatus;
+  const isHighRisk = change.toStatus !== change.fromStatus || change.fromCommunityRoleName !== change.toCommunityRoleName;
+  const isDestructive = change.toStatus !== "Active" && change.toStatus !== change.fromStatus;
 
   return (
     <div className="action-dialog-overlay" onClick={onCancel}>
@@ -118,7 +119,7 @@ export function AccessChangeDialog({
             <span className="eyebrow">{t("users.accessConfirmEyebrow")}</span>
             <strong>{t(isHighRisk ? "users.accessConfirmTitleCritical" : "users.accessConfirmTitle")}</strong>
           </div>
-          <AlertTriangle size={22} />
+          <AlertTriangle className={isDestructive ? undefined : "primary-dialog-icon"} size={22} />
         </div>
         <p className="helper-copy">
           {t("users.accessConfirmDescription", {
@@ -128,9 +129,9 @@ export function AccessChangeDialog({
         </p>
         <div className="access-confirm-grid">
           <article className="settings-row">
-            <span>{t("session.role")}</span>
+            <span>Topluluk rolü</span>
             <strong>
-              {roleLabel(language, change.fromRole)} -&gt; {roleLabel(language, change.toRole)}
+              {change.fromCommunityRoleName || "Atanmadi"} -&gt; {change.toCommunityRoleName || "Atanmadi"}
             </strong>
           </article>
           <article className="settings-row">
@@ -144,7 +145,7 @@ export function AccessChangeDialog({
           <button className="secondary-button" type="button" onClick={onCancel}>
             {t("common.cancel")}
           </button>
-          <button className="danger-button strong-danger-button" type="button" onClick={onConfirm}>
+          <button className={isDestructive ? "danger-button strong-danger-button" : "primary-button"} type="button" onClick={onConfirm}>
             {t("users.confirmAccessChange")}
           </button>
         </div>

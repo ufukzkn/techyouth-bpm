@@ -8,8 +8,14 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 internal static class MappingExtensions
 {
-    public static UserDto ToDto(this User user) =>
-        new(
+    public static UserDto ToDto(this User user)
+    {
+        var membership = ActiveMembership(user);
+        var permissions = user.Role == Role.SuperAdmin
+            ? PermissionNames.All
+            : membership?.CommunityRole?.Permissions.Select(permission => permission.Permission).Distinct().Order().ToArray() ?? [];
+
+        return new UserDto(
             user.Id,
             user.Username,
             user.DisplayName,
@@ -17,10 +23,19 @@ internal static class MappingExtensions
             user.Role,
             user.Status,
             user.IsEmailVerified,
-            user.MustChangePassword);
+            user.MustChangePassword,
+            membership?.CommunityId,
+            membership?.Community?.Name ?? string.Empty,
+            membership?.CommunityRoleId,
+            membership?.CommunityRole?.Name ?? string.Empty,
+            permissions,
+            membership?.Community?.IsActive ?? true);
+    }
 
-    public static UserAdminDto ToAdminDto(this User user) =>
-        new(
+    public static UserAdminDto ToAdminDto(this User user)
+    {
+        var dto = user.ToDto();
+        return new UserAdminDto(
             user.Id,
             user.Username,
             user.DisplayName,
@@ -31,13 +46,22 @@ internal static class MappingExtensions
             user.FailedLoginCount,
             user.LockedUntil,
             user.CreatedAt,
-            user.MustChangePassword);
+            user.MustChangePassword,
+            dto.CommunityId,
+            dto.CommunityName,
+            dto.CommunityRoleId,
+            dto.CommunityRoleName,
+            dto.Permissions,
+            dto.IsCommunityActive);
+    }
 
     public static FormDefinitionDto ToDto(this FormDefinition form) =>
         new(
             form.Id,
             form.Name,
             form.Description,
+            form.CommunityId,
+            form.Community?.Name ?? string.Empty,
             form.CreatedByUserId,
             form.CreatedAt,
             form.Fields
@@ -61,7 +85,9 @@ internal static class MappingExtensions
         new(
             task.Id,
             task.ProcessInstanceId,
-            task.AssignedRole,
+            task.AssignedCommunityRoleId,
+            task.AssignedCommunityRole?.Name ?? string.Empty,
+            task.RequiredPermission,
             task.Status,
             JsonHelpers.Deserialize<IReadOnlyList<WorkflowAction>>(task.AvailableActionsJson, []),
             task.CreatedAt,
@@ -72,6 +98,8 @@ internal static class MappingExtensions
             process.Id,
             process.FormDefinitionId,
             process.FormDefinition?.Name ?? "Unknown form",
+            process.CommunityId,
+            process.Community?.Name ?? string.Empty,
             process.Status,
             process.StartedAt,
             process.CompletedAt);
@@ -81,6 +109,8 @@ internal static class MappingExtensions
             process.Id,
             process.FormDefinitionId,
             process.FormDefinition?.Name ?? "Unknown form",
+            process.CommunityId,
+            process.Community?.Name ?? string.Empty,
             process.Status,
             JsonHelpers.ToElement(process.FormDataJson),
             process.StartedAt,
@@ -96,4 +126,31 @@ internal static class MappingExtensions
                 log.User?.Username ?? "unknown",
                 log.CreatedAt,
                 log.Note)).ToArray());
+
+    public static CommunityDto ToDto(this Community community) =>
+        new(community.Id, community.Name, community.Description, community.InviteCode, community.IsActive, community.CreatedAt);
+
+    public static CommunityRoleDto ToDto(this CommunityRole role) =>
+        new(
+            role.Id,
+            role.CommunityId,
+            role.Name,
+            role.Description,
+            role.TemplateKey,
+            role.IsSystemRole,
+            role.Permissions.Select(permission => permission.Permission).Order().ToArray());
+
+    public static NotificationDto ToDto(this Notification notification) =>
+        new(
+            notification.Id,
+            notification.Type,
+            notification.Title,
+            notification.Message,
+            notification.EntityType,
+            notification.EntityId,
+            notification.CreatedAt,
+            notification.ReadAt);
+
+    private static UserCommunityMembership? ActiveMembership(User user) =>
+        user.CommunityMemberships.FirstOrDefault(membership => membership.IsActive);
 }
