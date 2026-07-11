@@ -13,28 +13,19 @@ import { ForcedPasswordChangeView } from "@/features/app-shell/views/ForcedPassw
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError, setUnauthorizedHandler } from "@/lib/api";
-import type { Language, NotificationItem, User } from "@/lib/types";
+import type { NotificationItem } from "@/lib/types";
 
 const maxBrowserTimeoutDelay = 2_147_483_647;
 
-export type WorkspaceShellContext = {
-  user: User;
-  token: string | null;
-  expiresAt: string | null;
-  language: Language;
-  visibleViewIds: ViewId[];
-  navigate: (viewId: ViewId) => void;
-  logout: () => void;
-  setUser: (user: User) => void;
-};
+function canUseNavItem(userPermissions: string[], requiredPermissions?: string[]) {
+  if (!requiredPermissions?.length) {
+    return true;
+  }
 
-export function WorkspaceShell({
-  viewId,
-  children,
-}: {
-  viewId: ViewId;
-  children: (context: WorkspaceShellContext) => ReactNode;
-}) {
+  return requiredPermissions.some((permission) => userPermissions.includes(permission));
+}
+
+export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const {
@@ -239,7 +230,9 @@ export function WorkspaceShell({
       }),
     [user],
   );
-  const canAccessCurrentRoute = visibleNavItems.some((item) => item.viewId === viewId);
+
+  const currentViewId = navItems.find((item) => item.path === pathname)?.viewId;
+  const canAccessCurrentRoute = visibleNavItems.some((item) => item.viewId === currentViewId);
   const unreadNotificationCount = notifications.filter((notification) => !notification.readAt).length;
 
   async function markNotificationRead(notificationId: string) {
@@ -505,16 +498,7 @@ export function WorkspaceShell({
         </header>
 
         <main className="content">
-          {children({
-            user,
-            token,
-            expiresAt,
-            language,
-            visibleViewIds: visibleNavItems.map((item) => item.viewId),
-            navigate,
-            logout: endSession,
-            setUser,
-          })}
+          {children}
         </main>
       </div>
     </div>
@@ -543,12 +527,4 @@ function LoginRedirectLoading() {
       </section>
     </main>
   );
-}
-
-function canUseNavItem(userPermissions: string[], requiredPermissions?: string[]) {
-  if (!requiredPermissions?.length) {
-    return true;
-  }
-
-  return requiredPermissions.some((permission) => userPermissions.includes(permission));
 }
