@@ -2402,6 +2402,21 @@ input[type="checkbox"] {
   border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
 }
 
+.audit-node-escalate .audit-node {
+  color: #ea580c;
+  background: color-mix(in srgb, #ea580c 14%, var(--surface));
+}
+
+.escalate-button {
+  color: #c2410c;
+  border-color: color-mix(in srgb, #ea580c 35%, var(--border));
+  background: color-mix(in srgb, #ea580c 8%, transparent);
+}
+
+.escalate-button:hover {
+  background: color-mix(in srgb, #ea580c 16%, transparent);
+}
+
 .stacked-summary {
   display: grid;
   gap: 5px;
@@ -2435,6 +2450,12 @@ input[type="checkbox"] {
   color: var(--danger);
   background: color-mix(in srgb, var(--danger) 8%, var(--surface));
   border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+.status-escalated {
+  color: #c2410c; /* orange-700 */
+  background: color-mix(in srgb, #f97316 12%, var(--surface));
+  border-color: color-mix(in srgb, #f97316 34%, var(--border));
 }
 
 .access-editor {
@@ -3147,7 +3168,8 @@ input[type="checkbox"] {
 }
 
 .success-button,
-.danger-button {
+.danger-button,
+.escalate-button {
   min-height: 36px;
   display: inline-flex;
   align-items: center;
@@ -3172,6 +3194,7 @@ input[type="checkbox"] {
 
 .success-button:hover,
 .danger-button:hover,
+.escalate-button:hover,
 .secondary-button:hover {
   transform: translateY(-1px);
 }
@@ -3183,6 +3206,11 @@ input[type="checkbox"] {
 .danger-button {
   color: #ffffff;
   background: #b42318;
+}
+
+.escalate-button {
+  color: #ffffff;
+  background: #ea580c; /* orange-600 */
 }
 
 .audit-card {

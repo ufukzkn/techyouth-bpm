@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, CircleDot, XCircle } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, CircleDot, XCircle } from "lucide-react";
 import { useState } from "react";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { TaskActionDialog } from "@/features/processes/TaskActionDialog";
@@ -72,6 +72,17 @@ export function MyTasksView({ tasks, language, status, onExecuteTask }: MyTasksV
                     <XCircle size={17} />
                     {t("process.reject")}
                   </button>
+                  {task.availableActions?.includes("Escalate") ? (
+                    <button
+                      className="escalate-button"
+                      disabled={status === "acting"}
+                      onClick={() => setPendingAction({ taskId: task.id, action: "Escalate" })}
+                      type="button"
+                    >
+                      <ArrowUpRight size={17} />
+                      {translate(language, "action.Escalate")}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}

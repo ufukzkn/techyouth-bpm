@@ -166,9 +166,9 @@ export type CreateFormRequest = {
   communityId?: string | null;
 };
 
-export type ProcessStatus = "Pending" | "InProgress" | "Completed" | "Rejected";
+export type ProcessStatus = "Pending" | "InProgress" | "Completed" | "Rejected" | "Escalated";
 export type ProcessTaskStatus = "Open" | "Completed" | "Cancelled";
-export type WorkflowAction = "Start" | "Approve" | "Reject";
+export type WorkflowAction = "Start" | "Approve" | "Reject" | "Escalate";
 
 export type ProcessTask = {
   id: string;

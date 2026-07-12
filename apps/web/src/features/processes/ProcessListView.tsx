@@ -22,6 +22,7 @@ const filterOptions: { value: StatusFilter; labelKey: TranslationKey }[] = [
   { value: "InProgress", labelKey: "process.filterInProgress" },
   { value: "Completed", labelKey: "process.filterCompleted" },
   { value: "Rejected", labelKey: "process.filterRejected" },
+  { value: "Escalated", labelKey: "process.filterEscalated" },
 ];
 
 export function ProcessListView({ processes, language, selectedProcessId, onSelectProcess }: ProcessListViewProps) {
