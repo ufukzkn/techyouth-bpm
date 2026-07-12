@@ -1,0 +1,351 @@
+/* auth styles */
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--primary) 18%, transparent), transparent 28%),
+    linear-gradient(135deg, var(--background), color-mix(in srgb, var(--navy) 8%, var(--background)));
+}
+
+@keyframes shell-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.58;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes language-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(5px) scale(0.88);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-actions {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 5;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.login-panel {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 18px;
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: content-enter 260ms ease both;
+}
+
+.login-mark,
+.brand-symbol {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: transparent;
+}
+
+.login-mark {
+  width: 52px;
+  height: 52px;
+}
+
+.prototype-logo-bg {
+  fill: var(--navy);
+}
+
+.prototype-logo-flow {
+  stroke: var(--primary);
+}
+
+.prototype-logo-check {
+  stroke: #ffffff;
+}
+
+.login-panel h1 {
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.login-panel p,
+.demo-users,
+.metric-card span,
+.workspace-header p,
+.eyebrow {
+  color: var(--muted);
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.segmented-control button {
+  min-height: 38px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.08);
+}
+
+.login-form label {
+  display: grid;
+  gap: 7px;
+  font-weight: 650;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.login-form label.checkbox-row,
+.tool-panel label.checkbox-row,
+.field-editor-grid label.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.remember-row {
+  justify-self: start;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.login-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.login-secondary-actions button {
+  min-height: 34px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 65%, transparent);
+  background: transparent;
+  color: var(--primary);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.login-secondary-actions button:hover {
+  color: var(--primary-strong);
+}
+
+.login-form input:not([type="checkbox"]),
+.tool-panel input:not([type="checkbox"]),
+.tool-panel select,
+.field-editor input:not([type="checkbox"]),
+.field-editor select,
+.rule-editor input:not([type="checkbox"]),
+.rule-editor select,
+.runner-form input:not([type="checkbox"]),
+.runner-form select,
+.runner-form textarea {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.runner-form textarea {
+  min-height: 112px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  resize: vertical;
+}
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  accent-color: var(--primary);
+}
+
+.primary-button,
+.icon-button {
+  border: 0;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primary-button {
+  min-height: var(--control-height-md);
+  gap: 8px;
+  padding: 0 18px;
+  color: #fff;
+  background: var(--primary);
+  font-weight: 700;
+}
+
+.primary-button:hover {
+  background: var(--primary-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+.primary-button:disabled {
+  opacity: 0.68;
+  cursor: wait;
+}
+
+.field-editor .icon-button:disabled,
+.option-editor .secondary-button:disabled,
+.rule-editor .secondary-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.form-error {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--border));
+  border-radius: 7px;
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+}
+
+.session-notice {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: 7px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.session-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(10, 16, 28, 0.42);
+}
+
+.session-dialog {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.session-dialog h2 {
+  font-size: 22px;
+}
+
+.session-dialog p {
+  color: var(--muted);
+}
+
+.session-loading {
+  justify-items: start;
+}
+
+.demo-users {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.demo-users button {
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--foreground);
+  background: var(--surface-muted);
+  font: inherit;
+  font-weight: 700;
+}
+
+.demo-users button:hover {
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--border));
+  transform: translateY(-1px);
+}

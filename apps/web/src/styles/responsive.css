@@ -1,0 +1,221 @@
+/* responsive styles */
+
+@media (max-width: 1100px) {
+  .field-editor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    display: block;
+  }
+
+  .main-area {
+    margin-left: 0;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 90;
+    width: min(300px, 86vw);
+    border-right: 1px solid color-mix(in srgb, var(--navy) 18%, var(--border));
+    border-bottom: 0;
+    box-shadow: var(--shadow);
+    transform: translateX(-104%);
+    transition: transform 220ms ease;
+  }
+
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+  }
+
+  .sidebar .brand {
+    padding-right: 44px;
+  }
+
+  .mobile-nav-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .mobile-nav-toggle {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: var(--z-mobile-trigger);
+    display: inline-flex;
+    flex: 0 0 auto;
+    border-color: color-mix(in srgb, var(--primary) 42%, var(--border));
+    color: var(--primary-strong);
+    background: color-mix(in srgb, var(--primary-soft) 84%, var(--surface));
+    box-shadow: 0 10px 24px rgba(24, 36, 58, 0.16);
+    backdrop-filter: blur(8px);
+  }
+
+  .mobile-nav-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-mobile-backdrop);
+    display: block;
+    border: 0;
+    background: rgba(16, 24, 39, 0.46);
+    backdrop-filter: blur(2px);
+  }
+
+  .topbar {
+    padding-left: 68px;
+  }
+}
+
+@media (max-width: 860px) {
+  .side-nav,
+  .metric-grid,
+  .dashboard-insight-grid,
+  .flow-preview,
+  .designer-grid,
+  .field-editor-grid,
+  .process-grid,
+  .runner-grid,
+  .detail-list,
+  .settings-grid,
+  .settings-action-grid,
+  .inline-form,
+  .profile-form,
+  .admin-create-grid,
+  .filter-toolbar,
+  .management-layout,
+  .community-management-layout,
+  .community-create-form,
+  .community-settings-grid,
+  .role-editor-grid,
+  .audit-category-grid,
+  .session-row,
+  .user-management-row,
+  .system-audit-row,
+  .inline-verification-form,
+  .compact-grid,
+  .access-editor,
+  .password-reset-inline,
+  .access-confirm-grid,
+  .rule-row {
+    grid-template-columns: 1fr;
+  }
+
+  .status-checkbox-filters {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  .users-scope-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .system-audit-meta {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .session-danger-action {
+    justify-content: stretch;
+  }
+
+  .session-danger-action .strong-danger-button {
+    width: 100%;
+  }
+
+  .field-palette-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-palette-rail {
+    position: static;
+  }
+
+  .workspace-header,
+  .section-heading,
+  .process-card-header,
+  .task-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .topbar {
+    min-height: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 14px 14px 68px;
+  }
+
+  .topbar-user {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .topbar-actions {
+    margin-left: 0;
+    justify-self: end;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .topbar-identity strong {
+    max-width: 100%;
+  }
+
+  .role-pill {
+    justify-self: start;
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+
+  .content {
+    padding: 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar {
+    padding-right: 10px;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .icon-button,
+  .session-icon-button {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle-orb,
+  .language-toggle-orbit,
+  .language-toggle-code,
+  .email-verification-section,
+  .admin-create-panel,
+  .disclosure-content,
+  .user-detail-content,
+  .timeline-reveal {
+    animation-duration: 1ms;
+    transition-duration: 1ms;
+  }
+}
