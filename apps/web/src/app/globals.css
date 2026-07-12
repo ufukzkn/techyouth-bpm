@@ -528,7 +528,8 @@ input[type="checkbox"] {
   gap: 6px;
 }
 
-.side-nav button {
+.side-nav button,
+.side-nav a {
   min-height: 40px;
   display: flex;
   align-items: center;
@@ -541,16 +542,20 @@ input[type="checkbox"] {
   font: inherit;
   font-weight: 700;
   text-align: left;
+  text-decoration: none;
 }
 
 .side-nav button:hover,
-.side-nav button.active {
+.side-nav button.active,
+.side-nav a:hover,
+.side-nav a.active {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.1);
   transform: translateX(2px);
 }
 
-.side-nav button.active {
+.side-nav button.active,
+.side-nav a.active {
   background: color-mix(in srgb, var(--primary) 52%, transparent);
   box-shadow: inset 3px 0 0 #ffffff;
 }
@@ -568,7 +573,31 @@ input[type="checkbox"] {
   border-left: 1px solid rgba(255, 255, 255, 0.16);
   animation: disclosure-enter 260ms ease both;
 }
-.side-nav .nav-submenu button { min-height: 38px; padding: 0 10px; font-size: 13px; }
+.side-nav .nav-submenu button,
+.side-nav .nav-submenu a { min-height: 38px; padding: 0 10px; font-size: 13px; }
+
+.workspace-route-content {
+  min-width: 0;
+  animation: workspace-route-enter 150ms ease-out both;
+}
+
+@keyframes workspace-route-enter {
+  from {
+    opacity: 0.98;
+    transform: translateY(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-route-content {
+    animation: none;
+  }
+}
 
 .main-area {
   min-width: 0;
