@@ -1,6 +1,7 @@
 "use client";
 
 import { AuditTimeline } from "@/features/processes/AuditTimeline";
+import { ProcessFlowIndicator } from "@/features/processes/ProcessFlowIndicator";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { StatusBadge } from "@/features/processes/StatusBadge";
 import { formatApiDateTime } from "@/lib/dateTime";
@@ -48,6 +49,8 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
           </div>
           <StatusBadge status={detail.status} language={language} />
         </div>
+
+        <ProcessFlowIndicator status={detail.status} language={language} />
 
         <dl className="detail-list">
           <div>

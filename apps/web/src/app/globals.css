@@ -2417,6 +2417,109 @@ input[type="checkbox"] {
   background: color-mix(in srgb, #ea580c 16%, transparent);
 }
 
+.process-flow-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  margin: 0 -20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+  width: 80px;
+}
+
+.flow-step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  color: var(--muted);
+  transition: all 0.3s ease;
+}
+
+.flow-step.pending .flow-step-icon {
+  border-color: var(--border);
+}
+
+.flow-step.pending .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+.flow-step.active .flow-step-icon {
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 15%, transparent);
+}
+
+.flow-step.completed .flow-step-icon {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.flow-step.active.terminal-completed .flow-step-icon {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: white;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--teal) 15%, transparent);
+}
+
+.flow-step.active.terminal-rejected .flow-step-icon {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 15%, transparent);
+}
+
+.flow-step.active.terminal-escalated .flow-step-icon {
+  background: #ea580c; /* orange-600 */
+  border-color: #ea580c;
+  color: white;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #ea580c 15%, transparent);
+}
+
+.flow-step-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+}
+
+.flow-step.active .flow-step-label {
+  color: var(--foreground);
+  font-weight: 700;
+}
+
+.flow-connector {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin: 0 -20px;
+  transform: translateY(-12px);
+  z-index: 1;
+  transition: background 0.3s ease;
+}
+
+.flow-connector.active {
+  background: var(--primary);
+}
+
 .stacked-summary {
   display: grid;
   gap: 5px;
