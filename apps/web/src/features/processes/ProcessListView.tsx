@@ -88,6 +88,26 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
     });
   }
 
+  function handleMoveUp(id: string) {
+    setOrderedProcesses((prev) => {
+      const index = prev.findIndex((p) => p.id === id);
+      if (index <= 0) return prev;
+      const next = arrayMove(prev, index, index - 1);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next.map((p) => p.id)));
+      return next;
+    });
+  }
+
+  function handleMoveDown(id: string) {
+    setOrderedProcesses((prev) => {
+      const index = prev.findIndex((p) => p.id === id);
+      if (index < 0 || index >= prev.length - 1) return prev;
+      const next = arrayMove(prev, index, index + 1);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next.map((p) => p.id)));
+      return next;
+    });
+  }
+
   const filteredProcesses = useMemo(
     () => (filter === "all" ? orderedProcesses : orderedProcesses.filter((p) => p.status === filter)),
     [orderedProcesses, filter],
@@ -130,13 +150,17 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
         >
           <SortableContext items={filteredProcesses.map((p) => p.id)} strategy={verticalListSortingStrategy}>
             <div className="process-list">
-              {filteredProcesses.map((process) => (
+              {filteredProcesses.map((process, index) => (
                 <SortableProcessCard
                   key={process.id}
+                  isFirst={index === 0}
+                  isLast={index === filteredProcesses.length - 1}
                   isSelected={process.id === selectedProcessId}
                   language={language}
                   process={process}
                   onSelect={onSelectProcess}
+                  onMoveUp={handleMoveUp}
+                  onMoveDown={handleMoveDown}
                 />
               ))}
             </div>
