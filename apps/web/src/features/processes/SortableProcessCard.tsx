@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ProcessCard } from "@/features/processes/ProcessCard";
+import { translate } from "@/features/i18n/translations";
 import type { Language, ProcessSummary } from "@/lib/types";
 
 type SortableProcessCardProps = {
@@ -42,6 +43,8 @@ export function SortableProcessCard({
     transition,
   };
 
+  const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
+
   return (
     <div
       ref={setNodeRef}
@@ -53,7 +56,7 @@ export function SortableProcessCard({
           ref={setActivatorNodeRef}
           className="process-drag-handle"
           type="button"
-          aria-label="Sırayı değiştirmek için sürükle"
+          aria-label={t("process.dragHandle")}
           {...attributes}
           {...listeners}
         >
@@ -63,7 +66,7 @@ export function SortableProcessCard({
           className="process-move-btn"
           type="button"
           disabled={isFirst}
-          aria-label="Yukarı taşı"
+          aria-label={t("process.moveUp")}
           onClick={() => onMoveUp(process.id)}
         >
           <ChevronUp size={14} aria-hidden="true" />
@@ -72,7 +75,7 @@ export function SortableProcessCard({
           className="process-move-btn"
           type="button"
           disabled={isLast}
-          aria-label="Aşağı taşı"
+          aria-label={t("process.moveDown")}
           onClick={() => onMoveDown(process.id)}
         >
           <ChevronDown size={14} aria-hidden="true" />
