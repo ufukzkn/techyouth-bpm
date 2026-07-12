@@ -3,6 +3,7 @@
 import { AuditTimeline } from "@/features/processes/AuditTimeline";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { StatusBadge } from "@/features/processes/StatusBadge";
+import { JsonViewer } from "@/features/ui/JsonViewer";
 import { formatApiDateTime } from "@/lib/dateTime";
 import type { Language, ProcessDetail } from "@/lib/types";
 
@@ -70,7 +71,7 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
           </div>
         </dl>
 
-        <pre className="json-preview compact-json">{JSON.stringify(detail.formData, null, 2)}</pre>
+        <JsonViewer className="compact-json" language={language} value={detail.formData} />
       </article>
 
       <article className="process-card audit-card">

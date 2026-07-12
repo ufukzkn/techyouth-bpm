@@ -6,7 +6,7 @@ import { LoginRedirectLoading, WorkspaceLoadingShell } from "@/features/app-shel
 import { WorkspaceSessionController } from "@/features/app-shell/components/WorkspaceSessionController";
 import { WorkspaceSidebar } from "@/features/app-shell/components/WorkspaceSidebar";
 import { WorkspaceTopbar } from "@/features/app-shell/components/WorkspaceTopbar";
-import { navItems } from "@/features/app-shell/navigation";
+import { navItems, type NavGroupId } from "@/features/app-shell/navigation";
 import { ForcedPasswordChangeView } from "@/features/app-shell/views/ForcedPasswordChangeView";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api } from "@/lib/api";
@@ -35,7 +35,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
     toggleTheme,
   } = useSessionStore();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [isManagementOpen, setIsManagementOpen] = useState(() => pathname.startsWith("/management"));
+  const [openNavGroups, setOpenNavGroups] = useState<NavGroupId[]>([]);
 
   const visibleNavItems = useMemo(
     () =>
@@ -51,7 +51,11 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
 
   const currentViewId = navItems.find((item) => item.path === pathname)?.viewId;
   const canAccessCurrentRoute = visibleNavItems.some((item) => item.viewId === currentViewId);
-  const isManagementExpanded = pathname.startsWith("/management") || isManagementOpen;
+  const toggleNavGroup = useCallback((groupId: NavGroupId) => {
+    setOpenNavGroups((current) =>
+      current.includes(groupId) ? current.filter((candidate) => candidate !== groupId) : [...current, groupId],
+    );
+  }, []);
 
   const endSession = useCallback(() => {
     logout();
@@ -116,13 +120,13 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
       {hasHydrated && user && !user.mustChangePassword && canAccessCurrentRoute ? (
         <div className="app-shell">
           <WorkspaceSidebar
-            isManagementOpen={isManagementExpanded}
             isMobileOpen={isMobileNavOpen}
             items={visibleNavItems}
             language={language}
+            openGroups={openNavGroups}
             pathname={pathname}
             onCloseMobile={() => setIsMobileNavOpen(false)}
-            onToggleManagement={() => setIsManagementOpen((isOpen) => !isOpen)}
+            onToggleGroup={toggleNavGroup}
           />
           <div className={pathname === "/forms" ? "main-area main-area-designer" : "main-area"}>
             <WorkspaceTopbar

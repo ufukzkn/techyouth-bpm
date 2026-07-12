@@ -59,6 +59,51 @@
   justify-self: end;
 }
 
+.json-viewer {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.json-viewer-toolbar {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.json-copy-feedback {
+  min-width: 0;
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.json-copy-feedback-copied {
+  color: var(--teal);
+}
+
+.json-copy-feedback-error {
+  color: var(--danger);
+}
+
+.json-viewer .json-preview {
+  min-width: 0;
+  margin: 0;
+  max-height: 240px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.json-viewer-expanded .json-preview {
+  max-height: min(70dvh, 760px);
+}
+
 .designer-section {
   display: grid;
   gap: 18px;

@@ -1,34 +1,31 @@
 "use client";
 
-import { ChevronDown, UsersRound, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
 import Link from "next/link";
-import type { NavItem } from "@/features/app-shell/navigation";
+import { navGroups, type NavGroupId, type NavItem } from "@/features/app-shell/navigation";
 import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 import { translate } from "@/features/i18n/translations";
 import type { Language } from "@/lib/types";
 
 type WorkspaceSidebarProps = {
-  isManagementOpen: boolean;
   isMobileOpen: boolean;
   items: NavItem[];
   language: Language;
+  openGroups: NavGroupId[];
   pathname: string;
   onCloseMobile: () => void;
-  onToggleManagement: () => void;
+  onToggleGroup: (groupId: NavGroupId) => void;
 };
 
 export function WorkspaceSidebar({
-  isManagementOpen,
   isMobileOpen,
   items,
   language,
+  openGroups,
   pathname,
   onCloseMobile,
-  onToggleManagement,
+  onToggleGroup,
 }: WorkspaceSidebarProps) {
-  const managementItems = items.filter((item) => item.group === "management");
-  const hasActiveManagementRoute = managementItems.some((item) => pathname === item.path);
-
   return (
     <>
       <aside className={isMobileOpen ? "sidebar sidebar-open" : "sidebar"} id="workspace-navigation">
@@ -51,29 +48,34 @@ export function WorkspaceSidebar({
         </button>
         <nav className="side-nav" aria-label={translate(language, "app.navigation")}>
           {items.map((item, index) => {
-            if (item.group === "management") {
-              const isFirstManagementItem = !items
-                .slice(0, index)
-                .some((previousItem) => previousItem.group === "management");
-              if (!isFirstManagementItem) {
+            if (item.group) {
+              const groupId = item.group;
+              const groupItems = items.filter((candidate) => candidate.group === groupId);
+              const isFirstGroupItem = !items.slice(0, index).some((previousItem) => previousItem.group === groupId);
+              if (!isFirstGroupItem) {
                 return null;
               }
 
+              const group = navGroups[groupId];
+              const GroupIcon = group.icon;
+              const hasActiveRoute = groupItems.some((candidate) => pathname === candidate.path);
+              const isGroupOpen = hasActiveRoute || openGroups.includes(groupId);
+
               return (
-                <div className="nav-disclosure" key="management">
+                <div className="nav-disclosure" key={groupId}>
                   <button
-                    aria-expanded={isManagementOpen}
-                    className={hasActiveManagementRoute ? "nav-group-trigger active" : "nav-group-trigger"}
-                    onClick={onToggleManagement}
+                    aria-expanded={isGroupOpen}
+                    className={hasActiveRoute ? "nav-group-trigger active" : "nav-group-trigger"}
+                    onClick={() => onToggleGroup(groupId)}
                     type="button"
                   >
-                    <UsersRound size={18} />
-                    <span>{translate(language, "nav.management")}</span>
-                    <ChevronDown className={isManagementOpen ? "nav-group-chevron open" : "nav-group-chevron"} size={16} />
+                    <GroupIcon size={18} />
+                    <span>{translate(language, group.labelKey)}</span>
+                    <ChevronDown className={isGroupOpen ? "nav-group-chevron open" : "nav-group-chevron"} size={16} />
                   </button>
-                  {isManagementOpen ? (
+                  {isGroupOpen ? (
                     <div className="nav-submenu">
-                      {managementItems.map((child) => {
+                      {groupItems.map((child) => {
                         const ChildIcon = child.icon;
                         return (
                           <Link

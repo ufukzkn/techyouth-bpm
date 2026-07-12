@@ -40,6 +40,7 @@ Do not place a new feature at the bottom of an unrelated file. Preserve the impo
 - `InlineValueLoader`: compact numeric/value loading without temporary `0` or `-`.
 - `ActionFeedback`: success/error/loading feedback inside the card that initiated a mutation.
 - `ConfirmationDialog`: required for create, access, revoke, deactivate and delete operations when the action has meaningful impact.
+- `JsonViewer`: the only raw JSON presentation surface; it contains long values and owns copy plus expand/collapse feedback.
 
 Screen migrations to these contracts are incremental. Do not rewrite every feature merely to replace an existing stable button in one commit.
 
@@ -63,10 +64,12 @@ Screen migrations to these contracts are incremental. Do not rewrite every featu
 ## Responsive Rules
 
 - Desktop navigation remains fixed; tablet/mobile navigation uses the existing drawer.
+- Related routes use reusable sidebar disclosures. `Formlar` owns designer/runner and `Yonetim` owns users/communities; route permissions still decide which children exist.
 - General workspace content stays capped at `1180px`.
 - Form Designer may expand to `1460px` on wide screens.
 - At `1440px` and above, the field palette is the sticky third grid column. It must not use viewport-fixed positioning or overlap the canvas.
-- At tablet/mobile widths, the field palette returns to normal flow below the canvas.
+- Between 861px and 1439px, the field palette remains in normal flow below the canvas.
+- At 860px and below, the normal palette is hidden. A draggable edge-snapping trigger opens a viewport-bottom sheet; selecting a type appends the field and returns focus to the trigger when the sheet closes.
 - `overflow-x: clip` is intentional: it prevents horizontal spill without creating a scroll container that breaks sticky positioning.
 
 ## Verification Checklist

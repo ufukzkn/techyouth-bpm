@@ -242,3 +242,11 @@ The backend checks also passed after adding form update tests:
 ```bash
 dotnet test apps/api/TechYouthBpm.slnx
 ```
+
+## Latest Mobile And Navigation UX
+
+- `Form Tasarimi` and `Form Baslat` keep their native routes but now appear under one permission-aware `Formlar` sidebar disclosure.
+- At 860 CSS pixels and below, the long palette card is replaced by a draggable circular trigger. The trigger is constrained to the viewport, snaps to the nearest horizontal edge and remembers a normalized vertical position for the device.
+- The trigger opens an accessible bottom sheet from the viewport edge. Selecting a field type appends it through the existing palette insertion function, closes the sheet and scrolls the new field into view.
+- Tablet/desktop drag-and-drop and field-card move controls remain unchanged.
+- Designer, runner and process-detail JSON now use the shared `JsonViewer`, which contains long values, limits vertical growth and provides copy plus expand/collapse actions.

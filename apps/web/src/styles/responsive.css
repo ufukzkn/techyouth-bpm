@@ -219,4 +219,10 @@
     animation-duration: 1ms;
     transition-duration: 1ms;
   }
+
+  .mobile-field-palette-sheet,
+  .mobile-field-palette-fab {
+    animation-duration: 1ms;
+    transition-duration: 1ms;
+  }
 }
