@@ -32,6 +32,7 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 - The move from hash-scroll to route-based navigation makes the app feel closer to a real workspace.
 - Form designer and user management are the densest screens; they are usable, but final demo should verify common viewport widths.
 - Audit and management screens now avoid loading all data at once through server-side pagination/search, which helps production readiness.
+- Shared styles are separated into token, base, shell and feature-owned files. Form Designer uses a responsive sticky palette rail, while the language control uses a fixed-width directional transition without shifting the topbar.
 
 ## Presentation Defense Notes
 

@@ -133,7 +133,7 @@ The runner reads the same `validationRules` array and blocks submit before calli
 
 - Drag/drop behavior uses the existing `@dnd-kit/core`, `@dnd-kit/sortable` and `@dnd-kit/utilities` dependencies.
 - No new dependency was added for ordering or field creation.
-- The Form Designer includes a sticky right-side field palette on wide screens. On narrower screens the palette falls back into the normal page flow.
+- The Form Designer includes a true sticky third-column field palette from 1440 CSS pixels upward. It stays below the topbar without overlaying the canvas. On narrower screens the palette falls back into normal page flow.
 - Palette items use field-specific icons, localized field names and short Turkish descriptions.
 - Palette items do not create fields on click. A real drag/drop gesture is required before a new field is inserted.
 - While dragging from the palette, the field list shows an insertion indicator so users can see where the field will be added.
@@ -162,7 +162,7 @@ Every palette card has an icon from the existing lucide-react dependency. The UI
 - Checkbox controls were adjusted to stay normal-sized and aligned with other inputs.
 - Dependent validation and option areas were made more readable with scoped layout polish.
 - Drag handles are visibly labeled so ordering is easier to discover during a demo.
-- The field palette uses a polished right rail on desktop and no longer squeezes the field editor area.
+- The field palette uses a 280-320px sticky right column on wide desktop layouts. Form Designer alone may widen to 1460px, while other workspace routes retain the standard 1180px content width.
 - Turkish UI copy was corrected for terms such as Satın Alma, Seçenek düğmesi and Açılır seçim listesi.
 - RequiredWhen helper text was removed from every field card to keep the dependent validation area quieter while preserving the rule UI.
 - Runner states now explain loading, empty list, validation-blocked submit, success and backend-error outcomes.
