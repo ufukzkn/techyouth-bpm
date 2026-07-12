@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   closestCenter,
   DndContext,
+  DragOverlay,
   type DragEndEvent,
+  type DragStartEvent,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -17,6 +19,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { ProcessCard } from "@/features/processes/ProcessCard";
 import { SortableProcessCard } from "@/features/processes/SortableProcessCard";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import type { Language, ProcessStatus, ProcessSummary } from "@/lib/types";
@@ -52,6 +55,7 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [orderedProcesses, setOrderedProcesses] = useState<ProcessSummary[]>(processes);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   // API'den yeni liste geldiğinde kaydedilmiş sıralamayı koruyarak güncelle
   useEffect(() => {
@@ -66,8 +70,13 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id));
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
+    setActiveId(null);
     if (!over || active.id === over.id) return;
 
     setOrderedProcesses((prev) => {
@@ -113,7 +122,12 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
           {processes.length === 0 ? t("process.noProcess") : t("process.noFilterMatch")}
         </p>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
           <SortableContext items={filteredProcesses.map((p) => p.id)} strategy={verticalListSortingStrategy}>
             <div className="process-list">
               {filteredProcesses.map((process) => (
@@ -127,6 +141,18 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
               ))}
             </div>
           </SortableContext>
+          <DragOverlay>
+            {activeId ? (
+              <div className="process-drag-overlay">
+                <ProcessCard
+                  isSelected={false}
+                  language={language}
+                  process={orderedProcesses.find((p) => p.id === activeId)!}
+                  onSelect={() => undefined}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
         </DndContext>
       )}
     </article>
