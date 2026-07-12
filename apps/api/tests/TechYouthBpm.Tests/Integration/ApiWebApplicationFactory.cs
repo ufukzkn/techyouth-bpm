@@ -9,11 +9,16 @@ using TechYouthBpm.Infrastructure.Data;
 
 namespace TechYouthBpm.Tests.Integration;
 
-internal sealed class ApiWebApplicationFactory(int rateLimitPermitLimit = 100) : WebApplicationFactory<Program>
+internal sealed class ApiWebApplicationFactory(
+    int rateLimitPermitLimit = 100,
+    string databaseProvider = "Sqlite",
+    string? connectionString = null) : WebApplicationFactory<Program>
 {
     private readonly string databasePath = Path.Combine(
         Path.GetTempPath(),
         $"techyouth-bpm-integration-{Guid.NewGuid():N}.db");
+
+    private string DatabaseConnectionString => connectionString ?? $"Data Source={databasePath}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -22,8 +27,8 @@ internal sealed class ApiWebApplicationFactory(int rateLimitPermitLimit = 100) :
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Database:Provider"] = "Sqlite",
-                ["ConnectionStrings:DefaultConnection"] = $"Data Source={databasePath}",
+                ["Database:Provider"] = databaseProvider,
+                ["ConnectionStrings:DefaultConnection"] = DatabaseConnectionString,
                 ["Seed:MockData"] = "true",
                 ["Email:Provider"] = "Demo",
                 ["Auth:RateLimitPermitLimit"] = rateLimitPermitLimit.ToString(),
@@ -35,7 +40,17 @@ internal sealed class ApiWebApplicationFactory(int rateLimitPermitLimit = 100) :
             services.RemoveAll<AppDbContext>();
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlite($"Data Source={databasePath}"));
+            {
+                if (databaseProvider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase)
+                    || databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
+                {
+                    options.UseNpgsql(DatabaseConnectionString);
+                }
+                else
+                {
+                    options.UseSqlite(DatabaseConnectionString);
+                }
+            });
         });
     }
 
@@ -63,7 +78,7 @@ internal sealed class ApiWebApplicationFactory(int rateLimitPermitLimit = 100) :
     {
         base.Dispose(disposing);
         SqliteConnection.ClearAllPools();
-        if (File.Exists(databasePath))
+        if (connectionString is null && File.Exists(databasePath))
         {
             File.Delete(databasePath);
         }
