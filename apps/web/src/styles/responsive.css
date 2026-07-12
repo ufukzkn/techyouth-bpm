@@ -209,6 +209,7 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle-orb,
   .language-toggle-orbit,
+  .language-toggle-track,
   .language-toggle-code,
   .email-verification-section,
   .admin-create-panel,

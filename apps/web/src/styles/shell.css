@@ -465,27 +465,41 @@
   transform: scaleY(0.45);
 }
 
-.language-toggle-code {
+.language-toggle-track {
   position: relative;
   z-index: 1;
+  width: 22px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  transform: translateX(0);
+  transition: transform var(--motion-normal) ease-out;
+}
+
+.language-toggle-button[data-language="en"] .language-toggle-track {
+  transform: translateX(-22px);
+}
+
+.language-toggle-code {
+  width: 22px;
+  flex: 0 0 22px;
   min-width: 22px;
   display: inline-flex;
+  align-items: center;
   justify-content: center;
   color: var(--foreground);
   font-size: 10px;
   font-weight: 900;
+  line-height: 1;
   letter-spacing: 0;
-  animation: language-pop 220ms ease both;
-  transition:
-    color 220ms ease,
-    transform 220ms ease;
+  transition: color var(--motion-fast) ease;
 }
 
-.language-toggle-button[data-language="en"] .language-toggle-code {
+.language-toggle-code-en {
   color: var(--teal);
 }
 
-.language-toggle-button[data-language="tr"] .language-toggle-code {
+.language-toggle-code-tr {
   color: var(--primary-strong);
 }
 
@@ -496,9 +510,14 @@
   transform: rotate(198deg) scale(1.08);
 }
 
-.language-toggle-button:hover .language-toggle-code,
-.language-toggle-button:focus-visible .language-toggle-code {
-  transform: scale(1.08);
+.language-toggle-button[data-language="tr"]:hover .language-toggle-track,
+.language-toggle-button[data-language="tr"]:focus-visible .language-toggle-track {
+  transform: translateX(0) scale(1.08);
+}
+
+.language-toggle-button[data-language="en"]:hover .language-toggle-track,
+.language-toggle-button[data-language="en"]:focus-visible .language-toggle-track {
+  transform: translateX(-22px) scale(1.08);
 }
 
 .logout-button:hover,

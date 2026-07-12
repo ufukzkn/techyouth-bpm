@@ -124,7 +124,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
             onCloseMobile={() => setIsMobileNavOpen(false)}
             onToggleManagement={() => setIsManagementOpen((isOpen) => !isOpen)}
           />
-          <div className="main-area">
+          <div className={pathname === "/forms" ? "main-area main-area-designer" : "main-area"}>
             <WorkspaceTopbar
               expiresAt={expiresAt}
               isMobileNavOpen={isMobileNavOpen}
@@ -137,7 +137,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
               onToggleMobileNav={() => setIsMobileNavOpen((isOpen) => !isOpen)}
               onToggleTheme={toggleTheme}
             />
-            <main className="content">
+            <main className={pathname === "/forms" ? "content content-designer-wide" : "content"}>
               <div className="workspace-route-content" key={pathname}>{children}</div>
             </main>
           </div>

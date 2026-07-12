@@ -19,8 +19,9 @@ export function LanguageToggleButton({ language, label, onToggle }: LanguageTogg
       type="button"
     >
       <span className="language-toggle-orbit" aria-hidden="true" />
-      <span className="language-toggle-code" aria-hidden="true">
-        {language.toUpperCase()}
+      <span className="language-toggle-track" aria-hidden="true">
+        <span className="language-toggle-code language-toggle-code-tr">TR</span>
+        <span className="language-toggle-code language-toggle-code-en">EN</span>
       </span>
     </button>
   );
