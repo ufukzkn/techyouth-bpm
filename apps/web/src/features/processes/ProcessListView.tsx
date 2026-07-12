@@ -2,9 +2,8 @@
 
 import { CircleDot, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
+import { ProcessCard } from "@/features/processes/ProcessCard";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
-import { StatusBadge } from "@/features/processes/StatusBadge";
-import { formatApiDateTime } from "@/lib/dateTime";
 import type { Language, ProcessStatus, ProcessSummary } from "@/lib/types";
 
 type ProcessListViewProps = {
@@ -65,18 +64,13 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
       ) : (
         <div className="process-list">
           {filteredProcesses.map((process) => (
-            <button
-              className={process.id === selectedProcessId ? "process-list-item active" : "process-list-item"}
+            <ProcessCard
               key={process.id}
-              onClick={() => onSelectProcess(process.id)}
-              type="button"
-            >
-              <span>
-                <strong>{process.formName}</strong>
-                <small>{formatApiDateTime(process.startedAt, language)}</small>
-              </span>
-              <StatusBadge status={process.status} language={language} />
-            </button>
+              isSelected={process.id === selectedProcessId}
+              language={language}
+              process={process}
+              onSelect={onSelectProcess}
+            />
           ))}
         </div>
       )}
