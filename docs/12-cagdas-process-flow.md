@@ -33,6 +33,10 @@ The scope includes:
 - Added `AuditLogTests` with 4 test scenarios covering audit log creation after approve/reject actions.
 - Added `TestDbFactory` as a shared helper for creating InMemory database contexts and seed data.
 
+### Bonus Work (Completed)
+- **Escalation Workflow**: Added `Escalate` action and `Escalated` status. Updated `ProcessStateMachine` to handle transitions (`InProgress → Escalated`, `Escalated → Approve/Reject`) and updated `TaskService` to automatically spawn an Admin review task upon escalation.
+- **Visual Process Flow**: Implemented `ProcessFlowIndicator` to visually represent the linear workflow progression (`Pending → InProgress → Terminal State`).
+
 ## Current Process Flow Capabilities
 
 ### Process List
@@ -46,6 +50,7 @@ The scope includes:
 ### Process Detail
 
 - Shows form name, status badge, start date, completion date (if finished) and task summary.
+- Includes a visual `ProcessFlowIndicator` mapping the current status onto the high-level workflow steps.
 - Displays submitted form data as formatted JSON.
 - Shows all tasks with their open/completed counts.
 - Renders the full audit timeline with chronological entries.
@@ -83,6 +88,9 @@ The `ProcessStateMachine` defines allowed transitions as a simple dictionary:
 | Pending | Start | InProgress |
 | InProgress | Approve | Completed |
 | InProgress | Reject | Rejected |
+| InProgress | Escalate | Escalated |
+| Escalated | Approve | Completed |
+| Escalated | Reject | Rejected |
 
 Any other combination returns a validation error. This is the core BPM correctness guarantee.
 
@@ -120,12 +128,16 @@ Frontend process-flow files:
 - `apps/web/src/features/processes/TaskActionDialog.tsx`
 - `apps/web/src/features/processes/AuditTimeline.tsx`
 - `apps/web/src/features/processes/StatusBadge.tsx`
+- `apps/web/src/features/processes/ProcessFlowIndicator.tsx`
 - `apps/web/src/app/globals.css`
+- `apps/web/src/lib/types.ts`
+- `apps/web/src/features/i18n/translations.ts`
 
 Backend test files:
 
 - `apps/api/tests/TechYouthBpm.Tests/Workflow/TaskAuthorizationTests.cs`
 - `apps/api/tests/TechYouthBpm.Tests/Workflow/AuditLogTests.cs`
+- `apps/api/tests/TechYouthBpm.Tests/Workflow/ProcessStateMachineTests.cs`
 - `apps/api/tests/TechYouthBpm.Tests/TestDbFactory.cs`
 - `apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj`
 
