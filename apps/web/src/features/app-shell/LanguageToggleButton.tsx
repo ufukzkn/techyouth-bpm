@@ -19,9 +19,11 @@ export function LanguageToggleButton({ language, label, onToggle }: LanguageTogg
       type="button"
     >
       <span className="language-toggle-orbit" aria-hidden="true" />
-      <span className="language-toggle-track" aria-hidden="true">
-        <span className="language-toggle-code language-toggle-code-tr">TR</span>
-        <span className="language-toggle-code language-toggle-code-en">EN</span>
+      <span className="language-toggle-window" aria-hidden="true">
+        <span className="language-toggle-track">
+          <span className="language-toggle-code language-toggle-code-tr">TR</span>
+          <span className="language-toggle-code language-toggle-code-en">EN</span>
+        </span>
       </span>
     </button>
   );
