@@ -59,8 +59,8 @@ Remaining hardening opportunities:
 - split rate limit policies per endpoint group instead of one shared `auth` policy
 - add refresh-token family/device identifiers for more precise suspicious-device handling
 - configure allowed CORS origins through environment variables for non-local deployments
-- use production migrations instead of implicit schema creation
-- add integration tests against real HTTP middleware for cookie/CSRF behavior
+- add optimistic concurrency protection for simultaneous task actions
+- move production CORS/cookie policy into environment-specific deployment configuration
 
 ## BPM and Process Flow Review
 
@@ -87,7 +87,7 @@ Task execution now also supports permission-based access. The v1 task still keep
 
 Process listing now uses EF Core projection to return only summary fields such as process id, form name, status and dates. Full tasks and audit logs are loaded only by the process detail endpoint, which prevents the board from pulling large related object graphs from PostgreSQL/Neon. Detail loading uses split queries so related collections do not create one oversized joined result set.
 
-Recommended BPM improvement: wrap process start and task action persistence plus system audit in explicit transactions. Today the main state save and system audit save are separate service calls, which can theoretically leave business data saved without the matching system audit if the second write fails.
+Form update, process start and task action now use explicit EF Core transactions. Form fields, process/task state, notifications and audit writes commit together; a downstream audit failure rolls the full business mutation back. Dedicated failure-injection tests verify these boundaries.
 
 ## Test Coverage
 
@@ -97,7 +97,7 @@ Current backend tests are strong for the project scope. The latest run passed:
 dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj
 ```
 
-Result: `55 passed`.
+Result: `101 passed`.
 
 Covered areas include:
 
@@ -113,8 +113,16 @@ Covered areas include:
 - admin user creation/deletion/session management
 - OTP hashing and expiry
 - password reset and public email verification
+- relational constraints through SQLite instead of EF InMemory
+- real HTTP login, cookies, CSRF, Bearer and logout behavior
+- refresh-token rotation and reuse through the controller pipeline
+- rate limiting with standard `429` responses
+- SuperAdmin and community-admin authorization boundaries
+- Swagger bearer metadata and form-to-process endpoint smoke flow
+- transaction rollback for form, process and task writes
+- SQLite migration/startup smoke and opt-in PostgreSQL/Neon migration smoke
 
-Main gap: most tests are service-level with EF InMemory. Add API integration tests with `WebApplicationFactory` for controller routing, cookies, CSRF, rate limiting and Swagger-facing behavior.
+The remaining test gap is browser-level E2E coverage. The API now has service, relational persistence and `WebApplicationFactory` HTTP coverage; Playwright should next protect the critical login -> form -> process -> task -> audit user journey.
 
 ## Presentation Defense Notes
 
@@ -149,26 +157,24 @@ Login returns a bearer token. In Swagger, paste it into Authorize as a bearer to
 
 ### High
 
-- Add EF Core migrations and document migration commands for SQLite/PostgreSQL.
-- Add explicit transactions around form update, process start, task action and related audit writes.
-- Add API integration tests for login, cookie auth, CSRF, protected endpoints and admin-only authorization.
 - Move CORS allowed origins and cookie security policy fully into environment-specific config.
+- Add optimistic concurrency or row-version checks for competing task actions.
+- Add Playwright coverage for the critical cross-role BPM journey.
 
 ### Medium
 
 - Add paged process/task endpoints for large datasets.
 - Add endpoint-specific rate limits for login, register, verification, reset password and admin mutations.
-- Add optimistic concurrency or row version checks for task approval to prevent double-submit races.
 - Add structured audit action enums/constants instead of free-form action strings.
-- Add API integration tests for community-admin boundary checks across users, forms, processes and tasks.
+- Extend HTTP integration coverage when new community-scoped mutations are added.
 
 ### Low
 
 - Add health check endpoints for database and SMTP readiness.
 - Add audit export endpoints for CSV/JSON reporting.
 - Add OpenAPI examples for common auth and BPM requests.
-- Add Docker Compose for API, web and PostgreSQL onboarding.
+- Add automated CI checks for backend tests and frontend lint/build.
 
 ## Reviewer Summary
 
-The backend is presentation-ready for the PDF scope. Its strongest points are layered architecture, role-aware services, state-machine-based BPM, hashed sessions/passwords, refresh-token rotation, audit traceability and meaningful test coverage. The most valuable next step is not another feature, but production hardening: migrations, transactions and API-level security tests.
+The backend is presentation-ready for the PDF scope. Its strongest points are layered architecture, role-aware services, state-machine-based BPM, hashed sessions/passwords, refresh-token rotation, transactional audit traceability, migrations and real HTTP security tests. The most valuable next step is browser-level E2E plus task concurrency protection, not another broad feature package.
