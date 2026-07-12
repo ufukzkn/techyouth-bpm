@@ -77,5 +77,108 @@ public class DashboardServiceTests
         Assert.Equal(1, approverSummary.OpenTaskCount);
         Assert.Equal(1, approverSummary.InProgressProcessCount);
         Assert.Equal(1, approverSummary.CompletedProcessCount);
+        Assert.Empty(starterSummary.RecentOpenTasks!);
+        Assert.Single(approverSummary.RecentOpenTasks!);
+        Assert.Equal(2, starterSummary.RecentProcesses!.Count);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_Limits_And_Sorts_Recent_Items()
+    {
+        await using var db = TestDbFactory.Create();
+        var starter = TestDbFactory.SeedUser(db, Role.User, "recent-starter");
+        var approver = TestDbFactory.SeedUser(db, Role.Approver, "recent-approver");
+        var now = DateTime.UtcNow;
+
+        for (var index = 0; index < 6; index++)
+        {
+            var form = new FormDefinition
+            {
+                Id = Guid.NewGuid(),
+                Name = $"Recent Form {index}",
+                CommunityId = TestDbFactory.CommunityId,
+                CreatedByUserId = starter.Id,
+                CreatedAt = now.AddMinutes(index)
+            };
+            var process = new ProcessInstance
+            {
+                Id = Guid.NewGuid(),
+                FormDefinitionId = form.Id,
+                CommunityId = TestDbFactory.CommunityId,
+                StartedByUserId = starter.Id,
+                Status = ProcessStatus.InProgress,
+                FormDataJson = "{}",
+                StartedAt = now.AddMinutes(index)
+            };
+            db.AddRange(
+                form,
+                process,
+                new ProcessTask
+                {
+                    Id = Guid.NewGuid(),
+                    ProcessInstanceId = process.Id,
+                    RequiredPermission = PermissionNames.TasksAct,
+                    Status = ProcessTaskStatus.Open,
+                    AvailableActionsJson = "[]",
+                    CreatedAt = now.AddMinutes(index)
+                });
+        }
+        await db.SaveChangesAsync();
+        var service = new DashboardService(db);
+
+        var summary = await service.GetSummaryAsync(TestDbFactory.ToDto(approver));
+
+        Assert.Equal(4, summary.RecentOpenTasks!.Count);
+        Assert.Equal(4, summary.RecentProcesses!.Count);
+        Assert.Equal(
+            ["Recent Form 5", "Recent Form 4", "Recent Form 3", "Recent Form 2"],
+            summary.RecentOpenTasks.Select(item => item.FormName).ToArray());
+        Assert.Equal(
+            ["Recent Form 5", "Recent Form 4", "Recent Form 3", "Recent Form 2"],
+            summary.RecentProcesses.Select(item => item.FormName).ToArray());
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_Uses_Community_Scope_While_SuperAdmin_Remains_Global()
+    {
+        await using var db = TestDbFactory.Create();
+        var starter = TestDbFactory.SeedUser(db, Role.User, "scoped-starter");
+        var superAdmin = TestDbFactory.SeedSuperAdmin(db, "global-superadmin");
+        var otherCommunityId = Guid.NewGuid();
+        var otherFormId = Guid.NewGuid();
+        db.Communities.Add(new Community
+        {
+            Id = otherCommunityId,
+            Name = "Other Community",
+            InviteCode = "OTHR1",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        db.FormDefinitions.Add(new FormDefinition
+        {
+            Id = otherFormId,
+            Name = "Other Community Form",
+            CommunityId = otherCommunityId,
+            CreatedByUserId = starter.Id,
+            CreatedAt = DateTime.UtcNow
+        });
+        db.ProcessInstances.Add(new ProcessInstance
+        {
+            Id = Guid.NewGuid(),
+            FormDefinitionId = otherFormId,
+            CommunityId = otherCommunityId,
+            StartedByUserId = starter.Id,
+            Status = ProcessStatus.InProgress,
+            FormDataJson = "{}",
+            StartedAt = DateTime.UtcNow.AddMinutes(1)
+        });
+        await db.SaveChangesAsync();
+        var service = new DashboardService(db);
+
+        var scopedSummary = await service.GetSummaryAsync(TestDbFactory.ToDto(starter));
+        var globalSummary = await service.GetSummaryAsync(TestDbFactory.ToDto(superAdmin));
+
+        Assert.DoesNotContain(scopedSummary.RecentProcesses!, item => item.FormName == "Other Community Form");
+        Assert.Contains(globalSummary.RecentProcesses!, item => item.FormName == "Other Community Form");
     }
 }

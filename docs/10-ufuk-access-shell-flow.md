@@ -79,11 +79,12 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Workspace navigation uses real route paths such as `/dashboard`, `/forms`, `/tasks` and `/settings` instead of hash-scroll sections or query-only views.
 - Desktop navigation stays fixed on the left while the workspace scrolls.
 - On tablet/mobile widths, workspace navigation is collapsed behind a fixed hamburger button and opens as a drawer with backdrop/escape-close behavior.
-- Dashboard metrics are loaded from process/task API data.
+- Dashboard metrics and compact recent-work lists are loaded from `GET /api/dashboard/summary`.
 - Dashboard now includes a compact donut distribution for pending tasks, in-progress processes and completed processes.
 - Dashboard metrics keep the last loaded values while refreshing, so the cards do not flash to placeholder values during fast navigation.
 - Dashboard metric cards navigate to the related workspace area when the user role has access.
-- BPM flow steps on the dashboard now act as role-aware shortcuts.
+- `Oncelikli Islerim` and `Son Sureclerim` show at most four newest records already filtered by the current user's permissions and community.
+- Compact dashboard actions only appear when the current user can open their target route.
 - Process/task refresh keeps the visible data on screen, shows inline button loading and reports success/error with a bottom-right toast.
 - The top bar places the compact session icon next to the active user identity. Clicking it opens session details: display name, username, role and expiry time.
 - The top bar includes a notification dropdown backed by `/api/notifications`, with unread count and `Tumunu okundu yap`.
@@ -97,7 +98,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - `Bekleyen isler` routes approvers/admins to `Islerim`.
 - `Devam eden surecler` routes users to `Surecler`.
 - `Tamamlanan surecler` routes users to `Surecler`.
-- Flow shortcuts only appear when the active role can open the target screen.
+- Work lists and quick actions only appear within the active user's permission/community scope.
 - Returning to the dashboard reuses the latest loaded metric values while the API refreshes in the background.
 - If API metrics cannot be loaded, the dashboard keeps the user in place and shows an error message instead of logging out.
 

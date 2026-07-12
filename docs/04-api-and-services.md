@@ -63,6 +63,14 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
 
 Browser flows send cookies with `credentials: include`. Mutating cookie-authenticated requests include `X-CSRF-Token`; Swagger and local API debugging can still use the `Authorization: Bearer` header.
 
+## Dashboard
+
+- `GET /api/dashboard/summary`
+  - Returns open-task, in-progress-process and completed-process counts without loading full lists.
+  - Also returns at most four recent open tasks and four recent visible processes, ordered newest first.
+  - Applies the same authorization scope as task/process services: SuperAdmin is global, community-scoped roles stay inside their community, and a user without task visibility sees only processes they started.
+  - Keeps the original three count fields for backward compatibility; recent collections are additive.
+
 ## Users And Access
 
 - `GET /api/users`

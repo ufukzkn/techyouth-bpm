@@ -248,6 +248,23 @@ export type DashboardSummary = {
   openTaskCount: number;
   inProgressProcessCount: number;
   completedProcessCount: number;
+  recentOpenTasks?: DashboardTaskItem[];
+  recentProcesses?: DashboardProcessItem[];
+};
+
+export type DashboardTaskItem = {
+  id: string;
+  processInstanceId: string;
+  formName: string;
+  status: ProcessTaskStatus;
+  createdAt: string;
+};
+
+export type DashboardProcessItem = {
+  id: string;
+  formName: string;
+  status: ProcessStatus;
+  startedAt: string;
 };
 
 export type Community = {

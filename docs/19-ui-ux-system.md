@@ -70,6 +70,8 @@ Screen migrations to these contracts are incremental. Do not rewrite every featu
 - At `1440px` and above, the field palette is the sticky third grid column. It must not use viewport-fixed positioning or overlap the canvas.
 - Between 861px and 1439px, the field palette remains in normal flow below the canvas.
 - At 860px and below, the normal palette is hidden. A draggable edge-snapping trigger opens a viewport-bottom sheet; selecting a type appends the field and returns focus to the trigger when the sheet closes.
+- Dashboard work cards use two columns on desktop/tablet and one column on narrow mobile. Their list rows remain compact, show no more than four items and use an explicit empty state instead of stretching the page.
+- Dashboard quick actions are permission-aware; unavailable routes must be omitted rather than rendered disabled.
 - `overflow-x: clip` is intentional: it prevents horizontal spill without creating a scroll container that breaks sticky positioning.
 
 ## Verification Checklist

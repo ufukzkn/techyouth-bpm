@@ -1,9 +1,12 @@
-import { CircleCheckBig, ListTodo, Workflow } from "lucide-react";
+import { ArrowRight, CircleCheckBig, Clock3, FilePlus2, ListTodo, PlayCircle, UserRound, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import type { ViewId } from "@/features/app-shell/navigation";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
+import { StatusBadge } from "@/features/processes/StatusBadge";
+import { EmptyState } from "@/features/ui/EmptyState";
 import { api } from "@/lib/api";
+import { formatApiDateTime } from "@/lib/dateTime";
 import type { DashboardSummary, Language, User } from "@/lib/types";
 
 const dashboardMetricsCache = new Map<string, DashboardSummary>();
@@ -70,6 +73,8 @@ export function DashboardView({
   const openTaskCount = summary?.openTaskCount ?? 0;
   const inProgressCount = summary?.inProgressProcessCount ?? 0;
   const completedCount = summary?.completedProcessCount ?? 0;
+  const recentOpenTasks = summary?.recentOpenTasks ?? [];
+  const recentProcesses = summary?.recentProcesses ?? [];
   const chartSegments = useMemo(() => {
     const circumference = 2 * Math.PI * 44;
     const total = Math.max(1, openTaskCount + inProgressCount + completedCount);
@@ -101,28 +106,20 @@ export function DashboardView({
     { label: t("dashboard.completed"), value: completedCount, viewId: canOpen("processes") ? "processes" : undefined, icon: CircleCheckBig },
   ];
 
-  const flowSteps: Array<{ label: string; caption: string; viewId: ViewId }> = [
-    { label: t("dashboard.flow.session"), caption: t("dashboard.flow.sessionCaption"), viewId: "settings" },
-    {
-      label: t("dashboard.flow.formDefinition"),
-      caption: t("dashboard.flow.formDefinitionCaption"),
-      viewId: "forms",
-    },
-    {
-      label: t("dashboard.flow.processInstance"),
-      caption: t("dashboard.flow.processInstanceCaption"),
-      viewId: "runner",
-    },
-    { label: t("dashboard.flow.taskAction"), caption: t("dashboard.flow.taskActionCaption"), viewId: "tasks" },
-    { label: t("dashboard.flow.auditLog"), caption: t("dashboard.flow.auditLogCaption"), viewId: "processes" },
+  const availableQuickActions: Array<{ label: string; caption: string; viewId: ViewId; icon: typeof ListTodo }> = [
+    { label: t("dashboard.quick.design"), caption: t("dashboard.quick.designCaption"), viewId: "forms", icon: FilePlus2 },
+    { label: t("dashboard.quick.start"), caption: t("dashboard.quick.startCaption"), viewId: "runner", icon: PlayCircle },
+    { label: t("dashboard.quick.tasks"), caption: t("dashboard.quick.tasksCaption"), viewId: "tasks", icon: ListTodo },
+    { label: t("dashboard.quick.processes"), caption: t("dashboard.quick.processesCaption"), viewId: "processes", icon: Workflow },
   ];
+  const quickActions = availableQuickActions.filter((action) => canOpen(action.viewId));
 
   return (
     <div className="view-panel">
       <section className="workspace-header">
         <div>
           <span className="eyebrow">{t("dashboard.eyebrow")}</span>
-          <h1>{t("dashboard.title")}</h1>
+          <h1>{t("dashboard.welcome", { name: user.displayName })}</h1>
           {user.communityName ? <p className="dashboard-community-label"><span>{t("dashboard.communityLabel")}</span><strong>{user.communityName}</strong></p> : null}
         </div>
         <p>
@@ -247,21 +244,122 @@ export function DashboardView({
         <article className="dashboard-context-card">
           <span className="eyebrow">Baglam</span>
           <h3>{user.communityName || "Platform yonetimi"}</h3>
-          <p>{currentAccessLabel}</p>
-          <small>Menuler ve kisa yollar aktif izinlere gore sadeleştirilir.</small>
+          <div className="dashboard-role-context">
+            <UserRound size={18} aria-hidden="true" />
+            <p>{currentAccessLabel}</p>
+          </div>
+          <small>{t("dashboard.contextDescription", { count: quickActions.length })}</small>
         </article>
       </section>
 
-      <section className="flow-preview">
-        {flowSteps
-          .filter((step) => canOpen(step.viewId))
-          .map((step) => (
-            <button className="flow-step" key={step.label} onClick={() => onNavigate(step.viewId)} type="button">
-              <strong>{step.label}</strong>
-              <span>{step.caption}</span>
-            </button>
-          ))}
+      <section className="dashboard-work-grid">
+        <article className="dashboard-work-card">
+          <div className="dashboard-card-heading">
+            <div>
+              <span className="eyebrow">{t("dashboard.priorityEyebrow")}</span>
+              <h3>{t("dashboard.priorityTitle")}</h3>
+            </div>
+            {canOpen("tasks") ? (
+              <button className="dashboard-heading-action" onClick={() => onNavigate("tasks")} type="button">
+                {t("dashboard.viewAll")} <ArrowRight size={15} />
+              </button>
+            ) : null}
+          </div>
+          {status === "loading" && !summary ? (
+            <DashboardListSkeleton />
+          ) : recentOpenTasks.length > 0 ? (
+            <div className="dashboard-activity-list">
+              {recentOpenTasks.map((task) => (
+                <button className="dashboard-activity-item" key={task.id} onClick={() => onNavigate("tasks")} type="button">
+                  <span className="dashboard-activity-icon"><ListTodo size={17} /></span>
+                  <span className="dashboard-activity-copy">
+                    <strong>{task.formName}</strong>
+                    <small><Clock3 size={13} /> {formatApiDateTime(task.createdAt, language)}</small>
+                  </span>
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              description={t("dashboard.priorityEmptyDescription")}
+              icon={<CircleCheckBig size={20} />}
+              title={t("dashboard.priorityEmptyTitle")}
+            />
+          )}
+        </article>
+
+        <article className="dashboard-work-card">
+          <div className="dashboard-card-heading">
+            <div>
+              <span className="eyebrow">{t("dashboard.recentEyebrow")}</span>
+              <h3>{t("dashboard.recentTitle")}</h3>
+            </div>
+            {canOpen("processes") ? (
+              <button className="dashboard-heading-action" onClick={() => onNavigate("processes")} type="button">
+                {t("dashboard.viewAll")} <ArrowRight size={15} />
+              </button>
+            ) : null}
+          </div>
+          {status === "loading" && !summary ? (
+            <DashboardListSkeleton />
+          ) : recentProcesses.length > 0 ? (
+            <div className="dashboard-activity-list">
+              {recentProcesses.map((process) => (
+                <button className="dashboard-activity-item" key={process.id} onClick={() => onNavigate("processes")} type="button">
+                  <span className="dashboard-activity-copy">
+                    <strong>{process.formName}</strong>
+                    <small>{formatApiDateTime(process.startedAt, language)}</small>
+                  </span>
+                  <span className="dashboard-activity-status">
+                    <StatusBadge language={language} status={process.status} />
+                  </span>
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              description={t("dashboard.recentEmptyDescription")}
+              icon={<Workflow size={20} />}
+              title={t("dashboard.recentEmptyTitle")}
+            />
+          )}
+        </article>
       </section>
+
+      {quickActions.length > 0 ? (
+        <section className="dashboard-quick-section">
+          <div className="dashboard-card-heading">
+            <div>
+              <span className="eyebrow">{t("dashboard.quickEyebrow")}</span>
+              <h3>{t("dashboard.quickTitle")}</h3>
+            </div>
+          </div>
+          <div className="dashboard-quick-actions">
+            {quickActions.map((action) => (
+              <button className="dashboard-quick-action" key={action.viewId} onClick={() => onNavigate(action.viewId)} type="button">
+                <action.icon size={18} aria-hidden="true" />
+                <span>
+                  <strong>{action.label}</strong>
+                  <small>{action.caption}</small>
+                </span>
+                <ArrowRight size={15} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
+function DashboardListSkeleton() {
+  return (
+    <div className="dashboard-list-skeleton" aria-hidden="true">
+      {[0, 1, 2].map((item) => (
+        <span key={item} />
+      ))}
     </div>
   );
 }
