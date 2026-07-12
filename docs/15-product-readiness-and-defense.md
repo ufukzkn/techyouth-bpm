@@ -87,7 +87,7 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 **How is i18n handled?** The frontend uses a shared TR/EN dictionary and maps known API errors to localized messages. Remaining raw backend messages should be mapped before final demo.
 
-**Is Docker ready?** Not yet. The repo is ready for Docker Compose, but Docker files are still recommended next work for repeatable API/web/database startup.
+**Is Docker ready?** Yes. Separate Compose stacks run the SQLite local demo or the Neon-backed cloud flow with the same API/web images, migrations and deterministic seed. They share host ports and are intentionally started one at a time.
 
 ## Recommended Next Work
 
@@ -101,7 +101,7 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 ### Should
 
 - Add API integration tests for cookie auth, CSRF, rate limits, protected endpoints and admin-only authorization.
-- Add Docker Compose for web, API and PostgreSQL onboarding.
+- Keep Docker local/cloud startup and secret onboarding notes current as configuration changes.
 - Add audit export for filtered logs.
 - Add a compact role/permission matrix for Admin, User and Approver.
 - Extend the compact matrix to include SuperAdmin, Topluluk Admin and custom community roles.

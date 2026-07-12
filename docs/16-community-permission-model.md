@@ -68,7 +68,7 @@ The current UI labels this role as `Gozlemci`. It keeps the existing read-only p
 
 `Lojistik Gorevlisi` is not a default system template because its first permission set duplicated `Onay Sorumlusu`. A logistics community can still create that name as a custom role and then tailor its permissions.
 
-Ready templates are directly usable roles, not automatic duplicates. Selecting `Surec Baslatici` shows that exact name and its fixed permission set. The administrator must explicitly choose `Bu sablonu ozellestir` before a mutable copy such as `Surec Baslatici*` can be created; this prevents accidental duplicate roles and makes the customization intent visible in the name.
+Ready templates are directly usable roles, not automatic duplicates. Selecting `Surec Baslatici` shows that exact name and its fixed permission set. If the administrator changes one of its permissions, the editor automatically creates a mutable custom draft named `Surec Baslatici*`; unchanged templates are not duplicated.
 
 ## Presentation Defense
 
