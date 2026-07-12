@@ -9,7 +9,10 @@ public class ProcessStateMachine
     {
         [(ProcessStatus.Pending, WorkflowAction.Start)] = ProcessStatus.InProgress,
         [(ProcessStatus.InProgress, WorkflowAction.Approve)] = ProcessStatus.Completed,
-        [(ProcessStatus.InProgress, WorkflowAction.Reject)] = ProcessStatus.Rejected
+        [(ProcessStatus.InProgress, WorkflowAction.Reject)] = ProcessStatus.Rejected,
+        [(ProcessStatus.InProgress, WorkflowAction.Escalate)] = ProcessStatus.Escalated,
+        [(ProcessStatus.Escalated, WorkflowAction.Approve)] = ProcessStatus.Completed,
+        [(ProcessStatus.Escalated, WorkflowAction.Reject)] = ProcessStatus.Rejected
     };
 
     public Result<ProcessStatus> Move(ProcessStatus currentStatus, WorkflowAction action)

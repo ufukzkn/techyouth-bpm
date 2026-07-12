@@ -11,6 +11,9 @@ public class ProcessStateMachineTests
     [InlineData(ProcessStatus.Pending, WorkflowAction.Start, ProcessStatus.InProgress)]
     [InlineData(ProcessStatus.InProgress, WorkflowAction.Approve, ProcessStatus.Completed)]
     [InlineData(ProcessStatus.InProgress, WorkflowAction.Reject, ProcessStatus.Rejected)]
+    [InlineData(ProcessStatus.InProgress, WorkflowAction.Escalate, ProcessStatus.Escalated)]
+    [InlineData(ProcessStatus.Escalated, WorkflowAction.Approve, ProcessStatus.Completed)]
+    [InlineData(ProcessStatus.Escalated, WorkflowAction.Reject, ProcessStatus.Rejected)]
     public void Move_Allows_Defined_Transitions(
         ProcessStatus currentStatus,
         WorkflowAction action,
@@ -28,6 +31,8 @@ public class ProcessStateMachineTests
     [InlineData(ProcessStatus.Pending, WorkflowAction.Reject)]
     [InlineData(ProcessStatus.Completed, WorkflowAction.Approve)]
     [InlineData(ProcessStatus.Rejected, WorkflowAction.Start)]
+    [InlineData(ProcessStatus.Escalated, WorkflowAction.Start)]
+    [InlineData(ProcessStatus.Escalated, WorkflowAction.Escalate)]
     public void Move_Rejects_Undefined_Transitions(ProcessStatus currentStatus, WorkflowAction action)
     {
         var result = _stateMachine.Move(currentStatus, action);
@@ -41,10 +46,12 @@ public class ProcessStateMachineTests
     {
         var pendingActions = _stateMachine.GetAvailableActions(ProcessStatus.Pending);
         var inProgressActions = _stateMachine.GetAvailableActions(ProcessStatus.InProgress);
+        var escalatedActions = _stateMachine.GetAvailableActions(ProcessStatus.Escalated);
         var completedActions = _stateMachine.GetAvailableActions(ProcessStatus.Completed);
 
         Assert.Equal([WorkflowAction.Start], pendingActions);
-        Assert.Equal([WorkflowAction.Approve, WorkflowAction.Reject], inProgressActions);
+        Assert.Equal([WorkflowAction.Approve, WorkflowAction.Reject, WorkflowAction.Escalate], inProgressActions);
+        Assert.Equal([WorkflowAction.Approve, WorkflowAction.Reject], escalatedActions);
         Assert.Empty(completedActions);
     }
 }

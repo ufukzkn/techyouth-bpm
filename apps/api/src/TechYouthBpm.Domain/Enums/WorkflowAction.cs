@@ -4,5 +4,6 @@ public enum WorkflowAction
 {
     Start = 1,
     Approve = 2,
-    Reject = 3
+    Reject = 3,
+    Escalate = 4
 }

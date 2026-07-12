@@ -95,6 +95,22 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             task.ProcessInstance.CompletedAt = DateTime.UtcNow;
         }
 
+        if (transition.Value is ProcessStatus.Escalated)
+        {
+            var escalationTask = new ProcessTask
+            {
+                Id = Guid.NewGuid(),
+                ProcessInstanceId = task.ProcessInstance.Id,
+                AssignedRole = Role.Admin,
+                AssignedCommunityRoleId = task.AssignedCommunityRoleId,
+                RequiredPermission = task.RequiredPermission,
+                Status = ProcessTaskStatus.Open,
+                AvailableActionsJson = JsonHelpers.Serialize(new[] { WorkflowAction.Approve, WorkflowAction.Reject }),
+                CreatedAt = DateTime.UtcNow
+            };
+            db.ProcessTasks.Add(escalationTask);
+        }
+
         db.AuditLogs.Add(new AuditLog
         {
             Id = Guid.NewGuid(),
