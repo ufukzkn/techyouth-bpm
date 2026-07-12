@@ -13,10 +13,29 @@ public class DashboardServiceTests
         await using var db = TestDbFactory.Create();
         var starter = TestDbFactory.SeedUser(db, Role.User, "process-starter");
         var approver = TestDbFactory.SeedUser(db, Role.Approver, "approver");
+        var inProgressFormId = Guid.NewGuid();
+        var completedFormId = Guid.NewGuid();
+        db.FormDefinitions.AddRange(
+            new FormDefinition
+            {
+                Id = inProgressFormId,
+                Name = "In Progress Form",
+                CommunityId = TestDbFactory.CommunityId,
+                CreatedByUserId = starter.Id,
+                CreatedAt = DateTime.UtcNow
+            },
+            new FormDefinition
+            {
+                Id = completedFormId,
+                Name = "Completed Form",
+                CommunityId = TestDbFactory.CommunityId,
+                CreatedByUserId = starter.Id,
+                CreatedAt = DateTime.UtcNow
+            });
         var inProgressProcess = new ProcessInstance
         {
             Id = Guid.NewGuid(),
-            FormDefinitionId = Guid.NewGuid(),
+            FormDefinitionId = inProgressFormId,
             CommunityId = TestDbFactory.CommunityId,
             StartedByUserId = starter.Id,
             Status = ProcessStatus.InProgress,
@@ -28,7 +47,7 @@ public class DashboardServiceTests
             new ProcessInstance
             {
                 Id = Guid.NewGuid(),
-                FormDefinitionId = Guid.NewGuid(),
+                FormDefinitionId = completedFormId,
                 CommunityId = TestDbFactory.CommunityId,
                 StartedByUserId = starter.Id,
                 Status = ProcessStatus.Completed,
