@@ -37,6 +37,41 @@
   font-weight: 650;
 }
 
+.designer-form-info-panel {
+  position: relative;
+  isolation: isolate;
+}
+
+.designer-form-transition-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  backdrop-filter: blur(1px);
+  animation: designer-form-transition-enter 180ms ease-out;
+}
+
+.designer-form-transition-indicator {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 999px;
+  color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+}
+
+@keyframes designer-form-transition-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .tool-panel label {
   display: grid;
   gap: 7px;

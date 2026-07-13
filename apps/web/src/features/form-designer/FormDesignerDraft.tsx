@@ -128,6 +128,7 @@ export function FormDesignerDraft() {
   const [savedForms, setSavedForms] = useState<FormDefinition[]>([]);
   const [selectedFormId, setSelectedFormId] = useState("");
   const [isLoadingForms, setIsLoadingForms] = useState(false);
+  const [isSwitchingForm, setIsSwitchingForm] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
@@ -515,21 +516,27 @@ export function FormDesignerDraft() {
 
   async function loadSavedForm(id: string) {
     setSelectedFormId(id);
+    setIsSwitchingForm(true);
+    const minimumTransition = new Promise<void>((resolve) => window.setTimeout(resolve, 240));
 
     if (!id) {
+      await minimumTransition;
       resetDesigner();
+      setIsSwitchingForm(false);
       return;
     }
 
     if (!token) {
+      await minimumTransition;
       setSaveState("error");
       setMessage(t("form.designer.sessionRequiredLoad"));
+      setIsSwitchingForm(false);
       return;
     }
 
     try {
       setIsLoadingForms(true);
-      const form = await api.getForm(token, id);
+      const [form] = await Promise.all([api.getForm(token, id), minimumTransition]);
       setSelectedFormId(form.id);
       setFormName(form.name);
       setDescription(form.description);
@@ -537,10 +544,12 @@ export function FormDesignerDraft() {
       setSaveState("idle");
       setMessage(t("form.designer.loadedForEdit", { name: form.name }));
     } catch (error) {
+      await minimumTransition;
       setSaveState("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.formLoadFailed"));
     } finally {
       setIsLoadingForms(false);
+      setIsSwitchingForm(false);
     }
   }
 
@@ -605,9 +614,16 @@ export function FormDesignerDraft() {
         onDragStart={handleDragStart}
       >
         <div className="designer-grid">
-          <div className="tool-panel">
+          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm}>
+            {isSwitchingForm ? (
+              <div className="designer-form-transition-overlay" role="status" aria-live="polite">
+                <span className="designer-form-transition-indicator">
+                  <InlineValueLoader label={t("form.designer.loadingForms")} />
+                </span>
+              </div>
+            ) : null}
             <h3>{t("form.designer.formInfo")}</h3>
-            {isLoadingForms ? (
+            {isLoadingForms && !isSwitchingForm ? (
               <div className="designer-loading-state" aria-live="polite">
                 <InlineValueLoader label={t("form.designer.loadingForms")} />
                 <span>{t("form.designer.loadingForms")}</span>
