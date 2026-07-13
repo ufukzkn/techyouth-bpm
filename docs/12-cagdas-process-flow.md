@@ -34,6 +34,7 @@ The scope includes:
 - Added `TestDbFactory` as a shared helper for creating InMemory database contexts and seed data.
 
 ### Bonus Work (Completed)
+- **Drag-and-Drop Process Reordering**: Implemented a drag-and-drop feature to allow users to visually reorder processes in `ProcessListView` using `@dnd-kit`. Extracted `SortableProcessCard`, added ghost overlay during dragging, persisted ordering logic to `localStorage` to save the customized view state per user, and added keyboard accessible move up/down controls.
 - **Escalation Workflow**: Added `Escalate` action and `Escalated` status. Updated `ProcessStateMachine` to handle transitions (`InProgress → Escalated`, `Escalated → Approve/Reject`) and updated `TaskService` to automatically spawn an Admin review task upon escalation.
 - **Visual Process Flow**: Implemented `ProcessFlowIndicator` to visually represent the linear workflow progression (`Pending → InProgress → Terminal State`).
 
@@ -123,13 +124,15 @@ Frontend process-flow files:
 
 - `apps/web/src/features/processes/ProcessBoardDraft.tsx`
 - `apps/web/src/features/processes/ProcessListView.tsx`
+- `apps/web/src/features/processes/ProcessCard.tsx`
+- `apps/web/src/features/processes/SortableProcessCard.tsx`
 - `apps/web/src/features/processes/ProcessDetailPanel.tsx`
 - `apps/web/src/features/processes/MyTasksView.tsx`
 - `apps/web/src/features/processes/TaskActionDialog.tsx`
 - `apps/web/src/features/processes/AuditTimeline.tsx`
 - `apps/web/src/features/processes/StatusBadge.tsx`
 - `apps/web/src/features/processes/ProcessFlowIndicator.tsx`
-- `apps/web/src/app/globals.css`
+- `apps/web/src/styles/processes.css`
 - `apps/web/src/lib/types.ts`
 - `apps/web/src/features/i18n/translations.ts`
 
