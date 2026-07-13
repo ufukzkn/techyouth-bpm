@@ -145,9 +145,103 @@
   background: transparent;
 }
 
-.form-opening-fields .skeleton-block {
-  min-height: 104px;
+.form-opening-field-guide,
+.form-opening-field-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
   border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.form-opening-field-guide {
+  border-color: color-mix(in srgb, var(--primary) 22%, var(--border));
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+
+.form-opening-field-guide-title {
+  width: min(210px, 42%);
+  min-height: 17px;
+}
+
+.form-opening-field-guide-copy {
+  width: min(460px, 74%);
+  min-height: 13px;
+}
+
+.form-opening-field-card {
+  min-height: 128px;
+}
+
+.form-opening-field-header,
+.form-opening-field-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-opening-field-header {
+  justify-content: space-between;
+}
+
+.form-opening-field-heading {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 7px;
+}
+
+.form-opening-field-title {
+  width: min(220px, 42%);
+  min-height: 18px;
+}
+
+.form-opening-field-meta {
+  width: min(340px, 64%);
+  min-height: 13px;
+}
+
+.form-opening-field-actions {
+  flex: 0 0 auto;
+}
+
+.form-opening-field-drag {
+  width: 92px;
+  min-height: 38px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 28%, var(--border));
+}
+
+.form-opening-field-action {
+  width: 38px;
+  min-height: 38px;
+}
+
+.form-opening-field-controls {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.95fr) minmax(150px, 1.15fr) minmax(120px, 0.8fr) minmax(104px, auto);
+  align-items: end;
+  gap: 10px;
+}
+
+.form-opening-field-control {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.form-opening-field-label {
+  width: 58%;
+  min-height: 12px;
+}
+
+.form-opening-field-input,
+.form-opening-field-required {
+  min-height: 40px;
+}
+
+.form-opening-field-required {
+  min-width: 104px;
 }
 
 .form-runner-opening-skeleton .form-opening-grid {
@@ -370,6 +464,14 @@
   .form-opening-skeleton {
     min-height: 380px;
     padding: 12px;
+  }
+
+  .form-opening-field-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-opening-field-required {
+    min-width: 0;
   }
 
   .designer-section .field-palette {

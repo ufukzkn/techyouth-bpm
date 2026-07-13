@@ -1014,8 +1014,34 @@ function FormDesignerOpeningSkeleton({ label }: { label: string }) {
         </div>
       </div>
       <div className="form-opening-fields">
-        <SkeletonBlock />
-        <SkeletonBlock />
+        <div className="form-opening-field-guide">
+          <SkeletonBlock className="form-opening-field-guide-title" />
+          <SkeletonBlock className="form-opening-field-guide-copy" />
+        </div>
+        {Array.from({ length: 2 }, (_, index) => (
+          <div className="form-opening-field-card" key={index}>
+            <div className="form-opening-field-header">
+              <div className="form-opening-field-heading">
+                <SkeletonBlock className="form-opening-field-title" />
+                <SkeletonBlock className="form-opening-field-meta" />
+              </div>
+              <div className="form-opening-field-actions">
+                <SkeletonBlock className="form-opening-field-drag" />
+                <SkeletonBlock className="form-opening-field-action" />
+                <SkeletonBlock className="form-opening-field-action" />
+              </div>
+            </div>
+            <div className="form-opening-field-controls">
+              {Array.from({ length: 3 }, (_, controlIndex) => (
+                <div className="form-opening-field-control" key={controlIndex}>
+                  <SkeletonBlock className="form-opening-field-label" />
+                  <SkeletonBlock className="form-opening-field-input" />
+                </div>
+              ))}
+              <SkeletonBlock className="form-opening-field-required" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
