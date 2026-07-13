@@ -40,7 +40,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
+import { InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { MobileFieldPalette } from "@/features/form-designer/MobileFieldPalette";
 import { JsonViewer } from "@/features/ui/JsonViewer";
 import {
@@ -128,6 +128,7 @@ export function FormDesignerDraft() {
   const [savedForms, setSavedForms] = useState<FormDefinition[]>([]);
   const [selectedFormId, setSelectedFormId] = useState("");
   const [isLoadingForms, setIsLoadingForms] = useState(false);
+  const [hasLoadedForms, setHasLoadedForms] = useState(false);
   const [isSwitchingForm, setIsSwitchingForm] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
@@ -139,6 +140,7 @@ export function FormDesignerDraft() {
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
+  const isInitialDesignerLoading = Boolean(token) && !hasLoadedForms;
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -194,6 +196,7 @@ export function FormDesignerDraft() {
       } finally {
         if (!ignore) {
           setIsLoadingForms(false);
+          setHasLoadedForms(true);
         }
       }
     }
@@ -596,7 +599,7 @@ export function FormDesignerDraft() {
   }
 
   return (
-    <section className="designer-section">
+    <section className={`designer-section${isInitialDesignerLoading ? " designer-section-initial-loading" : ""}`}>
       <div className="section-heading">
         <div>
           <span className="eyebrow">{t("form.designer.eyebrow")}</span>
@@ -604,6 +607,8 @@ export function FormDesignerDraft() {
         </div>
         <p>{t("form.designer.description")}</p>
       </div>
+
+      {isInitialDesignerLoading ? <FormDesignerOpeningSkeleton label={t("form.designer.loadingForms")} /> : null}
 
       <DndContext
         sensors={sensors}
@@ -984,6 +989,35 @@ export function FormDesignerDraft() {
         title={t("form.designer.fieldPaletteTitle")}
       />
     </section>
+  );
+}
+
+function FormDesignerOpeningSkeleton({ label }: { label: string }) {
+  return (
+    <div className="form-opening-skeleton form-designer-opening-skeleton" role="status" aria-label={label}>
+      <div className="form-opening-heading">
+        <InlineValueLoader label={label} />
+        <strong>{label}</strong>
+      </div>
+      <div className="form-opening-grid">
+        <div className="form-opening-panel">
+          <SkeletonBlock className="form-opening-title" />
+          <SkeletonBlock className="form-opening-control" />
+          <SkeletonBlock className="form-opening-control" />
+          <SkeletonBlock className="form-opening-control" />
+        </div>
+        <div className="form-opening-panel form-opening-palette">
+          <SkeletonBlock className="form-opening-title" />
+          <SkeletonBlock className="form-opening-palette-row" />
+          <SkeletonBlock className="form-opening-palette-row" />
+          <SkeletonBlock className="form-opening-palette-row" />
+        </div>
+      </div>
+      <div className="form-opening-fields">
+        <SkeletonBlock />
+        <SkeletonBlock />
+      </div>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { Play, RotateCcw } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
 import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
 import { validateFormValues } from "@/features/forms/formValidation";
@@ -151,7 +152,7 @@ export function FormRunnerDraft() {
   }
 
   return (
-    <section className="runner-section">
+    <section className={`runner-section${loadStatus === "loading" ? " runner-section-initial-loading" : ""}`}>
       <div className="section-heading">
         <div>
           <span className="eyebrow">{t("form.runner.eyebrow")}</span>
@@ -160,10 +161,10 @@ export function FormRunnerDraft() {
         <p>{t("form.runner.description")}</p>
       </div>
 
+      {loadStatus === "loading" ? <FormRunnerSkeleton language={language} /> : null}
+
       <div className="runner-grid">
         <form className="runner-form" onSubmit={handleSubmit}>
-          {loadStatus === "loading" ? <FormRunnerSkeleton language={language} /> : null}
-
           {loadStatus === "error" ? (
             <div className="runner-state-panel runner-state-error" role="alert">
               <strong>{token ? t("form.runner.loadFailed") : t("form.runner.sessionRequired")}</strong>
@@ -281,11 +282,27 @@ export function FormRunnerDraft() {
 }
 
 function FormRunnerSkeleton({ language }: { language: "tr" | "en" }) {
+  const label = translate(language, "form.runner.loadingForms");
+
   return (
-    <div className="form-skeleton" aria-label={translate(language, "form.runner.skeleton")}>
-      <span />
-      <span />
-      <span />
+    <div className="form-opening-skeleton form-runner-opening-skeleton" role="status" aria-label={label}>
+      <div className="form-opening-heading">
+        <InlineValueLoader label={label} />
+        <strong>{label}</strong>
+      </div>
+      <div className="form-opening-grid">
+        <div className="form-opening-panel">
+          <SkeletonBlock className="form-opening-title" />
+          <SkeletonBlock className="form-opening-control" />
+          <SkeletonBlock className="form-opening-summary" />
+          <SkeletonBlock className="form-opening-control" />
+          <SkeletonBlock className="form-opening-control" />
+        </div>
+        <div className="form-opening-panel form-opening-preview">
+          <SkeletonBlock className="form-opening-title" />
+          <SkeletonBlock className="form-opening-preview-block" />
+        </div>
+      </div>
     </div>
   );
 }
