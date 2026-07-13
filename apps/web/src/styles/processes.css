@@ -61,6 +61,107 @@
   color: var(--muted);
 }
 
+/* Drag & Drop Reorder Styles */
+
+.process-sortable-item {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  position: relative;
+  border-radius: 8px;
+  transition: box-shadow 0.2s ease, z-index 0s;
+}
+
+.process-sortable-item.is-dragging {
+  z-index: 50;
+  box-shadow: 0 12px 24px rgba(24, 36, 58, 0.12);
+}
+
+.process-sortable-item.is-dragging .process-list-item {
+  border-color: var(--primary);
+  background: var(--surface);
+}
+
+.process-sortable-item > .process-list-item {
+  flex: 1;
+}
+
+.process-move-controls {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.15;
+  transition: opacity 0.2s ease;
+}
+
+.process-sortable-item:hover .process-move-controls,
+.process-sortable-item:focus-within .process-move-controls {
+  opacity: 1;
+}
+
+.process-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: grab;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.process-drag-handle:hover,
+.process-drag-handle:focus-visible {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.process-drag-handle:active {
+  cursor: grabbing;
+}
+
+.process-move-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.process-move-btn:hover:not(:disabled),
+.process-move-btn:focus-visible:not(:disabled) {
+  color: var(--foreground);
+  background: var(--surface-muted);
+}
+
+.process-move-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.process-drag-overlay {
+  opacity: 0.8;
+  box-shadow: 0 14px 28px rgba(24, 36, 58, 0.15);
+  border-radius: 8px;
+  transform: scale(1.02);
+  cursor: grabbing;
+}
+
+.process-drag-overlay .process-list-item {
+  border-color: var(--primary);
+  background: var(--surface);
+}
+
+
 .status-badge {
   padding: 7px 10px;
   border-radius: 999px;
