@@ -42,6 +42,7 @@ These notes are the project memory. Update this file whenever an implementation 
 
 ## Current Implementation Log
 
+- Form Runner hardening now formats process `startedAt` with the shared date/time helper and a safe empty fallback, while its async form-list load ignores state, message and cache updates after unmount. Existing selection, initial values, validation, payload and runner status behavior remain unchanged; frontend lint/build passed.
 - Ozgun Form Flow validation hardening aligned frontend and backend text validation, added a dedicated localized text-type error, blocked raw empty designer keys before key normalization, strengthened case-insensitive Select/Radio option validation, added backend `yyyy-MM-dd` Date validation, and added focused backend definition/process-start tests. Frontend lint/build, backend solution build and the related backend tests passed; auth/session/login, dashboard, app shell, workflow/task/audit behavior, drag/drop UI and package/dependency files were unchanged.
 - Documentation baseline started from the PDF requirements.
 - Backend scaffold created as a .NET 8 solution with Domain, Application, Infrastructure and Api projects.

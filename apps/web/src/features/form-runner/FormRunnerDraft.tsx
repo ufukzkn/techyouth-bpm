@@ -9,6 +9,7 @@ import { JsonViewer } from "@/features/ui/JsonViewer";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
+import { formatApiDateTime } from "@/lib/dateTime";
 import type { FormDefinition, ProcessDetail } from "@/lib/types";
 
 type LoadStatus = "loading" | "refreshing" | "idle" | "error";
@@ -54,6 +55,8 @@ export function FormRunnerDraft() {
   }, [selectedFormId]);
 
   useEffect(() => {
+    let ignore = false;
+
     async function loadForms() {
       if (!token) {
         setLoadStatus("error");
@@ -64,6 +67,10 @@ export function FormRunnerDraft() {
       try {
         setLoadStatus(formRunnerFormsCache ? "refreshing" : "loading");
         const result = await api.listForms(token);
+        if (ignore) {
+          return;
+        }
+
         formRunnerFormsCache = result;
         const currentSelection = result.find((form) => form.id === selectedFormIdRef.current);
         const nextSelectedForm = currentSelection ?? result[0];
@@ -78,12 +85,20 @@ export function FormRunnerDraft() {
         setSubmitStatus("idle");
         setMessage(result.length > 0 ? t("form.runner.loadedForms") : t("form.runner.designFirst"));
       } catch (error) {
+        if (ignore) {
+          return;
+        }
+
         setLoadStatus("error");
         setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.runner.loadFailed"));
       }
     }
 
     void loadForms();
+
+    return () => {
+      ignore = true;
+    };
   }, [token, language, t]);
 
   function handleChange(fieldKey: string, value: FormValue) {
@@ -233,7 +248,7 @@ export function FormRunnerDraft() {
                 {t("form.runner.successSummary", {
                   id: submitResult.id,
                   status: statusLabel(language, submitResult.status),
-                  startedAt: new Date(submitResult.startedAt).toLocaleString(),
+                  startedAt: submitResult.startedAt ? formatApiDateTime(submitResult.startedAt, language) : "-",
                 })}
               </span>
             </div>
