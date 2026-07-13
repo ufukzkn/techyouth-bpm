@@ -40,6 +40,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { MobileFieldPalette } from "@/features/form-designer/MobileFieldPalette";
 import { JsonViewer } from "@/features/ui/JsonViewer";
 import {
@@ -61,6 +62,7 @@ type DesignerField = Omit<FormFieldDefinition, "id"> & {
 
 const fieldPalettePrefix = "palette:";
 const fieldCanvasDropId = "field-canvas";
+const fieldPaletteDropId = "field-palette-drop-zone";
 const paletteDragDistanceThreshold = 8;
 const fieldTypeIcons: Record<FieldType, LucideIcon> = {
   Text: Type,
@@ -126,16 +128,21 @@ export function FormDesignerDraft() {
   const [savedForms, setSavedForms] = useState<FormDefinition[]>([]);
   const [selectedFormId, setSelectedFormId] = useState("");
   const [isLoadingForms, setIsLoadingForms] = useState(false);
+  const [hasLoadedForms, setHasLoadedForms] = useState(false);
+  const [isSwitchingForm, setIsSwitchingForm] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
   const [highlightedFieldId, setHighlightedFieldId] = useState("");
+  const [moveFeedback, setMoveFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
+  const [displacedFeedback, setDisplacedFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
+  const isInitialDesignerLoading = Boolean(token) && !hasLoadedForms;
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -191,6 +198,7 @@ export function FormDesignerDraft() {
       } finally {
         if (!ignore) {
           setIsLoadingForms(false);
+          setHasLoadedForms(true);
         }
       }
     }
@@ -207,13 +215,31 @@ export function FormDesignerDraft() {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => setHighlightedFieldId(""), 1800);
+    const timeoutId = window.setTimeout(() => setHighlightedFieldId(""), 900);
     return () => window.clearTimeout(timeoutId);
   }, [highlightedFieldId]);
 
+  useEffect(() => {
+    if (!moveFeedback) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setMoveFeedback(null), 680);
+    return () => window.clearTimeout(timeoutId);
+  }, [moveFeedback]);
+
+  useEffect(() => {
+    if (!displacedFeedback) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setDisplacedFeedback(null), 680);
+    return () => window.clearTimeout(timeoutId);
+  }, [displacedFeedback]);
+
   function handleDragStart(event: DragStartEvent) {
     if (isPaletteDragId(event.active.id)) {
-      setPaletteInsertIndex(fields.length);
+      setPaletteInsertIndex(null);
     }
   }
 
@@ -234,11 +260,6 @@ export function FormDesignerDraft() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (!over) {
-      setPaletteInsertIndex(null);
-      return;
-    }
-
     if (isPaletteDragId(active.id)) {
       const fieldType = active.data.current?.fieldType;
       const insertIndex = resolvePaletteInsertIndex(event, fields);
@@ -249,7 +270,18 @@ export function FormDesignerDraft() {
       return;
     }
 
+    if (!over) {
+      setPaletteInsertIndex(null);
+      return;
+    }
+
     if (active.id === over.id) {
+      return;
+    }
+
+    const activeFieldIndex = fields.findIndex((field) => field.id === active.id);
+    const overFieldIndex = fields.findIndex((field) => field.id === over.id);
+    if (activeFieldIndex < 0 || overFieldIndex < 0) {
       return;
     }
 
@@ -359,6 +391,13 @@ export function FormDesignerDraft() {
   }
 
   function moveField(id: string, direction: -1 | 1) {
+    const currentIndex = fields.findIndex((field) => field.id === id);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= fields.length) {
+      return;
+    }
+    const displacedFieldId = fields[targetIndex].id;
+
     setFields((current) => {
       const currentIndex = current.findIndex((field) => field.id === id);
       const nextIndex = currentIndex + direction;
@@ -372,7 +411,15 @@ export function FormDesignerDraft() {
       nextFields.splice(nextIndex, 0, field);
       return normalizeSortOrder(nextFields);
     });
+    setMoveFeedback({ id, direction });
+    setDisplacedFeedback({ id: displacedFieldId, direction: direction === -1 ? 1 : -1 });
+    triggerFieldHighlight(id);
     markUnsaved();
+  }
+
+  function triggerFieldHighlight(id: string) {
+    setHighlightedFieldId("");
+    window.requestAnimationFrame(() => setHighlightedFieldId(id));
   }
 
   function addOption(fieldId: string) {
@@ -495,21 +542,27 @@ export function FormDesignerDraft() {
 
   async function loadSavedForm(id: string) {
     setSelectedFormId(id);
+    setIsSwitchingForm(true);
+    const minimumTransition = new Promise<void>((resolve) => window.setTimeout(resolve, 240));
 
     if (!id) {
+      await minimumTransition;
       resetDesigner();
+      setIsSwitchingForm(false);
       return;
     }
 
     if (!token) {
+      await minimumTransition;
       setSaveState("error");
       setMessage(t("form.designer.sessionRequiredLoad"));
+      setIsSwitchingForm(false);
       return;
     }
 
     try {
       setIsLoadingForms(true);
-      const form = await api.getForm(token, id);
+      const [form] = await Promise.all([api.getForm(token, id), minimumTransition]);
       setSelectedFormId(form.id);
       setFormName(form.name);
       setDescription(form.description);
@@ -517,10 +570,12 @@ export function FormDesignerDraft() {
       setSaveState("idle");
       setMessage(t("form.designer.loadedForEdit", { name: form.name }));
     } catch (error) {
+      await minimumTransition;
       setSaveState("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.formLoadFailed"));
     } finally {
       setIsLoadingForms(false);
+      setIsSwitchingForm(false);
     }
   }
 
@@ -567,7 +622,7 @@ export function FormDesignerDraft() {
   }
 
   return (
-    <section className="designer-section">
+    <section className={`designer-section${isInitialDesignerLoading ? " designer-section-initial-loading" : ""}`}>
       <div className="section-heading">
         <div>
           <span className="eyebrow">{t("form.designer.eyebrow")}</span>
@@ -575,6 +630,8 @@ export function FormDesignerDraft() {
         </div>
         <p>{t("form.designer.description")}</p>
       </div>
+
+      {isInitialDesignerLoading ? <FormDesignerOpeningSkeleton label={t("form.designer.loadingForms")} /> : null}
 
       <DndContext
         sensors={sensors}
@@ -585,8 +642,21 @@ export function FormDesignerDraft() {
         onDragStart={handleDragStart}
       >
         <div className="designer-grid">
-          <div className="tool-panel">
+          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm}>
+            {isSwitchingForm ? (
+              <div className="designer-form-transition-overlay" role="status" aria-live="polite">
+                <span className="designer-form-transition-indicator">
+                  <InlineValueLoader label={t("form.designer.loadingForms")} />
+                </span>
+              </div>
+            ) : null}
             <h3>{t("form.designer.formInfo")}</h3>
+            {isLoadingForms && !isSwitchingForm ? (
+              <div className="designer-loading-state" aria-live="polite">
+                <InlineValueLoader label={t("form.designer.loadingForms")} />
+                <span>{t("form.designer.loadingForms")}</span>
+              </div>
+            ) : null}
             <label>
               {t("form.designer.savedForm")}
               <select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}>
@@ -623,22 +693,15 @@ export function FormDesignerDraft() {
                 ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
                 : t("form.designer.createOnSave")}
             </p>
-            <button className="secondary-button" disabled={saveState === "saving"} type="button" onClick={resetDesigner}>
+            <button
+              className="secondary-button"
+              disabled={saveState === "saving"}
+              type="button"
+              onClick={resetDesigner}
+            >
               <Plus size={18} />
               {t("form.designer.newForm")}
             </button>
-            <button className="primary-button" disabled={saveState === "saving"} type="button" onClick={saveForm}>
-              <Save size={18} />
-              {saveState === "saving"
-                ? t("form.designer.saving")
-                : selectedFormId
-                  ? t("form.designer.updateForm")
-                  : t("form.designer.saveForm")}
-            </button>
-            {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
-            <p className={`status-line status-line-${saveState}`} aria-live="polite">
-              {message}
-            </p>
             <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
               <li>{t("form.designer.demoStepEdit")}</li>
               <li>{t("form.designer.demoStepOptions")}</li>
@@ -693,6 +756,18 @@ export function FormDesignerDraft() {
                       <article
                         className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
                           highlightedFieldId === field.id ? " field-editor-highlighted" : ""
+                        }${
+                          moveFeedback?.id === field.id
+                            ? moveFeedback.direction === -1
+                              ? " field-editor-move-up"
+                              : " field-editor-move-down"
+                            : ""
+                        }${
+                          displacedFeedback?.id === field.id
+                            ? displacedFeedback.direction === -1
+                              ? " field-editor-displaced-up"
+                              : " field-editor-displaced-down"
+                            : ""
                         }`}
                         id={`designer-field-${field.id}`}
                       >
@@ -901,7 +976,7 @@ export function FormDesignerDraft() {
             <JsonViewer language={language} value={formModel} />
           </div>
 
-          <aside className="field-palette-rail" aria-label={t("form.designer.fieldPaletteStickyTitle")}>
+          <FieldPaletteRail label={t("form.designer.fieldPaletteStickyTitle")}>
             <div className="field-palette">
               <div className="field-palette-header">
                 <strong>{t("form.designer.fieldPaletteStickyTitle")}</strong>
@@ -913,7 +988,26 @@ export function FormDesignerDraft() {
                 ))}
               </div>
             </div>
-          </aside>
+            <div className="designer-save-panel">
+              <button
+                className="primary-button"
+                disabled={saveState === "saving"}
+                type="button"
+                onClick={saveForm}
+              >
+                <Save size={18} />
+                {saveState === "saving"
+                  ? t("form.designer.saving")
+                  : selectedFormId
+                    ? t("form.designer.updateForm")
+                    : t("form.designer.saveForm")}
+              </button>
+              {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
+              <p className={`status-line status-line-${saveState}`} aria-live="polite">
+                {message}
+              </p>
+            </div>
+          </FieldPaletteRail>
         </div>
       </DndContext>
       <MobileFieldPalette
@@ -930,6 +1024,61 @@ export function FormDesignerDraft() {
         title={t("form.designer.fieldPaletteTitle")}
       />
     </section>
+  );
+}
+
+function FormDesignerOpeningSkeleton({ label }: { label: string }) {
+  return (
+    <div className="form-opening-skeleton form-designer-opening-skeleton" role="status" aria-label={label}>
+      <div className="form-opening-heading">
+        <InlineValueLoader label={label} />
+        <strong>{label}</strong>
+      </div>
+      <div className="form-opening-grid">
+        <div className="form-opening-panel">
+          <SkeletonBlock className="form-opening-title" />
+          <SkeletonBlock className="form-opening-control" />
+          <SkeletonBlock className="form-opening-control" />
+          <SkeletonBlock className="form-opening-control" />
+        </div>
+        <div className="form-opening-panel form-opening-palette">
+          <SkeletonBlock className="form-opening-title" />
+          <SkeletonBlock className="form-opening-palette-row" />
+          <SkeletonBlock className="form-opening-palette-row" />
+          <SkeletonBlock className="form-opening-palette-row" />
+        </div>
+      </div>
+      <div className="form-opening-fields">
+        <div className="form-opening-field-guide">
+          <SkeletonBlock className="form-opening-field-guide-title" />
+          <SkeletonBlock className="form-opening-field-guide-copy" />
+        </div>
+        {Array.from({ length: 2 }, (_, index) => (
+          <div className="form-opening-field-card" key={index}>
+            <div className="form-opening-field-header">
+              <div className="form-opening-field-heading">
+                <SkeletonBlock className="form-opening-field-title" />
+                <SkeletonBlock className="form-opening-field-meta" />
+              </div>
+              <div className="form-opening-field-actions">
+                <SkeletonBlock className="form-opening-field-drag" />
+                <SkeletonBlock className="form-opening-field-action" />
+                <SkeletonBlock className="form-opening-field-action" />
+              </div>
+            </div>
+            <div className="form-opening-field-controls">
+              {Array.from({ length: 3 }, (_, controlIndex) => (
+                <div className="form-opening-field-control" key={controlIndex}>
+                  <SkeletonBlock className="form-opening-field-label" />
+                  <SkeletonBlock className="form-opening-field-input" />
+                </div>
+              ))}
+              <SkeletonBlock className="form-opening-field-required" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -976,9 +1125,23 @@ function FieldCanvasDropZone({ children, label }: { children: ReactNode; label: 
   const { isOver, setNodeRef } = useDroppable({ id: fieldCanvasDropId });
 
   return (
-    <div ref={setNodeRef} className={`field-list${isOver ? " field-list-drop-active" : ""}`} aria-label={label}>
+    <div id={fieldCanvasDropId} ref={setNodeRef} className={`field-list${isOver ? " field-list-drop-active" : ""}`} aria-label={label}>
       {children}
     </div>
+  );
+}
+
+function FieldPaletteRail({ children, label }: { children: ReactNode; label: string }) {
+  const { isOver, setNodeRef } = useDroppable({ id: fieldPaletteDropId });
+
+  return (
+    <aside
+      ref={setNodeRef}
+      className={`field-palette-rail${isOver ? " field-palette-rail-drop-active" : ""}`}
+      aria-label={label}
+    >
+      {children}
+    </aside>
   );
 }
 
@@ -994,14 +1157,20 @@ function SortableFieldCard({
   id: string;
   children: (props: SortableFieldCardRenderProps) => ReactNode;
 }) {
-  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    transition: {
+      duration: 300,
+      easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+    },
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} className="sortable-field-card" style={style}>
       {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
     </div>
   );

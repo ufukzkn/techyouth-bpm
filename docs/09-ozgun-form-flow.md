@@ -48,7 +48,12 @@ The scope includes:
 - Strengthened Select and Radio option validation on both frontend and backend: option lists must exist, values must remain non-empty after trimming, and duplicates are rejected case-insensitively.
 - Added backend process-start validation requiring Date values to be JSON strings parseable in exact `yyyy-MM-dd` format, and aligned backend Text/TextArea string validation.
 - Added focused backend tests for empty and duplicate Radio options, empty Select options, invalid Date format and non-string TextArea data.
-- Kept login/session, dashboard, app shell, process state machine, task approve/reject, audit generation, drag/drop UI and package/dependency definitions out of scope.
+- During validation hardening, kept login/session, dashboard, app shell, process state machine, task approve/reject, audit generation, drag/drop UI and package/dependency definitions out of scope.
+- Fixed the ThemeToggleButton first-render theme mismatch that caused hydration errors on `/login`, without changing persisted theme behavior.
+- Compacted and centered the desktop palette rail, removed its unnecessary internal scrollbar and placed save/update in a separate action panel below the palette.
+- Hardened palette drops so field creation requires a valid canvas or existing-field target; palette, empty and invalid targets create nothing, and cancellation clears insertion feedback.
+- Added a short form-selection overlay plus management-style opening skeletons for the designer and runner. Designer loading includes field-card-shaped placeholders with header, metadata, controls and action/drag affordances.
+- Added scoped move up/down feedback: the clicked card receives a short primary highlight and directional motion, while the displaced neighbor receives subtler neutral motion. This uses no FLIP measurements or drag overlay.
 
 ## Current Form Designer Capabilities
 
@@ -77,6 +82,8 @@ The scope includes:
 - The designer layout uses two control panels at the top, then a full-width field list on desktop. Field editors spread key, label, type and required controls across the available width, then collapse to fewer columns on smaller screens.
 - Checkbox controls are styled separately from text inputs so required toggles stay compact while still using the app accent color.
 - The dependent validation editor keeps the rule controls visible without extra explanatory copy inside every field card.
+- Changing the saved-form selection shows a short translucent loading overlay over the Form Information panel only; the field list, palette, JSON preview and save panel remain available in their existing layout.
+- Initial designer loading uses shared `SkeletonBlock`/`InlineValueLoader` styling and field-card-shaped placeholders before the normal designer is revealed.
 
 ## Current Form Runner Capabilities
 
@@ -93,8 +100,9 @@ The scope includes:
 - Validated form data is sent to `POST /api/processes/start` through the existing API client.
 - Number values are converted before submit so they do not stay as plain strings when sent to the backend.
 - Checkbox values stay boolean in the submitted payload.
-- The form runner keeps the latest loaded form definitions in a lightweight client cache and uses skeleton rows on first load, preventing form fields from flashing empty during quick navigation.
+- The form runner keeps the latest loaded form definitions in a lightweight client cache and uses a management-style opening skeleton for the form and payload preview during the true initial `loading` state.
 - Form-list loading uses an unmount ignore guard so a completed async request cannot update runner state, messages or the shared form cache after the component is gone.
+- Cached `refreshing` behavior and runner business logic remain unchanged.
 
 ## Validation Coverage
 
@@ -157,8 +165,10 @@ The runner reads the same `validationRules` array and blocks submit before calli
 - Palette items do not create fields on click. A real drag/drop gesture is required before a new field is inserted.
 - While dragging from the palette, the field list shows an insertion indicator so users can see where the field will be added.
 - Dropping on an existing field inserts the new field at that visible position. Dropping on the general canvas/drop zone falls back to appending the field to the end.
+- Dropping a palette item back on the palette, outside the designer or on any other invalid target does not create a field. Cancelling a palette drag clears the insertion preview.
 - Text Area and Radio Button field creation use the same default field helper as the manual fallback.
 - Move up/down controls remain available as a fallback and accessibility-friendly ordering path.
+- Move up/down feedback is presentation-only: the moved card uses a short primary ring and soft directional motion, while the swapped neighbor uses neutral, lower-distance motion. Reduced-motion users receive highlight-only feedback.
 - After drag/drop, move up/down or remove operations, the field list is normalized so `sortOrder` stays sequential.
 - JSON preview and save payload are generated from the current field order, so persisted form definitions follow the visible order.
 
@@ -184,6 +194,9 @@ Select and Radio share option validation across the designer and backend definit
 - Dependent validation and option areas were made more readable with scoped layout polish.
 - Drag handles are visibly labeled so ordering is easier to discover during a demo.
 - The field palette uses a 280-320px sticky right column on wide desktop layouts. Form Designer alone may widen to 1460px, while other workspace routes retain the standard 1180px content width.
+- The palette is compact, centered within its rail and does not create its own unnecessary scrollbar. Save/update and its validation/status feedback live in a separate sticky action panel immediately below it.
+- Saved-form changes use a panel-scoped translucent loading overlay. Initial designer and runner loads use the same shared skeleton language as Users and Communities, and the designer skeleton mirrors real field-card structure to reduce layout shift.
+- The `/login` hydration fix keeps the ThemeToggleButton first server/client render stable while preserving normal theme switching after mount.
 - Turkish UI copy was corrected for terms such as Satın Alma, Seçenek düğmesi and Açılır seçim listesi.
 - RequiredWhen helper text was removed from every field card to keep the dependent validation area quieter while preserving the rule UI.
 - Runner states now explain loading, empty list, validation-blocked submit, success and backend-error outcomes.
@@ -202,6 +215,8 @@ Frontend form-flow files:
 - `apps/web/src/features/forms/formValues.ts`
 - `apps/web/src/features/i18n/translations.ts`
 - `apps/web/src/app/globals.css`
+- `apps/web/src/features/app-shell/ThemeToggleButton.tsx`
+- `apps/web/src/styles/forms.css`
 
 Backend form-flow files:
 
@@ -222,13 +237,15 @@ Documentation files:
 
 These areas were intentionally not changed:
 
-- Login/session flow.
+- Login/session/auth logic. ThemeToggleButton received only the minimal stable-first-render hydration fix; theme behavior was not redesigned.
 - Dashboard.
-- App shell behavior.
+- App shell behavior beyond that hydration fix.
 - Process state machine rules.
 - Task approve/reject business logic.
 - Audit log generation.
+- Backend form/process behavior, validation logic and field helper definitions during the UX polish pass.
 - Package files such as `package.json` and `package-lock.json`.
+- New dependencies.
 - Renaming draft feature files to final production names.
 
 ## Remaining Work
@@ -268,6 +285,17 @@ dotnet test tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj --no-build --no-r
 ```
 
 The focused Forms test group passed all 8 tests, including the new Radio, Select, Date and TextArea rejection scenarios. Frontend lint completed with no errors; its five existing unused-symbol warnings are in the out-of-scope `ProcessListView.tsx` file.
+
+The latest Form Designer UX polish was verified with:
+
+```bash
+cd apps/web
+npm run lint
+npm run build
+git diff --check
+```
+
+All checks passed. Lint still reports the same five pre-existing unused-symbol warnings in `ProcessListView.tsx`; that file was not changed by this branch.
 
 ## Latest Mobile And Navigation UX
 
