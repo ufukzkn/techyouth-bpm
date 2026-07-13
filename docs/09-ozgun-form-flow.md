@@ -89,10 +89,12 @@ The scope includes:
 - Frontend validation gives immediate field-level feedback, while backend validation remains authoritative for both saved form definitions and process-start data.
 - Submit shows clear submitting, success and error feedback.
 - Successful process-start responses can show process summary data such as id, status and started date.
+- Process `startedAt` uses the shared `formatApiDateTime` formatter with the current language and a safe fallback when the value is empty.
 - Validated form data is sent to `POST /api/processes/start` through the existing API client.
 - Number values are converted before submit so they do not stay as plain strings when sent to the backend.
 - Checkbox values stay boolean in the submitted payload.
 - The form runner keeps the latest loaded form definitions in a lightweight client cache and uses skeleton rows on first load, preventing form fields from flashing empty during quick navigation.
+- Form-list loading uses an unmount ignore guard so a completed async request cannot update runner state, messages or the shared form cache after the component is gone.
 
 ## Validation Coverage
 
