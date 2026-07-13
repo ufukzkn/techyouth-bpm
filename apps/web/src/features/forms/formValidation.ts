@@ -10,7 +10,7 @@ export function validateFormValues(form: FormDefinition, values: FormValues, lan
 
   for (const field of form.fields) {
     const value = values[field.key];
-    const isEmpty = isEmptyValue(value);
+    const isEmpty = isEmptyValue(value, field.type);
 
     if (field.required && isEmpty) {
       nextErrors[field.key] = translate(language, "form.validation.required", { label: field.label });
@@ -33,8 +33,8 @@ export function validateFormValues(form: FormDefinition, values: FormValues, lan
         nextErrors[field.key] = translate(language, "form.validation.select");
       }
 
-      if (field.type === "TextArea" && typeof value !== "string") {
-        nextErrors[field.key] = translate(language, "form.validation.required", { label: field.label });
+      if ((field.type === "Text" || field.type === "TextArea") && typeof value !== "string") {
+        nextErrors[field.key] = translate(language, "form.validation.text");
       }
 
       if (field.type === "Checkbox" && typeof value !== "boolean") {
@@ -56,8 +56,8 @@ export function validateFormValues(form: FormDefinition, values: FormValues, lan
   return nextErrors;
 }
 
-function isEmptyValue(value: FormValues[string]) {
-  return value === "" || value === false || value === undefined || value === null;
+function isEmptyValue(value: FormValues[string], fieldType: FormDefinition["fields"][number]["type"]) {
+  return value === "" || value === undefined || value === null || (fieldType === "Checkbox" && value === false);
 }
 
 function isValidEmail(value: string) {

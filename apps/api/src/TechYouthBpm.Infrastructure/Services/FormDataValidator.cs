@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using TechYouthBpm.Application.Forms;
 using TechYouthBpm.Domain.Enums;
@@ -73,14 +74,24 @@ internal static class FormDataValidator
     {
         switch (field.Type)
         {
+            case FieldType.Text when value.ValueKind != JsonValueKind.String:
+            case FieldType.TextArea when value.ValueKind != JsonValueKind.String:
+                errors.Add($"{field.Label} must be text.");
+                break;
             case FieldType.Number when value.ValueKind != JsonValueKind.Number:
                 errors.Add($"{field.Label} must be a number.");
                 break;
             case FieldType.Email when value.ValueKind != JsonValueKind.String || !value.GetString()!.Contains('@'):
                 errors.Add($"{field.Label} must be a valid email.");
                 break;
-            case FieldType.TextArea when value.ValueKind != JsonValueKind.String:
-                errors.Add($"{field.Label} must be text.");
+            case FieldType.Date when value.ValueKind != JsonValueKind.String
+                || !DateOnly.TryParseExact(
+                    value.GetString(),
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out _):
+                errors.Add($"{field.Label} must be a valid date in yyyy-MM-dd format.");
                 break;
             case FieldType.Checkbox when value.ValueKind is not JsonValueKind.True and not JsonValueKind.False:
                 errors.Add($"{field.Label} must be true or false.");
