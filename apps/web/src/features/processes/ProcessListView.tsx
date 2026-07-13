@@ -164,14 +164,16 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
               <div className="process-sortable-item process-drag-overlay">
                 <div className="process-move-controls" style={{ visibility: "hidden" }}>
                   <button className="process-drag-handle" type="button">
-                    <GripVertical size={16} />
+                    <GripVertical size={20} />
                   </button>
-                  <button className="process-move-btn" type="button">
-                    <ChevronUp size={14} />
-                  </button>
-                  <button className="process-move-btn" type="button">
-                    <ChevronDown size={14} />
-                  </button>
+                  <div className="process-move-arrows">
+                    <button className="process-move-btn" type="button">
+                      <ChevronUp size={14} />
+                    </button>
+                    <button className="process-move-btn" type="button">
+                      <ChevronDown size={14} />
+                    </button>
+                  </div>
                 </div>
                 <ProcessCard
                   isSelected={false}

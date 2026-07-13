@@ -88,12 +88,13 @@
 
 .process-move-controls {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: center;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   opacity: 0.15;
   transition: opacity 0.2s ease;
+  padding-right: 4px;
 }
 
 .process-sortable-item:hover .process-move-controls,
@@ -105,12 +106,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 8px 6px;
   border: none;
   background: transparent;
   color: var(--muted);
   cursor: grab;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: color 0.15s ease, background 0.15s ease;
 }
 
@@ -123,6 +124,14 @@
 .process-drag-handle:active {
   cursor: grabbing;
 }
+
+.process-move-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+
 
 .process-move-btn {
   display: flex;

@@ -60,26 +60,28 @@ export function SortableProcessCard({
           {...attributes}
           {...listeners}
         >
-          <GripVertical size={16} aria-hidden="true" />
+          <GripVertical size={20} aria-hidden="true" />
         </button>
-        <button
-          className="process-move-btn"
-          type="button"
-          disabled={isFirst}
-          aria-label={t("process.moveUp")}
-          onClick={() => onMoveUp(process.id)}
-        >
-          <ChevronUp size={14} aria-hidden="true" />
-        </button>
-        <button
-          className="process-move-btn"
-          type="button"
-          disabled={isLast}
-          aria-label={t("process.moveDown")}
-          onClick={() => onMoveDown(process.id)}
-        >
-          <ChevronDown size={14} aria-hidden="true" />
-        </button>
+        <div className="process-move-arrows">
+          <button
+            className="process-move-btn"
+            type="button"
+            disabled={isFirst}
+            aria-label={t("process.moveUp")}
+            onClick={() => onMoveUp(process.id)}
+          >
+            <ChevronUp size={14} aria-hidden="true" />
+          </button>
+          <button
+            className="process-move-btn"
+            type="button"
+            disabled={isLast}
+            aria-label={t("process.moveDown")}
+            onClick={() => onMoveDown(process.id)}
+          >
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <ProcessCard
         process={process}
