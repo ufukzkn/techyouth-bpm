@@ -22,6 +22,7 @@ import {
 import { ProcessCard } from "@/features/processes/ProcessCard";
 import { SortableProcessCard } from "@/features/processes/SortableProcessCard";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
+import { applyStoredOrder } from "@/features/processes/processOrder";
 import type { Language, ProcessStatus, ProcessSummary } from "@/lib/types";
 
 type ProcessListViewProps = {
@@ -43,13 +44,6 @@ const filterOptions: { value: StatusFilter; labelKey: TranslationKey }[] = [
 ];
 
 const STORAGE_KEY = "process-card-order";
-
-function applyStoredOrder(fresh: ProcessSummary[], savedIds: string[]): ProcessSummary[] {
-  const byId = new Map(fresh.map((p) => [p.id, p]));
-  const ordered = savedIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
-  const unseen = fresh.filter((p) => !savedIds.includes(p.id));
-  return [...ordered, ...unseen];
-}
 
 export function ProcessListView({ processes, language, selectedProcessId, onSelectProcess }: ProcessListViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
