@@ -230,9 +230,27 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
                 errors.Add($"Field '{field.Key}' needs a label.");
             }
 
-            if ((field.Type == FieldType.Select || field.Type == FieldType.Radio) && field.Options.Count == 0)
+            if (field.Type == FieldType.Select || field.Type == FieldType.Radio)
             {
-                errors.Add($"Option field '{field.Key}' needs options.");
+                if (field.Options is null || field.Options.Count == 0)
+                {
+                    errors.Add($"Option field '{field.Key}' needs options.");
+                    continue;
+                }
+
+                if (field.Options.Any(string.IsNullOrWhiteSpace))
+                {
+                    errors.Add($"Option field '{field.Key}' cannot contain empty options.");
+                }
+
+                var hasDuplicateOptions = field.Options
+                    .GroupBy(option => option?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                    .Any(group => group.Count() > 1);
+
+                if (hasDuplicateOptions)
+                {
+                    errors.Add($"Option field '{field.Key}' cannot contain duplicate options.");
+                }
             }
         }
 

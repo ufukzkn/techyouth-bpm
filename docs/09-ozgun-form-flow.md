@@ -43,7 +43,12 @@ The scope includes:
 - Ran a manual demo check through the local API for login, form creation, dependent validation, email validation and successful process start.
 - Added `PUT /api/forms/{id}` so saved form definitions can be edited after creation.
 - Added form designer loading for saved forms, with create/update behavior behind the same save control.
-- Kept backend, login/session, dashboard, app shell, process/task and audit behavior out of scope.
+- Hardened frontend Text and TextArea validation so non-empty values must be strings and type failures use the dedicated localized `form.validation.text` message instead of a required-field message.
+- Changed designer empty-key validation to inspect the raw `field.key` input before normalization, preventing an empty key from silently becoming a fallback such as `field1` and being saved.
+- Strengthened Select and Radio option validation on both frontend and backend: option lists must exist, values must remain non-empty after trimming, and duplicates are rejected case-insensitively.
+- Added backend process-start validation requiring Date values to be JSON strings parseable in exact `yyyy-MM-dd` format, and aligned backend Text/TextArea string validation.
+- Added focused backend tests for empty and duplicate Radio options, empty Select options, invalid Date format and non-string TextArea data.
+- Kept login/session, dashboard, app shell, process state machine, task approve/reject, audit generation, drag/drop UI and package/dependency definitions out of scope.
 
 ## Current Form Designer Capabilities
 
@@ -62,7 +67,9 @@ The scope includes:
   - `Checkbox`
   - `Date`
 - Select and radio fields keep option add, remove and edit behavior.
-- Designer validation prevents empty field keys, empty labels, duplicate keys, empty option sets, empty option values and duplicate option values for option-based fields.
+- Designer validation prevents empty field keys, empty labels, duplicate keys, empty option sets, empty option values and case-insensitive duplicate option values for option-based fields.
+- Empty field keys are checked from the raw input with `field.key.trim()`. Key normalization is used only to compare uniqueness and to generate the save payload; it must not turn an empty raw key into a fallback key that bypasses validation.
+- Select and Radio definitions receive equivalent final option validation from the backend on both create and update requests.
 - Dependent `RequiredWhen` rules can be configured per field without changing backend models.
 - The JSON preview reflects the same form model that is sent to the API, including ordering, options and validation rules.
 - UI guidance now shows the demo path: add fields, edit properties, manage options/rules, reorder, inspect JSON and save.
@@ -79,6 +86,7 @@ The scope includes:
 - User-entered form data is shown as JSON output.
 - The process-start payload is displayed as `formDefinitionId` plus prepared `formData`.
 - Submit blocks before the API call when frontend validation finds field errors.
+- Frontend validation gives immediate field-level feedback, while backend validation remains authoritative for both saved form definitions and process-start data.
 - Submit shows clear submitting, success and error feedback.
 - Successful process-start responses can show process summary data such as id, status and started date.
 - Validated form data is sent to `POST /api/processes/start` through the existing API client.
@@ -88,19 +96,28 @@ The scope includes:
 
 ## Validation Coverage
 
+Validation responsibility is intentionally split by boundary:
+
+- Frontend validation provides early, field-level feedback before an API request. Non-empty Text and TextArea values must be strings, and type failures use `form.validation.text` rather than a required-field message.
+- Designer validation checks empty field keys from the raw `field.key.trim()` input. Normalization is used only for uniqueness comparison and save-payload generation, so it cannot hide an empty key behind a fallback such as `field1`.
+- Frontend Select/Radio designer checks reject missing option sets, values that are empty after trimming and case-insensitive duplicates.
+- Backend validation is the final source of truth. Form definition create/update applies the same Select/Radio option constraints, even if a client bypasses the designer.
+- Backend process-start validation keeps required checks separate from type checks, requires non-empty Text/TextArea values to be JSON strings, and requires Date values to be JSON strings parseable in exact `yyyy-MM-dd` format.
+
 Frontend validation currently covers:
 
 - Required fields.
+- Non-empty Text and TextArea values as strings, with type errors separate from required errors.
 - Email format.
 - Number values.
 - Date values.
 - Select option membership.
 - Checkbox boolean values.
 - Dependent `RequiredWhen` rules.
-- Text Area values as strings.
 - Radio Button / `Seçenek düğmesi` option membership.
 - ASCII-safe technical field keys in the designer save payload.
-- Empty option values and duplicate option values in option-based designer fields.
+- Raw empty keys before save-payload normalization.
+- Missing option sets, empty option values after trimming and case-insensitive duplicate option values in option-based designer fields.
 
 The manual API check confirmed:
 
@@ -108,7 +125,7 @@ The manual API check confirmed:
 - Invalid email values are rejected.
 - A valid payload starts a process and returns `InProgress` process data.
 
-Backend validation remains the final source of truth when a process is started. Backend form definition validation also protects create/update requests by requiring a name, at least one field, unique field keys and option values for option-based fields.
+Backend validation remains the final source of truth. Form definition validation protects create/update requests by requiring a name, at least one field, unique field keys and valid Select/Radio option sets; form-data validation independently protects process start.
 
 ## Dependent Validation Behavior
 
@@ -145,16 +162,18 @@ The runner reads the same `validationRules` array and blocks submit before calli
 
 ## Supported Field Types
 
-- `Text`: single-line text input.
-- `TextArea`: multi-line text input, shown as Uzun metin in Turkish UI.
+- `Text`: single-line text input; non-empty values must be strings on both frontend and backend.
+- `TextArea`: multi-line text input, shown as Uzun metin in Turkish UI; it uses the same string-type rule as Text and a type failure is not reported as required.
 - `Number`: numeric input with number conversion before process start.
 - `Email`: email input with format validation.
 - `Select`: option-based dropdown, shown with corrected Turkish copy such as Açılır seçim listesi.
 - `Radio`: option-based single-choice field, shown to Turkish users as Seçenek düğmesi.
 - `Checkbox`: boolean input that remains a boolean in submitted payloads.
-- `Date`: date input with date validation.
+- `Date`: date input with early frontend validation and authoritative backend JSON-string validation in exact `yyyy-MM-dd` format.
 
 Every palette card has an icon from the existing lucide-react dependency. The UI can show localized Turkish labels, while generated field keys and technical payload keys stay ASCII-safe.
+
+Select and Radio share option validation across the designer and backend definition boundary: option sets cannot be null or empty, trimmed values cannot be empty, and duplicate values are rejected case-insensitively.
 
 ## UI/UX Notes
 
@@ -190,6 +209,7 @@ Backend form-flow files:
 - `apps/api/src/TechYouthBpm.Infrastructure/Services/FormService.cs`
 - `apps/api/src/TechYouthBpm.Infrastructure/Services/FormDataValidator.cs`
 - `apps/api/tests/TechYouthBpm.Tests/Forms/FormServiceTests.cs`
+- `apps/api/tests/TechYouthBpm.Tests/Forms/FormDataValidationTests.cs`
 
 Documentation files:
 
@@ -213,15 +233,15 @@ These areas were intentionally not changed:
 
 - Make small UI fixes if the team review finds presentation issues.
 - Address any PR review feedback.
-- Run a short smoke test before final merge.
+- Run a final end-to-end smoke test before merge if the integration baseline changes.
 - Check integration with the process/task/audit flow after the teammate-owned process/task/audit work is complete.
 - Decide whether form definitions should become immutable once processes are started. The current demo behavior updates the form definition in place so form editing is easy to demonstrate.
 - Prepare a demo scenario if needed, for example: if request type is Satın Alma, approval note becomes required.
-- Do final documentation and final test verification.
+- Keep focused validation tests current if field types or process-start payload rules change.
 
 ## Verification
 
-The frontend checks passed after the form foundation, designer editing, dependent validation, saved-form update, runner state, drag/drop ordering, field palette insertion behavior, new field types and UI polish work:
+The frontend checks passed after the validation hardening work:
 
 ```bash
 cd apps/web
@@ -237,11 +257,15 @@ Manual local checks were also run against the API for:
 - Email validation failure.
 - Successful process start with number and boolean payload values preserved.
 
-The backend checks also passed after adding form update tests:
+The backend solution build and focused form validation tests passed after validation hardening:
 
 ```bash
-dotnet test apps/api/TechYouthBpm.slnx
+cd apps/api
+dotnet build TechYouthBpm.slnx --no-restore
+dotnet test tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj --no-build --no-restore --filter "FullyQualifiedName~TechYouthBpm.Tests.Forms"
 ```
+
+The focused Forms test group passed all 8 tests, including the new Radio, Select, Date and TextArea rejection scenarios. Frontend lint completed with no errors; its five existing unused-symbol warnings are in the out-of-scope `ProcessListView.tsx` file.
 
 ## Latest Mobile And Navigation UX
 

@@ -83,11 +83,61 @@ public class FormServiceTests
         Assert.DoesNotContain(result.Value.Fields, field => field.Key == "requestType" && field.Type == FieldType.Text);
     }
 
+    [Fact]
+    public async Task CreateAsync_Rejects_Radio_Without_Options()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin);
+        var service = new FormService(db);
+        var request = CreateOptionRequest(FieldType.Radio, []);
+
+        var result = await service.CreateAsync(request, TestDbFactory.ToDto(admin));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.Contains("needs options", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CreateAsync_Rejects_Case_Insensitive_Duplicate_Radio_Options_After_Trim()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin);
+        var service = new FormService(db);
+        var request = CreateOptionRequest(FieldType.Radio, ["Onay", " onay "]);
+
+        var result = await service.CreateAsync(request, TestDbFactory.ToDto(admin));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.Contains("duplicate options", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task CreateAsync_Rejects_Select_With_Empty_Option()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin);
+        var service = new FormService(db);
+        var request = CreateOptionRequest(FieldType.Select, ["Onay", "   "]);
+
+        var result = await service.CreateAsync(request, TestDbFactory.ToDto(admin));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.Contains("empty options", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static CreateFormRequest CreateRequest(string name, string key, string label) =>
         new(
             name,
             "Test form",
             [
                 new CreateFormFieldRequest(key, label, FieldType.Text, true, 1, [], [])
+            ]);
+
+    private static CreateFormRequest CreateOptionRequest(FieldType type, IReadOnlyList<string> options) =>
+        new(
+            "Secim Formu",
+            "Test form",
+            [
+                new CreateFormFieldRequest("choice", "Secim", type, true, 1, options, [])
             ]);
 }

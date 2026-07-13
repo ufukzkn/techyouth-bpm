@@ -750,7 +750,6 @@ export function FormDesignerDraft() {
                           Key
                           <input
                             value={field.key}
-                            onBlur={(event) => updateField(field.id, { key: createDesignerFieldKey(event.target.value, index + 1) })}
                             onChange={(event) => updateField(field.id, { key: event.target.value })}
                           />
                           {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
@@ -1083,10 +1082,12 @@ type DesignerFieldErrors = Record<string, { key?: string; label?: string; option
 function validateDesignerFields(fields: DesignerField[], language: Language) {
   const errors: DesignerFieldErrors = {};
   const keyCounts = fields.reduce<Record<string, number>>((current, field) => {
-    const key = createDesignerFieldKey(field.key, field.sortOrder).toLowerCase();
-    if (key) {
-      current[key] = (current[key] ?? 0) + 1;
+    if (!field.key.trim()) {
+      return current;
     }
+
+    const key = createDesignerFieldKey(field.key, field.sortOrder).toLowerCase();
+    current[key] = (current[key] ?? 0) + 1;
 
     return current;
   }, {});
@@ -1095,7 +1096,7 @@ function validateDesignerFields(fields: DesignerField[], language: Language) {
     const fieldError: DesignerFieldErrors[string] = {};
     const key = createDesignerFieldKey(field.key, field.sortOrder);
 
-    if (!key) {
+    if (!field.key.trim()) {
       fieldError.key = translate(language, "form.validation.fieldKeyRequired");
     } else if (keyCounts[key.toLowerCase()] > 1) {
       fieldError.key = translate(language, "form.validation.fieldKeyUnique");
