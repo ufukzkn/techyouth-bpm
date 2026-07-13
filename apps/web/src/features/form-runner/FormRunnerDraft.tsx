@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
 import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
 import { validateFormValues } from "@/features/forms/formValidation";
+import { JsonViewer } from "@/features/ui/JsonViewer";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
@@ -257,7 +258,7 @@ export function FormRunnerDraft() {
             <span className="eyebrow">{t("form.runner.payloadEyebrow")}</span>
             <h3>{t("form.runner.payloadTitle")}</h3>
           </div>
-          <pre className="json-preview runner-output">{JSON.stringify(output, null, 2)}</pre>
+          <JsonViewer className="runner-output" language={language} value={output} />
         </div>
       </div>
     </section>

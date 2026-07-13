@@ -40,6 +40,8 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { MobileFieldPalette } from "@/features/form-designer/MobileFieldPalette";
+import { JsonViewer } from "@/features/ui/JsonViewer";
 import {
   createDefaultField,
   createDefaultOptions,
@@ -897,7 +899,7 @@ export function FormDesignerDraft() {
               <h3>{t("form.designer.jsonPreviewTitle")}</h3>
               <p>{t("form.designer.jsonPreviewDescription")}</p>
             </div>
-            <pre className="json-preview">{JSON.stringify(formModel, null, 2)}</pre>
+            <JsonViewer language={language} value={formModel} />
           </div>
 
           <aside className="field-palette-rail" aria-label={t("form.designer.fieldPaletteStickyTitle")}>
@@ -915,6 +917,19 @@ export function FormDesignerDraft() {
           </aside>
         </div>
       </DndContext>
+      <MobileFieldPalette
+        closeLabel={t("common.close")}
+        description={t("form.designer.mobilePaletteDescription")}
+        items={supportedFieldTypes.map((fieldType) => ({
+          type: fieldType,
+          label: fieldTypeLabel(language, fieldType),
+          description: translate(language, `form.designer.fieldType${fieldType}Description` as TranslationKey),
+          icon: fieldTypeIcons[fieldType],
+        }))}
+        onSelect={(fieldType) => addFieldFromPalette(fieldType, fields.length)}
+        openLabel={t("form.designer.mobilePaletteOpen")}
+        title={t("form.designer.fieldPaletteTitle")}
+      />
     </section>
   );
 }

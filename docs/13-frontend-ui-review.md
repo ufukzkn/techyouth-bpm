@@ -21,7 +21,7 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 ## Frontend Architecture Notes
 
 - `apps/web` uses Next.js App Router with TypeScript and feature folders.
-- `WorkspaceShell` coordinates session, role-aware navigation and shared workspace chrome. Each route imports its own view component for clearer ownership and better App Router code-splitting.
+- The shared `(workspace)` layout coordinates route access while focused shell components own session timing, sidebar, topbar, notifications and loading chrome. Route pages import only their feature view, preserving App Router code-splitting.
 - Domain flows are separated into `features/auth`, `features/session`, `features/forms`, `features/form-designer`, `features/form-runner`, `features/processes` and `features/app-shell/views`.
 - API calls are centralized in `src/lib/api.ts`, so components do not directly scatter fetch URLs.
 - Zustand stores global session, theme and language preferences. Feature-specific UI state stays inside components.
@@ -32,6 +32,7 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 - The move from hash-scroll to route-based navigation makes the app feel closer to a real workspace.
 - Form designer and user management are the densest screens; they are usable, but final demo should verify common viewport widths.
 - Audit and management screens now avoid loading all data at once through server-side pagination/search, which helps production readiness.
+- Shared styles are separated into token, base, shell and feature-owned files. Form Designer uses a responsive sticky palette rail, while the language control uses a fixed-width directional transition without shifting the topbar.
 
 ## Presentation Defense Notes
 
@@ -41,7 +42,7 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 
 **Why a service/API layer?** `src/lib/api.ts` centralizes API base URL, bearer token support, cookie credentials, CSRF header handling and response normalization.
 
-**How does route-based navigation work?** `navigation.ts` defines each view, path, icon and allowed roles. `WorkspaceShell` uses the active pathname for menu state, while route pages such as `/dashboard`, `/management` and `/logs` render their own view components.
+**How does route-based navigation work?** `navigation.ts` defines each view, path, icon and required permissions. The shared layout reads the active pathname, renders semantic Next.js links and keeps sidebar/topbar mounted while route pages such as `/dashboard`, `/management` and `/logs` replace only the content.
 
 **Which UI libraries are used?** Lucide React is used for icons. `@dnd-kit` is used for drag/drop field ordering. Most visual styling is custom CSS in `globals.css`.
 

@@ -52,7 +52,7 @@ Use this file for the final code review presentation.
   - registration creates pending/unverified accounts.
   - repeated failed login attempts lock the account.
   - logout revokes the stored session.
-- The backend test suite currently passes with 30 tests across auth, form, workflow, task authorization and audit coverage.
+- The latest verified backend suite passes 84 tests across auth, community access, forms, workflow, task authorization, notifications, dashboard scope and audit behavior.
 
 ## Current Frontend Story
 
@@ -61,8 +61,8 @@ Use this file for the final code review presentation.
 - `sessionStore` keeps the active user, token, expiry and theme in Zustand so refresh does not reset the demo flow.
 - `AuthService` verifies PBKDF2 password hashes and stores only hashed session tokens, while the frontend receives the raw opaque token once at login.
 - `AuthService` keeps the current opaque-session model instead of JWT because logout, revoke, lockout and pending approval need server-side state anyway.
-- `WorkspaceShell` verifies restored API sessions once on load, schedules local expiry, and sends expired/unauthorized sessions back to login with a confirmable alert.
-- `WorkspaceShell` filters navigation items by user role while each Next.js route imports its own view component, which demonstrates role-based UI without scattering role checks across pages.
+- The shared `(workspace)` layout keeps navigation chrome mounted across route changes. `WorkspaceSessionController` verifies restored API sessions, schedules expiry and sends expired/unauthorized sessions to login.
+- The layout filters navigation by effective permissions while each route imports only its feature view. Sidebar links remain semantic App Router links and backend services still enforce authorization.
 - `DashboardView` reads process/task metrics from the API, then turns metric cards and BPM flow steps into role-aware workspace shortcuts.
 - Dashboard metrics keep the last loaded values while refreshing so quick navigation does not flash placeholder values.
 - The form runner uses skeleton rows on first load and keeps cached form definitions during quick navigation.

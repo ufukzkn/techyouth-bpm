@@ -248,6 +248,23 @@ export type DashboardSummary = {
   openTaskCount: number;
   inProgressProcessCount: number;
   completedProcessCount: number;
+  recentOpenTasks?: DashboardTaskItem[];
+  recentProcesses?: DashboardProcessItem[];
+};
+
+export type DashboardTaskItem = {
+  id: string;
+  processInstanceId: string;
+  formName: string;
+  status: ProcessTaskStatus;
+  createdAt: string;
+};
+
+export type DashboardProcessItem = {
+  id: string;
+  formName: string;
+  status: ProcessStatus;
+  startedAt: string;
 };
 
 export type Community = {
@@ -313,4 +330,20 @@ export type NotificationItem = {
   entityId?: string | null;
   createdAt: string;
   readAt?: string | null;
+};
+
+export type NotificationReadStatus = "all" | "unread" | "read";
+export type NotificationCategory = "all" | "task" | "process" | "access" | "account";
+
+export type NotificationListParams = {
+  page?: number;
+  pageSize?: number;
+  query?: string;
+  readStatus?: NotificationReadStatus;
+  category?: NotificationCategory;
+};
+
+export type NotificationPage = PagedResult<NotificationItem> & {
+  allCount: number;
+  unreadCount: number;
 };

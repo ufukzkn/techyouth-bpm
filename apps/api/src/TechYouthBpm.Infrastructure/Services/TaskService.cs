@@ -85,6 +85,7 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             return Result<ProcessDetailDto>.Failure(transition.Errors);
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         task.Status = ProcessTaskStatus.Completed;
         task.CompletedAt = DateTime.UtcNow;
         task.CompletedByUserId = user.Id;
@@ -130,6 +131,7 @@ public class TaskService(AppDbContext db, ProcessStateMachine stateMachine, ISys
             task.Id.ToString(),
             $"Task action '{request.Action}' moved process '{processId}' from {previousStatus} to {transition.Value}.",
             cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var process = await db.ProcessInstances
             .Include(item => item.FormDefinition)

@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
@@ -18,11 +17,11 @@ internal static class TestDbFactory
     public static AppDbContext Create(string? dbName = null)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(dbName ?? Guid.NewGuid().ToString())
-            .ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .UseSqlite("Data Source=:memory:")
             .Options;
 
         var context = new AppDbContext(options);
+        context.Database.OpenConnection();
         context.Database.EnsureCreated();
         return context;
     }
@@ -58,6 +57,25 @@ internal static class TestDbFactory
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         });
+        db.SaveChanges();
+        return user;
+    }
+
+    public static User SeedSuperAdmin(AppDbContext db, string username = "superadmin")
+    {
+        var user = new User
+        {
+            Id = Guid.NewGuid(),
+            Username = username,
+            DisplayName = "Test SuperAdmin",
+            Email = $"{Guid.NewGuid():N}@test.local",
+            Password = "test-hash",
+            Role = Role.SuperAdmin,
+            Status = UserStatus.Active,
+            IsEmailVerified = true
+        };
+
+        db.Users.Add(user);
         db.SaveChanges();
         return user;
     }
@@ -108,6 +126,9 @@ internal static class TestDbFactory
         AppDbContext db,
         User startedByUser)
     {
+        EnsureCommunityModel(db);
+        db.SaveChanges();
+
         var formDefinition = new FormDefinition
         {
             Id = Guid.NewGuid(),

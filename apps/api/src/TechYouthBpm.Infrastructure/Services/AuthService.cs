@@ -1022,7 +1022,6 @@ public class AuthService(
             user.Id.ToString(),
             $"User '{user.Username}' access changed from {oldRole}/{oldStatus} to {user.Role}/{user.Status}.",
             cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
         if (oldStatus != user.Status || !string.Equals(oldCommunityRoleName, updatedCommunityRoleName, StringComparison.Ordinal))
         {
             var accessMessage = !string.Equals(oldCommunityRoleName, updatedCommunityRoleName, StringComparison.Ordinal)
@@ -1037,6 +1036,7 @@ public class AuthService(
                 user.Id.ToString(),
                 cancellationToken);
         }
+        await transaction.CommitAsync(cancellationToken);
         var updated = await UserQuery().SingleAsync(item => item.Id == user.Id, cancellationToken);
         return Result<UserAdminDto>.Success(updated.ToAdminDto());
     }
