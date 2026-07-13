@@ -136,6 +136,8 @@ export function FormDesignerDraft() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
   const [highlightedFieldId, setHighlightedFieldId] = useState("");
+  const [moveFeedback, setMoveFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
+  const [displacedFeedback, setDisplacedFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
@@ -216,6 +218,24 @@ export function FormDesignerDraft() {
     const timeoutId = window.setTimeout(() => setHighlightedFieldId(""), 900);
     return () => window.clearTimeout(timeoutId);
   }, [highlightedFieldId]);
+
+  useEffect(() => {
+    if (!moveFeedback) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setMoveFeedback(null), 680);
+    return () => window.clearTimeout(timeoutId);
+  }, [moveFeedback]);
+
+  useEffect(() => {
+    if (!displacedFeedback) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setDisplacedFeedback(null), 680);
+    return () => window.clearTimeout(timeoutId);
+  }, [displacedFeedback]);
 
   function handleDragStart(event: DragStartEvent) {
     if (isPaletteDragId(event.active.id)) {
@@ -376,6 +396,7 @@ export function FormDesignerDraft() {
     if (currentIndex < 0 || targetIndex < 0 || targetIndex >= fields.length) {
       return;
     }
+    const displacedFieldId = fields[targetIndex].id;
 
     setFields((current) => {
       const currentIndex = current.findIndex((field) => field.id === id);
@@ -390,6 +411,8 @@ export function FormDesignerDraft() {
       nextFields.splice(nextIndex, 0, field);
       return normalizeSortOrder(nextFields);
     });
+    setMoveFeedback({ id, direction });
+    setDisplacedFeedback({ id: displacedFieldId, direction: direction === -1 ? 1 : -1 });
     triggerFieldHighlight(id);
     markUnsaved();
   }
@@ -733,6 +756,18 @@ export function FormDesignerDraft() {
                       <article
                         className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
                           highlightedFieldId === field.id ? " field-editor-highlighted" : ""
+                        }${
+                          moveFeedback?.id === field.id
+                            ? moveFeedback.direction === -1
+                              ? " field-editor-move-up"
+                              : " field-editor-move-down"
+                            : ""
+                        }${
+                          displacedFeedback?.id === field.id
+                            ? displacedFeedback.direction === -1
+                              ? " field-editor-displaced-up"
+                              : " field-editor-displaced-down"
+                            : ""
                         }`}
                         id={`designer-field-${field.id}`}
                       >
