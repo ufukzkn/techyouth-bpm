@@ -70,6 +70,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(notification => notification.UserId)
             .OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<Notification>().HasIndex(notification => new { notification.UserId, notification.ReadAt, notification.CreatedAt });
+        modelBuilder.Entity<Notification>().HasIndex(notification => new { notification.UserId, notification.CreatedAt });
 
         modelBuilder.Entity<UserSession>().HasKey(session => session.Id);
         modelBuilder.Entity<UserSession>().HasIndex(session => session.Token).IsUnique();

@@ -8,7 +8,7 @@ namespace TechYouthBpm.Tests.Auth;
 public class NotificationServiceTests
 {
     [Fact]
-    public async Task ListAsync_Returns_Only_Current_User_Notifications_And_Prioritizes_Unread()
+    public async Task ListAsync_Returns_Only_Current_User_Notifications_In_Newest_First_Order()
     {
         await using var db = TestDbFactory.Create();
         var currentUser = CreateUser("current-user");
@@ -21,12 +21,44 @@ public class NotificationServiceTests
         await db.SaveChangesAsync();
         var service = new NotificationService(db);
 
-        var result = await service.ListAsync(ToDto(currentUser));
+        var result = await service.ListAsync(new NotificationListRequest(), ToDto(currentUser));
 
-        Assert.Equal(2, result.Count);
-        Assert.Equal(olderUnread.Id, result[0].Id);
-        Assert.Equal(newerRead.Id, result[1].Id);
-        Assert.DoesNotContain(result, notification => notification.Id == otherNotification.Id);
+        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(2, result.AllCount);
+        Assert.Equal(1, result.UnreadCount);
+        Assert.Equal(newerRead.Id, result.Items[0].Id);
+        Assert.Equal(olderUnread.Id, result.Items[1].Id);
+        Assert.DoesNotContain(result.Items, notification => notification.Id == otherNotification.Id);
+    }
+
+    [Fact]
+    public async Task ListAsync_Applies_Search_Category_Read_State_And_Pagination()
+    {
+        await using var db = TestDbFactory.Create();
+        var currentUser = CreateUser("current-user");
+        db.Users.Add(currentUser);
+        db.Notifications.AddRange(
+            CreateNotification(currentUser.Id, "Transfer approval", DateTime.UtcNow.AddMinutes(-1), type: "Task.Assigned"),
+            CreateNotification(currentUser.Id, "Transfer completed", DateTime.UtcNow.AddMinutes(-2), DateTime.UtcNow, "Process.Completed"),
+            CreateNotification(currentUser.Id, "Another task", DateTime.UtcNow.AddMinutes(-3), type: "Task.Assigned"));
+        await db.SaveChangesAsync();
+        var service = new NotificationService(db);
+
+        var result = await service.ListAsync(new NotificationListRequest
+        {
+            Page = 1,
+            PageSize = 1,
+            Query = "Transfer",
+            ReadStatus = "unread",
+            Category = "task"
+        }, ToDto(currentUser));
+
+        Assert.Single(result.Items);
+        Assert.Equal("Transfer approval", result.Items[0].Title);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(3, result.AllCount);
+        Assert.Equal(2, result.UnreadCount);
+        Assert.Equal(1, result.PageSize);
     }
 
     [Fact]
@@ -67,6 +99,23 @@ public class NotificationServiceTests
         Assert.Null(otherUnread.ReadAt);
     }
 
+    [Fact]
+    public async Task SetReadStateAsync_Can_Mark_Own_Notification_Unread()
+    {
+        await using var db = TestDbFactory.Create();
+        var currentUser = CreateUser("current-user");
+        var notification = CreateNotification(currentUser.Id, "Read item", DateTime.UtcNow, DateTime.UtcNow);
+        db.Users.Add(currentUser);
+        db.Notifications.Add(notification);
+        await db.SaveChangesAsync();
+        var service = new NotificationService(db);
+
+        var result = await service.SetReadStateAsync(notification.Id, false, ToDto(currentUser));
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(notification.ReadAt);
+    }
+
     private static User CreateUser(string username) => new()
     {
         Id = Guid.NewGuid(),
@@ -88,11 +137,16 @@ public class NotificationServiceTests
         user.Status,
         user.IsEmailVerified);
 
-    private static Notification CreateNotification(Guid userId, string title, DateTime createdAt, DateTime? readAt = null) => new()
+    private static Notification CreateNotification(
+        Guid userId,
+        string title,
+        DateTime createdAt,
+        DateTime? readAt = null,
+        string type = "Process.Updated") => new()
     {
         Id = Guid.NewGuid(),
         UserId = userId,
-        Type = "Process.Updated",
+        Type = type,
         Title = title,
         Message = title,
         CreatedAt = createdAt,
