@@ -40,6 +40,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { MobileFieldPalette } from "@/features/form-designer/MobileFieldPalette";
 import { JsonViewer } from "@/features/ui/JsonViewer";
 import {
@@ -61,6 +62,7 @@ type DesignerField = Omit<FormFieldDefinition, "id"> & {
 
 const fieldPalettePrefix = "palette:";
 const fieldCanvasDropId = "field-canvas";
+const fieldPaletteDropId = "field-palette-drop-zone";
 const paletteDragDistanceThreshold = 8;
 const fieldTypeIcons: Record<FieldType, LucideIcon> = {
   Text: Type,
@@ -207,13 +209,13 @@ export function FormDesignerDraft() {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => setHighlightedFieldId(""), 1800);
+    const timeoutId = window.setTimeout(() => setHighlightedFieldId(""), 900);
     return () => window.clearTimeout(timeoutId);
   }, [highlightedFieldId]);
 
   function handleDragStart(event: DragStartEvent) {
     if (isPaletteDragId(event.active.id)) {
-      setPaletteInsertIndex(fields.length);
+      setPaletteInsertIndex(null);
     }
   }
 
@@ -234,11 +236,6 @@ export function FormDesignerDraft() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
 
-    if (!over) {
-      setPaletteInsertIndex(null);
-      return;
-    }
-
     if (isPaletteDragId(active.id)) {
       const fieldType = active.data.current?.fieldType;
       const insertIndex = resolvePaletteInsertIndex(event, fields);
@@ -249,7 +246,18 @@ export function FormDesignerDraft() {
       return;
     }
 
+    if (!over) {
+      setPaletteInsertIndex(null);
+      return;
+    }
+
     if (active.id === over.id) {
+      return;
+    }
+
+    const activeFieldIndex = fields.findIndex((field) => field.id === active.id);
+    const overFieldIndex = fields.findIndex((field) => field.id === over.id);
+    if (activeFieldIndex < 0 || overFieldIndex < 0) {
       return;
     }
 
@@ -359,6 +367,12 @@ export function FormDesignerDraft() {
   }
 
   function moveField(id: string, direction: -1 | 1) {
+    const currentIndex = fields.findIndex((field) => field.id === id);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= fields.length) {
+      return;
+    }
+
     setFields((current) => {
       const currentIndex = current.findIndex((field) => field.id === id);
       const nextIndex = currentIndex + direction;
@@ -372,7 +386,13 @@ export function FormDesignerDraft() {
       nextFields.splice(nextIndex, 0, field);
       return normalizeSortOrder(nextFields);
     });
+    triggerFieldHighlight(id);
     markUnsaved();
+  }
+
+  function triggerFieldHighlight(id: string) {
+    setHighlightedFieldId("");
+    window.requestAnimationFrame(() => setHighlightedFieldId(id));
   }
 
   function addOption(fieldId: string) {
@@ -587,6 +607,12 @@ export function FormDesignerDraft() {
         <div className="designer-grid">
           <div className="tool-panel">
             <h3>{t("form.designer.formInfo")}</h3>
+            {isLoadingForms ? (
+              <div className="designer-loading-state" aria-live="polite">
+                <InlineValueLoader label={t("form.designer.loadingForms")} />
+                <span>{t("form.designer.loadingForms")}</span>
+              </div>
+            ) : null}
             <label>
               {t("form.designer.savedForm")}
               <select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}>
@@ -623,22 +649,15 @@ export function FormDesignerDraft() {
                 ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
                 : t("form.designer.createOnSave")}
             </p>
-            <button className="secondary-button" disabled={saveState === "saving"} type="button" onClick={resetDesigner}>
+            <button
+              className="secondary-button"
+              disabled={saveState === "saving"}
+              type="button"
+              onClick={resetDesigner}
+            >
               <Plus size={18} />
               {t("form.designer.newForm")}
             </button>
-            <button className="primary-button" disabled={saveState === "saving"} type="button" onClick={saveForm}>
-              <Save size={18} />
-              {saveState === "saving"
-                ? t("form.designer.saving")
-                : selectedFormId
-                  ? t("form.designer.updateForm")
-                  : t("form.designer.saveForm")}
-            </button>
-            {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
-            <p className={`status-line status-line-${saveState}`} aria-live="polite">
-              {message}
-            </p>
             <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
               <li>{t("form.designer.demoStepEdit")}</li>
               <li>{t("form.designer.demoStepOptions")}</li>
@@ -901,7 +920,7 @@ export function FormDesignerDraft() {
             <JsonViewer language={language} value={formModel} />
           </div>
 
-          <aside className="field-palette-rail" aria-label={t("form.designer.fieldPaletteStickyTitle")}>
+          <FieldPaletteRail label={t("form.designer.fieldPaletteStickyTitle")}>
             <div className="field-palette">
               <div className="field-palette-header">
                 <strong>{t("form.designer.fieldPaletteStickyTitle")}</strong>
@@ -913,7 +932,26 @@ export function FormDesignerDraft() {
                 ))}
               </div>
             </div>
-          </aside>
+            <div className="designer-save-panel">
+              <button
+                className="primary-button"
+                disabled={saveState === "saving"}
+                type="button"
+                onClick={saveForm}
+              >
+                <Save size={18} />
+                {saveState === "saving"
+                  ? t("form.designer.saving")
+                  : selectedFormId
+                    ? t("form.designer.updateForm")
+                    : t("form.designer.saveForm")}
+              </button>
+              {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
+              <p className={`status-line status-line-${saveState}`} aria-live="polite">
+                {message}
+              </p>
+            </div>
+          </FieldPaletteRail>
         </div>
       </DndContext>
       <MobileFieldPalette
@@ -976,9 +1014,23 @@ function FieldCanvasDropZone({ children, label }: { children: ReactNode; label: 
   const { isOver, setNodeRef } = useDroppable({ id: fieldCanvasDropId });
 
   return (
-    <div ref={setNodeRef} className={`field-list${isOver ? " field-list-drop-active" : ""}`} aria-label={label}>
+    <div id={fieldCanvasDropId} ref={setNodeRef} className={`field-list${isOver ? " field-list-drop-active" : ""}`} aria-label={label}>
       {children}
     </div>
+  );
+}
+
+function FieldPaletteRail({ children, label }: { children: ReactNode; label: string }) {
+  const { isOver, setNodeRef } = useDroppable({ id: fieldPaletteDropId });
+
+  return (
+    <aside
+      ref={setNodeRef}
+      className={`field-palette-rail${isOver ? " field-palette-rail-drop-active" : ""}`}
+      aria-label={label}
+    >
+      {children}
+    </aside>
   );
 }
 
@@ -994,14 +1046,20 @@ function SortableFieldCard({
   id: string;
   children: (props: SortableFieldCardRenderProps) => ReactNode;
 }) {
-  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    transition: {
+      duration: 300,
+      easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+    },
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} className="sortable-field-card" style={style}>
       {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
     </div>
   );
