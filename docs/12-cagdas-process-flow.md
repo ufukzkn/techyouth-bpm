@@ -36,7 +36,6 @@ The scope includes:
 ### Bonus Work (Completed)
 - **Drag-and-Drop Process Reordering**: Implemented a drag-and-drop feature to allow users to visually reorder processes in `ProcessListView` using `@dnd-kit`. Extracted `SortableProcessCard`, added ghost overlay during dragging, persisted ordering logic to `localStorage` to save the customized view state per user, and added keyboard accessible move up/down controls.
 - **Escalation Workflow**: Added `Escalate` action and `Escalated` status. Updated `ProcessStateMachine` to handle transitions (`InProgress → Escalated`, `Escalated → Approve/Reject`) and updated `TaskService` to automatically spawn an Admin review task upon escalation.
-- **Visual Process Flow**: Implemented `ProcessFlowIndicator` to visually represent the linear workflow progression (`Pending → InProgress → Terminal State`).
 
 ## Current Process Flow Capabilities
 
@@ -51,7 +50,6 @@ The scope includes:
 ### Process Detail
 
 - Shows form name, status badge, start date, completion date (if finished) and task summary.
-- Includes a visual `ProcessFlowIndicator` mapping the current status onto the high-level workflow steps.
 - Displays submitted form data as formatted JSON.
 - Shows all tasks with their open/completed counts.
 - Renders the full audit timeline with chronological entries.
@@ -131,7 +129,6 @@ Frontend process-flow files:
 - `apps/web/src/features/processes/TaskActionDialog.tsx`
 - `apps/web/src/features/processes/AuditTimeline.tsx`
 - `apps/web/src/features/processes/StatusBadge.tsx`
-- `apps/web/src/features/processes/ProcessFlowIndicator.tsx`
 - `apps/web/src/styles/processes.css`
 - `apps/web/src/lib/types.ts`
 - `apps/web/src/features/i18n/translations.ts`
