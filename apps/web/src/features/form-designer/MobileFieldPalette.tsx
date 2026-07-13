@@ -1,7 +1,7 @@
 "use client";
 
 import { Blocks, X, type LucideIcon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import type { FieldType } from "@/lib/types";
 
@@ -10,6 +10,8 @@ const buttonSize = 54;
 const safeInset = 14;
 const safeTop = 78;
 const dragThreshold = 7;
+const sheetCloseDistance = 72;
+const sheetCloseVelocity = 0.45;
 const defaultPosition: StoredPosition = { edge: "right", yRatio: 0.82 };
 const subscribeToHydration = () => () => undefined;
 
@@ -19,6 +21,7 @@ type StoredPosition = {
 };
 
 type Point = { x: number; y: number };
+type SheetPhase = "opening" | "open" | "closing";
 
 type MobileFieldPaletteProps = {
   closeLabel: string;
@@ -44,6 +47,8 @@ export function MobileFieldPalette({
 }: MobileFieldPaletteProps) {
   const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const [isOpen, setIsOpen] = useState(false);
+  const [sheetPhase, setSheetPhase] = useState<SheetPhase>("opening");
+  const [isSheetDragging, setIsSheetDragging] = useState(false);
   const [position, setPosition] = useState<StoredPosition>(() =>
     typeof window === "undefined" ? defaultPosition : readStoredPosition() ?? defaultPosition,
   );
@@ -55,20 +60,76 @@ export function MobileFieldPalette({
   const bubbleRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLElement>(null);
-  const bubbleDragRef = useRef<{ pointerId: number; start: Point; origin: Point } | null>(null);
-  const sheetDragRef = useRef<{ pointerId: number; startY: number } | null>(null);
+  const bubbleDragRef = useRef<{ pointerId: number; start: Point; origin: Point; hasDragged: boolean } | null>(null);
+  const suppressNextClickRef = useRef(false);
+  const sheetDragRef = useRef<{
+    pointerId: number;
+    startY: number;
+    startAt: number;
+    lastY: number;
+    lastAt: number;
+  } | null>(null);
 
   useEffect(() => {
     function updateViewport() {
       setViewport({ width: window.innerWidth, height: window.innerHeight });
       if (window.innerWidth > 860) {
         setIsOpen(false);
+        setSheetPhase("opening");
+        setIsSheetDragging(false);
+        setSheetDragY(0);
       }
     }
 
     window.addEventListener("resize", updateViewport);
     return () => window.removeEventListener("resize", updateViewport);
   }, []);
+
+  const finishClose = useCallback(() => {
+    setIsOpen(false);
+    setSheetPhase("opening");
+    setIsSheetDragging(false);
+    setSheetDragY(0);
+  }, []);
+
+  const requestClose = useCallback(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      finishClose();
+      return;
+    }
+
+    setIsSheetDragging(false);
+    setSheetPhase("closing");
+  }, [finishClose]);
+
+  useEffect(() => {
+    if (!isOpen || sheetPhase !== "opening") {
+      return;
+    }
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      if (reduceMotion) {
+        setSheetPhase("open");
+        return;
+      }
+      secondFrame = window.requestAnimationFrame(() => setSheetPhase("open"));
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [isOpen, sheetPhase]);
+
+  useEffect(() => {
+    if (sheetPhase !== "closing") {
+      return;
+    }
+
+    const fallback = window.setTimeout(finishClose, 500);
+    return () => window.clearTimeout(fallback);
+  }, [finishClose, sheetPhase]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -82,7 +143,7 @@ export function MobileFieldPalette({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        requestClose();
       }
     }
 
@@ -92,7 +153,7 @@ export function MobileFieldPalette({
       window.removeEventListener("keydown", handleKeyDown);
       bubble?.focus();
     };
-  }, [isOpen]);
+  }, [isOpen, requestClose]);
 
   const restingPoint = useMemo(() => positionToPoint(position, viewport), [position, viewport]);
   const bubblePoint = draftPoint ?? restingPoint;
@@ -108,6 +169,7 @@ export function MobileFieldPalette({
       pointerId: event.pointerId,
       start: { x: event.clientX, y: event.clientY },
       origin: bubblePoint,
+      hasDragged: false,
     };
   }
 
@@ -117,6 +179,12 @@ export function MobileFieldPalette({
       return;
     }
 
+    const distance = Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y);
+    if (!drag.hasDragged && distance < dragThreshold) {
+      return;
+    }
+
+    drag.hasDragged = true;
     setDraftPoint(clampPoint({
       x: drag.origin.x + event.clientX - drag.start.x,
       y: drag.origin.y + event.clientY - drag.start.y,
@@ -129,14 +197,13 @@ export function MobileFieldPalette({
       return;
     }
 
-    const distance = Math.hypot(event.clientX - drag.start.x, event.clientY - drag.start.y);
     bubbleDragRef.current = null;
-    if (distance < dragThreshold) {
+    if (!drag.hasDragged) {
       setDraftPoint(null);
-      setIsOpen(true);
       return;
     }
 
+    suppressNextClickRef.current = true;
     const point = clampPoint({
       x: drag.origin.x + event.clientX - drag.start.x,
       y: drag.origin.y + event.clientY - drag.start.y,
@@ -147,14 +214,29 @@ export function MobileFieldPalette({
     window.localStorage.setItem(storageKey, JSON.stringify(nextPosition));
   }
 
+  function resetBubbleDrag() {
+    bubbleDragRef.current = null;
+    setDraftPoint(null);
+  }
+
   function handleSheetPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     event.currentTarget.setPointerCapture(event.pointerId);
-    sheetDragRef.current = { pointerId: event.pointerId, startY: event.clientY };
+    const now = performance.now();
+    sheetDragRef.current = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startAt: now,
+      lastY: event.clientY,
+      lastAt: now,
+    };
+    setIsSheetDragging(true);
   }
 
   function handleSheetPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
     const drag = sheetDragRef.current;
     if (drag?.pointerId === event.pointerId) {
+      drag.lastY = event.clientY;
+      drag.lastAt = performance.now();
       setSheetDragY(Math.max(0, event.clientY - drag.startY));
     }
   }
@@ -165,11 +247,35 @@ export function MobileFieldPalette({
       return;
     }
 
+    const now = performance.now();
+    const releasedDistance = Math.max(0, event.clientY - drag.startY);
+    const sampleDistance = Math.max(0, event.clientY - drag.lastY);
+    const sampleDuration = Math.max(1, now - drag.lastAt);
+    const totalVelocity = releasedDistance / Math.max(1, now - drag.startAt);
+    const releaseVelocity = Math.max(sampleDistance / sampleDuration, totalVelocity);
     sheetDragRef.current = null;
-    if (sheetDragY > 80) {
-      setIsOpen(false);
+    setIsSheetDragging(false);
+    if (releasedDistance >= sheetCloseDistance || (releasedDistance >= 18 && releaseVelocity >= sheetCloseVelocity)) {
+      setSheetDragY(releasedDistance);
+      requestClose();
+      return;
     }
     setSheetDragY(0);
+  }
+
+  function resetSheetDrag() {
+    if (!sheetDragRef.current) {
+      return;
+    }
+    sheetDragRef.current = null;
+    setIsSheetDragging(false);
+    setSheetDragY(0);
+  }
+
+  function openSheet() {
+    setSheetDragY(0);
+    setSheetPhase("opening");
+    setIsOpen(true);
   }
 
   if (!mounted) {
@@ -179,16 +285,20 @@ export function MobileFieldPalette({
   return createPortal(
     <>
       <button
-        aria-expanded={isOpen}
+        aria-expanded={isOpen && sheetPhase !== "closing"}
         aria-haspopup="dialog"
         aria-label={openLabel}
         className="mobile-field-palette-fab"
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
+        onClick={(event) => {
+          if (suppressNextClickRef.current) {
+            suppressNextClickRef.current = false;
             event.preventDefault();
-            setIsOpen(true);
+            return;
           }
+          openSheet();
         }}
+        onLostPointerCapture={resetBubbleDrag}
+        onPointerCancel={resetBubbleDrag}
         onPointerDown={handleBubblePointerDown}
         onPointerMove={handleBubblePointerMove}
         onPointerUp={handleBubblePointerUp}
@@ -201,12 +311,14 @@ export function MobileFieldPalette({
       </button>
 
       {isOpen ? (
-        <div className="mobile-field-palette-layer">
-          <button className="mobile-field-palette-backdrop" aria-label={closeLabel} onClick={() => setIsOpen(false)} type="button" />
+        <div className={`mobile-field-palette-layer mobile-field-palette-layer-${sheetPhase}`}>
+          <button className="mobile-field-palette-backdrop" aria-label={closeLabel} onClick={requestClose} type="button" />
           <section
             aria-labelledby="mobile-field-palette-title"
             aria-modal="true"
-            className="mobile-field-palette-sheet"
+            className={`mobile-field-palette-sheet mobile-field-palette-sheet-${sheetPhase}${
+              isSheetDragging ? " mobile-field-palette-sheet-dragging" : ""
+            }`}
             onKeyDown={(event) => {
               if (event.key !== "Tab") {
                 return;
@@ -227,22 +339,30 @@ export function MobileFieldPalette({
             }}
             ref={sheetRef}
             role="dialog"
-            style={{ transform: `translateY(${sheetDragY}px)` }}
+            style={{ "--sheet-drag-y": `${sheetDragY}px` } as CSSProperties}
+            onTransitionEnd={(event) => {
+              if (event.target === event.currentTarget && event.propertyName === "transform" && sheetPhase === "closing") {
+                finishClose();
+              }
+            }}
           >
             <div
-              className="mobile-field-palette-handle"
+              aria-label={closeLabel}
+              className="mobile-field-palette-drag-zone"
+              onLostPointerCapture={resetSheetDrag}
+              onPointerCancel={resetSheetDrag}
               onPointerDown={handleSheetPointerDown}
               onPointerMove={handleSheetPointerMove}
               onPointerUp={handleSheetPointerUp}
             >
-              <span aria-hidden="true" />
+              <span className="mobile-field-palette-handle" aria-hidden="true" />
             </div>
             <div className="mobile-field-palette-heading">
               <div>
                 <h2 id="mobile-field-palette-title">{title}</h2>
                 <p>{description}</p>
               </div>
-              <button className="icon-button" aria-label={closeLabel} onClick={() => setIsOpen(false)} ref={closeRef} type="button">
+              <button className="icon-button" aria-label={closeLabel} onClick={requestClose} ref={closeRef} type="button">
                 <X size={18} />
               </button>
             </div>
@@ -253,7 +373,7 @@ export function MobileFieldPalette({
                   key={item.type}
                   onClick={() => {
                     onSelect(item.type);
-                    setIsOpen(false);
+                    requestClose();
                   }}
                   type="button"
                 >

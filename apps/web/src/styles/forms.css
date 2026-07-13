@@ -250,6 +250,8 @@
     border: 0;
     background: rgba(10, 18, 31, 0.48);
     backdrop-filter: blur(2px);
+    opacity: 1;
+    transition: opacity var(--motion-normal) ease-out;
   }
 
   .mobile-field-palette-sheet {
@@ -265,19 +267,38 @@
     border-radius: 16px 16px 0 0;
     background: var(--surface);
     box-shadow: 0 -20px 44px rgba(10, 18, 31, 0.22);
-    animation: mobile-palette-enter var(--motion-normal) var(--ease-standard) both;
-    transition: transform var(--motion-fast) ease-out;
+    transform: translateY(var(--sheet-drag-y, 0px));
+    transition: transform var(--motion-normal) var(--ease-standard), opacity var(--motion-fast) ease-out;
+    will-change: transform;
   }
 
-  .mobile-field-palette-handle {
-    min-height: 18px;
+  .mobile-field-palette-layer-closing .mobile-field-palette-backdrop {
+    opacity: 0;
+  }
+
+  .mobile-field-palette-sheet-opening,
+  .mobile-field-palette-sheet-closing {
+    transform: translateY(calc(100% + max(18px, env(safe-area-inset-bottom))));
+  }
+
+  .mobile-field-palette-sheet-dragging {
+    transition: none;
+  }
+
+  .mobile-field-palette-drag-zone {
+    min-height: 48px;
+    margin: -8px -16px -12px;
     display: grid;
     place-items: center;
     cursor: grab;
     touch-action: none;
   }
 
-  .mobile-field-palette-handle span {
+  .mobile-field-palette-drag-zone:active {
+    cursor: grabbing;
+  }
+
+  .mobile-field-palette-handle {
     width: 44px;
     height: 4px;
     border-radius: 999px;
@@ -443,6 +464,7 @@
   background: var(--surface-muted);
   font-weight: 700;
   cursor: grab;
+  touch-action: none;
 }
 
 .field-editor .drag-handle:active {
