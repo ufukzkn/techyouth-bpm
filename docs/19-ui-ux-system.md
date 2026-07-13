@@ -13,6 +13,7 @@ Global styles are imported through `apps/web/src/app/globals.css` in a fixed cas
 - `auth.css`: login, registration, verification and password-reset surfaces.
 - `shell.css`: persistent sidebar, topbar, session and notification controls.
 - `dashboard.css`: metrics, donut chart and dashboard shortcuts.
+- `inbox.css`: inbox toolbar, notification rows, filters and responsive layout.
 - `components.css`: shared UI contracts, settings surfaces and reusable states.
 - `management.css`: users, communities, logs, filters and pagination.
 - `forms.css`: Form Designer and dynamic field editing.
@@ -70,8 +71,10 @@ Screen migrations to these contracts are incremental. Do not rewrite every featu
 - At `1440px` and above, the field palette is the sticky third grid column. It must not use viewport-fixed positioning or overlap the canvas.
 - Between 861px and 1439px, the field palette remains in normal flow below the canvas.
 - At 860px and below, the normal palette is hidden. A draggable edge-snapping trigger opens a viewport-bottom sheet; selecting a type appends the field and returns focus to the trigger when the sheet closes.
-- Dashboard work cards use two columns on desktop/tablet and one column on narrow mobile. Their list rows remain compact, show no more than four items and use an explicit empty state instead of stretching the page.
-- Dashboard quick actions are permission-aware; unavailable routes must be omitted rather than rendered disabled.
+- The sheet's full 48px top strip is the dismissal target. Close animation must complete before unmount (`transitionend` plus timeout fallback); reduced-motion may close immediately.
+- Mobile palette items append on tap. Existing canvas fields remain touch-sortable only from the drag handle, so normal card scrolling does not accidentally start a drag. Keep move up/down buttons as the keyboard and touch fallback.
+- Dashboard counts belong to the donut legend rather than a duplicate metric-card row. Header actions contain only permission-aware form/process creation commands; recent activity is notification-backed and capped at four rows.
+- Inbox and notification popover never fetch the complete history. Popover renders five records and the true unread count; inbox renders ten-record server pages with deliberate skeleton, empty and error states.
 - `overflow-x: clip` is intentional: it prevents horizontal spill without creating a scroll container that breaks sticky positioning.
 
 ## Verification Checklist
@@ -80,5 +83,7 @@ Screen migrations to these contracts are incremental. Do not rewrite every featu
 - Check light/dark and TR/EN states.
 - Check 1920, 1536 (1920 at 125% scale), 1440, 1024 and 390 CSS-pixel widths.
 - Verify palette drag/drop at the beginning, middle and end of the field list.
+- Verify mobile field reordering from the handle, normal page scrolling outside the handle, edge-snap trigger movement and visible sheet close/snap-back motion.
+- Verify notification search, read/category filters, direct page jump, read/unread toggles and navigation targets without loading all records.
 - Verify sticky behavior while scrolling and confirm there is no horizontal overflow.
 - Confirm dashboard chart behavior after any dashboard or shared SVG rule change.

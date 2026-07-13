@@ -235,6 +235,7 @@ Ana workspace route'lari:
 - `http://localhost:3000/runner`
 - `http://localhost:3000/processes`
 - `http://localhost:3000/tasks`
+- `http://localhost:3000/inbox`
 - `http://localhost:3000/management`
 - `http://localhost:3000/logs`
 - `http://localhost:3000/settings`
@@ -332,6 +333,7 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 5. Form runner ekraninda seeded veya guncellenmis bir form secip yeni surec baslat.
 6. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
 7. Surec detayinda JSON veri ve audit log mantigini incele.
+8. Bildirim popover'inda son bes kaydi, `Gelen Kutusu` ekraninda arama/filtre/pagination ve okundu durumunu dene.
 
 ## Troubleshooting
 
