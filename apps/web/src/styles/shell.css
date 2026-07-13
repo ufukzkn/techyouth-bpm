@@ -323,6 +323,30 @@
   box-shadow: var(--shadow);
 }
 
+.notification-loading {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.notification-inbox-link {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border: 0;
+  border-top: 1px solid var(--border);
+  color: var(--primary);
+  background: var(--surface);
+  font-weight: 800;
+}
+
 .notification-popover-header {
   display: flex;
   align-items: center;

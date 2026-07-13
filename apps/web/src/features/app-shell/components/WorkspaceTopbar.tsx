@@ -1,6 +1,7 @@
 "use client";
 
 import { LogOut, Menu } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
 import { NotificationMenu } from "@/features/app-shell/components/NotificationMenu";
@@ -8,7 +9,8 @@ import { SessionStatusButton } from "@/features/app-shell/SessionStatusButton";
 import { formatSessionExpiry } from "@/features/app-shell/sessionFormatters";
 import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
-import { api } from "@/lib/api";
+import { getNotificationTarget } from "@/features/notifications/notificationNavigation";
+import { useNotificationStore } from "@/features/notifications/notificationStore";
 import type { Language, NotificationItem, ThemeMode, User } from "@/lib/types";
 
 type WorkspaceTopbarProps = {
@@ -36,9 +38,18 @@ export function WorkspaceTopbar({
   onToggleMobileNav,
   onToggleTheme,
 }: WorkspaceTopbarProps) {
+  const router = useRouter();
   const [isSessionDetailsOpen, setIsSessionDetailsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const {
+    previewItems,
+    unreadCount,
+    isLoading: isNotificationsLoading,
+    loadPreview,
+    markAllRead,
+    reset: resetNotifications,
+    setReadState,
+  } = useNotificationStore();
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
@@ -46,31 +57,55 @@ export function WorkspaceTopbar({
 
   const loadNotifications = useCallback(async () => {
     if (!token || token.startsWith("demo-")) {
-      setNotifications([]);
+      resetNotifications(user.id);
       return;
     }
 
     try {
-      setNotifications(await api.listNotifications(token));
+      await loadPreview(token, user.id);
     } catch {
-      setNotifications([]);
+      // The workspace keeps running when notification refresh fails.
     }
-  }, [token]);
+  }, [loadPreview, resetNotifications, token, user.id]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadNotifications();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [loadNotifications, user.id]);
+    void loadNotifications();
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
+      }
+    }, 30_000);
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        void loadNotifications();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [loadNotifications]);
 
-  async function markNotificationRead(notificationId: string) {
+  useEffect(() => {
+    if (isNotificationsOpen) {
+      void loadNotifications();
+    }
+  }, [isNotificationsOpen, loadNotifications]);
+
+  async function openNotification(notification: NotificationItem) {
     if (!token || token.startsWith("demo-")) {
       return;
     }
 
-    await api.markNotificationRead(token, notificationId);
-    await loadNotifications();
+    if (!notification.readAt) {
+      await setReadState(token, notification.id, true);
+    }
+    setIsNotificationsOpen(false);
+    const target = getNotificationTarget(notification);
+    if (target) {
+      router.push(target);
+    }
   }
 
   async function markAllNotificationsRead() {
@@ -78,8 +113,7 @@ export function WorkspaceTopbar({
       return;
     }
 
-    await api.markAllNotificationsRead(token);
-    await loadNotifications();
+    await markAllRead(token);
   }
 
   const effectiveRole = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
@@ -125,12 +159,19 @@ export function WorkspaceTopbar({
       <div className="topbar-actions">
         <NotificationMenu
           emptyLabel={t("notifications.empty")}
+          inboxLabel={t("notifications.openInbox")}
           isOpen={isNotificationsOpen}
-          items={notifications}
+          isLoading={isNotificationsLoading}
+          items={previewItems}
           label={t("notifications.title")}
           markAllLabel={t("notifications.markAllRead")}
+          unreadCount={unreadCount}
           onMarkAllRead={() => void markAllNotificationsRead()}
-          onMarkRead={(notificationId) => void markNotificationRead(notificationId)}
+          onOpenInbox={() => {
+            setIsNotificationsOpen(false);
+            router.push("/inbox");
+          }}
+          onSelect={(notification) => void openNotification(notification)}
           onToggle={() => {
             setIsNotificationsOpen((isOpen) => !isOpen);
             setIsSessionDetailsOpen(false);

@@ -98,8 +98,9 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   }
 
   useEffect(() => {
+    const requestedProcessId = new URLSearchParams(window.location.search).get("processId") ?? "";
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void refreshData("");
+    void refreshData(requestedProcessId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, language]);
 

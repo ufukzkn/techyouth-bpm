@@ -331,3 +331,19 @@ export type NotificationItem = {
   createdAt: string;
   readAt?: string | null;
 };
+
+export type NotificationReadStatus = "all" | "unread" | "read";
+export type NotificationCategory = "all" | "task" | "process" | "access" | "account";
+
+export type NotificationListParams = {
+  page?: number;
+  pageSize?: number;
+  query?: string;
+  readStatus?: NotificationReadStatus;
+  category?: NotificationCategory;
+};
+
+export type NotificationPage = PagedResult<NotificationItem> & {
+  allCount: number;
+  unreadCount: number;
+};

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import { ArrowRight, Bell, LoaderCircle } from "lucide-react";
 import type { NotificationItem } from "@/lib/types";
 
 type NotificationMenuProps = {
@@ -8,9 +8,13 @@ type NotificationMenuProps = {
   items: NotificationItem[];
   label: string;
   emptyLabel: string;
+  inboxLabel: string;
+  isLoading: boolean;
   markAllLabel: string;
+  unreadCount: number;
   onMarkAllRead: () => void;
-  onMarkRead: (notificationId: string) => void;
+  onOpenInbox: () => void;
+  onSelect: (notification: NotificationItem) => void;
   onToggle: () => void;
 };
 
@@ -19,13 +23,15 @@ export function NotificationMenu({
   items,
   label,
   emptyLabel,
+  inboxLabel,
+  isLoading,
   markAllLabel,
+  unreadCount,
   onMarkAllRead,
-  onMarkRead,
+  onOpenInbox,
+  onSelect,
   onToggle,
 }: NotificationMenuProps) {
-  const unreadCount = items.filter((notification) => !notification.readAt).length;
-
   return (
     <div className="notification-menu">
       <button
@@ -37,7 +43,7 @@ export function NotificationMenu({
         type="button"
       >
         <Bell size={18} />
-        {unreadCount > 0 ? <span className="notification-badge">{unreadCount}</span> : null}
+        {unreadCount > 0 ? <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span> : null}
       </button>
       {isOpen ? (
         <div className="notification-popover" role="dialog" aria-label={label}>
@@ -52,15 +58,20 @@ export function NotificationMenu({
               <button
                 className={notification.readAt ? "notification-item" : "notification-item is-unread"}
                 key={notification.id}
-                onClick={() => onMarkRead(notification.id)}
+                onClick={() => onSelect(notification)}
                 type="button"
               >
                 <strong>{notification.title}</strong>
                 <span>{notification.message}</span>
               </button>
             ))}
-            {!items.length ? <p className="status-line">{emptyLabel}</p> : null}
+            {isLoading && !items.length ? <p className="notification-loading"><LoaderCircle className="spin-icon" size={18} /> {label}</p> : null}
+            {!isLoading && !items.length ? <p className="status-line">{emptyLabel}</p> : null}
           </div>
+          <button className="notification-inbox-link" type="button" onClick={onOpenInbox}>
+            {inboxLabel}
+            <ArrowRight size={15} aria-hidden="true" />
+          </button>
         </div>
       ) : null}
     </div>
