@@ -377,6 +377,10 @@
   background: var(--surface-muted);
 }
 
+.runner-preview-panel {
+  align-self: start;
+}
+
 .runner-state-panel span,
 .selected-form-summary span,
 .runner-preview-panel h3 {
@@ -396,7 +400,6 @@
 }
 .runner-output {
   grid-column: auto;
-  max-height: none;
 }
 
 /* Status filter chips */
