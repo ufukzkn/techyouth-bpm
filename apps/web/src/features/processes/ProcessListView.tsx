@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleDot, Filter } from "lucide-react";
+import { CircleDot, Filter, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   closestCenter,
@@ -159,9 +159,20 @@ export function ProcessListView({ processes, language, selectedProcessId, onSele
               ))}
             </div>
           </SortableContext>
-          <DragOverlay>
+          <DragOverlay modifiers={[]}>
             {activeId ? (
-              <div className="process-drag-overlay">
+              <div className="process-sortable-item process-drag-overlay">
+                <div className="process-move-controls" style={{ visibility: "hidden" }}>
+                  <button className="process-drag-handle" type="button">
+                    <GripVertical size={16} />
+                  </button>
+                  <button className="process-move-btn" type="button">
+                    <ChevronUp size={14} />
+                  </button>
+                  <button className="process-move-btn" type="button">
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
                 <ProcessCard
                   isSelected={false}
                   language={language}
