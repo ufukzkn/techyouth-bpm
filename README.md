@@ -235,6 +235,7 @@ Ana workspace route'lari:
 - `http://localhost:3000/runner`
 - `http://localhost:3000/processes`
 - `http://localhost:3000/tasks`
+- `http://localhost:3000/inbox`
 - `http://localhost:3000/management`
 - `http://localhost:3000/logs`
 - `http://localhost:3000/settings`
@@ -287,6 +288,18 @@ Backend testleri:
 dotnet test apps/api/TechYouthBpm.slnx
 ```
 
+Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, community scope, Swagger ve formdan surec baslatmaya kadar gercek controller pipeline'i dogrulanir.
+
+Neon/PostgreSQL migration smoke testi varsayilan kosuda dis servise baglanmaz. Opt-in calistirmak icin baglanti bilgisini yalniz mevcut terminal oturumunda tanimla:
+
+```powershell
+$env:TECHYOUTH_TEST_POSTGRES_CONNECTION = "<postgresql-connection-string>"
+dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj --filter "FullyQualifiedName~PostgreSql_Startup_Applies_Migrations"
+Remove-Item Env:TECHYOUTH_TEST_POSTGRES_CONNECTION
+```
+
+Test benzersiz gecici bir PostgreSQL schema olusturur, migrations + seed + login/form smoke akisini calistirir ve schema'yi sonunda siler. Paylasilan demo tablolarina dokunmaz.
+
 Frontend lint ve production build:
 
 ```bash
@@ -320,6 +333,7 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 5. Form runner ekraninda seeded veya guncellenmis bir form secip yeni surec baslat.
 6. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
 7. Surec detayinda JSON veri ve audit log mantigini incele.
+8. Bildirim popover'inda son bes kaydi, `Gelen Kutusu` ekraninda arama/filtre/pagination ve okundu durumunu dene.
 
 ## Troubleshooting
 

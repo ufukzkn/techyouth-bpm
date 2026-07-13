@@ -785,8 +785,8 @@ public class AuthServiceTests
             "TempPass123!");
 
         var rejected = await service.CreateUserAsync(request, TestDbFactory.ToDto(admin));
-        var superAdmin = new UserDto(Guid.NewGuid(), "superadmin", "Super Admin", "superadmin@test.local", Role.SuperAdmin, UserStatus.Active, true);
-        var created = await service.CreateUserAsync(request, superAdmin);
+        var superAdmin = TestDbFactory.SeedSuperAdmin(db);
+        var created = await service.CreateUserAsync(request, TestDbFactory.ToDto(superAdmin));
 
         Assert.False(rejected.IsSuccess);
         Assert.True(created.IsSuccess, string.Join(" | ", created.Errors));
@@ -802,12 +802,12 @@ public class AuthServiceTests
         await using var db = TestDbFactory.Create();
         var user = TestDbFactory.SeedUser(db, Role.User, "existing-user");
         var service = new AuthService(db, CreateTestConfiguration());
-        var superAdmin = new UserDto(Guid.NewGuid(), "superadmin", "Super Admin", "superadmin@test.local", Role.SuperAdmin, UserStatus.Active, true);
+        var superAdmin = TestDbFactory.SeedSuperAdmin(db);
 
         var result = await service.UpdateUserAccessAsync(
             user.Id,
             new UpdateUserAccessRequest(Role.SuperAdmin, UserStatus.Active),
-            superAdmin);
+            TestDbFactory.ToDto(superAdmin));
 
         Assert.False(result.IsSuccess);
         Assert.Contains("cannot be promoted", result.Errors.Single(), StringComparison.OrdinalIgnoreCase);
@@ -820,7 +820,7 @@ public class AuthServiceTests
         await using var db = TestDbFactory.Create();
         var user = TestDbFactory.SeedUser(db, Role.User, "role-target");
         var service = new AuthService(db, CreateTestConfiguration());
-        var superAdmin = new UserDto(Guid.NewGuid(), "superadmin", "Super Admin", "superadmin@test.local", Role.SuperAdmin, UserStatus.Active, true);
+        var superAdmin = TestDbFactory.SeedSuperAdmin(db);
 
         var result = await service.UpdateUserAccessAsync(
             user.Id,
@@ -829,7 +829,7 @@ public class AuthServiceTests
                 UserStatus.Active,
                 TestDbFactory.CommunityId,
                 TestDbFactory.ApproverCommunityRoleId),
-            superAdmin);
+            TestDbFactory.ToDto(superAdmin));
 
         Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
         var activeMembership = db.UserCommunityMemberships.Single(membership => membership.UserId == user.Id && membership.IsActive);

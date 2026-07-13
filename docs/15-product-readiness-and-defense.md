@@ -4,7 +4,7 @@
 
 The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, permission-aware access, community/custom role management, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
-The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, backend services own business rules, EF Core migrations own schema evolution, and documentation tracks feature ownership. The main remaining production gaps are operational hardening: explicit write transactions, API-level security integration tests, Docker onboarding and final responsive/accessibility QA.
+The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, backend services own business rules, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional and the real HTTP pipeline is covered for cookie/CSRF, Bearer, refresh, rate limit and authorization behavior. The main remaining production gaps are browser E2E, task concurrency protection, CI and final responsive/accessibility QA.
 
 ## PDF Compliance Matrix
 
@@ -18,11 +18,11 @@ The strongest defense is extensibility. Forms are data-driven, workflow transiti
 | Form runner | Dynamic rendering, frontend validation, payload preview and process start. | Strong | Add UI smoke tests. |
 | Required/type/dependent validation | Frontend helpers plus backend validation for process start. | Strong | Keep backend as final source of truth. |
 | Loading/success/error states | Implemented in auth, forms, dashboard refresh, process/task and management flows. | Good | Normalize every remaining backend error message. |
-| .NET 8 REST API | Layered API with controllers, services, EF Core and Swagger. | Strong | Add API integration tests. |
+| .NET 8 REST API | Layered API with controllers, services, EF Core, Swagger and WebApplicationFactory integration tests. | Strong | Add automated CI execution. |
 | User/role storage and authorization | Users, roles, statuses, sessions, communities, custom roles, permissions and scope checks. | Strong | Add final permission matrix screen/doc for demo. |
 | Form definition persistence | EF entities, migrations and create/update/list/detail endpoints. | Strong | Add migration review to release checklist. |
 | JSON submission data | Process start stores submitted form data as JSON and displays it in detail. | Strong | Consider JSON schema/versioning later. |
-| Process/task workflow | Start process, create task, list tasks, approve/reject and show details. | Strong | Add explicit transactions around state/audit writes. |
+| Process/task workflow | Start process, create task, list tasks, approve/reject and show details with transactional state/audit writes. | Strong | Add optimistic concurrency for simultaneous actions. |
 | BPM state machine | `Pending -> InProgress -> Completed/Rejected` controlled by `ProcessStateMachine`. | Strong | Extend only through state-machine rules. |
 | Audit trail | Process audit and system audit show actor, action, target and timestamp. | Strong | Add export for filtered audit results. |
 | Swagger/OpenAPI | Development Swagger with Bearer token support. | Strong | Add OpenAPI examples for demo requests. |
@@ -87,21 +87,21 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 **How is i18n handled?** The frontend uses a shared TR/EN dictionary and maps known API errors to localized messages. Remaining raw backend messages should be mapped before final demo.
 
-**Is Docker ready?** Not yet. The repo is ready for Docker Compose, but Docker files are still recommended next work for repeatable API/web/database startup.
+**Is Docker ready?** Yes. Separate Compose stacks run the SQLite local demo or the Neon-backed cloud flow with the same API/web images, migrations and deterministic seed. They share host ports and are intentionally started one at a time.
 
 ## Recommended Next Work
 
 ### Must
 
 - Commit and merge the current access/security package after final lint/build/test checks.
-- Add explicit transactions around form update, process start, task action and audit writes.
 - Finish i18n mapping for backend auth/access errors.
 - Run final responsive and accessibility QA on form designer, management and logs.
 
 ### Should
 
-- Add API integration tests for cookie auth, CSRF, rate limits, protected endpoints and admin-only authorization.
-- Add Docker Compose for web, API and PostgreSQL onboarding.
+- Keep Docker local/cloud startup and secret onboarding notes current as configuration changes.
+- Add Playwright E2E for login, form design, process start, task action and audit review.
+- Add optimistic concurrency protection for competing task actions.
 - Add audit export for filtered logs.
 - Add a compact role/permission matrix for Admin, User and Approver.
 - Extend the compact matrix to include SuperAdmin, Topluluk Admin and custom community roles.

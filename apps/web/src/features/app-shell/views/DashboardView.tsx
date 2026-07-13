@@ -1,10 +1,18 @@
-import { CircleCheckBig, ListTodo, Workflow } from "lucide-react";
+"use client";
+
+import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlus2, ListTodo, PlayCircle, Workflow } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import type { ViewId } from "@/features/app-shell/navigation";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
+import { getNotificationTarget } from "@/features/notifications/notificationNavigation";
+import { useNotificationStore } from "@/features/notifications/notificationStore";
+import { StatusBadge } from "@/features/processes/StatusBadge";
+import { EmptyState } from "@/features/ui/EmptyState";
 import { api } from "@/lib/api";
-import type { DashboardSummary, Language, User } from "@/lib/types";
+import { formatApiDateTime } from "@/lib/dateTime";
+import type { DashboardSummary, Language, NotificationItem, User } from "@/lib/types";
 
 const dashboardMetricsCache = new Map<string, DashboardSummary>();
 
@@ -21,6 +29,7 @@ export function DashboardView({
   visibleViewIds: ViewId[];
   onNavigate: (viewId: ViewId) => void;
 }) {
+  const router = useRouter();
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
@@ -32,6 +41,7 @@ export function DashboardView({
   );
   const [hoveredChartSegment, setHoveredChartSegment] = useState<string | null>(null);
   const [chartTooltipPosition, setChartTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const { previewItems, isLoading: notificationsLoading, loadPreview, setReadState } = useNotificationStore();
 
   useEffect(() => {
     let ignore = false;
@@ -54,214 +64,211 @@ export function DashboardView({
           setStatus("idle");
         }
       } catch {
-        if (!ignore) {
-          setStatus("error");
-        }
+        if (!ignore) setStatus("error");
       }
     }
 
     void loadMetrics();
-
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [dashboardCacheKey, token]);
+
+  useEffect(() => {
+    if (!token || token.startsWith("demo-")) return;
+    const timer = window.setTimeout(() => void loadPreview(token, user.id).catch(() => undefined), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadPreview, token, user.id]);
 
   const openTaskCount = summary?.openTaskCount ?? 0;
   const inProgressCount = summary?.inProgressProcessCount ?? 0;
   const completedCount = summary?.completedProcessCount ?? 0;
+  const recentOpenTasks = summary?.recentOpenTasks ?? [];
+  const recentProcesses = summary?.recentProcesses ?? [];
+  const chartTotal = openTaskCount + inProgressCount + completedCount;
   const chartSegments = useMemo(() => {
     const circumference = 2 * Math.PI * 44;
-    const total = Math.max(1, openTaskCount + inProgressCount + completedCount);
+    const total = Math.max(1, chartTotal);
     let offset = 0;
     return [
-      { key: "open", label: t("dashboard.pendingTasks"), value: openTaskCount, className: "chart-segment-open" },
-      { key: "progress", label: t("dashboard.inProgress"), value: inProgressCount, className: "chart-segment-progress" },
-      { key: "completed", label: t("dashboard.completed"), value: completedCount, className: "chart-segment-completed" },
+      { key: "open", label: t("dashboard.pendingTasks"), value: openTaskCount, className: "chart-segment-open", viewId: "tasks" as ViewId },
+      { key: "progress", label: t("dashboard.inProgress"), value: inProgressCount, className: "chart-segment-progress", viewId: "processes" as ViewId },
+      { key: "completed", label: t("dashboard.completed"), value: completedCount, className: "chart-segment-completed", viewId: "processes" as ViewId },
     ].map((segment) => {
       const length = (segment.value / total) * circumference;
       const result = {
         ...segment,
-        percentage: total === 1 && segment.value === 0 ? 0 : Math.round((segment.value / total) * 100),
+        percentage: chartTotal === 0 ? 0 : Math.round((segment.value / total) * 100),
         dashArray: `${length} ${circumference - length}`,
         dashOffset: -offset,
       };
       offset += length;
       return result;
     });
-  }, [completedCount, inProgressCount, openTaskCount, t]);
+  }, [chartTotal, completedCount, inProgressCount, openTaskCount, t]);
   const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
   const shouldShowMetricLoader = status === "loading" && !summary;
   const activeChartSegment = chartSegments.find((segment) => segment.key === hoveredChartSegment);
   const currentAccessLabel = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
+  const showTaskFocus = canOpen("tasks");
 
-  const metricCards: Array<{ label: string; value: number; viewId?: ViewId; icon: typeof ListTodo }> = [
-    { label: t("dashboard.pendingTasks"), value: openTaskCount, viewId: canOpen("tasks") ? "tasks" : undefined, icon: ListTodo },
-    { label: t("dashboard.inProgress"), value: inProgressCount, viewId: canOpen("processes") ? "processes" : undefined, icon: Workflow },
-    { label: t("dashboard.completed"), value: completedCount, viewId: canOpen("processes") ? "processes" : undefined, icon: CircleCheckBig },
-  ];
-
-  const flowSteps: Array<{ label: string; caption: string; viewId: ViewId }> = [
-    { label: t("dashboard.flow.session"), caption: t("dashboard.flow.sessionCaption"), viewId: "settings" },
-    {
-      label: t("dashboard.flow.formDefinition"),
-      caption: t("dashboard.flow.formDefinitionCaption"),
-      viewId: "forms",
-    },
-    {
-      label: t("dashboard.flow.processInstance"),
-      caption: t("dashboard.flow.processInstanceCaption"),
-      viewId: "runner",
-    },
-    { label: t("dashboard.flow.taskAction"), caption: t("dashboard.flow.taskActionCaption"), viewId: "tasks" },
-    { label: t("dashboard.flow.auditLog"), caption: t("dashboard.flow.auditLogCaption"), viewId: "processes" },
-  ];
+  async function openNotification(notification: NotificationItem) {
+    if (token && !token.startsWith("demo-") && !notification.readAt) {
+      await setReadState(token, notification.id, true).catch(() => undefined);
+    }
+    router.push(getNotificationTarget(notification) ?? "/inbox");
+  }
 
   return (
     <div className="view-panel">
-      <section className="workspace-header">
+      <section className="workspace-header dashboard-header">
         <div>
           <span className="eyebrow">{t("dashboard.eyebrow")}</span>
-          <h1>{t("dashboard.title")}</h1>
+          <h1>{t("dashboard.welcome", { name: user.displayName })}</h1>
           {user.communityName ? <p className="dashboard-community-label"><span>{t("dashboard.communityLabel")}</span><strong>{user.communityName}</strong></p> : null}
         </div>
-        <p>
-          {status === "error"
-            ? t("dashboard.error")
-            : status === "loading"
-              ? t("dashboard.loading")
-              : `${user.communityName || "Platform"} / ${currentAccessLabel} - ${t("dashboard.summary", { role: currentAccessLabel })}`}
-        </p>
+        <div className="dashboard-header-side">
+          <p>
+            {status === "error"
+              ? t("dashboard.error")
+              : status === "loading"
+                ? t("dashboard.loading")
+                : `${user.communityName || "Platform"} / ${currentAccessLabel}`}
+          </p>
+          <div className="dashboard-header-actions">
+            {canOpen("runner") ? (
+              <button className="primary-button" onClick={() => onNavigate("runner")} type="button">
+                <PlayCircle size={17} /> {t("dashboard.quick.start")}
+              </button>
+            ) : null}
+            {canOpen("forms") ? (
+              <button className="secondary-button" onClick={() => onNavigate("forms")} type="button">
+                <FilePlus2 size={17} /> {t("dashboard.quick.design")}
+              </button>
+            ) : null}
+          </div>
+        </div>
       </section>
 
       {user.communityId && user.isCommunityActive === false ? (
         <p className="dashboard-community-inactive" role="status">{t("dashboard.communityInactive")}</p>
       ) : null}
 
-      <section className="metric-grid" aria-label="Process summary">
-        {metricCards.map((card) =>
-          card.viewId ? (
-            <button
-              className="metric-card metric-action"
-              key={card.label}
-              onClick={() => onNavigate(card.viewId!)}
-              type="button"
-            >
-              <card.icon className="metric-card-icon" size={20} aria-hidden="true" />
-              <span>{card.label}</span>
-              {shouldShowMetricLoader ? (
-                <span className="metric-inline-loader" aria-label={t("common.loading")}>
-                  <span className="button-spinner" aria-hidden="true" />
-                </span>
-              ) : (
-                <strong>{card.value}</strong>
-              )}
-            </button>
-          ) : (
-            <article className="metric-card" key={card.label}>
-              <card.icon className="metric-card-icon" size={20} aria-hidden="true" />
-              <span>{card.label}</span>
-              {shouldShowMetricLoader ? (
-                <span className="metric-inline-loader" aria-label={t("common.loading")}>
-                  <span className="button-spinner" aria-hidden="true" />
-                </span>
-              ) : (
-                <strong>{card.value}</strong>
-              )}
-            </article>
-          ),
-        )}
-      </section>
-
-      <section className="dashboard-insight-grid">
+      <section className="dashboard-focus-grid">
         <article className="dashboard-chart-card dashboard-chart-card-prominent">
-          <div>
-            <span className="eyebrow">Dagilim</span>
-            <h3>Surec ve is yogunlugu</h3>
+          <div className="dashboard-chart-copy">
+            <span className="eyebrow">{t("dashboard.distributionEyebrow")}</span>
+            <h3>{t("dashboard.distributionTitle")}</h3>
+            <div className="chart-legend dashboard-metric-legend">
+              {chartSegments.map((segment) => (
+                <button
+                  disabled={!canOpen(segment.viewId)}
+                  key={segment.key}
+                  onClick={() => onNavigate(segment.viewId)}
+                  type="button"
+                >
+                  <span><i className={`legend-${segment.key}`} /> {segment.label}</span>
+                  {shouldShowMetricLoader ? <InlineValueLoader label={t("common.loading")} /> : <strong>{segment.value}</strong>}
+                </button>
+              ))}
+            </div>
           </div>
           <div
             className={shouldShowMetricLoader ? "dashboard-donut is-loading" : "dashboard-donut"}
-            aria-label={activeChartSegment ? `${activeChartSegment.label}: %${activeChartSegment.percentage}` : "Surec dagilimi"}
+            aria-label={activeChartSegment ? `${activeChartSegment.label}: %${activeChartSegment.percentage}` : t("dashboard.distributionTitle")}
           >
-            <svg
-              aria-label={activeChartSegment ? `${activeChartSegment.label}: %${activeChartSegment.percentage}` : "Surec dagilimi"}
-              className="dashboard-donut-svg"
-              role="img"
-              viewBox="0 0 112 112"
-            >
+            <svg className="dashboard-donut-svg" role="img" viewBox="0 0 112 112">
               <circle className="chart-track" cx="56" cy="56" r="44" />
               {!shouldShowMetricLoader ? chartSegments.map((segment) => (
                 <circle
+                  aria-label={`${segment.label}: %${segment.percentage}`}
                   className={segment.className}
                   cx="56"
                   cy="56"
+                  data-active={activeChartSegment ? activeChartSegment.key === segment.key : undefined}
                   key={segment.key}
+                  onBlur={() => { setHoveredChartSegment(null); setChartTooltipPosition(null); }}
+                  onFocus={() => setHoveredChartSegment(segment.key)}
+                  onMouseEnter={() => setHoveredChartSegment(segment.key)}
+                  onMouseLeave={() => { setHoveredChartSegment(null); setChartTooltipPosition(null); }}
+                  onMouseMove={(event) => {
+                    const bounds = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                    if (bounds) setChartTooltipPosition({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+                  }}
                   r="44"
                   strokeDasharray={segment.dashArray}
                   strokeDashoffset={segment.dashOffset}
                   tabIndex={0}
-                  aria-label={`${segment.label}: %${segment.percentage}`}
-                  data-active={activeChartSegment ? activeChartSegment.key === segment.key : undefined}
-                  onBlur={() => {
-                    setHoveredChartSegment(null);
-                    setChartTooltipPosition(null);
-                  }}
-                  onFocus={() => setHoveredChartSegment(segment.key)}
-                  onMouseEnter={() => setHoveredChartSegment(segment.key)}
-                  onMouseLeave={() => {
-                    setHoveredChartSegment(null);
-                    setChartTooltipPosition(null);
-                  }}
-                  onMouseMove={(event) => {
-                    const bounds = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
-                    if (bounds) {
-                      setChartTooltipPosition({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
-                    }
-                  }}
                 />
               )) : null}
             </svg>
             <span className="dashboard-donut-value" aria-live="polite">
-              {shouldShowMetricLoader
-                ? <InlineValueLoader label={t("common.loading")} />
-                : activeChartSegment
-                  ? activeChartSegment.value
-                  : openTaskCount + inProgressCount}
+              {shouldShowMetricLoader ? <InlineValueLoader label={t("common.loading")} /> : activeChartSegment?.value ?? chartTotal}
             </span>
             {activeChartSegment && chartTooltipPosition ? (
-              <span
-                className="chart-hover-tooltip"
-                role="tooltip"
-                style={{ left: chartTooltipPosition.x, top: chartTooltipPosition.y }}
-              >
+              <span className="chart-hover-tooltip" role="tooltip" style={{ left: chartTooltipPosition.x, top: chartTooltipPosition.y }}>
                 %{activeChartSegment.percentage}
               </span>
             ) : null}
           </div>
-          <div className="chart-legend">
-            <span><i className="legend-open" /> {t("dashboard.pendingTasks")}</span>
-            <span><i className="legend-progress" /> {t("dashboard.inProgress")}</span>
-            <span><i className="legend-completed" /> {t("dashboard.completed")}</span>
-          </div>
         </article>
-        <article className="dashboard-context-card">
-          <span className="eyebrow">Baglam</span>
-          <h3>{user.communityName || "Platform yonetimi"}</h3>
-          <p>{currentAccessLabel}</p>
-          <small>Menuler ve kisa yollar aktif izinlere gore sadeleştirilir.</small>
+
+        <article className="dashboard-work-card dashboard-priority-card">
+          <div className="dashboard-card-heading">
+            <div><span className="eyebrow">{t("dashboard.priorityEyebrow")}</span><h3>{t("dashboard.priorityTitle")}</h3></div>
+            <button className="dashboard-heading-action" onClick={() => onNavigate(showTaskFocus ? "tasks" : "processes")} type="button">
+              {t("dashboard.viewAll")} <ArrowRight size={15} />
+            </button>
+          </div>
+          {status === "loading" && !summary ? <DashboardListSkeleton /> : showTaskFocus && recentOpenTasks.length > 0 ? (
+            <div className="dashboard-activity-list">
+              {recentOpenTasks.map((task) => (
+                <button className="dashboard-activity-item" key={task.id} onClick={() => onNavigate("tasks")} type="button">
+                  <span className="dashboard-activity-icon"><ListTodo size={17} /></span>
+                  <span className="dashboard-activity-copy"><strong>{task.formName}</strong><small><Clock3 size={13} /> {formatApiDateTime(task.createdAt, language)}</small></span>
+                  <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          ) : !showTaskFocus && recentProcesses.length > 0 ? (
+            <div className="dashboard-activity-list">
+              {recentProcesses.map((process) => (
+                <button className="dashboard-activity-item" key={process.id} onClick={() => onNavigate("processes")} type="button">
+                  <span className="dashboard-activity-icon"><Workflow size={17} /></span>
+                  <span className="dashboard-activity-copy"><strong>{process.formName}</strong><small>{formatApiDateTime(process.startedAt, language)}</small></span>
+                  <span className="dashboard-activity-status"><StatusBadge language={language} status={process.status} /></span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <EmptyState description={t("dashboard.priorityEmptyDescription")} icon={<CircleCheckBig size={20} />} title={t("dashboard.priorityEmptyTitle")} />
+          )}
         </article>
       </section>
 
-      <section className="flow-preview">
-        {flowSteps
-          .filter((step) => canOpen(step.viewId))
-          .map((step) => (
-            <button className="flow-step" key={step.label} onClick={() => onNavigate(step.viewId)} type="button">
-              <strong>{step.label}</strong>
-              <span>{step.caption}</span>
-            </button>
-          ))}
+      <section className="dashboard-work-card dashboard-notification-card">
+        <div className="dashboard-card-heading">
+          <div><span className="eyebrow">{t("dashboard.activityEyebrow")}</span><h3>{t("dashboard.activityTitle")}</h3></div>
+          <button className="dashboard-heading-action" onClick={() => onNavigate("inbox")} type="button">
+            {t("dashboard.viewAll")} <ArrowRight size={15} />
+          </button>
+        </div>
+        {notificationsLoading && !previewItems.length ? <DashboardListSkeleton /> : previewItems.length > 0 ? (
+          <div className="dashboard-activity-list dashboard-notification-list">
+            {previewItems.slice(0, 4).map((notification) => (
+              <button className={notification.readAt ? "dashboard-activity-item" : "dashboard-activity-item is-unread"} key={notification.id} onClick={() => void openNotification(notification)} type="button">
+                <span className="dashboard-activity-icon"><Bell size={17} /></span>
+                <span className="dashboard-activity-copy"><strong>{notification.title}</strong><small>{notification.message} · {formatApiDateTime(notification.createdAt, language)}</small></span>
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <EmptyState description={t("inbox.emptyDescription")} icon={<Bell size={20} />} title={t("inbox.emptyTitle")} />
+        )}
       </section>
     </div>
   );
+}
+
+function DashboardListSkeleton() {
+  return <div className="dashboard-list-skeleton" aria-hidden="true">{[0, 1, 2].map((item) => <span key={item} />)}</div>;
 }

@@ -133,6 +133,7 @@ public class ProcessService(
             ]
         };
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         db.ProcessInstances.Add(process);
         await db.SaveChangesAsync(cancellationToken);
         await NotifyTaskCandidatesAsync(
@@ -147,6 +148,7 @@ public class ProcessService(
             process.Id.ToString(),
             $"Process was started from form '{form.Name}'.",
             cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var saved = await GetAsync(process.Id, user, cancellationToken);
         return Result<ProcessDetailDto>.Success(saved!);

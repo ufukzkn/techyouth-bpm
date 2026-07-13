@@ -63,6 +63,14 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
 
 Browser flows send cookies with `credentials: include`. Mutating cookie-authenticated requests include `X-CSRF-Token`; Swagger and local API debugging can still use the `Authorization: Bearer` header.
 
+## Dashboard
+
+- `GET /api/dashboard/summary`
+  - Returns open-task, in-progress-process and completed-process counts without loading full lists.
+  - Also returns at most four recent open tasks and four recent visible processes, ordered newest first.
+  - Applies the same authorization scope as task/process services: SuperAdmin is global, community-scoped roles stay inside their community, and a user without task visibility sees only processes they started.
+  - Keeps the original three count fields for backward compatibility; recent collections are additive.
+
 ## Users And Access
 
 - `GET /api/users`
@@ -130,13 +138,17 @@ Browser flows send cookies with `credentials: include`. Mutating cookie-authenti
 ## Notifications
 
 - `GET /api/notifications`
-  - Lists the current user's latest DB-backed notifications.
+  - Returns only the current user's DB-backed notifications, newest first.
+  - Supports `page`, `pageSize` (maximum 50), `query`, `readStatus` (`read`/`unread`) and `category` (`task`, `process`, `access`, `account`).
+  - Returns `items`, `page`, `pageSize`, filtered `totalCount`, user-wide `allCount` and user-wide `unreadCount`.
 - `PATCH /api/notifications/{id}/read`
-  - Marks one notification as read.
+  - Backward-compatible endpoint that marks one owned notification as read.
+- `PATCH /api/notifications/{id}/read-state`
+  - Receives `{ isRead }` and changes an owned notification in either direction.
 - `POST /api/notifications/read-all`
   - Marks all current-user notifications as read.
 
-Notifications are created for events such as pending registration, assigned tasks, process outcome changes, password reset and access updates. V1 is database-backed polling/dropdown UI; WebSocket/SSE can be added later without changing the notification table.
+Notifications are created for events such as pending registration, assigned tasks, process outcome changes, password reset and access updates. Access update audit and target-user notification commit inside the same database transaction. The topbar asks for five records and polls every 30 seconds while visible; `/inbox` uses ten-record server-side pages. V1 remains database-backed polling, so WebSocket/SSE can be added later without changing the notification table or public UI behavior.
 
 ## Audit
 
@@ -216,7 +228,7 @@ Controllers should stay thin. Services own decisions:
 - `FormService`: form definition CRUD and field validation.
 - `ProcessService`: process start, detail and listing. List queries return projected summary DTOs; detail queries load the full process graph.
 - `TaskService`: task listing and action execution.
-- `NotificationService`: current-user notification list/read/read-all operations.
+- `NotificationService`: current-user paged search/filter, count, read-state and read-all operations.
 - `ProcessStateMachine`: allowed transitions.
 - `DatabaseSeeder`: local demo users and optional mock workflow data.
 
@@ -227,7 +239,7 @@ The frontend API client now exposes one method for each planned endpoint:
 - Auth: `register`, `login`, `me`, `logout`, `updateProfile`, `changePassword`, `listSessions`, `revokeSession`, `startEmailVerification`, `confirmEmailVerification`
 - Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`, `resetUserPasswordByAdmin`
 - Communities: `listCommunities`, `createCommunity`, `updateCommunity`, `regenerateCommunityInviteCode`, `getCommunitySummary`, `listRoleTemplates`, `listCommunityRoles`, `createCommunityRole`, `updateCommunityRole`, `deleteCommunityRole`
-- Notifications: `listNotifications`, `markNotificationRead`, `markAllNotificationsRead`
+- Notifications: `listNotifications`, `markNotificationRead`, `setNotificationReadState`, `markAllNotificationsRead`
 - Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`
 - Processes: `startProcess`, `listProcesses`, `getProcess`

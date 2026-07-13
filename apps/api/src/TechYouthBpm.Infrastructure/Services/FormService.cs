@@ -122,6 +122,7 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             return Result<FormDefinitionDto>.Failure("The form community is not active.");
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var formId = form.Id;
         form.Name = request.Name.Trim();
         form.Description = request.Description.Trim();
@@ -146,6 +147,7 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             formId.ToString(),
             $"Form definition '{request.Name.Trim()}' was updated.",
             cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var saved = await GetAsync(formId, user, cancellationToken);
         return Result<FormDefinitionDto>.Success(saved!);

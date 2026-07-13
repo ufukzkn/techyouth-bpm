@@ -14,7 +14,8 @@ import type {
   CommunitySummary,
   DashboardSummary,
   LoginResponse,
-  NotificationItem,
+  NotificationListParams,
+  NotificationPage,
   PagedResult,
   ProcessDetail,
   ProcessSummary,
@@ -325,11 +326,24 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  listNotifications(token: string) {
-    return request<NotificationItem[]>("/api/notifications", { token });
+  listNotifications(token: string, params: NotificationListParams = {}) {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    if (params.query?.trim()) search.set("query", params.query.trim());
+    if (params.readStatus && params.readStatus !== "all") search.set("readStatus", params.readStatus);
+    if (params.category && params.category !== "all") search.set("category", params.category);
+    return request<NotificationPage>(`/api/notifications${search.size ? `?${search}` : ""}`, { token });
   },
   markNotificationRead(token: string, notificationId: string) {
     return request<void>(`/api/notifications/${notificationId}/read`, { method: "PATCH", token });
+  },
+  setNotificationReadState(token: string, notificationId: string, isRead: boolean) {
+    return request<void>(`/api/notifications/${notificationId}/read-state`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ isRead }),
+    });
   },
   markAllNotificationsRead(token: string) {
     return request<void>("/api/notifications/read-all", { method: "POST", token });
