@@ -990,7 +990,9 @@ export function FormDesignerDraft() {
                   )}
                 </SortableFieldCard>
               ))}
-              {paletteInsertIndex === fields.length ? <div className="field-insert-indicator" /> : null}
+              {paletteInsertIndex === fields.length ? (
+                <div className="field-insert-indicator field-insert-indicator-bottom" aria-hidden="true" />
+              ) : null}
             </FieldCanvasDropZone>
           </SortableContext>
 
@@ -1201,7 +1203,11 @@ function SortableFieldCard({
   };
 
   return (
-    <div ref={setNodeRef} className="sortable-field-card" style={style}>
+    <div
+      ref={setNodeRef}
+      className={`sortable-field-card${isDragging ? " sortable-field-card-dragging" : ""}`}
+      style={style}
+    >
       {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
     </div>
   );

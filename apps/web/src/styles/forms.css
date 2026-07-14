@@ -367,6 +367,40 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
+.field-insert-indicator-bottom {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--primary) 52%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--primary) 5%, transparent);
+  pointer-events: none;
+  animation: field-bottom-insert-enter 160ms ease-out;
+}
+
+.field-insert-indicator-bottom::before {
+  width: min(96px, 32%);
+  height: 3px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 13%, transparent);
+  content: "";
+}
+
+@keyframes field-bottom-insert-enter {
+  from {
+    min-height: 12px;
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    min-height: 34px;
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .field-palette-rail {
   grid-column: 1 / -1;
   min-width: 0;
@@ -822,6 +856,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .field-insert-indicator-bottom {
+    animation: none;
+  }
+
   .designer-manual-field-overlay,
   .designer-section .designer-blocking-error,
   .designer-section .status-line-error,
@@ -889,7 +927,27 @@
 
 .sortable-field-card {
   min-width: 0;
+  contain: layout style;
+  backface-visibility: hidden;
+  transform-style: flat;
   will-change: transform;
+}
+
+.sortable-field-card-dragging {
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+}
+
+.sortable-field-card-dragging .field-editor {
+  overflow: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: opacity, box-shadow;
+}
+
+.sortable-field-card-dragging .field-editor * {
+  animation-play-state: paused;
 }
 
 .field-editor {
