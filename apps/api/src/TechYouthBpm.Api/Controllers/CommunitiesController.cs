@@ -6,7 +6,11 @@ namespace TechYouthBpm.Api.Controllers;
 
 [ApiController]
 [Route("api/communities")]
-public class CommunitiesController(ICommunityService communityService, IAuthService authService) : ApiControllerBase(authService)
+public class CommunitiesController(
+    ICommunityService communityService,
+    ICommunityRoleService communityRoleService,
+    IUserAdministrationService userAdministrationService,
+    IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken cancellationToken)
@@ -82,7 +86,7 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.ListRoleTemplatesAsync(user, cancellationToken);
+        var result = await communityRoleService.ListRoleTemplatesAsync(user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -95,7 +99,7 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.ListRolesAsync(communityId, user, cancellationToken);
+        var result = await communityRoleService.ListRolesAsync(communityId, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -108,7 +112,7 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.CreateRoleAsync(communityId, request, user, cancellationToken);
+        var result = await communityRoleService.CreateRoleAsync(communityId, request, user, cancellationToken);
         return result.IsSuccess ? Created($"/api/communities/{communityId}/roles/{result.Value!.Id}", result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -121,7 +125,7 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.UpdateRoleAsync(communityId, roleId, request, user, cancellationToken);
+        var result = await communityRoleService.UpdateRoleAsync(communityId, roleId, request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -138,7 +142,7 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.DeleteRoleAsync(communityId, roleId, request, user, cancellationToken);
+        var result = await communityRoleService.DeleteRoleAsync(communityId, roleId, request, user, cancellationToken);
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
@@ -151,7 +155,7 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.ListUsersAsync(communityId, user, request, cancellationToken);
+        var result = await userAdministrationService.ListCommunityUsersAsync(communityId, user, request, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -164,7 +168,7 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.CreateUserAsync(communityId, request, user, cancellationToken);
+        var result = await userAdministrationService.CreateCommunityUserAsync(communityId, request, user, cancellationToken);
         return result.IsSuccess ? Created($"/api/users/{result.Value!.Id}", result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -181,7 +185,12 @@ public class CommunitiesController(ICommunityService communityService, IAuthServ
             return UnauthorizedProblem();
         }
 
-        var result = await communityService.UpdateMembershipAsync(communityId, userId, request, user, cancellationToken);
+        var result = await userAdministrationService.UpdateCommunityMembershipAsync(
+            communityId,
+            userId,
+            request,
+            user,
+            cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 }

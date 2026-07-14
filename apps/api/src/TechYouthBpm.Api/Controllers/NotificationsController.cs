@@ -6,7 +6,9 @@ namespace TechYouthBpm.Api.Controllers;
 
 [ApiController]
 [Route("api/notifications")]
-public class NotificationsController(INotificationService notificationService, IAuthService authService) : ApiControllerBase(authService)
+public class NotificationsController(
+    INotificationService notificationService,
+    IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] NotificationListRequest request, CancellationToken cancellationToken)

@@ -6,7 +6,9 @@ namespace TechYouthBpm.Api.Controllers;
 
 [ApiController]
 [Route("api/forms")]
-public class FormsController(IFormService formService, IAuthService authService) : ApiControllerBase(authService)
+public class FormsController(
+    IFormService formService,
+    IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet]
     public async Task<IActionResult> List(CancellationToken cancellationToken)

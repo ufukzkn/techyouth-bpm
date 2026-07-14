@@ -8,7 +8,7 @@ namespace TechYouthBpm.Api.Controllers;
 [Route("api/audit")]
 public class AuditController(
     ISystemAuditService systemAuditService,
-    IAuthService authService) : ApiControllerBase(authService)
+    IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet("system")]
     public async Task<IActionResult> System([FromQuery] SystemAuditSearchRequest request, CancellationToken cancellationToken)

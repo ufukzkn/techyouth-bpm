@@ -4,9 +4,9 @@ using TechYouthBpm.Application.Services;
 
 namespace TechYouthBpm.Api.Controllers;
 
-public abstract class ApiControllerBase(IAuthService authService) : ControllerBase
+public abstract class ApiControllerBase(IAuthenticationService authenticationService) : ControllerBase
 {
-    protected IAuthService AuthService { get; } = authService;
+    protected IAuthenticationService AuthenticationService { get; } = authenticationService;
 
     protected string CurrentToken()
     {
@@ -28,7 +28,7 @@ public abstract class ApiControllerBase(IAuthService authService) : ControllerBa
 
     protected async Task<UserDto?> CurrentUserAsync(CancellationToken cancellationToken)
     {
-        return await AuthService.GetUserByTokenAsync(CurrentToken(), cancellationToken);
+        return await AuthenticationService.GetUserByTokenAsync(CurrentToken(), cancellationToken);
     }
 
     protected IActionResult UnauthorizedProblem() =>

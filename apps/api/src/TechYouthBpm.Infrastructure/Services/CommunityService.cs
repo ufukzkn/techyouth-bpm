@@ -10,8 +10,7 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 public class CommunityService(
     AppDbContext db,
-    IAuthService authService,
-    ISystemAuditService auditService) : ICommunityService
+    ISystemAuditService auditService) : ICommunityService, ICommunityRoleService
 {
     public async Task<Result<IReadOnlyList<CommunityDto>>> ListAsync(UserDto currentUser, CancellationToken cancellationToken = default)
     {
@@ -363,78 +362,6 @@ public class CommunityService(
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Result.Success();
-    }
-
-    public async Task<Result<PagedResult<UserAdminDto>>> ListUsersAsync(Guid communityId, UserDto currentUser, UserSearchRequest request, CancellationToken cancellationToken = default)
-    {
-        if (!CanManageCommunity(currentUser, communityId, PermissionNames.CommunityManageUsers))
-        {
-            return Result<PagedResult<UserAdminDto>>.Failure("Current user cannot view community users.");
-        }
-
-        return await authService.ListUsersAsync(currentUser, request with { CommunityId = communityId }, cancellationToken);
-    }
-
-    public async Task<Result<UserAdminDto>> CreateUserAsync(Guid communityId, CreateUserRequest request, UserDto currentUser, CancellationToken cancellationToken = default)
-    {
-        if (!CanManageCommunity(currentUser, communityId, PermissionNames.CommunityManageUsers))
-        {
-            return Result<UserAdminDto>.Failure("Current user cannot create community users.");
-        }
-
-        return await authService.CreateUserAsync(request with { CommunityId = communityId }, currentUser, cancellationToken);
-    }
-
-    public async Task<Result<UserAdminDto>> UpdateMembershipAsync(Guid communityId, Guid userId, UpdateUserMembershipRequest request, UserDto currentUser, CancellationToken cancellationToken = default)
-    {
-        if (!CanManageCommunity(currentUser, communityId, PermissionNames.CommunityManageUsers))
-        {
-            return Result<UserAdminDto>.Failure("Current user cannot update community memberships.");
-        }
-
-        var user = await db.Users
-            .Include(item => item.CommunityMemberships)
-            .ThenInclude(membership => membership.Community)
-            .Include(item => item.CommunityMemberships)
-            .ThenInclude(membership => membership.CommunityRole)
-            .ThenInclude(role => role!.Permissions)
-            .SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
-        if (user is null)
-        {
-            return Result<UserAdminDto>.Failure("User not found.");
-        }
-
-        if (!currentUser.IsSuperAdmin()
-            && !user.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))
-        {
-            return Result<UserAdminDto>.Failure("Current user cannot update memberships outside this community.");
-        }
-
-        var roleExists = await db.CommunityRoles.AnyAsync(role => role.Id == request.CommunityRoleId && role.CommunityId == communityId, cancellationToken);
-        if (!roleExists)
-        {
-            return Result<UserAdminDto>.Failure("Community role was not found.");
-        }
-
-        foreach (var membership in user.CommunityMemberships)
-        {
-            membership.IsActive = false;
-        }
-
-        user.CommunityMemberships.Add(new UserCommunityMembership
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            CommunityId = communityId,
-            CommunityRoleId = request.CommunityRoleId,
-            IsActive = request.IsActive,
-            CreatedAt = DateTime.UtcNow
-        });
-
-        await db.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(currentUser, "CommunityMembership.Updated", "User", user.Id.ToString(), $"User '{user.Username}' membership was updated.", cancellationToken);
-
-        return Result<UserAdminDto>.Success(user.ToAdminDto());
     }
 
     private async Task SeedDefaultRolesAsync(Guid communityId, CancellationToken cancellationToken)

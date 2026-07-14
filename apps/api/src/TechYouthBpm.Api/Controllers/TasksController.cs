@@ -6,7 +6,9 @@ namespace TechYouthBpm.Api.Controllers;
 
 [ApiController]
 [Route("api/tasks")]
-public class TasksController(ITaskService taskService, IAuthService authService) : ApiControllerBase(authService)
+public class TasksController(
+    ITaskService taskService,
+    IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet("my")]
     public async Task<IActionResult> MyTasks(CancellationToken cancellationToken)

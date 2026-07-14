@@ -919,6 +919,93 @@ public class AuthService(
             totalCount));
     }
 
+    public async Task<Result<PagedResult<UserAdminDto>>> ListCommunityUsersAsync(
+        Guid communityId,
+        UserDto currentUser,
+        UserSearchRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanManageCommunityUsers(currentUser, communityId))
+        {
+            return Result<PagedResult<UserAdminDto>>.Failure("Current user cannot view community users.");
+        }
+
+        return await ListUsersAsync(currentUser, request with { CommunityId = communityId }, cancellationToken);
+    }
+
+    public async Task<Result<UserAdminDto>> CreateCommunityUserAsync(
+        Guid communityId,
+        CreateUserRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanManageCommunityUsers(currentUser, communityId))
+        {
+            return Result<UserAdminDto>.Failure("Current user cannot create community users.");
+        }
+
+        return await CreateUserAsync(request with { CommunityId = communityId }, currentUser, cancellationToken);
+    }
+
+    public async Task<Result<UserAdminDto>> UpdateCommunityMembershipAsync(
+        Guid communityId,
+        Guid userId,
+        UpdateUserMembershipRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanManageCommunityUsers(currentUser, communityId))
+        {
+            return Result<UserAdminDto>.Failure("Current user cannot update community memberships.");
+        }
+
+        var user = await UserQuery().SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return Result<UserAdminDto>.Failure("User not found.");
+        }
+
+        if (!currentUser.IsSuperAdmin()
+            && !user.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))
+        {
+            return Result<UserAdminDto>.Failure("Current user cannot update memberships outside this community.");
+        }
+
+        var roleExists = await db.CommunityRoles.AnyAsync(
+            role => role.Id == request.CommunityRoleId && role.CommunityId == communityId,
+            cancellationToken);
+        if (!roleExists)
+        {
+            return Result<UserAdminDto>.Failure("Community role was not found.");
+        }
+
+        foreach (var membership in user.CommunityMemberships)
+        {
+            membership.IsActive = false;
+        }
+
+        user.CommunityMemberships.Add(new UserCommunityMembership
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            CommunityId = communityId,
+            CommunityRoleId = request.CommunityRoleId,
+            IsActive = request.IsActive,
+            CreatedAt = DateTime.UtcNow
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "CommunityMembership.Updated",
+            "User",
+            user.Id.ToString(),
+            $"User '{user.Username}' membership was updated.",
+            cancellationToken);
+
+        return Result<UserAdminDto>.Success(user.ToAdminDto());
+    }
+
     public async Task<Result<UserAdminDto>> UpdateUserAccessAsync(
         Guid userId,
         UpdateUserAccessRequest request,
@@ -1773,6 +1860,11 @@ public class AuthService(
 
         return targetCommunityId is null || currentUser.CommunityId == targetCommunityId;
     }
+
+    private static bool CanManageCommunityUsers(UserDto currentUser, Guid communityId) =>
+        currentUser.IsSuperAdmin()
+        || (currentUser.CommunityId == communityId
+            && currentUser.HasPermission(PermissionNames.CommunityManageUsers));
 
     private async Task<Guid?> ResolveTargetCommunityIdAsync(
         UserDto currentUser,

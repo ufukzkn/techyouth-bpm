@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
@@ -14,7 +15,7 @@ public class CommunityServiceTests
         await using var db = TestDbFactory.Create();
         TestDbFactory.EnsureCommunityModel(db);
         await db.SaveChangesAsync();
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new CommunityService(db, new SystemAuditService(db));
         var superAdmin = new UserDto(Guid.NewGuid(), "superadmin", "Super Admin", "super@test.local", Role.SuperAdmin, UserStatus.Active, true);
 
         var result = await service.ListRolesAsync(TestDbFactory.CommunityId, superAdmin);
@@ -48,7 +49,7 @@ public class CommunityServiceTests
         });
         await db.SaveChangesAsync();
 
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new CommunityService(db, new SystemAuditService(db));
         var adminDto = TestDbFactory.ToDto(admin);
         var result = await service.UpdateAsync(
             TestDbFactory.CommunityId,
@@ -70,7 +71,7 @@ public class CommunityServiceTests
         community.IsActive = false;
         await db.SaveChangesAsync();
 
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new CommunityService(db, new SystemAuditService(db));
         var result = await service.UpdateAsync(
             TestDbFactory.CommunityId,
             new UpdateCommunityRequest("Test Community", "Unit test community", "TEST1", true),
@@ -87,7 +88,7 @@ public class CommunityServiceTests
         var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
         var otherCommunity = SeedOtherCommunity(db);
         await db.SaveChangesAsync();
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new CommunityService(db, new SystemAuditService(db));
 
         var result = await service.ListRolesAsync(otherCommunity.Id, TestDbFactory.ToDto(admin));
 
@@ -122,9 +123,9 @@ public class CommunityServiceTests
         });
         db.Users.Add(externalUser);
         await db.SaveChangesAsync();
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new AuthService(db, new ConfigurationBuilder().Build());
 
-        var result = await service.UpdateMembershipAsync(
+        var result = await service.UpdateCommunityMembershipAsync(
             TestDbFactory.CommunityId,
             externalUser.Id,
             new UpdateUserMembershipRequest(TestDbFactory.CommunityId, TestDbFactory.UserCommunityRoleId),
@@ -140,7 +141,7 @@ public class CommunityServiceTests
     {
         await using var db = TestDbFactory.Create();
         var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new CommunityService(db, new SystemAuditService(db));
 
         var result = await service.CreateRoleAsync(
             TestDbFactory.CommunityId,
@@ -157,7 +158,7 @@ public class CommunityServiceTests
     {
         await using var db = TestDbFactory.Create();
         var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new CommunityService(db, new SystemAuditService(db));
 
         var result = await service.CreateRoleAsync(
             TestDbFactory.CommunityId,
@@ -176,7 +177,7 @@ public class CommunityServiceTests
         await using var db = TestDbFactory.Create();
         var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-admin");
         var member = TestDbFactory.SeedUser(db, Role.User, "community-member");
-        var service = new CommunityService(db, null!, new SystemAuditService(db));
+        var service = new CommunityService(db, new SystemAuditService(db));
         var createdRole = await service.CreateRoleAsync(
             TestDbFactory.CommunityId,
             new CreateCommunityRoleRequest("Ayakkabici", "Topluluga ozel rol", "custom", [PermissionNames.ProcessesView]),

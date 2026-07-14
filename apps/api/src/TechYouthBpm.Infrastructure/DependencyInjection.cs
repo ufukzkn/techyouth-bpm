@@ -33,7 +33,13 @@ public static class DependencyInjection
             }
         });
 
-        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<AuthService>();
+        services.AddScoped<IAuthService>(provider => provider.GetRequiredService<AuthService>());
+        services.AddScoped<IAuthenticationService>(provider => provider.GetRequiredService<AuthService>());
+        services.AddScoped<IRegistrationService>(provider => provider.GetRequiredService<AuthService>());
+        services.AddScoped<IAccountService>(provider => provider.GetRequiredService<AuthService>());
+        services.AddScoped<ISessionService>(provider => provider.GetRequiredService<AuthService>());
+        services.AddScoped<IUserAdministrationService>(provider => provider.GetRequiredService<AuthService>());
         services.AddScoped<IOtpService, OtpService>();
         services.AddScoped<IEmailSender>(_ =>
         {
@@ -53,6 +59,8 @@ public static class DependencyInjection
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ISystemAuditService, SystemAuditService>();
         services.AddScoped<ICommunityService, CommunityService>();
+        services.AddScoped<ICommunityRoleService>(provider =>
+            (ICommunityRoleService)provider.GetRequiredService<ICommunityService>());
         services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<ProcessStateMachine>();
 

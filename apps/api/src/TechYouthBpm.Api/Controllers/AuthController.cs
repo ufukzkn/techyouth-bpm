@@ -8,13 +8,17 @@ namespace TechYouthBpm.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController(IAuthService authService) : ApiControllerBase(authService)
+public class AuthController(
+    IAuthenticationService authenticationService,
+    IRegistrationService registrationService,
+    IAccountService accountService,
+    ISessionService sessionService) : ApiControllerBase(authenticationService)
 {
     [EnableRateLimiting("auth")]
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterRequest request, CancellationToken cancellationToken)
     {
-        var result = await AuthService.RegisterAsync(request, cancellationToken);
+        var result = await registrationService.RegisterAsync(request, cancellationToken);
         return result.IsSuccess ? Created($"/api/users/{result.Value!.Id}", result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -22,7 +26,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await AuthService.LoginAsync(
+        var result = await AuthenticationService.LoginAsync(
             request,
             ResolveClientIpAddress(),
             Request.Headers.UserAgent.ToString(),
@@ -42,7 +46,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
         var refreshToken = Request.Cookies.TryGetValue(AuthCookieNames.RefreshToken, out var cookieRefreshToken)
             ? cookieRefreshToken
             : string.Empty;
-        var result = await AuthService.RefreshSessionAsync(
+        var result = await AuthenticationService.RefreshSessionAsync(
             refreshToken,
             ResolveClientIpAddress(),
             Request.Headers.UserAgent.ToString(),
@@ -69,7 +73,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
-        var result = await AuthService.LogoutAsync(CurrentToken(), cancellationToken);
+        var result = await sessionService.LogoutAsync(CurrentToken(), cancellationToken);
         ClearAuthCookies();
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
@@ -78,7 +82,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request, CancellationToken cancellationToken)
     {
-        var result = await AuthService.ForgotPasswordAsync(request, cancellationToken);
+        var result = await accountService.ForgotPasswordAsync(request, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -86,7 +90,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword(ResetPasswordRequest request, CancellationToken cancellationToken)
     {
-        var result = await AuthService.ResetPasswordAsync(request, cancellationToken);
+        var result = await accountService.ResetPasswordAsync(request, cancellationToken);
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
@@ -99,7 +103,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.UpdateProfileAsync(request, user, cancellationToken);
+        var result = await accountService.UpdateProfileAsync(request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -112,7 +116,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.ChangePasswordAsync(request, user, cancellationToken);
+        var result = await accountService.ChangePasswordAsync(request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -125,7 +129,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.ListSessionsAsync(user, CurrentToken(), cancellationToken);
+        var result = await sessionService.ListSessionsAsync(user, CurrentToken(), cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -138,7 +142,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.RevokeSessionAsync(sessionId, user, CurrentToken(), cancellationToken);
+        var result = await sessionService.RevokeSessionAsync(sessionId, user, CurrentToken(), cancellationToken);
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
@@ -151,7 +155,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.StartEmailVerificationAsync(user, cancellationToken);
+        var result = await accountService.StartEmailVerificationAsync(user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -166,7 +170,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.ConfirmEmailVerificationAsync(request, user, cancellationToken);
+        var result = await accountService.ConfirmEmailVerificationAsync(request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -176,7 +180,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
         PublicEmailVerificationStartRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await AuthService.StartPublicEmailVerificationAsync(request, cancellationToken);
+        var result = await registrationService.StartPublicEmailVerificationAsync(request, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -186,7 +190,7 @@ public class AuthController(IAuthService authService) : ApiControllerBase(authSe
         PublicEmailVerificationConfirmRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await AuthService.ConfirmPublicEmailVerificationAsync(request, cancellationToken);
+        var result = await registrationService.ConfirmPublicEmailVerificationAsync(request, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 

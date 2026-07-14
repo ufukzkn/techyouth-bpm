@@ -6,7 +6,10 @@ namespace TechYouthBpm.Api.Controllers;
 
 [ApiController]
 [Route("api/users")]
-public class UsersController(IAuthService authService) : ApiControllerBase(authService)
+public class UsersController(
+    IUserAdministrationService userAdministrationService,
+    ISessionService sessionService,
+    IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] UserSearchRequest request, CancellationToken cancellationToken)
@@ -17,7 +20,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.ListUsersAsync(user, request, cancellationToken);
+        var result = await userAdministrationService.ListUsersAsync(user, request, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -30,7 +33,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.CreateUserAsync(request, user, cancellationToken);
+        var result = await userAdministrationService.CreateUserAsync(request, user, cancellationToken);
         return result.IsSuccess ? Created($"/api/users/{result.Value!.Id}", result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -46,7 +49,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.UpdateUserAccessAsync(userId, request, user, cancellationToken);
+        var result = await userAdministrationService.UpdateUserAccessAsync(userId, request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -59,7 +62,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.DeleteUserAsync(userId, user, cancellationToken);
+        var result = await userAdministrationService.DeleteUserAsync(userId, user, cancellationToken);
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 
@@ -75,7 +78,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.ResetPasswordByAdminAsync(userId, request, user, cancellationToken);
+        var result = await userAdministrationService.ResetPasswordByAdminAsync(userId, request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -88,7 +91,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.ListUserSessionsAsync(userId, user, CurrentToken(), cancellationToken);
+        var result = await sessionService.ListUserSessionsAsync(userId, user, CurrentToken(), cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
@@ -104,7 +107,7 @@ public class UsersController(IAuthService authService) : ApiControllerBase(authS
             return UnauthorizedProblem();
         }
 
-        var result = await AuthService.RevokeUserSessionAsync(userId, sessionId, user, cancellationToken);
+        var result = await sessionService.RevokeUserSessionAsync(userId, sessionId, user, cancellationToken);
         return result.IsSuccess ? NoContent() : ValidationProblem(result.Errors);
     }
 }

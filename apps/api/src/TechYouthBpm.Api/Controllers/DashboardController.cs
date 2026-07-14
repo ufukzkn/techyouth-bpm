@@ -7,7 +7,7 @@ namespace TechYouthBpm.Api.Controllers;
 [Route("api/dashboard")]
 public class DashboardController(
     IDashboardService dashboardService,
-    IAuthService authService) : ApiControllerBase(authService)
+    IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet("summary")]
     public async Task<IActionResult> Summary(CancellationToken cancellationToken)
