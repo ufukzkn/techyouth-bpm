@@ -203,6 +203,27 @@ Select and Radio share option validation across the designer and backend definit
 - The process-start payload panel is labeled for demo review and keeps submitted JSON visible.
 - CSS changes were scoped to form designer/form runner classes and did not intentionally change global app behavior.
 
+## Latest Form UX Polish
+
+- Form Designer and Form Runner content is centered and width-balanced inside the workspace content area; the sidebar remains outside this calculation.
+- Actionable Designer/Runner warnings use scoped, more visible panels with a short fade/translate highlight. Existing live-region semantics remain intact and reduced-motion preferences are respected.
+- Manual `Add field` shows a short overlay/spinner on its own panel while preserving immediate field creation and input reset behavior. Starting a new form uses matching short feedback over the Form Information panel. The saved-form selection overlay remains unchanged.
+- Palette-created fields still require a valid canvas or existing-field target. Returning to the palette, cancelling, dropping outside the designer or using another invalid target creates no field.
+- Palette insertion feedback uses the same decorative, non-interactive preview at top, middle and bottom indices. The improved bottom preview and the shared insertion rendering do not change index resolution or field creation rules.
+- Existing field reorder, move up/down feedback, sequential `sortOrder` normalization, JSON preview order and save/update payload order remain aligned. The DnD context, sortable/draggable setup and handler algorithms were not unnecessarily redesigned during this polish work.
+
+## Validation Feedback
+
+- Designer blocking feedback is derived from the existing field validation results instead of relying only on a generic save-blocked sentence. Summaries identify empty or duplicate keys, empty labels, missing/empty/duplicate Select or Radio options and invalid dependent `RequiredWhen` rules.
+- The save panel shows a short localized heading, one concise line for a single problem, or at most three list items for multiple problems. Additional problems are summarized with `and X more errors` / `ve X hata daha`; field-level inline errors remain visible.
+- Known API errors are mapped only at the presentation boundary. In particular, `A community is required for form definitions.` is shown in Turkish as `Form tanımı için bir topluluk seçilmelidir.` when Turkish is active. Unknown API messages keep the existing fallback behavior, and backend/API behavior is unchanged.
+
+## Known Limitations / Deferred Items
+
+- Mixed-height field cards can still produce a distorted active drag preview in some reorder paths, especially when short fields cross long Select, Radio or `RequiredWhen` editors. Reorder behavior itself remains functional; this is deferred visual debt.
+- A palette item preview can drift away from the cursor when the page scrolls during an active palette drag. Palette field creation, invalid-drop guards and insertion indices remain functional; cursor/scroll alignment is deferred.
+- Previous experimental DragOverlay, fixed/max-height and compact-preview approaches that were restored are not completed features and should not be treated as the current implementation.
+
 ## Files Changed
 
 Frontend form-flow files:
@@ -296,6 +317,8 @@ git diff --check
 ```
 
 All checks passed. Lint still reports the same five pre-existing unused-symbol warnings in `ProcessListView.tsx`; that file was not changed by this branch.
+
+The latest feedback, insertion-preview and validation-readability polish uses the same verification baseline. No backend, API endpoint, field-helper, auth/session, process/task/audit, package or dependency changes were part of that batch.
 
 ## Latest Mobile And Navigation UX
 
