@@ -1115,6 +1115,96 @@
   font-size: 13px;
 }
 
+.file-upload-policy-note,
+.runner-file-upload,
+.runner-file-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.file-upload-policy-note,
+.runner-file-summary {
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-muted) 48%, var(--surface));
+}
+
+.file-upload-policy-note span,
+.runner-file-note,
+.runner-file-summary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.runner-file-summary .secondary-button {
+  justify-self: start;
+}
+
+.runner-file-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.runner-file-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.runner-file-button:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.runner-file-button:focus-within {
+  outline: 2px solid color-mix(in srgb, var(--primary) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.runner-file-native-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.runner-file-selection-state {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .runner-file-picker {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .runner-file-button {
+    align-self: start;
+  }
+}
+
 .option-list,
 .rule-list {
   display: grid;

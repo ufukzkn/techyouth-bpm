@@ -1,9 +1,10 @@
 "use client";
 
-import type { ChangeEvent } from "react";
+import { type ChangeEvent, useRef } from "react";
 import { translate } from "@/features/i18n/translations";
 import type { FieldType, FormFieldDefinition, Language } from "@/lib/types";
 import type { FormValue } from "@/features/forms/formValues";
+import { fileUploadAccept } from "@/features/forms/fieldTypes";
 
 type FieldRendererProps = {
   field: FormFieldDefinition;
@@ -59,6 +60,61 @@ function FieldInput({
   language: Language;
   onChange: (fieldKey: string, value: FormValue) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  if (field.type === "FileUpload") {
+    const metadata = value && typeof value === "object" ? value : null;
+
+    return (
+      <div className="runner-file-upload">
+        <div className="runner-file-picker">
+          <label className="runner-file-button">
+            {translate(language, "form.fileUpload.choose")}
+            <input
+              ref={fileInputRef}
+              accept={fileUploadAccept}
+              className="runner-file-native-input"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                onChange(
+                  field.key,
+                  file
+                    ? { name: file.name, size: file.size, type: file.type, lastModified: file.lastModified }
+                    : null,
+                );
+              }}
+              type="file"
+            />
+          </label>
+          <span className="runner-file-selection-state">
+            {metadata ? metadata.name : translate(language, "form.fileUpload.noneSelected")}
+          </span>
+        </div>
+        <span className="runner-file-note">{translate(language, "form.fileUpload.metadataNote")}</span>
+        {metadata ? (
+          <div className="runner-file-summary">
+            <span>
+              {translate(language, "form.fileUpload.selectedFile")}: <strong>{metadata.name}</strong>
+            </span>
+            <span>{formatFileSize(metadata.size)} · {metadata.type || "-"}</span>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => {
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = "";
+                }
+                onChange(field.key, null);
+              }}
+            >
+              {translate(language, "form.fileUpload.clear")}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   if (field.type === "Select") {
     return (
       <select value={String(value ?? "")} onChange={(event) => onChange(field.key, event.target.value)}>
@@ -108,6 +164,10 @@ function FieldInput({
       type={toInputType(field.type)}
     />
   );
+}
+
+function formatFileSize(size: number) {
+  return size < 1024 * 1024 ? `${Math.ceil(size / 1024)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function toInputType(fieldType: FieldType) {

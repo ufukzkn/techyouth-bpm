@@ -39,7 +39,10 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5291";
 
 type ApiErrorPayload = {
-  errors?: string[];
+  errors?: unknown;
+  message?: unknown;
+  title?: unknown;
+  detail?: unknown;
 };
 
 let unauthorizedHandler: (() => void) | null = null;
@@ -73,6 +76,48 @@ function isMutation(method?: string) {
   return ["POST", "PUT", "PATCH", "DELETE"].includes((method ?? "GET").toUpperCase());
 }
 
+function normalizeApiErrors(payload: unknown) {
+  if (!isRecord(payload)) {
+    return ["Request failed."];
+  }
+
+  const errors = normalizeErrorsValue(payload.errors);
+  if (errors.length > 0) {
+    return errors;
+  }
+
+  for (const key of ["message", "detail", "title"] as const) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) {
+      return [value.trim()];
+    }
+  }
+
+  return ["Request failed."];
+}
+
+function normalizeErrorsValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  }
+
+  if (!isRecord(value)) {
+    return [];
+  }
+
+  return Object.values(value).flatMap((item) =>
+    Array.isArray(item)
+      ? item.filter((message): message is string => typeof message === "string" && message.trim().length > 0)
+      : typeof item === "string" && item.trim()
+        ? [item.trim()]
+        : [],
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 async function request<T>(path: string, init?: RequestInit & { token?: string }): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
@@ -93,11 +138,11 @@ async function request<T>(path: string, init?: RequestInit & { token?: string })
   });
 
   if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as ApiErrorPayload;
+    const payload: ApiErrorPayload = await response.json().catch(() => ({}));
     if (response.status === 401 && init?.token) {
       unauthorizedHandler?.();
     }
-    throw new ApiError(payload.errors ?? ["Request failed."], response.status);
+    throw new ApiError(normalizeApiErrors(payload), response.status);
   }
 
   if (response.status === 204) {

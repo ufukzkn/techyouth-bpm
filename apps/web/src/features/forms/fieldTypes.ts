@@ -11,6 +11,7 @@ export const supportedFieldTypes = [
   "Radio",
   "Checkbox",
   "Date",
+  "FileUpload",
 ] as const satisfies readonly FieldType[];
 
 export const fieldTypeLabels: Record<FieldType, string> = {
@@ -22,7 +23,25 @@ export const fieldTypeLabels: Record<FieldType, string> = {
   Radio: "Radio Button",
   Checkbox: "Checkbox",
   Date: "Date",
+  FileUpload: "File Upload",
 };
+
+export const fileUploadMaxSizeBytes = 10 * 1024 * 1024;
+export const fileUploadAllowedExtensions = ["pdf", "png", "jpg", "jpeg", "doc", "docx", "xls", "xlsx"] as const;
+export const fileUploadAllowedMimeTypes = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+] as const;
+
+export const fileUploadAccept = [
+  ...fileUploadAllowedExtensions.map((extension) => `.${extension}`),
+  ...fileUploadAllowedMimeTypes,
+].join(",");
 
 export function fieldTypeLabel(language: Language, fieldType: FieldType) {
   return translate(language, `form.type.${fieldType}` as TranslationKey);
