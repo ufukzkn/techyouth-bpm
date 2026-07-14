@@ -17,7 +17,7 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -133,6 +133,8 @@ export function FormDesignerDraft() {
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
+  const [isAddingManualField, setIsAddingManualField] = useState(false);
+  const manualFieldFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
   const [highlightedFieldId, setHighlightedFieldId] = useState("");
@@ -152,6 +154,15 @@ export function FormDesignerDraft() {
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
+  );
+
+  useEffect(
+    () => () => {
+      if (manualFieldFeedbackTimeoutRef.current) {
+        clearTimeout(manualFieldFeedbackTimeoutRef.current);
+      }
+    },
+    [],
   );
 
   const formModel = useMemo<CreateFormRequest>(
@@ -350,6 +361,14 @@ export function FormDesignerDraft() {
     setRequired(false);
     setSaveState("idle");
     setMessage(t("form.designer.unsaved"));
+    setIsAddingManualField(true);
+    if (manualFieldFeedbackTimeoutRef.current) {
+      clearTimeout(manualFieldFeedbackTimeoutRef.current);
+    }
+    manualFieldFeedbackTimeoutRef.current = setTimeout(() => {
+      setIsAddingManualField(false);
+      manualFieldFeedbackTimeoutRef.current = null;
+    }, 240);
   }
 
   function updateField(id: string, patch: Partial<Omit<DesignerField, "id">>) {
@@ -710,7 +729,15 @@ export function FormDesignerDraft() {
             </ol>
           </div>
 
-          <div className="tool-panel">
+          <div className="tool-panel designer-manual-field-panel" aria-busy={isAddingManualField}>
+            {isAddingManualField ? (
+              <div className="designer-manual-field-overlay" role="status" aria-live="polite">
+                <span className="designer-manual-field-indicator">
+                  <InlineValueLoader label={t("form.designer.addingField")} />
+                  <span>{t("form.designer.addingField")}</span>
+                </span>
+              </div>
+            ) : null}
             <h3>{t("form.designer.addFieldTitle")}</h3>
             <label>
               {t("form.designer.label")}
@@ -1002,7 +1029,11 @@ export function FormDesignerDraft() {
                     ? t("form.designer.updateForm")
                     : t("form.designer.saveForm")}
               </button>
-              {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
+              {hasFieldErrors ? (
+                <p className="field-error designer-blocking-error" role="alert">
+                  {t("form.designer.blockingErrors")}
+                </p>
+              ) : null}
               <p className={`status-line status-line-${saveState}`} aria-live="polite">
                 {message}
               </p>

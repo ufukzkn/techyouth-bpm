@@ -1,5 +1,19 @@
 /* forms styles */
 
+.designer-section,
+.runner-section {
+  width: 100%;
+  margin-inline: auto;
+}
+
+.designer-section {
+  max-width: 1460px;
+}
+
+.runner-section {
+  max-width: 1180px;
+}
+
 .designer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -40,6 +54,37 @@
 .designer-form-info-panel {
   position: relative;
   isolation: isolate;
+}
+
+.designer-manual-field-panel {
+  position: relative;
+  isolation: isolate;
+}
+
+.designer-manual-field-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: grayscale(0.35) blur(1px);
+  animation: designer-form-transition-enter 140ms ease-out;
+}
+
+.designer-manual-field-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 999px;
+  color: var(--primary-strong);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .designer-form-transition-overlay {
@@ -450,6 +495,54 @@
   margin: 0;
 }
 
+.designer-section .designer-blocking-error,
+.designer-section .status-line-error,
+.runner-section .runner-state-error,
+.runner-section .status-line-error {
+  animation: form-action-message-enter 320ms ease-out;
+}
+
+.designer-section .designer-blocking-error,
+.designer-section .status-line-error,
+.runner-section .status-line-error {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 7%, transparent);
+}
+
+.designer-section .field-editor .field-error,
+.runner-section .field-error {
+  animation: form-field-error-enter 220ms ease-out;
+}
+
+@keyframes form-action-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 18%, transparent);
+  }
+  65% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 9%, transparent);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes form-field-error-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .mobile-field-palette-fab,
 .mobile-field-palette-layer {
   display: none;
@@ -729,6 +822,16 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .designer-manual-field-overlay,
+  .designer-section .designer-blocking-error,
+  .designer-section .status-line-error,
+  .designer-section .field-editor .field-error,
+  .runner-section .runner-state-error,
+  .runner-section .status-line-error,
+  .runner-section .field-error {
+    animation: none;
+  }
+
   .designer-section .field-editor-move-up,
   .designer-section .field-editor-move-down {
     animation: designer-field-feedback 480ms ease-out;

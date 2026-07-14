@@ -255,7 +255,9 @@ export function FormRunnerDraft() {
             </div>
           ) : null}
 
-          <p className={`status-line status-line-${submitStatus}`}>{message}</p>
+          <p className={`status-line status-line-${submitStatus}`} aria-live="polite">
+            {message}
+          </p>
 
           <div className="runner-actions">
             <button className="primary-button" disabled={isActionDisabled} type="submit">
