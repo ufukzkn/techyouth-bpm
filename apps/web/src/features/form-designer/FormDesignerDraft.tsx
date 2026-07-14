@@ -130,11 +130,13 @@ export function FormDesignerDraft() {
   const [isLoadingForms, setIsLoadingForms] = useState(false);
   const [hasLoadedForms, setHasLoadedForms] = useState(false);
   const [isSwitchingForm, setIsSwitchingForm] = useState(false);
+  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
   const [isAddingManualField, setIsAddingManualField] = useState(false);
   const manualFieldFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newFormFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
   const [highlightedFieldId, setHighlightedFieldId] = useState("");
@@ -160,6 +162,9 @@ export function FormDesignerDraft() {
     () => () => {
       if (manualFieldFeedbackTimeoutRef.current) {
         clearTimeout(manualFieldFeedbackTimeoutRef.current);
+      }
+      if (newFormFeedbackTimeoutRef.current) {
+        clearTimeout(newFormFeedbackTimeoutRef.current);
       }
     },
     [],
@@ -607,6 +612,18 @@ export function FormDesignerDraft() {
     setMessage(t("form.designer.draftReady"));
   }
 
+  function startNewForm() {
+    resetDesigner();
+    setIsCreatingNewForm(true);
+    if (newFormFeedbackTimeoutRef.current) {
+      clearTimeout(newFormFeedbackTimeoutRef.current);
+    }
+    newFormFeedbackTimeoutRef.current = setTimeout(() => {
+      setIsCreatingNewForm(false);
+      newFormFeedbackTimeoutRef.current = null;
+    }, 240);
+  }
+
   async function saveForm() {
     if (!token) {
       setSaveState("error");
@@ -661,11 +678,13 @@ export function FormDesignerDraft() {
         onDragStart={handleDragStart}
       >
         <div className="designer-grid">
-          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm}>
-            {isSwitchingForm ? (
+          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm || isCreatingNewForm}>
+            {isSwitchingForm || isCreatingNewForm ? (
               <div className="designer-form-transition-overlay" role="status" aria-live="polite">
                 <span className="designer-form-transition-indicator">
-                  <InlineValueLoader label={t("form.designer.loadingForms")} />
+                  <InlineValueLoader
+                    label={isCreatingNewForm ? t("form.designer.preparingNewForm") : t("form.designer.loadingForms")}
+                  />
                 </span>
               </div>
             ) : null}
@@ -716,7 +735,7 @@ export function FormDesignerDraft() {
               className="secondary-button"
               disabled={saveState === "saving"}
               type="button"
-              onClick={resetDesigner}
+              onClick={startNewForm}
             >
               <Plus size={18} />
               {t("form.designer.newForm")}
@@ -779,7 +798,9 @@ export function FormDesignerDraft() {
                 <SortableFieldCard id={field.id} key={field.id}>
                   {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
                     <>
-                      {paletteInsertIndex === index ? <div className="field-insert-indicator" /> : null}
+                      {paletteInsertIndex === index ? (
+                        <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
+                      ) : null}
                       <article
                         className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
                           highlightedFieldId === field.id ? " field-editor-highlighted" : ""
@@ -991,7 +1012,7 @@ export function FormDesignerDraft() {
                 </SortableFieldCard>
               ))}
               {paletteInsertIndex === fields.length ? (
-                <div className="field-insert-indicator field-insert-indicator-bottom" aria-hidden="true" />
+                <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
               ) : null}
             </FieldCanvasDropZone>
           </SortableContext>

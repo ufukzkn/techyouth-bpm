@@ -367,7 +367,7 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
-.field-insert-indicator-bottom {
+.field-insert-indicator-preview {
   min-height: 34px;
   display: grid;
   place-items: center;
@@ -379,7 +379,7 @@
   animation: field-bottom-insert-enter 160ms ease-out;
 }
 
-.field-insert-indicator-bottom::before {
+.field-insert-indicator-preview::before {
   width: min(96px, 32%);
   height: 3px;
   border-radius: 999px;
@@ -856,7 +856,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .field-insert-indicator-bottom {
+  .field-insert-indicator-preview {
     animation: none;
   }
 
@@ -948,6 +948,13 @@
 
 .sortable-field-card-dragging .field-editor * {
   animation-play-state: paused;
+}
+
+.sortable-field-card-dragging .option-editor,
+.sortable-field-card-dragging .rule-editor {
+  opacity: 0.08;
+  filter: grayscale(1);
+  pointer-events: none;
 }
 
 .field-editor {
