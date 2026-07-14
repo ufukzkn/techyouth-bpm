@@ -545,6 +545,35 @@
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 7%, transparent);
 }
 
+.designer-section .designer-blocking-error {
+  display: grid;
+  gap: 7px;
+  max-height: 210px;
+  overflow-y: auto;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.designer-section .designer-blocking-error strong,
+.designer-section .designer-blocking-error span {
+  color: inherit;
+}
+
+.designer-section .designer-blocking-error ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.designer-section .designer-blocking-error li {
+  padding-left: 2px;
+}
+
+.designer-section .designer-blocking-error-more {
+  font-weight: 700;
+}
+
 .designer-section .field-editor .field-error,
 .runner-section .field-error {
   animation: form-field-error-enter 220ms ease-out;

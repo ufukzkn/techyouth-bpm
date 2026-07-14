@@ -637,7 +637,7 @@ export function FormDesignerDraft() {
 
     if (hasFieldErrors) {
       setSaveState("error");
-      setMessage(fieldErrorSummary);
+      setMessage(fieldErrorSummary.text);
       return;
     }
 
@@ -1059,9 +1059,23 @@ export function FormDesignerDraft() {
                     : t("form.designer.saveForm")}
               </button>
               {hasFieldErrors ? (
-                <p className="field-error designer-blocking-error" role="alert">
-                  {fieldErrorSummary}
-                </p>
+                <div className="field-error designer-blocking-error" role="alert">
+                  <strong>{t("form.designer.saveBlockedTitle")}</strong>
+                  {fieldErrorSummary.messages.length === 1 ? (
+                    <span>{fieldErrorSummary.messages[0]}</span>
+                  ) : (
+                    <ul>
+                      {fieldErrorSummary.messages.map((errorMessage) => (
+                        <li key={errorMessage}>{errorMessage}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {fieldErrorSummary.remainingCount > 0 ? (
+                    <span className="designer-blocking-error-more">
+                      {t("form.designer.moreErrors", { count: fieldErrorSummary.remainingCount })}
+                    </span>
+                  ) : null}
+                </div>
               ) : null}
               <p className={`status-line status-line-${saveState}`} aria-live="polite">
                 {message}
@@ -1369,11 +1383,16 @@ function buildDesignerErrorSummary(fields: DesignerField[], errors: DesignerFiel
 
   const visibleMessages = messages.slice(0, 3);
   const remainingCount = messages.length - visibleMessages.length;
+  const textParts = [...visibleMessages];
   if (remainingCount > 0) {
-    visibleMessages.push(translate(language, "form.designer.moreErrors", { count: remainingCount }));
+    textParts.push(translate(language, "form.designer.moreErrors", { count: remainingCount }));
   }
 
-  return visibleMessages.join(" ") || translate(language, "form.designer.blockingErrors");
+  return {
+    messages: visibleMessages,
+    remainingCount,
+    text: textParts.join(" ") || translate(language, "form.designer.blockingErrors"),
+  };
 }
 
 function validateDesignerFields(fields: DesignerField[], language: Language) {
