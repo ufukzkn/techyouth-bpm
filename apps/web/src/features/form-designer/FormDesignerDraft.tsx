@@ -17,7 +17,7 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -145,6 +145,10 @@ export function FormDesignerDraft() {
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const fieldErrorSummary = useMemo(
+    () => buildDesignerErrorSummary(fields, fieldErrors, language),
+    [fieldErrors, fields, language],
+  );
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
   const isInitialDesignerLoading = Boolean(token) && !hasLoadedForms;
   const sensors = useSensors(
@@ -209,7 +213,7 @@ export function FormDesignerDraft() {
         }
       } catch (error) {
         if (!ignore) {
-          setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.loadFailed"));
+          setMessage(formatDesignerApiError(error, language, t("form.designer.loadFailed")));
         }
       } finally {
         if (!ignore) {
@@ -596,7 +600,7 @@ export function FormDesignerDraft() {
     } catch (error) {
       await minimumTransition;
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.formLoadFailed"));
+      setMessage(formatDesignerApiError(error, language, t("form.designer.formLoadFailed")));
     } finally {
       setIsLoadingForms(false);
       setIsSwitchingForm(false);
@@ -633,7 +637,7 @@ export function FormDesignerDraft() {
 
     if (hasFieldErrors) {
       setSaveState("error");
-      setMessage(t("form.designer.fixErrorsBeforeSave"));
+      setMessage(fieldErrorSummary);
       return;
     }
 
@@ -653,7 +657,7 @@ export function FormDesignerDraft() {
       );
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.saveFailed"));
+      setMessage(formatDesignerApiError(error, language, t("form.designer.saveFailed")));
     }
   }
 
@@ -795,12 +799,13 @@ export function FormDesignerDraft() {
                 </span>
               </div>
               {fields.map((field, index) => (
-                <SortableFieldCard id={field.id} key={field.id}>
+                <Fragment key={field.id}>
+                  {paletteInsertIndex === index ? (
+                    <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
+                  ) : null}
+                  <SortableFieldCard id={field.id}>
                   {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
                     <>
-                      {paletteInsertIndex === index ? (
-                        <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
-                      ) : null}
                       <article
                         className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
                           highlightedFieldId === field.id ? " field-editor-highlighted" : ""
@@ -1009,7 +1014,8 @@ export function FormDesignerDraft() {
                       </article>
                     </>
                   )}
-                </SortableFieldCard>
+                  </SortableFieldCard>
+                </Fragment>
               ))}
               {paletteInsertIndex === fields.length ? (
                 <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
@@ -1054,7 +1060,7 @@ export function FormDesignerDraft() {
               </button>
               {hasFieldErrors ? (
                 <p className="field-error designer-blocking-error" role="alert">
-                  {t("form.designer.blockingErrors")}
+                  {fieldErrorSummary}
                 </p>
               ) : null}
               <p className={`status-line status-line-${saveState}`} aria-live="polite">
@@ -1305,6 +1311,70 @@ function upsertForm(forms: FormDefinition[], form: FormDefinition) {
 }
 
 type DesignerFieldErrors = Record<string, { key?: string; label?: string; options?: string; rules?: Record<number, string> }>;
+
+function formatDesignerApiError(error: unknown, language: Language, fallback: string) {
+  if (!(error instanceof ApiError)) {
+    return fallback;
+  }
+
+  return error.errors
+    .map((message) =>
+      message === "A community is required for form definitions."
+        ? translate(language, "form.designer.apiCommunityRequired")
+        : message,
+    )
+    .join(" ");
+}
+
+function buildDesignerErrorSummary(fields: DesignerField[], errors: DesignerFieldErrors, language: Language) {
+  const messages: string[] = [];
+
+  for (const field of fields) {
+    const error = errors[field.id];
+    if (!error) {
+      continue;
+    }
+
+    const fieldName = field.label.trim() || field.key.trim() || translate(language, "form.designer.untitledField");
+    if (error.key) {
+      messages.push(
+        field.key.trim()
+          ? translate(language, "form.designer.errorDuplicateKey", { key: field.key.trim() })
+          : translate(language, "form.designer.errorEmptyKey"),
+      );
+    }
+    if (error.label) {
+      messages.push(translate(language, "form.designer.errorEmptyLabel"));
+    }
+    if (error.options) {
+      const filledOptions = field.options.map((option) => option.trim()).filter(Boolean);
+      const duplicateOption = filledOptions.find(
+        (option, index) =>
+          filledOptions.findIndex((candidate) => candidate.toLocaleLowerCase("tr") === option.toLocaleLowerCase("tr")) !== index,
+      );
+      if (filledOptions.length === 0) {
+        messages.push(translate(language, "form.designer.errorOptionsRequired", { field: fieldName }));
+      } else if (field.options.some((option) => !option.trim())) {
+        messages.push(translate(language, "form.designer.errorEmptyOption", { field: fieldName }));
+      } else if (duplicateOption) {
+        messages.push(
+          translate(language, "form.designer.errorDuplicateOption", { field: fieldName, option: duplicateOption }),
+        );
+      }
+    }
+    for (const ruleError of Object.values(error.rules ?? {})) {
+      messages.push(translate(language, "form.designer.errorDependentRule", { field: fieldName, error: ruleError }));
+    }
+  }
+
+  const visibleMessages = messages.slice(0, 3);
+  const remainingCount = messages.length - visibleMessages.length;
+  if (remainingCount > 0) {
+    visibleMessages.push(translate(language, "form.designer.moreErrors", { count: remainingCount }));
+  }
+
+  return visibleMessages.join(" ") || translate(language, "form.designer.blockingErrors");
+}
 
 function validateDesignerFields(fields: DesignerField[], language: Language) {
   const errors: DesignerFieldErrors = {};

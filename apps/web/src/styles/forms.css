@@ -369,6 +369,7 @@
 
 .field-insert-indicator-preview {
   min-height: 34px;
+  contain: layout paint;
   display: grid;
   place-items: center;
   border: 1px dashed color-mix(in srgb, var(--primary) 52%, var(--border));
@@ -390,12 +391,10 @@
 
 @keyframes field-bottom-insert-enter {
   from {
-    min-height: 12px;
     opacity: 0;
     transform: translateY(-3px);
   }
   to {
-    min-height: 34px;
     opacity: 1;
     transform: translateY(0);
   }
@@ -860,6 +859,11 @@
     animation: none;
   }
 
+  .sortable-field-card-dragging .option-editor,
+  .sortable-field-card-dragging .rule-editor {
+    transition: none;
+  }
+
   .designer-manual-field-overlay,
   .designer-section .designer-blocking-error,
   .designer-section .status-line-error,
@@ -952,9 +956,14 @@
 
 .sortable-field-card-dragging .option-editor,
 .sortable-field-card-dragging .rule-editor {
-  opacity: 0.08;
+  max-height: 28px;
+  overflow: hidden;
+  opacity: 0.12;
   filter: grayscale(1);
   pointer-events: none;
+  transition:
+    max-height 120ms ease-out,
+    opacity 100ms ease-out;
 }
 
 .field-editor {
