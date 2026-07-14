@@ -48,6 +48,9 @@ The scope includes:
 - Strengthened Select and Radio option validation on both frontend and backend: option lists must exist, values must remain non-empty after trimming, and duplicates are rejected case-insensitively.
 - Added backend process-start validation requiring Date values to be JSON strings parseable in exact `yyyy-MM-dd` format, and aligned backend Text/TextArea string validation.
 - Added focused backend tests for empty and duplicate Radio options, empty Select options, invalid Date format and non-string TextArea data.
+- Added `FileUpload` to the frontend/backend field-type contract without changing the existing enum values. File Upload is available from the Designer palette and type selector, keeps required-field behavior, does not open the Select/Radio option editor, and survives form definition create/update round trips.
+- Added a single-file Runner control that stores JSON-safe file metadata instead of a browser `File`, plus explicit copy explaining that actual upload will be delivered in a later phase.
+- Added frontend and backend validation for the fixed File Upload metadata policy, and normalized ASP.NET model-binding validation dictionaries in the frontend API client without breaking the existing localized community-required error mapping.
 - During validation hardening, kept login/session, dashboard, app shell, process state machine, task approve/reject, audit generation, drag/drop UI and package/dependency definitions out of scope.
 - Fixed the ThemeToggleButton first-render theme mismatch that caused hydration errors on `/login`, without changing persisted theme behavior.
 - Compacted and centered the desktop palette rail, removed its unnecessary internal scrollbar and placed save/update in a separate action panel below the palette.
@@ -71,6 +74,7 @@ The scope includes:
   - `Radio` / Radio Button / Seçenek düğmesi
   - `Checkbox`
   - `Date`
+  - `FileUpload` / File Upload / Dosya yükleme
 - Select and radio fields keep option add, remove and edit behavior.
 - Designer validation prevents empty field keys, empty labels, duplicate keys, empty option sets, empty option values and case-insensitive duplicate option values for option-based fields.
 - Empty field keys are checked from the raw input with `field.key.trim()`. Key normalization is used only to compare uniqueness and to generate the save payload; it must not turn an empty raw key into a fallback key that bypasses validation.
@@ -103,6 +107,54 @@ The scope includes:
 - The form runner keeps the latest loaded form definitions in a lightweight client cache and uses a management-style opening skeleton for the form and payload preview during the true initial `loading` state.
 - Form-list loading uses an unmount ignore guard so a completed async request cannot update runner state, messages or the shared form cache after the component is gone.
 - Cached `refreshing` behavior and runner business logic remain unchanged.
+
+## File Upload Foundation
+
+- `FileUpload` is part of the frontend `FieldType` union, shared supported-field list and backend `FieldType` enum. The backend value was appended without renumbering existing field types.
+- The Designer palette and field type selector expose File Upload with the existing icon/localization system. It uses the general field-definition shape, supports `required`, persists through create/update, and never opens the Select/Radio option editor.
+- Existing Text, TextArea, Number, Email, Select, Radio, Checkbox and Date behavior remains unchanged.
+- Palette creation and invalid-drop guards remain unchanged: returning a palette item to the palette creates nothing. Existing drag/drop reorder, move up/down, `RequiredWhen`, sequential `sortOrder`, JSON preview and save/update payload behavior remain intact.
+
+## File Upload Metadata-Only Behavior
+
+The current File Upload support is a metadata-only foundation, not a real file upload module. The Runner lets the user select one local file and creates this JSON-safe value:
+
+```json
+{
+  "name": "document.pdf",
+  "size": 1024,
+  "type": "application/pdf",
+  "lastModified": 0
+}
+```
+
+- The browser `File` object is never placed in form values, JSON preview or the process-start request.
+- JSON preview and `formData` contain only the metadata object or `null`.
+- The Runner shows the selected file name, size and MIME type, and provides selection/clear controls styled with the existing form UI.
+- UI copy deliberately avoids language such as “uploaded” or “upload complete.” It states that selected metadata is included now and actual upload will be added later.
+
+## File Upload Validation
+
+- The first-phase policy is single-file only with a maximum size of 10 MB.
+- Allowed extensions are `pdf`, `png`, `jpg`, `jpeg`, `doc`, `docx`, `xls` and `xlsx`.
+- Allowed MIME types are:
+  - `application/pdf`
+  - `image/png`
+  - `image/jpeg`
+  - `application/msword`
+  - `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+  - `application/vnd.ms-excel`
+  - `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+- Frontend validation rejects an empty required File Upload, malformed metadata, non-positive or over-limit size, disallowed MIME type and disallowed extension before process start.
+- Backend `FormDataValidator` independently requires the metadata object shape and validates `name`, `size`, `type`, `lastModified`, the 10 MB limit and both allowlists.
+- Backend validation protects only the metadata contract. It does not inspect or validate file contents because no binary is transferred or stored in this phase.
+
+## API Error Normalization
+
+- The frontend API client preserves the existing `{ "errors": ["..."] }` behavior.
+- ASP.NET model-binding responses with an `errors` object/dictionary are flattened from their string-array values into a stable `ApiError.errors` list.
+- Standard problem-details `message`, `detail` and `title` values are supported as fallbacks; unknown response shapes use a generic error without throwing a parsing `TypeError`.
+- The known `A community is required for form definitions.` message still reaches the Designer presentation mapping and is shown in Turkish as `Form tanımı için bir topluluk seçilmelidir.`.
 
 ## Validation Coverage
 
@@ -182,6 +234,7 @@ The runner reads the same `validationRules` array and blocks submit before calli
 - `Radio`: option-based single-choice field, shown to Turkish users as Seçenek düğmesi.
 - `Checkbox`: boolean input that remains a boolean in submitted payloads.
 - `Date`: date input with early frontend validation and authoritative backend JSON-string validation in exact `yyyy-MM-dd` format.
+- `FileUpload`: single-file metadata selection with required, size, MIME and extension validation; it does not transfer or persist binary content.
 
 Every palette card has an icon from the existing lucide-react dependency. The UI can show localized Turkish labels, while generated field keys and technical payload keys stay ASCII-safe.
 
@@ -223,6 +276,20 @@ Select and Radio share option validation across the designer and backend definit
 - Mixed-height field cards can still produce a distorted active drag preview in some reorder paths, especially when short fields cross long Select, Radio or `RequiredWhen` editors. Reorder behavior itself remains functional; this is deferred visual debt.
 - A palette item preview can drift away from the cursor when the page scrolls during an active palette drag. Palette field creation, invalid-drop guards and insertion indices remain functional; cursor/scroll alignment is deferred.
 - Previous experimental DragOverlay, fixed/max-height and compact-preview approaches that were restored are not completed features and should not be treated as the current implementation.
+
+## Deferred Real Upload / Storage
+
+Real file upload/storage was deliberately excluded from the foundation batch. It will be considered in a separate future batch only after the responsible stakeholders approve the storage, security and lifecycle design. Deferred work includes:
+
+- Binary file transfer and a `multipart/form-data` endpoint.
+- Attachment/file entities and disk, database or object-storage persistence.
+- Attachment relationships across community, form field, process instance and uploader.
+- Authorized download/view, delete and replace operations, plus audit logging.
+- Permission-based file access and community isolation.
+- Safe storage paths, path-traversal prevention, executable blocking, extension/MIME reconciliation and content-signature or magic-byte inspection.
+- Virus scanning, quarantine, orphan-upload cleanup and retention policy.
+
+Until that work is approved and implemented, File Upload must be described and treated only as metadata selection; it does not prove that a file was uploaded or retained.
 
 ## Files Changed
 
@@ -319,6 +386,22 @@ git diff --check
 All checks passed. Lint still reports the same five pre-existing unused-symbol warnings in `ProcessListView.tsx`; that file was not changed by this branch.
 
 The latest feedback, insertion-preview and validation-readability polish uses the same verification baseline. No backend, API endpoint, field-helper, auth/session, process/task/audit, package or dependency changes were part of that batch.
+
+The File Upload foundation and API error-normalization work was verified with:
+
+```bash
+cd apps/web
+npm run lint
+npm run build
+
+cd apps/api
+dotnet build
+dotnet test
+
+git diff --check
+```
+
+Frontend lint/build, the File Upload foundation backend build/test suite and `git diff --check` passed. Lint still reports the five pre-existing unused-symbol warnings in `ProcessListView.tsx`; that file and those warnings were not changed in this scope. No package/lockfile or dependency changes were required.
 
 ## Latest Mobile And Navigation UX
 
