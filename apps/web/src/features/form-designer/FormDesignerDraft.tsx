@@ -17,7 +17,7 @@ import {
   Type,
   type LucideIcon,
 } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
   DndContext,
@@ -130,9 +130,13 @@ export function FormDesignerDraft() {
   const [isLoadingForms, setIsLoadingForms] = useState(false);
   const [hasLoadedForms, setHasLoadedForms] = useState(false);
   const [isSwitchingForm, setIsSwitchingForm] = useState(false);
+  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
+  const [isAddingManualField, setIsAddingManualField] = useState(false);
+  const manualFieldFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newFormFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
   const [highlightedFieldId, setHighlightedFieldId] = useState("");
@@ -141,6 +145,10 @@ export function FormDesignerDraft() {
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+  const fieldErrorSummary = useMemo(
+    () => buildDesignerErrorSummary(fields, fieldErrors, language),
+    [fieldErrors, fields, language],
+  );
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
   const isInitialDesignerLoading = Boolean(token) && !hasLoadedForms;
   const sensors = useSensors(
@@ -152,6 +160,18 @@ export function FormDesignerDraft() {
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
+  );
+
+  useEffect(
+    () => () => {
+      if (manualFieldFeedbackTimeoutRef.current) {
+        clearTimeout(manualFieldFeedbackTimeoutRef.current);
+      }
+      if (newFormFeedbackTimeoutRef.current) {
+        clearTimeout(newFormFeedbackTimeoutRef.current);
+      }
+    },
+    [],
   );
 
   const formModel = useMemo<CreateFormRequest>(
@@ -193,7 +213,7 @@ export function FormDesignerDraft() {
         }
       } catch (error) {
         if (!ignore) {
-          setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.loadFailed"));
+          setMessage(formatDesignerApiError(error, language, t("form.designer.loadFailed")));
         }
       } finally {
         if (!ignore) {
@@ -350,6 +370,14 @@ export function FormDesignerDraft() {
     setRequired(false);
     setSaveState("idle");
     setMessage(t("form.designer.unsaved"));
+    setIsAddingManualField(true);
+    if (manualFieldFeedbackTimeoutRef.current) {
+      clearTimeout(manualFieldFeedbackTimeoutRef.current);
+    }
+    manualFieldFeedbackTimeoutRef.current = setTimeout(() => {
+      setIsAddingManualField(false);
+      manualFieldFeedbackTimeoutRef.current = null;
+    }, 240);
   }
 
   function updateField(id: string, patch: Partial<Omit<DesignerField, "id">>) {
@@ -572,7 +600,7 @@ export function FormDesignerDraft() {
     } catch (error) {
       await minimumTransition;
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.formLoadFailed"));
+      setMessage(formatDesignerApiError(error, language, t("form.designer.formLoadFailed")));
     } finally {
       setIsLoadingForms(false);
       setIsSwitchingForm(false);
@@ -588,6 +616,18 @@ export function FormDesignerDraft() {
     setMessage(t("form.designer.draftReady"));
   }
 
+  function startNewForm() {
+    resetDesigner();
+    setIsCreatingNewForm(true);
+    if (newFormFeedbackTimeoutRef.current) {
+      clearTimeout(newFormFeedbackTimeoutRef.current);
+    }
+    newFormFeedbackTimeoutRef.current = setTimeout(() => {
+      setIsCreatingNewForm(false);
+      newFormFeedbackTimeoutRef.current = null;
+    }, 240);
+  }
+
   async function saveForm() {
     if (!token) {
       setSaveState("error");
@@ -597,7 +637,7 @@ export function FormDesignerDraft() {
 
     if (hasFieldErrors) {
       setSaveState("error");
-      setMessage(t("form.designer.fixErrorsBeforeSave"));
+      setMessage(fieldErrorSummary.text);
       return;
     }
 
@@ -617,7 +657,7 @@ export function FormDesignerDraft() {
       );
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.saveFailed"));
+      setMessage(formatDesignerApiError(error, language, t("form.designer.saveFailed")));
     }
   }
 
@@ -642,11 +682,13 @@ export function FormDesignerDraft() {
         onDragStart={handleDragStart}
       >
         <div className="designer-grid">
-          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm}>
-            {isSwitchingForm ? (
+          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm || isCreatingNewForm}>
+            {isSwitchingForm || isCreatingNewForm ? (
               <div className="designer-form-transition-overlay" role="status" aria-live="polite">
                 <span className="designer-form-transition-indicator">
-                  <InlineValueLoader label={t("form.designer.loadingForms")} />
+                  <InlineValueLoader
+                    label={isCreatingNewForm ? t("form.designer.preparingNewForm") : t("form.designer.loadingForms")}
+                  />
                 </span>
               </div>
             ) : null}
@@ -697,7 +739,7 @@ export function FormDesignerDraft() {
               className="secondary-button"
               disabled={saveState === "saving"}
               type="button"
-              onClick={resetDesigner}
+              onClick={startNewForm}
             >
               <Plus size={18} />
               {t("form.designer.newForm")}
@@ -710,7 +752,15 @@ export function FormDesignerDraft() {
             </ol>
           </div>
 
-          <div className="tool-panel">
+          <div className="tool-panel designer-manual-field-panel" aria-busy={isAddingManualField}>
+            {isAddingManualField ? (
+              <div className="designer-manual-field-overlay" role="status" aria-live="polite">
+                <span className="designer-manual-field-indicator">
+                  <InlineValueLoader label={t("form.designer.addingField")} />
+                  <span>{t("form.designer.addingField")}</span>
+                </span>
+              </div>
+            ) : null}
             <h3>{t("form.designer.addFieldTitle")}</h3>
             <label>
               {t("form.designer.label")}
@@ -749,10 +799,13 @@ export function FormDesignerDraft() {
                 </span>
               </div>
               {fields.map((field, index) => (
-                <SortableFieldCard id={field.id} key={field.id}>
+                <Fragment key={field.id}>
+                  {paletteInsertIndex === index ? (
+                    <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
+                  ) : null}
+                  <SortableFieldCard id={field.id}>
                   {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
                     <>
-                      {paletteInsertIndex === index ? <div className="field-insert-indicator" /> : null}
                       <article
                         className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
                           highlightedFieldId === field.id ? " field-editor-highlighted" : ""
@@ -961,9 +1014,12 @@ export function FormDesignerDraft() {
                       </article>
                     </>
                   )}
-                </SortableFieldCard>
+                  </SortableFieldCard>
+                </Fragment>
               ))}
-              {paletteInsertIndex === fields.length ? <div className="field-insert-indicator" /> : null}
+              {paletteInsertIndex === fields.length ? (
+                <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
+              ) : null}
             </FieldCanvasDropZone>
           </SortableContext>
 
@@ -1002,7 +1058,25 @@ export function FormDesignerDraft() {
                     ? t("form.designer.updateForm")
                     : t("form.designer.saveForm")}
               </button>
-              {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
+              {hasFieldErrors ? (
+                <div className="field-error designer-blocking-error" role="alert">
+                  <strong>{t("form.designer.saveBlockedTitle")}</strong>
+                  {fieldErrorSummary.messages.length === 1 ? (
+                    <span>{fieldErrorSummary.messages[0]}</span>
+                  ) : (
+                    <ul>
+                      {fieldErrorSummary.messages.map((errorMessage) => (
+                        <li key={errorMessage}>{errorMessage}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {fieldErrorSummary.remainingCount > 0 ? (
+                    <span className="designer-blocking-error-more">
+                      {t("form.designer.moreErrors", { count: fieldErrorSummary.remainingCount })}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
               <p className={`status-line status-line-${saveState}`} aria-live="polite">
                 {message}
               </p>
@@ -1170,7 +1244,11 @@ function SortableFieldCard({
   };
 
   return (
-    <div ref={setNodeRef} className="sortable-field-card" style={style}>
+    <div
+      ref={setNodeRef}
+      className={`sortable-field-card${isDragging ? " sortable-field-card-dragging" : ""}`}
+      style={style}
+    >
       {children({ attributes, listeners, setActivatorNodeRef, isDragging })}
     </div>
   );
@@ -1247,6 +1325,75 @@ function upsertForm(forms: FormDefinition[], form: FormDefinition) {
 }
 
 type DesignerFieldErrors = Record<string, { key?: string; label?: string; options?: string; rules?: Record<number, string> }>;
+
+function formatDesignerApiError(error: unknown, language: Language, fallback: string) {
+  if (!(error instanceof ApiError)) {
+    return fallback;
+  }
+
+  return error.errors
+    .map((message) =>
+      message === "A community is required for form definitions."
+        ? translate(language, "form.designer.apiCommunityRequired")
+        : message,
+    )
+    .join(" ");
+}
+
+function buildDesignerErrorSummary(fields: DesignerField[], errors: DesignerFieldErrors, language: Language) {
+  const messages: string[] = [];
+
+  for (const field of fields) {
+    const error = errors[field.id];
+    if (!error) {
+      continue;
+    }
+
+    const fieldName = field.label.trim() || field.key.trim() || translate(language, "form.designer.untitledField");
+    if (error.key) {
+      messages.push(
+        field.key.trim()
+          ? translate(language, "form.designer.errorDuplicateKey", { key: field.key.trim() })
+          : translate(language, "form.designer.errorEmptyKey"),
+      );
+    }
+    if (error.label) {
+      messages.push(translate(language, "form.designer.errorEmptyLabel"));
+    }
+    if (error.options) {
+      const filledOptions = field.options.map((option) => option.trim()).filter(Boolean);
+      const duplicateOption = filledOptions.find(
+        (option, index) =>
+          filledOptions.findIndex((candidate) => candidate.toLocaleLowerCase("tr") === option.toLocaleLowerCase("tr")) !== index,
+      );
+      if (filledOptions.length === 0) {
+        messages.push(translate(language, "form.designer.errorOptionsRequired", { field: fieldName }));
+      } else if (field.options.some((option) => !option.trim())) {
+        messages.push(translate(language, "form.designer.errorEmptyOption", { field: fieldName }));
+      } else if (duplicateOption) {
+        messages.push(
+          translate(language, "form.designer.errorDuplicateOption", { field: fieldName, option: duplicateOption }),
+        );
+      }
+    }
+    for (const ruleError of Object.values(error.rules ?? {})) {
+      messages.push(translate(language, "form.designer.errorDependentRule", { field: fieldName, error: ruleError }));
+    }
+  }
+
+  const visibleMessages = messages.slice(0, 3);
+  const remainingCount = messages.length - visibleMessages.length;
+  const textParts = [...visibleMessages];
+  if (remainingCount > 0) {
+    textParts.push(translate(language, "form.designer.moreErrors", { count: remainingCount }));
+  }
+
+  return {
+    messages: visibleMessages,
+    remainingCount,
+    text: textParts.join(" ") || translate(language, "form.designer.blockingErrors"),
+  };
+}
 
 function validateDesignerFields(fields: DesignerField[], language: Language) {
   const errors: DesignerFieldErrors = {};

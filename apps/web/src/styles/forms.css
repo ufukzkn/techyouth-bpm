@@ -1,5 +1,19 @@
 /* forms styles */
 
+.designer-section,
+.runner-section {
+  width: 100%;
+  margin-inline: auto;
+}
+
+.designer-section {
+  max-width: 1460px;
+}
+
+.runner-section {
+  max-width: 1180px;
+}
+
 .designer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));
@@ -40,6 +54,37 @@
 .designer-form-info-panel {
   position: relative;
   isolation: isolate;
+}
+
+.designer-manual-field-panel {
+  position: relative;
+  isolation: isolate;
+}
+
+.designer-manual-field-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  backdrop-filter: grayscale(0.35) blur(1px);
+  animation: designer-form-transition-enter 140ms ease-out;
+}
+
+.designer-manual-field-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 999px;
+  color: var(--primary-strong);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .designer-form-transition-overlay {
@@ -322,6 +367,39 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 14%, transparent);
 }
 
+.field-insert-indicator-preview {
+  min-height: 34px;
+  contain: layout paint;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--primary) 52%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--primary) 5%, transparent);
+  pointer-events: none;
+  animation: field-bottom-insert-enter 160ms ease-out;
+}
+
+.field-insert-indicator-preview::before {
+  width: min(96px, 32%);
+  height: 3px;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 13%, transparent);
+  content: "";
+}
+
+@keyframes field-bottom-insert-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .field-palette-rail {
   grid-column: 1 / -1;
   min-width: 0;
@@ -448,6 +526,83 @@
 .designer-save-panel .status-line,
 .designer-save-panel .field-error {
   margin: 0;
+}
+
+.designer-section .designer-blocking-error,
+.designer-section .status-line-error,
+.runner-section .runner-state-error,
+.runner-section .status-line-error {
+  animation: form-action-message-enter 320ms ease-out;
+}
+
+.designer-section .designer-blocking-error,
+.designer-section .status-line-error,
+.runner-section .status-line-error {
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 7%, transparent);
+}
+
+.designer-section .designer-blocking-error {
+  display: grid;
+  gap: 7px;
+  max-height: 210px;
+  overflow-y: auto;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.designer-section .designer-blocking-error strong,
+.designer-section .designer-blocking-error span {
+  color: inherit;
+}
+
+.designer-section .designer-blocking-error ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.designer-section .designer-blocking-error li {
+  padding-left: 2px;
+}
+
+.designer-section .designer-blocking-error-more {
+  font-weight: 700;
+}
+
+.designer-section .field-editor .field-error,
+.runner-section .field-error {
+  animation: form-field-error-enter 220ms ease-out;
+}
+
+@keyframes form-action-message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 18%, transparent);
+  }
+  65% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 9%, transparent);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes form-field-error-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .mobile-field-palette-fab,
@@ -729,6 +884,25 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .field-insert-indicator-preview {
+    animation: none;
+  }
+
+  .sortable-field-card-dragging .option-editor,
+  .sortable-field-card-dragging .rule-editor {
+    transition: none;
+  }
+
+  .designer-manual-field-overlay,
+  .designer-section .designer-blocking-error,
+  .designer-section .status-line-error,
+  .designer-section .field-editor .field-error,
+  .runner-section .runner-state-error,
+  .runner-section .status-line-error,
+  .runner-section .field-error {
+    animation: none;
+  }
+
   .designer-section .field-editor-move-up,
   .designer-section .field-editor-move-down {
     animation: designer-field-feedback 480ms ease-out;
@@ -786,7 +960,39 @@
 
 .sortable-field-card {
   min-width: 0;
+  contain: layout style;
+  backface-visibility: hidden;
+  transform-style: flat;
   will-change: transform;
+}
+
+.sortable-field-card-dragging {
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+}
+
+.sortable-field-card-dragging .field-editor {
+  overflow: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: opacity, box-shadow;
+}
+
+.sortable-field-card-dragging .field-editor * {
+  animation-play-state: paused;
+}
+
+.sortable-field-card-dragging .option-editor,
+.sortable-field-card-dragging .rule-editor {
+  max-height: 28px;
+  overflow: hidden;
+  opacity: 0.12;
+  filter: grayscale(1);
+  pointer-events: none;
+  transition:
+    max-height 120ms ease-out,
+    opacity 100ms ease-out;
 }
 
 .field-editor {
