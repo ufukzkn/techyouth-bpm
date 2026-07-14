@@ -2,6 +2,12 @@ import type { FormDefinition } from "@/lib/types";
 import type { FormValues } from "@/features/forms/formValues";
 import { translate } from "@/features/i18n/translations";
 import type { Language } from "@/lib/types";
+import type { FileUploadMetadata } from "@/lib/types";
+import {
+  fileUploadAllowedExtensions,
+  fileUploadAllowedMimeTypes,
+  fileUploadMaxSizeBytes,
+} from "@/features/forms/fieldTypes";
 
 export type FormValidationErrors = Record<string, string>;
 
@@ -40,6 +46,13 @@ export function validateFormValues(form: FormDefinition, values: FormValues, lan
       if (field.type === "Checkbox" && typeof value !== "boolean") {
         nextErrors[field.key] = translate(language, "form.validation.checkbox");
       }
+
+      if (field.type === "FileUpload") {
+        const fileError = validateFileUploadMetadata(value, language);
+        if (fileError) {
+          nextErrors[field.key] = fileError;
+        }
+      }
     }
 
     for (const rule of field.validationRules) {
@@ -58,6 +71,43 @@ export function validateFormValues(form: FormDefinition, values: FormValues, lan
 
 function isEmptyValue(value: FormValues[string], fieldType: FormDefinition["fields"][number]["type"]) {
   return value === "" || value === undefined || value === null || (fieldType === "Checkbox" && value === false);
+}
+
+function validateFileUploadMetadata(value: FormValues[string], language: Language) {
+  if (!isFileUploadMetadata(value)) {
+    return translate(language, "form.validation.fileMetadata");
+  }
+
+  if (value.size > fileUploadMaxSizeBytes) {
+    return translate(language, "form.validation.fileMaxSize");
+  }
+
+  if (!fileUploadAllowedMimeTypes.includes(value.type as (typeof fileUploadAllowedMimeTypes)[number])) {
+    return translate(language, "form.validation.fileType");
+  }
+
+  const extension = value.name.split(".").pop()?.toLocaleLowerCase("en-US") ?? "";
+  if (!fileUploadAllowedExtensions.includes(extension as (typeof fileUploadAllowedExtensions)[number])) {
+    return translate(language, "form.validation.fileExtension");
+  }
+
+  return undefined;
+}
+
+function isFileUploadMetadata(value: FormValues[string]): value is FileUploadMetadata {
+  return Boolean(
+    value
+      && typeof value === "object"
+      && typeof value.name === "string"
+      && value.name.trim().length > 0
+      && typeof value.size === "number"
+      && Number.isInteger(value.size)
+      && value.size > 0
+      && typeof value.type === "string"
+      && typeof value.lastModified === "number"
+      && Number.isInteger(value.lastModified)
+      && value.lastModified >= 0,
+  );
 }
 
 function isValidEmail(value: string) {

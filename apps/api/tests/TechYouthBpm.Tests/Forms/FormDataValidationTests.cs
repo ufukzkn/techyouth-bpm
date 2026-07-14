@@ -27,6 +27,28 @@ public class FormDataValidationTests
         Assert.Contains(result.Errors, error => error.Contains("must be text", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task StartAsync_Accepts_Valid_FileUpload_Metadata()
+    {
+        var result = await StartWithValueAsync(
+            FieldType.FileUpload,
+            """{"name":"document.pdf","size":1024,"type":"application/pdf","lastModified":0}""");
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("\"document.pdf\"")]
+    [InlineData("{\"name\":\"document.exe\",\"size\":1024,\"type\":\"application/pdf\",\"lastModified\":0}")]
+    [InlineData("{\"name\":\"document.pdf\",\"size\":10485761,\"type\":\"application/pdf\",\"lastModified\":0}")]
+    [InlineData("{\"name\":\"document.pdf\",\"size\":1024,\"type\":\"application/octet-stream\",\"lastModified\":0}")]
+    public async Task StartAsync_Rejects_Invalid_FileUpload_Metadata(string jsonValue)
+    {
+        var result = await StartWithValueAsync(FieldType.FileUpload, jsonValue);
+
+        Assert.False(result.IsSuccess);
+    }
+
     private static async Task<TechYouthBpm.Application.Common.Result<ProcessDetailDto>> StartWithValueAsync(
         FieldType fieldType,
         string jsonValue)

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   CircleDot,
+  FileUp,
   GripVertical,
   Hash,
   List,
@@ -73,6 +74,7 @@ const fieldTypeIcons: Record<FieldType, LucideIcon> = {
   Radio: CircleDot,
   Checkbox: SquareCheck,
   Date: Calendar,
+  FileUpload: FileUp,
 };
 
 const initialFields: DesignerField[] = [
@@ -935,6 +937,14 @@ export function FormDesignerDraft() {
                               </div>
                             ))}
                           </div>
+                        </div>
+                      ) : null}
+
+                      {field.type === "FileUpload" ? (
+                        <div className="file-upload-policy-note">
+                          <strong>{t("form.fileUpload.policyTitle")}</strong>
+                          <span>{t("form.fileUpload.policyDescription")}</span>
+                          <span>{t("form.fileUpload.metadataNote")}</span>
                         </div>
                       ) : null}
 

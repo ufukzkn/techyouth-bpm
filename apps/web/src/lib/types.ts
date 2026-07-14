@@ -126,7 +126,14 @@ export type ResetPasswordRequest = {
 export type ThemeMode = "light" | "dark";
 export type Language = "tr" | "en";
 
-export type FieldType = "Text" | "TextArea" | "Number" | "Email" | "Select" | "Radio" | "Checkbox" | "Date";
+export type FieldType = "Text" | "TextArea" | "Number" | "Email" | "Select" | "Radio" | "Checkbox" | "Date" | "FileUpload";
+
+export type FileUploadMetadata = {
+  name: string;
+  size: number;
+  type: string;
+  lastModified: number;
+};
 
 export type ValidationRuleType = "RequiredWhen";
 

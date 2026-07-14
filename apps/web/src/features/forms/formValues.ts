@@ -1,11 +1,11 @@
-import type { FormDefinition } from "@/lib/types";
+import type { FileUploadMetadata, FormDefinition } from "@/lib/types";
 
-export type FormValue = string | number | boolean;
+export type FormValue = string | number | boolean | FileUploadMetadata | null;
 export type FormValues = Record<string, FormValue>;
 
 export function buildInitialValues(form: FormDefinition) {
   return form.fields.reduce<FormValues>((current, field) => {
-    current[field.key] = field.type === "Checkbox" ? false : "";
+    current[field.key] = field.type === "Checkbox" ? false : field.type === "FileUpload" ? null : "";
     return current;
   }, {});
 }
@@ -16,6 +16,11 @@ export function prepareFormData(form: FormDefinition, values: FormValues): Recor
 
     if (field.type === "Number") {
       current[field.key] = value === "" ? "" : typeof value === "number" ? value : Number(value);
+      return current;
+    }
+
+    if (field.type === "FileUpload") {
+      current[field.key] = value && typeof value === "object" ? value : null;
       return current;
     }
 

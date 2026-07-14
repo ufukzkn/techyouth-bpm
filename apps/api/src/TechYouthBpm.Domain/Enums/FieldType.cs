@@ -9,5 +9,6 @@ public enum FieldType
     Checkbox = 5,
     Date = 6,
     TextArea = 7,
-    Radio = 8
+    Radio = 8,
+    FileUpload = 9
 }
