@@ -1,5 +1,8 @@
 import type {
   CreateFormRequest,
+  CreateFormVersionRequest,
+  CreateProcessDefinitionRequest,
+  CreateProcessDefinitionVersionRequest,
   CreateCommunityRequest,
   CreateCommunityRoleRequest,
   CreateUserAdminRequest,
@@ -9,6 +12,7 @@ import type {
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   FormDefinition,
+  FormDefinitionVersion,
   Community,
   CommunityRole,
   CommunitySummary,
@@ -18,6 +22,10 @@ import type {
   NotificationPage,
   PagedResult,
   ProcessDetail,
+  ProcessDefinition,
+  ProcessDefinitionSummary,
+  ProcessDefinitionVersion,
+  RunnableProcessDefinition,
   ProcessSummary,
   ProcessTask,
   RegisterResponse,
@@ -34,6 +42,7 @@ import type {
   UserSession,
   UserStatus,
   ChangePasswordRequest,
+  ClaimTaskRequest,
   CreateTeamRequest,
   Team,
   TeamCandidatePage,
@@ -531,6 +540,81 @@ export const api = {
   getForm(token: string, id: string) {
     return request<FormDefinition>(`/api/forms/${id}`, { token });
   },
+  listFormVersions(token: string, formId: string) {
+    return request<FormDefinitionVersion[]>(`/api/forms/${formId}/versions`, { token });
+  },
+  getFormVersion(token: string, formId: string, versionId: string) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}`, { token });
+  },
+  createFormVersion(token: string, formId: string, payload: CreateFormVersionRequest) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateFormVersion(token: string, formId: string, versionId: string, payload: CreateFormVersionRequest) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  publishFormVersion(token: string, formId: string, versionId: string) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}/publish`, {
+      method: "POST",
+      token,
+    });
+  },
+  archiveFormVersion(token: string, formId: string, versionId: string) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}/archive`, {
+      method: "POST",
+      token,
+    });
+  },
+  listProcessDefinitions(token: string) {
+    return request<ProcessDefinitionSummary[]>("/api/process-definitions", { token });
+  },
+  listRunnableProcessDefinitions(token: string) {
+    return request<RunnableProcessDefinition[]>("/api/process-definitions/runnable", { token });
+  },
+  getProcessDefinition(token: string, id: string) {
+    return request<ProcessDefinition>(`/api/process-definitions/${id}`, { token });
+  },
+  createProcessDefinition(token: string, payload: CreateProcessDefinitionRequest) {
+    return request<ProcessDefinition>("/api/process-definitions", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateProcessDefinition(token: string, id: string, payload: Pick<CreateProcessDefinitionRequest, "name" | "description">) {
+    return request<ProcessDefinition>(`/api/process-definitions/${id}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  createProcessDefinitionVersion(token: string, id: string, payload: CreateProcessDefinitionVersionRequest) {
+    return request<ProcessDefinitionVersion>(`/api/process-definitions/${id}/versions`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateProcessDefinitionVersion(token: string, id: string, versionId: string, payload: CreateProcessDefinitionVersionRequest) {
+    return request<ProcessDefinitionVersion>(`/api/process-definitions/${id}/versions/${versionId}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  publishProcessDefinitionVersion(token: string, id: string, versionId: string) {
+    return request<ProcessDefinitionVersion>(`/api/process-definitions/${id}/versions/${versionId}/publish`, {
+      method: "POST",
+      token,
+    });
+  },
   startProcess(token: string, payload: StartProcessRequest) {
     return request<ProcessDetail>("/api/processes/start", {
       method: "POST",
@@ -546,6 +630,27 @@ export const api = {
   },
   listMyTasks(token: string) {
     return request<ProcessTask[]>("/api/tasks/my", { token });
+  },
+  startProcessVersion(token: string, processDefinitionVersionId: string, formData: Record<string, unknown>) {
+    return request<ProcessDetail>("/api/processes/start/version", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ processDefinitionVersionId, formData }),
+    });
+  },
+  claimTask(token: string, taskId: string, payload: ClaimTaskRequest = {}) {
+    return request<ProcessTask>(`/api/tasks/${taskId}/claim`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  releaseTask(token: string, taskId: string, payload: ClaimTaskRequest = {}) {
+    return request<ProcessTask>(`/api/tasks/${taskId}/claim`, {
+      method: "DELETE",
+      token,
+      body: JSON.stringify(payload),
+    });
   },
   executeTaskAction(token: string, taskId: string, payload: TaskActionRequest) {
     return request<ProcessDetail>(`/api/tasks/${taskId}/actions`, {

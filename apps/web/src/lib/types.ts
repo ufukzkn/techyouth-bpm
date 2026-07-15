@@ -36,7 +36,12 @@ export type PermissionName =
   | "Forms.View"
   | "Forms.Create"
   | "Forms.Update"
+  | "Workflows.View"
+  | "Workflows.Create"
+  | "Workflows.Update"
+  | "Workflows.Publish"
   | "Processes.View"
+  | "Processes.ViewAll"
   | "Processes.Start"
   | "Tasks.View"
   | "Tasks.Act"
@@ -173,6 +178,8 @@ export type FormDefinition = {
   createdByUserId: string;
   createdAt: string;
   fields: FormFieldDefinition[];
+  latestPublishedVersionId?: string | null;
+  latestPublishedVersionNumber?: number | null;
 };
 
 export type CreateFormRequest = {
@@ -180,11 +187,156 @@ export type CreateFormRequest = {
   description: string;
   fields: Omit<FormFieldDefinition, "id">[];
   communityId?: string | null;
+  createPublishedVersion?: boolean;
+};
+
+export type DefinitionVersionStatus = "Draft" | "Published" | "Archived";
+
+export type CreateFormPageRequest = {
+  key: string;
+  title: string;
+  description: string;
+  sortOrder: number;
+  fields: Omit<FormFieldDefinition, "id">[];
+};
+
+export type CreateFormVersionRequest = {
+  pages: CreateFormPageRequest[];
+};
+
+export type FormPage = {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  sortOrder: number;
+  fields: FormFieldDefinition[];
+};
+
+export type FormDefinitionVersion = {
+  id: string;
+  formDefinitionId: string;
+  formName: string;
+  versionNumber: number;
+  status: DefinitionVersionStatus;
+  createdByUserId: string;
+  createdAt: string;
+  publishedByUserId?: string | null;
+  publishedAt?: string | null;
+  pages: FormPage[];
 };
 
 export type ProcessStatus = "Pending" | "InProgress" | "Completed" | "Rejected" | "Escalated";
-export type ProcessTaskStatus = "Open" | "Completed" | "Cancelled";
-export type WorkflowAction = "Start" | "Approve" | "Reject" | "Escalate";
+export type ProcessTaskStatus = "Open" | "Completed" | "Cancelled" | "Claimed";
+export type WorkflowAction = "Start" | "Approve" | "Reject" | "Escalate" | "SendBack" | "Complete";
+export type TaskPriority = "Low" | "Normal" | "High" | "Critical";
+export type TaskAssignmentType = "ProcessStarter" | "SpecificUser" | "Team" | "CommunityRole" | "TeamAndCommunityRole";
+export type ProcessNodeType = "Start" | "UserTask" | "ExclusiveGateway" | "CompletedEnd" | "RejectedEnd" | "TeamSwimlane";
+export type GraphConditionOperator = "Equals" | "NotEquals" | "GreaterThan" | "GreaterThanOrEquals" | "LessThan" | "LessThanOrEquals" | "Contains" | "IsEmpty" | "IsNotEmpty";
+export type ProcessStepStatus = "Active" | "Completed" | "Cancelled";
+
+export type TaskAssignment = {
+  type: TaskAssignmentType;
+  userId?: string | null;
+  teamId?: string | null;
+  communityRoleId?: string | null;
+};
+
+export type ProcessNode = {
+  key: string;
+  type: ProcessNodeType;
+  title: string;
+  description?: string | null;
+  formDefinitionVersionId?: string | null;
+  priority: TaskPriority;
+  actions?: WorkflowAction[] | null;
+  assignment?: TaskAssignment | null;
+  parentKey?: string | null;
+  teamId?: string | null;
+  positionX: number;
+  positionY: number;
+  width?: number | null;
+  height?: number | null;
+};
+
+export type ProcessCondition = {
+  path: string;
+  operator: GraphConditionOperator;
+  value?: unknown;
+};
+
+export type ProcessEdge = {
+  source: string;
+  target: string;
+  action?: WorkflowAction | null;
+  condition?: ProcessCondition | null;
+  isDefault: boolean;
+  order: number;
+  label?: string | null;
+};
+
+export type ProcessGraph = {
+  schemaVersion: string;
+  nodes: ProcessNode[];
+  edges: ProcessEdge[];
+};
+
+export type ProcessDefinitionSummary = {
+  id: string;
+  name: string;
+  description: string;
+  communityId: string;
+  communityName: string;
+  latestVersionNumber?: number | null;
+  latestPublishedVersionId?: string | null;
+  latestPublishedFormDefinitionVersionId?: string | null;
+  createdAt: string;
+};
+
+export type RunnableProcessDefinition = {
+  id: string;
+  name: string;
+  description: string;
+  communityId: string;
+  communityName: string;
+  processDefinitionVersionId: string;
+  formDefinitionVersionId: string;
+  versionNumber: number;
+};
+
+export type ProcessDefinitionVersion = {
+  id: string;
+  processDefinitionId: string;
+  versionNumber: number;
+  status: DefinitionVersionStatus;
+  formDefinitionVersionId: string;
+  graph: ProcessGraph;
+  createdByUserId: string;
+  createdAt: string;
+  publishedByUserId?: string | null;
+  publishedAt?: string | null;
+};
+
+export type ProcessDefinition = ProcessDefinitionSummary & {
+  createdByUserId: string;
+  versions: ProcessDefinitionVersion[];
+};
+
+export type CreateProcessDefinitionRequest = {
+  name: string;
+  description: string;
+  communityId?: string | null;
+};
+
+export type CreateProcessDefinitionVersionRequest = {
+  formDefinitionVersionId: string;
+  graph: ProcessGraph;
+};
+
+export type WorkflowValidationResult = {
+  isValid: boolean;
+  errors: string[];
+};
 
 export type ProcessTask = {
   id: string;
@@ -196,6 +348,19 @@ export type ProcessTask = {
   availableActions: WorkflowAction[];
   createdAt: string;
   completedAt?: string | null;
+  nodeKey?: string;
+  attempt?: number;
+  title?: string;
+  priority?: TaskPriority;
+  assignmentType?: TaskAssignmentType | null;
+  assignedUserId?: string | null;
+  candidateTeamId?: string | null;
+  candidateCommunityRoleId?: string | null;
+  claimedByUserId?: string | null;
+  claimedAt?: string | null;
+  claimVersion?: string | null;
+  formDefinitionVersionId?: string | null;
+  taskForm?: FormDefinitionVersion | null;
 };
 
 export type AuditLog = {
@@ -242,12 +407,31 @@ export type ProcessSummary = {
   status: ProcessStatus;
   startedAt: string;
   completedAt?: string | null;
+  processDefinitionVersionId?: string | null;
+  formDefinitionVersionId?: string | null;
+  currentNodeKey?: string;
+};
+
+export type ProcessStepExecution = {
+  id: string;
+  nodeKey: string;
+  nodeType: ProcessNodeType;
+  attempt: number;
+  status: ProcessStepStatus;
+  enteredAt: string;
+  completedAt?: string | null;
+  completedByUserId?: string | null;
+  completedByUserDisplayName?: string | null;
+  action?: WorkflowAction | null;
+  output: Record<string, unknown>;
 };
 
 export type ProcessDetail = ProcessSummary & {
   formData: Record<string, unknown>;
   tasks: ProcessTask[];
   auditLogs: AuditLog[];
+  variables?: Record<string, unknown>;
+  stepExecutions?: ProcessStepExecution[];
 };
 
 export type StartProcessRequest = {
@@ -258,6 +442,11 @@ export type StartProcessRequest = {
 export type TaskActionRequest = {
   action: WorkflowAction;
   note?: string;
+  formData?: Record<string, unknown>;
+};
+
+export type ClaimTaskRequest = {
+  claimVersion?: string | null;
 };
 
 export type DashboardSummary = {
