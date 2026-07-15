@@ -11,6 +11,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CommunityRole> CommunityRoles => Set<CommunityRole>();
     public DbSet<CommunityRolePermission> CommunityRolePermissions => Set<CommunityRolePermission>();
     public DbSet<UserCommunityMembership> UserCommunityMemberships => Set<UserCommunityMembership>();
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<TeamMembership> TeamMemberships => Set<TeamMembership>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
@@ -33,6 +35,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<CommunityRole>().HasIndex(role => new { role.CommunityId, role.Name }).IsUnique();
         modelBuilder.Entity<CommunityRolePermission>().HasIndex(permission => new { permission.CommunityRoleId, permission.Permission }).IsUnique();
         modelBuilder.Entity<UserCommunityMembership>().HasIndex(membership => new { membership.UserId, membership.IsActive });
+        modelBuilder.Entity<Team>().HasIndex(team => new { team.CommunityId, team.NormalizedName }).IsUnique();
+        modelBuilder.Entity<TeamMembership>().HasIndex(membership => new { membership.TeamId, membership.UserId }).IsUnique();
+        modelBuilder.Entity<TeamMembership>().HasIndex(membership => new { membership.UserId, membership.IsActive });
 
         modelBuilder.Entity<Community>()
             .HasMany(community => community.Roles)
@@ -63,6 +68,30 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(membership => membership.CommunityRoleId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Community>()
+            .HasMany(community => community.Teams)
+            .WithOne(team => team.Community)
+            .HasForeignKey(team => team.CommunityId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Team>()
+            .HasOne(team => team.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(team => team.CreatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Team>()
+            .HasMany(team => team.Memberships)
+            .WithOne(membership => membership.Team)
+            .HasForeignKey(membership => membership.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasMany(user => user.TeamMemberships)
+            .WithOne(membership => membership.User)
+            .HasForeignKey(membership => membership.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Notification>()
             .HasOne(notification => notification.User)

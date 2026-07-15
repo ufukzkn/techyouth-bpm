@@ -21,4 +21,5 @@ public class User
     public DateTime? PasswordResetTokenExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<UserCommunityMembership> CommunityMemberships { get; set; } = [];
+    public List<TeamMembership> TeamMemberships { get; set; } = [];
 }

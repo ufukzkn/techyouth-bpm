@@ -58,6 +58,22 @@ public static class DatabaseSeeder
     private static readonly Guid ProductOrderCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000003");
     private static readonly Guid HumanResourcesCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000004");
     private static readonly Guid ProcurementCommunityId = Guid.Parse("10101010-0000-0000-0000-000000000005");
+    private static readonly Guid SportScoutTeamId = Guid.Parse("30303030-0000-0000-0000-000000000001");
+    private static readonly Guid SportTechnicalTeamId = Guid.Parse("30303030-0000-0000-0000-000000000002");
+    private static readonly Guid SportFinanceTeamId = Guid.Parse("30303030-0000-0000-0000-000000000003");
+    private static readonly Guid SportTransferTeamId = Guid.Parse("30303030-0000-0000-0000-000000000004");
+    private static readonly Guid LogisticsPlanningTeamId = Guid.Parse("30303030-0000-0000-0000-000000000005");
+    private static readonly Guid LogisticsWarehouseTeamId = Guid.Parse("30303030-0000-0000-0000-000000000006");
+    private static readonly Guid LogisticsDeliveryTeamId = Guid.Parse("30303030-0000-0000-0000-000000000007");
+    private static readonly Guid ProductIntakeTeamId = Guid.Parse("30303030-0000-0000-0000-000000000008");
+    private static readonly Guid ProductStockTeamId = Guid.Parse("30303030-0000-0000-0000-000000000009");
+    private static readonly Guid ProductFulfillmentTeamId = Guid.Parse("30303030-0000-0000-0000-000000000010");
+    private static readonly Guid HrTalentTeamId = Guid.Parse("30303030-0000-0000-0000-000000000011");
+    private static readonly Guid HrExperienceTeamId = Guid.Parse("30303030-0000-0000-0000-000000000012");
+    private static readonly Guid HrPayrollTeamId = Guid.Parse("30303030-0000-0000-0000-000000000013");
+    private static readonly Guid ProcurementRequestTeamId = Guid.Parse("30303030-0000-0000-0000-000000000014");
+    private static readonly Guid ProcurementVendorTeamId = Guid.Parse("30303030-0000-0000-0000-000000000015");
+    private static readonly Guid ProcurementBudgetTeamId = Guid.Parse("30303030-0000-0000-0000-000000000016");
     private static readonly Guid SportAdminRoleId = Guid.Parse("20202020-0000-0000-0000-000000000001");
     private static readonly Guid SportUnassignedRoleId = Guid.Parse("20202020-0000-0000-0000-000000000010");
     private static readonly Guid SportStarterRoleId = Guid.Parse("20202020-0000-0000-0000-000000000002");
@@ -83,6 +99,7 @@ public static class DatabaseSeeder
     {
         await SeedCommunitiesAsync(db, cancellationToken);
         await SeedUsersAsync(db, cancellationToken);
+        await SeedTeamsAsync(db, cancellationToken);
 
         if (seedMockData)
         {
@@ -158,6 +175,141 @@ public static class DatabaseSeeder
         await EnsureSystemRoleTemplatesAsync(db, cancellationToken);
         await RetireDuplicateLogisticsRoleAsync(db, cancellationToken);
     }
+
+    private static async Task SeedTeamsAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var teamSeeds = BuildTeamSeeds();
+        var existingTeams = await db.Teams.ToListAsync(cancellationToken);
+        var existingTeamIds = existingTeams.Select(team => team.Id).ToHashSet();
+        var existingNames = existingTeams
+            .Select(team => (team.CommunityId, team.NormalizedName))
+            .ToHashSet();
+
+        var missingTeams = teamSeeds
+            .Where(team => !existingTeamIds.Contains(team.Id)
+                && !existingNames.Contains((team.CommunityId, team.NormalizedName)))
+            .ToArray();
+        if (missingTeams.Length > 0)
+        {
+            db.Teams.AddRange(missingTeams);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var teamIds = teamSeeds.Select(team => team.Id).ToArray();
+        var availableTeamIds = await db.Teams
+            .Where(team => teamIds.Contains(team.Id))
+            .Select(team => team.Id)
+            .ToListAsync(cancellationToken);
+        var existingMemberships = await db.TeamMemberships
+            .Where(membership => availableTeamIds.Contains(membership.TeamId))
+            .Select(membership => new { membership.TeamId, membership.UserId })
+            .ToListAsync(cancellationToken);
+        var existingMembershipKeys = existingMemberships
+            .Select(membership => (membership.TeamId, membership.UserId))
+            .ToHashSet();
+        var availableUserIds = (await db.Users
+            .Select(user => user.Id)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        var missingMemberships = BuildTeamMembershipSeeds()
+            .Where(membership => availableTeamIds.Contains(membership.TeamId)
+                && availableUserIds.Contains(membership.UserId)
+                && !existingMembershipKeys.Contains((membership.TeamId, membership.UserId)))
+            .ToArray();
+        if (missingMemberships.Length > 0)
+        {
+            db.TeamMemberships.AddRange(missingMemberships);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static IReadOnlyList<Team> BuildTeamSeeds() =>
+    [
+        TeamSeed(SportScoutTeamId, SportCommunityId, "Scout Ekibi", "Oyuncu izleme ve ilk teknik raporlama.", FatihTerimId),
+        TeamSeed(SportTechnicalTeamId, SportCommunityId, "Teknik Degerlendirme", "Teknik uygunluk ve kadro degerlendirmesi.", FatihTerimId),
+        TeamSeed(SportFinanceTeamId, SportCommunityId, "Mali Isler", "Transfer butcesi ve mali uygunluk kontrolu.", FatihTerimId),
+        TeamSeed(SportTransferTeamId, SportCommunityId, "Transfer Operasyon", "Sozlesme ve transfer operasyon takibi.", FatihTerimId),
+        TeamSeed(LogisticsPlanningTeamId, LogisticsCommunityId, "Sevkiyat Planlama", "Sevkiyat rotasi ve kapasite planlamasi.", AtibaId),
+        TeamSeed(LogisticsWarehouseTeamId, LogisticsCommunityId, "Depo Operasyon", "Depo cikis ve stok hareketleri.", AtibaId),
+        TeamSeed(LogisticsDeliveryTeamId, LogisticsCommunityId, "Teslimat Takibi", "Teslimat durumu ve hedefe ulasim takibi.", AtibaId),
+        TeamSeed(ProductIntakeTeamId, ProductOrderCommunityId, "Siparis Kabul", "Yeni urun siparislerinin ilk kontrolu.", AlexId),
+        TeamSeed(ProductStockTeamId, ProductOrderCommunityId, "Stok Kontrol", "Stok ve urun uygunlugu kontrolu.", AlexId),
+        TeamSeed(ProductFulfillmentTeamId, ProductOrderCommunityId, "Siparis Hazirlama", "Onaylanan siparislerin hazirlanmasi.", AlexId),
+        TeamSeed(HrTalentTeamId, HumanResourcesCommunityId, "Yetenek Kazanimi", "Aday ve ise alim operasyonlari.", SenolGunesId),
+        TeamSeed(HrExperienceTeamId, HumanResourcesCommunityId, "Calisan Deneyimi", "Izin ve calisan deneyimi talepleri.", SenolGunesId),
+        TeamSeed(HrPayrollTeamId, HumanResourcesCommunityId, "Bordro ve Ozluk", "Bordro ve ozluk kontrol surecleri.", SenolGunesId),
+        TeamSeed(ProcurementRequestTeamId, ProcurementCommunityId, "Talep Degerlendirme", "Satin alma taleplerinin ilk degerlendirmesi.", AliKocId),
+        TeamSeed(ProcurementVendorTeamId, ProcurementCommunityId, "Tedarikci Yonetimi", "Tedarikci secimi ve teklif karsilastirmasi.", AliKocId),
+        TeamSeed(ProcurementBudgetTeamId, ProcurementCommunityId, "Butce Kontrol", "Butce uygunlugu ve harcama kontrolu.", AliKocId)
+    ];
+
+    private static IReadOnlyList<TeamMembership> BuildTeamMembershipSeeds() =>
+    [
+        TeamMember(SportScoutTeamId, UserId, true),
+        TeamMember(SportScoutTeamId, ZlatanIbrahimovicId),
+        TeamMember(SportTechnicalTeamId, ApproverId, true),
+        TeamMember(SportTechnicalTeamId, QuaresmaId),
+        TeamMember(SportFinanceTeamId, OkanBurukId, true),
+        TeamMember(SportTransferTeamId, FatihTerimId, true),
+        TeamMember(SportTransferTeamId, QuaresmaId),
+        TeamMember(LogisticsPlanningTeamId, JoseMourinhoId, true),
+        TeamMember(LogisticsPlanningTeamId, EmreBelozogluId),
+        TeamMember(LogisticsWarehouseTeamId, AtibaId, true),
+        TeamMember(LogisticsWarehouseTeamId, DirkKuytId),
+        TeamMember(LogisticsDeliveryTeamId, SergenYalcinId, true),
+        TeamMember(LogisticsDeliveryTeamId, JoseMourinhoId),
+        TeamMember(ProductIntakeTeamId, TaliscaId, true),
+        TeamMember(ProductIntakeTeamId, CanerErkinId),
+        TeamMember(ProductStockTeamId, FerdiKadiogluId, true),
+        TeamMember(ProductStockTeamId, WesleySneijderId),
+        TeamMember(ProductFulfillmentTeamId, AlexId, true),
+        TeamMember(ProductFulfillmentTeamId, FerdiKadiogluId),
+        TeamMember(HrTalentTeamId, SenolGunesId, true),
+        TeamMember(HrTalentTeamId, ArdaTuranId),
+        TeamMember(HrExperienceTeamId, ArdaGulerId, true),
+        TeamMember(HrExperienceTeamId, IlhanMansizId),
+        TeamMember(HrPayrollTeamId, BurakYilmazId, true),
+        TeamMember(HrPayrollTeamId, OguzhanOzyakupId),
+        TeamMember(HrPayrollTeamId, SenolGunesId),
+        TeamMember(ProcurementRequestTeamId, AliKocId, true),
+        TeamMember(ProcurementRequestTeamId, DembaBaId),
+        TeamMember(ProcurementVendorTeamId, NecipUysalId, true),
+        TeamMember(ProcurementVendorTeamId, NaniId),
+        TeamMember(ProcurementBudgetTeamId, RobinGosensId, true),
+        TeamMember(ProcurementBudgetTeamId, AliKocId)
+    ];
+
+    private static Team TeamSeed(
+        Guid id,
+        Guid communityId,
+        string name,
+        string description,
+        Guid createdByUserId) =>
+        new()
+        {
+            Id = id,
+            CommunityId = communityId,
+            Name = name,
+            NormalizedName = name.Trim().ToUpperInvariant(),
+            Description = description,
+            IsActive = true,
+            CreatedByUserId = createdByUserId,
+            CreatedAt = DateTime.UtcNow.AddDays(-18),
+            UpdatedAt = DateTime.UtcNow.AddDays(-18)
+        };
+
+    private static TeamMembership TeamMember(Guid teamId, Guid userId, bool isLead = false) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            TeamId = teamId,
+            UserId = userId,
+            IsLead = isLead,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow.AddDays(-15),
+            UpdatedAt = DateTime.UtcNow.AddDays(-15)
+        };
 
     private static Community Community(Guid id, string name, string description) =>
         new()
