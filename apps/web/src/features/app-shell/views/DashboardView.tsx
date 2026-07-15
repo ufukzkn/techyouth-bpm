@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, ListTodo, Workflow } from "lucide-react";
+import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, ListTodo, Network, Workflow } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
@@ -134,6 +134,15 @@ export function DashboardView({
           <span className="eyebrow">{t("dashboard.eyebrow")}</span>
           <h1>{t("dashboard.welcome", { name: user.displayName })}</h1>
           {user.communityName ? <p className="dashboard-community-label"><span>{t("dashboard.communityLabel")}</span><strong>{user.communityName}</strong></p> : null}
+          {user.communityId ? (
+            <div className="dashboard-team-context" aria-label={t("dashboard.teams")}>
+              <Network size={15} />
+              <span>{t("dashboard.teams")}</span>
+              {(user.teams ?? []).length
+                ? (user.teams ?? []).map((team) => <strong key={team.id}>{team.name}{team.isLead ? ` · ${t("dashboard.teamLead")}` : ""}</strong>)
+                : <strong>{t("dashboard.unassignedTeam")}</strong>}
+            </div>
+          ) : null}
         </div>
         <div className="dashboard-header-side">
           <p>

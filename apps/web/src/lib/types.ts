@@ -18,12 +18,21 @@ export type User = {
   communityRoleName: string;
   permissions: PermissionName[];
   isCommunityActive: boolean;
+  teams?: UserTeam[];
+};
+
+export type UserTeam = {
+  id: string;
+  name: string;
+  isLead: boolean;
 };
 
 export type PermissionName =
   | "Community.ManageUsers"
   | "Community.ManageRoles"
   | "Community.ManageAdmins"
+  | "Teams.View"
+  | "Teams.Manage"
   | "Forms.View"
   | "Forms.Create"
   | "Forms.Update"
@@ -326,6 +335,60 @@ export type CommunitySummary = {
   communityId: string;
   memberCount: number;
   roleCounts: CommunityRoleCount[];
+};
+
+export type Team = {
+  id: string;
+  communityId: string;
+  communityName: string;
+  name: string;
+  description: string;
+  isActive: boolean;
+  memberCount: number;
+  leadCount: number;
+  createdByUserId?: string | null;
+  createdByDisplayName: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeamPage = PagedResult<Team> & {
+  unassignedCount: number;
+};
+
+export type TeamMember = {
+  userId: string;
+  username: string;
+  displayName: string;
+  email: string;
+  communityRoleName: string;
+  isLead: boolean;
+  joinedAt: string;
+};
+
+export type TeamMemberPage = PagedResult<TeamMember>;
+
+export type TeamCandidate = {
+  userId: string;
+  username: string;
+  displayName: string;
+  email: string;
+  communityRoleName: string;
+  activeTeamCount: number;
+};
+
+export type TeamCandidatePage = PagedResult<TeamCandidate>;
+
+export type CreateTeamRequest = {
+  communityId: string;
+  name: string;
+  description: string;
+};
+
+export type UpdateTeamRequest = {
+  name: string;
+  description: string;
+  isActive: boolean;
 };
 
 export type NotificationItem = {

@@ -122,6 +122,8 @@ export function permissionLabel(permission: PermissionName) {
     "Community.ManageUsers": "Kullanicilari yonetir",
     "Community.ManageRoles": "Rolleri yonetir",
     "Community.ManageAdmins": "Topluluk adminlerini yonetir",
+    "Teams.View": "Takimlari gorur",
+    "Teams.Manage": "Takimlari yonetir",
     "Forms.View": "Formlari gorur",
     "Forms.Create": "Form olusturur",
     "Forms.Update": "Form gunceller",

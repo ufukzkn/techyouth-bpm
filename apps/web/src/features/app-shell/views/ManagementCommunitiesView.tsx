@@ -23,6 +23,8 @@ const allPermissions: PermissionName[] = [
   "Community.ManageUsers",
   "Community.ManageRoles",
   "Community.ManageAdmins",
+  "Teams.View",
+  "Teams.Manage",
   "Forms.View",
   "Forms.Create",
   "Forms.Update",

@@ -59,6 +59,30 @@
   font-weight: 850;
 }
 
+.dashboard-team-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.dashboard-team-context svg {
+  color: var(--primary);
+}
+
+.dashboard-team-context strong {
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--primary) 22%, var(--border));
+  border-radius: 999px;
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  font-size: 11px;
+}
+
 .dashboard-role-unassigned {
   margin: 0;
   padding: 11px 13px;

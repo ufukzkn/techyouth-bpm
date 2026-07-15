@@ -161,6 +161,7 @@ export function WorkspaceTopbar({
               <div><span>{t("session.username")}</span><strong>{user.username}</strong></div>
               <div><span>{t("session.role")}</span><strong>{effectiveRole}</strong></div>
               {user.communityName ? <div><span>{t("session.community")}</span><strong>{user.communityName}</strong></div> : null}
+              {user.communityId ? <div><span>{t("session.teams")}</span><strong>{(user.teams ?? []).length ? (user.teams ?? []).map((team) => team.name).join(", ") : t("dashboard.unassignedTeam")}</strong></div> : null}
               <div><span>{t("session.activeUntil")}</span><strong>{formatSessionExpiry(expiresAt, language)}</strong></div>
             </div>
           ) : null}

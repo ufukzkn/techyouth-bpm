@@ -34,6 +34,13 @@ import type {
   UserSession,
   UserStatus,
   ChangePasswordRequest,
+  CreateTeamRequest,
+  Team,
+  TeamCandidatePage,
+  TeamMember,
+  TeamMemberPage,
+  TeamPage,
+  UpdateTeamRequest,
 } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5291";
@@ -166,6 +173,14 @@ function normalizePagedResult<T>(value: PagedResult<T> | T[], page = 1, pageSize
     ...value,
     items: Array.isArray(value.items) ? value.items : [],
   };
+}
+
+function buildTeamMemberSearch(params: { query?: string; page?: number; pageSize?: number }) {
+  const search = new URLSearchParams();
+  if (params.query?.trim()) search.set("query", params.query.trim());
+  if (params.page) search.set("page", String(params.page));
+  if (params.pageSize) search.set("pageSize", String(params.pageSize));
+  return search;
 }
 
 export const api = {
@@ -354,6 +369,60 @@ export const api = {
       token,
       body: JSON.stringify({ replacementRoleId }),
     });
+  },
+  listTeams(
+    token: string,
+    params: { communityId?: string | null; query?: string; isActive?: boolean | null; page?: number; pageSize?: number } = {},
+  ) {
+    const search = new URLSearchParams();
+    if (params.communityId) search.set("communityId", params.communityId);
+    if (params.query?.trim()) search.set("query", params.query.trim());
+    if (params.isActive !== null && params.isActive !== undefined) search.set("isActive", String(params.isActive));
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    return request<TeamPage>(`/api/teams${search.size ? `?${search}` : ""}`, { token });
+  },
+  getTeam(token: string, teamId: string) {
+    return request<Team>(`/api/teams/${teamId}`, { token });
+  },
+  createTeam(token: string, payload: CreateTeamRequest) {
+    return request<Team>("/api/teams", { method: "POST", token, body: JSON.stringify(payload) });
+  },
+  updateTeam(token: string, teamId: string, payload: UpdateTeamRequest) {
+    return request<Team>(`/api/teams/${teamId}`, { method: "PATCH", token, body: JSON.stringify(payload) });
+  },
+  listTeamMembers(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
+    const search = buildTeamMemberSearch(params);
+    return request<TeamMemberPage>(`/api/teams/${teamId}/members${search.size ? `?${search}` : ""}`, { token });
+  },
+  listTeamCandidates(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
+    const search = buildTeamMemberSearch(params);
+    return request<TeamCandidatePage>(`/api/teams/${teamId}/candidates${search.size ? `?${search}` : ""}`, { token });
+  },
+  listUnassignedTeamMembers(
+    token: string,
+    params: { communityId: string; query?: string; page?: number; pageSize?: number },
+  ) {
+    const search = buildTeamMemberSearch(params);
+    search.set("communityId", params.communityId);
+    return request<TeamCandidatePage>(`/api/teams/unassigned/members?${search}`, { token });
+  },
+  addTeamMember(token: string, teamId: string, userId: string, isLead = false) {
+    return request<TeamMember>(`/api/teams/${teamId}/members`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ userId, isLead }),
+    });
+  },
+  updateTeamMember(token: string, teamId: string, userId: string, isLead: boolean) {
+    return request<TeamMember>(`/api/teams/${teamId}/members/${userId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ isLead }),
+    });
+  },
+  removeTeamMember(token: string, teamId: string, userId: string) {
+    return request<void>(`/api/teams/${teamId}/members/${userId}`, { method: "DELETE", token });
   },
   deleteUser(token: string, userId: string) {
     return request<void>(`/api/users/${userId}`, { method: "DELETE", token });

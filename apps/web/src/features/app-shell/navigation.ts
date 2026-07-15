@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, FilePlay, FilePlus2, FolderKanban, History, Inbox, LayoutDashboard, Settings, UsersRound, Workflow } from "lucide-react";
+import { Building2, ClipboardList, FilePlay, FilePlus2, FolderKanban, History, Inbox, LayoutDashboard, Network, Settings, UsersRound, Workflow } from "lucide-react";
 import type { TranslationKey } from "@/features/i18n/translations";
 import type { PermissionName } from "@/lib/types";
 
@@ -11,6 +11,7 @@ export type ViewId =
   | "inbox"
   | "managementUsers"
   | "managementCommunities"
+  | "managementTeams"
   | "logs"
   | "settings";
 
@@ -81,6 +82,14 @@ export const navItems: NavItem[] = [
     path: "/management/communities",
     icon: Building2,
     permissions: ["Community.ManageRoles"],
+    group: "management",
+  },
+  {
+    labelKey: "nav.managementTeams",
+    viewId: "managementTeams",
+    path: "/management/teams",
+    icon: Network,
+    permissions: ["Teams.View"],
     group: "management",
   },
   {
