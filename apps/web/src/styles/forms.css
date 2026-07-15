@@ -15,8 +15,15 @@
   align-self: center;
 }
 
+main:has(> .workspace-route-content > .runner-section) {
+  margin-inline: auto;
+  align-self: center;
+}
+
 .runner-section {
   max-width: 1180px;
+  min-width: 0;
+  container: form-runner / inline-size;
 }
 
 .designer-grid {
@@ -340,6 +347,58 @@
   overflow-wrap: anywhere;
 }
 
+.runner-section .runner-form {
+  position: relative;
+  isolation: isolate;
+}
+
+.runner-section .runner-form-processing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  backdrop-filter: blur(1px);
+  cursor: wait;
+  animation: runner-form-processing-enter 160ms ease-out;
+}
+
+.runner-section .runner-form-processing-indicator {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+  border-radius: 999px;
+  color: var(--primary-strong);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.runner-section .runner-actions .button-spinner,
+.runner-section .runner-form-processing-indicator .button-spinner {
+  width: 18px;
+  height: 18px;
+}
+
+.runner-section .runner-actions button[aria-busy="true"] {
+  cursor: wait;
+}
+
+@keyframes runner-form-processing-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* Follow-up responsive containment for the form designer. */
 .designer-section .tool-panel,
 .designer-section .field-editor,
@@ -493,6 +552,22 @@
   }
 }
 
+@container form-runner (max-width: 1100px) {
+  .runner-section .runner-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.75fr);
+  }
+}
+
+@container form-runner (max-width: 960px) {
+  .runner-section .runner-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .runner-section .runner-preview-panel {
+    width: 100%;
+  }
+}
+
 .designer-section .field-editor-header {
   flex-wrap: wrap;
 }
@@ -501,6 +576,7 @@
 .designer-section .rule-editor-header > div,
 .designer-section .option-editor-header > strong,
 .designer-section .designer-save-panel,
+.runner-section .runner-grid,
 .runner-section .runner-form,
 .runner-section .runner-preview-panel,
 .runner-section .runner-output {
@@ -1156,6 +1232,12 @@
 
 @media (prefers-reduced-motion: reduce) {
   .field-insert-indicator-preview {
+    animation: none;
+  }
+
+  .runner-section .runner-form-processing-overlay,
+  .runner-section .runner-form-processing-indicator .button-spinner,
+  .runner-section .runner-actions .button-spinner {
     animation: none;
   }
 

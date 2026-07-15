@@ -107,6 +107,11 @@ The scope includes:
 - The form runner keeps the latest loaded form definitions in a lightweight client cache and uses a management-style opening skeleton for the form and payload preview during the true initial `loading` state.
 - Form-list loading uses an unmount ignore guard so a completed async request cannot update runner state, messages or the shared form cache after the component is gone.
 - Cached `refreshing` behavior and runner business logic remain unchanged.
+- The Runner heading, description, form panel and JSON preview share the same centered `.runner-section` axis. Runner-scoped CSS balances the space after the sidebar without changing global `.content`, `.main-area`, AppShell or sidebar rules; below 960px of actual Runner width, the JSON panel can stack under the form.
+- Changing the saved form updates its initial values and JSON preview immediately, then shows a 240ms `Form hazırlanıyor...` overlay scoped to `.runner-form`; the JSON panel is never covered by this overlay.
+- Process start enters its disabled spinner state with `Süreç başlatılıyor...` only after `validateFormValues` succeeds. A ref-based in-flight lock blocks double submit and is always released in `finally`, while existing success/error feedback remains intact.
+- Clear keeps the existing `buildInitialValues` reset behavior, clears validation errors and the previous process result immediately, and shows short `Temizleniyor...` feedback.
+- `validateFormValues`, `prepareFormData`, the API call and payload shape, `RequiredWhen`, metadata-only File Upload, number/date/select/radio/checkbox conversions, JSON preview copy/expand actions, Form Designer, palette drag/drop and existing-field reorder remain unchanged. No package or lockfile update was required.
 
 ## File Upload Foundation
 
@@ -290,6 +295,7 @@ Select and Radio share option validation across the designer and backend definit
 - **Known follow-up:** Mixed-height existing-field drag visuals are improved; continue manual verification across browser and zoom combinations.
 - **Known follow-up:** Drawer palette selection is click-to-add rather than drag/drop. This is accepted for now and can be researched in a separate isolated batch if required.
 - **Known follow-up:** Real binary File Upload transfer, storage, endpoint and attachment-entity design remains deferred until the responsible stakeholders provide the required architecture and security decisions.
+- **Known follow-up:** Continue manual regression coverage for Runner centering and loading feedback across browser and zoom combinations.
 
 ## Deferred Real Upload / Storage
 
