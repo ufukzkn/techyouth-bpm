@@ -223,7 +223,7 @@
 .dashboard-donut-svg circle[data-active="true"] {
   stroke-width: 18;
 }
-.chart-segment-open { stroke: var(--orange); }
+.chart-segment-open { stroke: var(--chart-pending); }
 .chart-segment-progress { stroke: var(--primary); }
 .chart-segment-completed { stroke: var(--teal); }
 
@@ -329,7 +329,7 @@
 }
 
 .legend-open {
-  background: var(--orange);
+  background: var(--chart-pending);
 }
 
 .legend-progress {
