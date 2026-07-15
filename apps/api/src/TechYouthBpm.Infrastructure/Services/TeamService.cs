@@ -189,6 +189,54 @@ public class TeamService(
         return Result<TeamDto>.Success(await GetTeamDtoAsync(team.Id, cancellationToken));
     }
 
+    public async Task<Result<IReadOnlyList<UserTeamMembershipDto>>> ListUserMembershipsAsync(
+        Guid userId,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var target = await db.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            .Select(user => new
+            {
+                user.Id,
+                CommunityId = user.CommunityMemberships
+                    .Where(membership => membership.IsActive)
+                    .Select(membership => (Guid?)membership.CommunityId)
+                    .FirstOrDefault()
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (target is null)
+        {
+            return Result<IReadOnlyList<UserTeamMembershipDto>>.Failure("User was not found.");
+        }
+
+        var canView = currentUser.Id == userId
+            || currentUser.IsSuperAdmin()
+            || (target.CommunityId is not null
+                && currentUser.CommunityId == target.CommunityId
+                && currentUser.HasPermission(PermissionNames.TeamsManage));
+        if (!canView)
+        {
+            return Result<IReadOnlyList<UserTeamMembershipDto>>.Failure("Current user cannot view these team memberships.");
+        }
+
+        var memberships = await db.TeamMemberships
+            .AsNoTracking()
+            .Where(membership => membership.UserId == userId && membership.IsActive && membership.Team != null)
+            .OrderBy(membership => membership.Team!.Name)
+            .Select(membership => new UserTeamMembershipDto(
+                membership.TeamId,
+                membership.Team!.Name,
+                membership.Team.IsActive,
+                membership.IsLead,
+                membership.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return Result<IReadOnlyList<UserTeamMembershipDto>>.Success(memberships);
+    }
+
     public async Task<Result<TeamMemberPageDto>> ListMembersAsync(
         Guid teamId,
         TeamMemberSearchRequest request,
@@ -242,6 +290,73 @@ public class TeamService(
             .ToListAsync(cancellationToken);
 
         return Result<TeamMemberPageDto>.Success(new TeamMemberPageDto(items, page, pageSize, totalCount));
+    }
+
+    public async Task<Result<TeamRosterPageDto>> ListRosterAsync(
+        Guid teamId,
+        TeamMemberSearchRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var team = await db.Teams
+            .AsNoTracking()
+            .Select(item => new { item.Id, item.CommunityId, item.IsActive })
+            .SingleOrDefaultAsync(item => item.Id == teamId, cancellationToken);
+        if (team is null)
+        {
+            return Result<TeamRosterPageDto>.Failure("Team was not found.");
+        }
+
+        var hasCommunityPermission = CanAccessCommunity(currentUser, team.CommunityId, PermissionNames.TeamsView);
+        var isActiveMember = team.IsActive
+            && currentUser.CommunityId == team.CommunityId
+            && await db.TeamMemberships.AsNoTracking().AnyAsync(
+                membership => membership.TeamId == teamId
+                    && membership.UserId == currentUser.Id
+                    && membership.IsActive,
+                cancellationToken);
+        if (!hasCommunityPermission && !isActiveMember)
+        {
+            return Result<TeamRosterPageDto>.Failure("Current user cannot view this team roster.");
+        }
+
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        var query = db.TeamMemberships.AsNoTracking()
+            .Where(membership => membership.TeamId == teamId
+                && membership.IsActive
+                && membership.User != null
+                && membership.User.Status == UserStatus.Active
+                && membership.User.CommunityMemberships.Any(communityMembership =>
+                    communityMembership.IsActive && communityMembership.CommunityId == team.CommunityId));
+        var search = request.Query?.Trim();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(membership => membership.User!.Username.Contains(search)
+                || membership.User.DisplayName.Contains(search));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderByDescending(membership => membership.IsLead)
+            .ThenBy(membership => membership.User!.DisplayName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(membership => new TeamRosterMemberDto(
+                membership.UserId,
+                membership.User!.Username,
+                membership.User.DisplayName,
+                membership.User.CommunityMemberships
+                    .Where(communityMembership => communityMembership.IsActive
+                        && communityMembership.CommunityId == team.CommunityId)
+                    .Select(communityMembership => communityMembership.CommunityRole != null
+                        ? communityMembership.CommunityRole.Name
+                        : string.Empty)
+                    .FirstOrDefault() ?? string.Empty,
+                membership.IsLead))
+            .ToListAsync(cancellationToken);
+
+        return Result<TeamRosterPageDto>.Success(new TeamRosterPageDto(items, page, pageSize, totalCount));
     }
 
     public async Task<Result<TeamCandidatePageDto>> ListCandidatesAsync(

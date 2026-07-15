@@ -10,7 +10,9 @@ public interface ITeamService
     Task<Result<TeamDto>> GetAsync(Guid teamId, UserDto currentUser, CancellationToken cancellationToken = default);
     Task<Result<TeamDto>> CreateAsync(CreateTeamRequest request, UserDto currentUser, CancellationToken cancellationToken = default);
     Task<Result<TeamDto>> UpdateAsync(Guid teamId, UpdateTeamRequest request, UserDto currentUser, CancellationToken cancellationToken = default);
+    Task<Result<IReadOnlyList<UserTeamMembershipDto>>> ListUserMembershipsAsync(Guid userId, UserDto currentUser, CancellationToken cancellationToken = default);
     Task<Result<TeamMemberPageDto>> ListMembersAsync(Guid teamId, TeamMemberSearchRequest request, UserDto currentUser, CancellationToken cancellationToken = default);
+    Task<Result<TeamRosterPageDto>> ListRosterAsync(Guid teamId, TeamMemberSearchRequest request, UserDto currentUser, CancellationToken cancellationToken = default);
     Task<Result<TeamCandidatePageDto>> ListCandidatesAsync(Guid teamId, TeamMemberSearchRequest request, UserDto currentUser, CancellationToken cancellationToken = default);
     Task<Result<TeamCandidatePageDto>> ListUnassignedAsync(UnassignedTeamMemberSearchRequest request, UserDto currentUser, CancellationToken cancellationToken = default);
     Task<Result<TeamMemberDto>> AddMemberAsync(Guid teamId, AddTeamMemberRequest request, UserDto currentUser, CancellationToken cancellationToken = default);

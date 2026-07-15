@@ -68,6 +68,26 @@ public record TeamMemberPageDto(
     int PageSize,
     int TotalCount);
 
+public record UserTeamMembershipDto(
+    Guid TeamId,
+    string TeamName,
+    bool TeamIsActive,
+    bool IsLead,
+    DateTime JoinedAt);
+
+public record TeamRosterMemberDto(
+    Guid UserId,
+    string Username,
+    string DisplayName,
+    string CommunityRoleName,
+    bool IsLead);
+
+public record TeamRosterPageDto(
+    IReadOnlyList<TeamRosterMemberDto> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
+
 public record TeamCandidateDto(
     Guid UserId,
     string Username,
