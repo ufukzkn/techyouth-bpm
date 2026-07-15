@@ -27,6 +27,7 @@ Production tasks:
 - Settings page draft for theme and user preferences.
 - Community-scoped team and multi-team membership management.
 - Virtual `Takimsiz` user view, team audit and membership notifications.
+- User-detail team assignment and the personal read-only `Takimlarim` roster.
 
 Backend/API touchpoints:
 
@@ -36,6 +37,7 @@ Backend/API touchpoints:
 - Community and permission data returned from auth response.
 - Community and custom role APIs.
 - Team and team-membership APIs.
+- Safe member roster and on-demand user membership APIs.
 
 Frontend files and areas:
 

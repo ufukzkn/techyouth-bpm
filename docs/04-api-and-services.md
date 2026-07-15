@@ -247,7 +247,7 @@ The frontend API client now exposes one method for each planned endpoint:
 - Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`, `resetUserPasswordByAdmin`
 - Communities: `listCommunities`, `createCommunity`, `updateCommunity`, `regenerateCommunityInviteCode`, `getCommunitySummary`, `listRoleTemplates`, `listCommunityRoles`, `createCommunityRole`, `updateCommunityRole`, `deleteCommunityRole`
 - Notifications: `listNotifications`, `markNotificationRead`, `setNotificationReadState`, `markAllNotificationsRead`
-- Teams: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `listTeamMembers`, `listTeamCandidates`, `listUnassignedTeamMembers`, `addTeamMember`, `updateTeamMember`, `removeTeamMember`
+- Teams: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `listTeamMembers`, `listTeamRoster`, `listUserTeamMemberships`, `listTeamCandidates`, `listUnassignedTeamMembers`, `addTeamMember`, `updateTeamMember`, `removeTeamMember`
 - Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`
 - Processes: `startProcess`, `listProcesses`, `getProcess`
@@ -264,12 +264,16 @@ The implemented team package uses `Teams.View` and `Teams.Manage` with these com
 - `GET/POST /api/teams`
 - `GET/PATCH /api/teams/{teamId}`
 - `GET /api/teams/{teamId}/members`
+- `GET /api/teams/{teamId}/roster`
 - `GET /api/teams/{teamId}/candidates`
 - `GET /api/teams/unassigned/members`
 - `POST /api/teams/{teamId}/members`
 - `PATCH/DELETE /api/teams/{teamId}/members/{userId}`
+- `GET /api/users/{userId}/team-memberships`
 
 List endpoints use server-side search and pagination. `Takimsiz` is computed from active approved community users without active team memberships; it is never stored as a team. A user may be active in multiple teams, while `IsLead` is descriptive and grants no permission by itself. Membership add/remove/lead mutations write system audit and notify the affected user. Moving a user to another community deactivates memberships in the previous community.
+
+`/members` is the management contract and may include administrative fields. `/roster` is the safe member-facing contract: an active team member can view only their own team's active roster, and the response omits email, session and audit data. User-detail membership reads are allowed to the target user, SuperAdmin or a same-community `Teams.Manage` holder; mutations continue to use the existing team endpoints.
 
 ## Community Management Additions
 

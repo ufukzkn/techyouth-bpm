@@ -238,6 +238,7 @@ Ana workspace route'lari:
 - `http://localhost:3000/inbox`
 - `http://localhost:3000/management`
 - `http://localhost:3000/management/teams`
+- `http://localhost:3000/teams` (kullanicinin kendi takimlari ve salt-okunur takim arkadaslari)
 - `http://localhost:3000/logs`
 - `http://localhost:3000/settings`
 
@@ -337,6 +338,7 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 7. Surec detayinda JSON veri ve audit log mantigini incele.
 8. Bildirim popover'inda son bes kaydi, `Gelen Kutusu` ekraninda arama/filtre/pagination ve okundu durumunu dene.
 9. `Yonetim > Takimlar` ekraninda topluluk takimlarini, uyeleri, adaylari, lider degisimini ve sanal `Takimsiz` listesini dene.
+10. Normal bir takim uyesiyle `/teams` ekranini ac; yalnizca kendi takimlarini ve e-posta icermeyen takim arkadasi listesini gorebildigini dogrula.
 
 ## Troubleshooting
 
