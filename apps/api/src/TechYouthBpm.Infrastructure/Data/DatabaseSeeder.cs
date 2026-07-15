@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
+using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Security;
@@ -248,9 +249,11 @@ public static class DatabaseSeeder
     [
         TeamMember(SportScoutTeamId, UserId, true),
         TeamMember(SportScoutTeamId, ZlatanIbrahimovicId),
+        TeamMember(SportScoutTeamId, QuaresmaId),
         TeamMember(SportTechnicalTeamId, ApproverId, true),
         TeamMember(SportTechnicalTeamId, QuaresmaId),
         TeamMember(SportFinanceTeamId, OkanBurukId, true),
+        TeamMember(SportFinanceTeamId, QuaresmaId),
         TeamMember(SportTransferTeamId, FatihTerimId, true),
         TeamMember(SportTransferTeamId, QuaresmaId),
         TeamMember(LogisticsPlanningTeamId, JoseMourinhoId, true),
@@ -783,6 +786,359 @@ public static class DatabaseSeeder
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    private static async Task EnsureVersionedWorkflowSeedAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var forms = await db.FormDefinitions
+            .Include(form => form.Fields)
+            .ThenInclude(field => field.ValidationRules)
+            .Include(form => form.Versions)
+            .ToListAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+
+        foreach (var form in forms.Where(form => form.Versions.Count == 0))
+        {
+            db.FormDefinitionVersions.Add(FormVersionModel.BuildLegacyPublishedVersion(
+                form,
+                1,
+                form.CreatedByUserId,
+                now));
+        }
+
+        if (db.ChangeTracker.HasChanges())
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        var transferFormVersion = await db.FormDefinitionVersions
+            .Where(version => version.FormDefinitionId == Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001")
+                && version.Status == DefinitionVersionStatus.Published)
+            .OrderByDescending(version => version.VersionNumber)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (transferFormVersion is null)
+        {
+            return;
+        }
+
+        var definitionId = Guid.Parse("abababab-0000-0000-0000-000000000001");
+        var versionId = Guid.Parse("abababab-1000-0000-0000-000000000001");
+        var definition = await db.ProcessDefinitions
+            .Include(item => item.Versions)
+            .SingleOrDefaultAsync(item => item.Id == definitionId, cancellationToken);
+        if (definition is null)
+        {
+            definition = new ProcessDefinition
+            {
+                Id = definitionId,
+                Name = "Legacy Basic Approval",
+                Description = "Versioned compatibility workflow for the original one-step approval path.",
+                CommunityId = SportCommunityId,
+                CreatedByUserId = AdminId,
+                CreatedAt = now
+            };
+            db.ProcessDefinitions.Add(definition);
+        }
+
+        if (definition.Versions.All(version => version.Id != versionId))
+        {
+            var graph = new ProcessGraphDto(
+                "1.0",
+                [
+                    new ProcessNodeDto(
+                        "start",
+                        ProcessNodeType.Start,
+                        "Start",
+                        transferFormVersion.Id,
+                        PositionX: 80,
+                        PositionY: 120,
+                        Width: 160,
+                        Height: 72,
+                        Description: "Submitted through the legacy-compatible start form."),
+                    new ProcessNodeDto(
+                        "approval",
+                        ProcessNodeType.UserTask,
+                        "Approval",
+                        Priority: TaskPriority.Normal,
+                        Actions: [WorkflowAction.Approve, WorkflowAction.Reject],
+                        Assignment: new TaskAssignmentDto(
+                            TaskAssignmentType.CommunityRole,
+                            CommunityRoleId: SportApproverRoleId),
+                        PositionX: 340,
+                        PositionY: 110,
+                        Width: 220,
+                        Height: 96,
+                        Description: "Community approver decision."),
+                    new ProcessNodeDto(
+                        "completed",
+                        ProcessNodeType.CompletedEnd,
+                        "Completed",
+                        PositionX: 680,
+                        PositionY: 60,
+                        Width: 160,
+                        Height: 72),
+                    new ProcessNodeDto(
+                        "rejected",
+                        ProcessNodeType.RejectedEnd,
+                        "Rejected",
+                        PositionX: 680,
+                        PositionY: 190,
+                        Width: 160,
+                        Height: 72)
+                ],
+                [
+                    new ProcessEdgeDto("start", "approval", Order: 0, Label: "Submit"),
+                    new ProcessEdgeDto("approval", "completed", WorkflowAction.Approve, Order: 1, Label: "Approve"),
+                    new ProcessEdgeDto("approval", "rejected", WorkflowAction.Reject, Order: 2, Label: "Reject")
+                ]);
+            definition.Versions.Add(new ProcessDefinitionVersion
+            {
+                Id = versionId,
+                ProcessDefinitionId = definitionId,
+                VersionNumber = 1,
+                Status = DefinitionVersionStatus.Published,
+                FormDefinitionVersionId = transferFormVersion.Id,
+                GraphJson = Serialize(graph),
+                CreatedByUserId = AdminId,
+                CreatedAt = now,
+                PublishedByUserId = AdminId,
+                PublishedAt = now
+            });
+        }
+
+        var taskFormIds = new[]
+        {
+            Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002"),
+            Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003"),
+            Guid.Parse("aaaaaaaa-0000-0000-0000-000000000004"),
+            Guid.Parse("aaaaaaaa-0000-0000-0000-000000000005")
+        };
+        var taskFormVersions = (await db.FormDefinitionVersions
+                .Where(version => taskFormIds.Contains(version.FormDefinitionId)
+                    && version.Status == DefinitionVersionStatus.Published)
+                .ToListAsync(cancellationToken))
+            .GroupBy(version => version.FormDefinitionId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(version => version.VersionNumber).First());
+
+        if (taskFormIds.All(taskFormVersions.ContainsKey))
+        {
+            var transferWorkflowId = Guid.Parse("abababab-0000-0000-0000-000000000002");
+            var transferWorkflowVersionId = Guid.Parse("abababab-1000-0000-0000-000000000002");
+            var transferWorkflow = await db.ProcessDefinitions
+                .Include(item => item.Versions)
+                .SingleOrDefaultAsync(item => item.Id == transferWorkflowId, cancellationToken);
+            if (transferWorkflow is null)
+            {
+                transferWorkflow = new ProcessDefinition
+                {
+                    Id = transferWorkflowId,
+                    Name = "Transfer Talep Akisi",
+                    Description = "Scout, teknik, mali ve transfer operasyon takimlarini kosullu olarak birlestiren demo BPM akisi.",
+                    CommunityId = SportCommunityId,
+                    CreatedByUserId = FatihTerimId,
+                    CreatedAt = now
+                };
+                db.ProcessDefinitions.Add(transferWorkflow);
+            }
+
+            if (transferWorkflow.Versions.All(version => version.Id != transferWorkflowVersionId))
+            {
+                using var threshold = JsonDocument.Parse("5000000");
+                var scoutFormVersion = taskFormVersions[taskFormIds[0]].Id;
+                var technicalFormVersion = taskFormVersions[taskFormIds[1]].Id;
+                var financeFormVersion = taskFormVersions[taskFormIds[2]].Id;
+                var operationFormVersion = taskFormVersions[taskFormIds[3]].Id;
+                var graph = new ProcessGraphDto(
+                    "1.0",
+                    [
+                        new ProcessNodeDto(
+                            "scout-lane",
+                            ProcessNodeType.TeamSwimlane,
+                            "Scout Ekibi",
+                            PositionX: 40,
+                            PositionY: 20,
+                            Width: 1120,
+                            Height: 220,
+                            Description: "Oyuncu izleme ve ilk rapor.",
+                            TeamId: SportScoutTeamId),
+                        new ProcessNodeDto(
+                            "technical-lane",
+                            ProcessNodeType.TeamSwimlane,
+                            "Teknik Degerlendirme",
+                            PositionX: 40,
+                            PositionY: 280,
+                            Width: 1120,
+                            Height: 220,
+                            Description: "Kadro ve teknik uygunluk karari.",
+                            TeamId: SportTechnicalTeamId),
+                        new ProcessNodeDto(
+                            "finance-lane",
+                            ProcessNodeType.TeamSwimlane,
+                            "Mali Isler",
+                            PositionX: 40,
+                            PositionY: 540,
+                            Width: 1120,
+                            Height: 220,
+                            Description: "Yuksek butceli taleplerin mali kontrolu.",
+                            TeamId: SportFinanceTeamId),
+                        new ProcessNodeDto(
+                            "operation-lane",
+                            ProcessNodeType.TeamSwimlane,
+                            "Transfer Operasyon",
+                            PositionX: 40,
+                            PositionY: 800,
+                            Width: 1120,
+                            Height: 220,
+                            Description: "Sozlesme ve tamamlama operasyonu.",
+                            TeamId: SportTransferTeamId),
+                        new ProcessNodeDto(
+                            "start",
+                            ProcessNodeType.Start,
+                            "Transfer Talebi",
+                            transferFormVersion.Id,
+                            ParentKey: "scout-lane",
+                            PositionX: 50,
+                            PositionY: 70,
+                            Width: 170,
+                            Height: 72),
+                        new ProcessNodeDto(
+                            "scoutReview",
+                            ProcessNodeType.UserTask,
+                            "Scout Raporu",
+                            scoutFormVersion,
+                            TaskPriority.High,
+                            [WorkflowAction.Approve, WorkflowAction.Reject],
+                            new TaskAssignmentDto(
+                                TaskAssignmentType.TeamAndCommunityRole,
+                                TeamId: SportScoutTeamId,
+                                CommunityRoleId: SportApproverRoleId),
+                            "scout-lane",
+                            330,
+                            58,
+                            230,
+                            104,
+                            "Scout raporunu doldur ve ilk karari ver."),
+                        new ProcessNodeDto(
+                            "technicalReview",
+                            ProcessNodeType.UserTask,
+                            "Teknik Degerlendirme",
+                            technicalFormVersion,
+                            TaskPriority.High,
+                            [WorkflowAction.Approve, WorkflowAction.Reject, WorkflowAction.SendBack],
+                            new TaskAssignmentDto(
+                                TaskAssignmentType.TeamAndCommunityRole,
+                                TeamId: SportTechnicalTeamId,
+                                CommunityRoleId: SportApproverRoleId),
+                            "technical-lane",
+                            300,
+                            58,
+                            240,
+                            104,
+                            "Teknik ekip kadro uygunlugunu degerlendirir."),
+                        new ProcessNodeDto(
+                            "budgetGateway",
+                            ProcessNodeType.ExclusiveGateway,
+                            "Butce Kontrolu",
+                            ParentKey: "technical-lane",
+                            PositionX: 650,
+                            PositionY: 60,
+                            Width: 180,
+                            Height: 96,
+                            Description: "Bes milyon uzeri talepler Mali Isler'e gider."),
+                        new ProcessNodeDto(
+                            "financeApproval",
+                            ProcessNodeType.UserTask,
+                            "Mali Onay",
+                            financeFormVersion,
+                            TaskPriority.Critical,
+                            [WorkflowAction.Approve, WorkflowAction.Reject, WorkflowAction.SendBack],
+                            new TaskAssignmentDto(
+                                TaskAssignmentType.TeamAndCommunityRole,
+                                TeamId: SportFinanceTeamId,
+                                CommunityRoleId: SportApproverRoleId),
+                            "finance-lane",
+                            330,
+                            58,
+                            230,
+                            104,
+                            "Butce uygunlugu ve onaylanan tutar kaydedilir."),
+                        new ProcessNodeDto(
+                            "transferOperation",
+                            ProcessNodeType.UserTask,
+                            "Transfer Operasyon",
+                            operationFormVersion,
+                            TaskPriority.Normal,
+                            [WorkflowAction.Complete, WorkflowAction.SendBack],
+                            new TaskAssignmentDto(
+                                TaskAssignmentType.Team,
+                                TeamId: SportTransferTeamId),
+                            "operation-lane",
+                            330,
+                            58,
+                            240,
+                            104,
+                            "Sozlesme ve transfer tamamlama bilgileri girilir."),
+                        new ProcessNodeDto(
+                            "completed",
+                            ProcessNodeType.CompletedEnd,
+                            "Transfer Tamamlandi",
+                            ParentKey: "operation-lane",
+                            PositionX: 740,
+                            PositionY: 70,
+                            Width: 190,
+                            Height: 72),
+                        new ProcessNodeDto(
+                            "rejected",
+                            ProcessNodeType.RejectedEnd,
+                            "Talep Reddedildi",
+                            ParentKey: "technical-lane",
+                            PositionX: 900,
+                            PositionY: 70,
+                            Width: 190,
+                            Height: 72)
+                    ],
+                    [
+                        new ProcessEdgeDto("start", "scoutReview", Order: 0, Label: "Talebi gonder"),
+                        new ProcessEdgeDto("scoutReview", "technicalReview", WorkflowAction.Approve, Order: 1, Label: "Scout olumlu"),
+                        new ProcessEdgeDto("scoutReview", "rejected", WorkflowAction.Reject, Order: 2, Label: "Scout reddi"),
+                        new ProcessEdgeDto("technicalReview", "budgetGateway", WorkflowAction.Approve, Order: 3, Label: "Teknik onay"),
+                        new ProcessEdgeDto("technicalReview", "rejected", WorkflowAction.Reject, Order: 4, Label: "Teknik ret"),
+                        new ProcessEdgeDto("technicalReview", "scoutReview", WorkflowAction.SendBack, Order: 5, Label: "Scout'a geri gonder"),
+                        new ProcessEdgeDto(
+                            "budgetGateway",
+                            "financeApproval",
+                            Condition: new ProcessConditionDto(
+                                "start.bonservis",
+                                GraphConditionOperator.GreaterThan,
+                                threshold.RootElement.Clone()),
+                            Order: 6,
+                            Label: "5M uzeri"),
+                        new ProcessEdgeDto("budgetGateway", "transferOperation", IsDefault: true, Order: 7, Label: "Standart butce"),
+                        new ProcessEdgeDto("financeApproval", "transferOperation", WorkflowAction.Approve, Order: 8, Label: "Mali onay"),
+                        new ProcessEdgeDto("financeApproval", "rejected", WorkflowAction.Reject, Order: 9, Label: "Mali ret"),
+                        new ProcessEdgeDto("financeApproval", "technicalReview", WorkflowAction.SendBack, Order: 10, Label: "Teknik ekibe don"),
+                        new ProcessEdgeDto("transferOperation", "completed", WorkflowAction.Complete, Order: 11, Label: "Transferi tamamla"),
+                        new ProcessEdgeDto("transferOperation", "technicalReview", WorkflowAction.SendBack, Order: 12, Label: "Teknik ekibe don")
+                    ]);
+                transferWorkflow.Versions.Add(new ProcessDefinitionVersion
+                {
+                    Id = transferWorkflowVersionId,
+                    ProcessDefinitionId = transferWorkflowId,
+                    VersionNumber = 1,
+                    Status = DefinitionVersionStatus.Published,
+                    FormDefinitionVersionId = transferFormVersion.Id,
+                    GraphJson = Serialize(graph),
+                    CreatedByUserId = FatihTerimId,
+                    CreatedAt = now,
+                    PublishedByUserId = FatihTerimId,
+                    PublishedAt = now
+                });
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     private static async Task RetireDuplicateLogisticsRoleAsync(AppDbContext db, CancellationToken cancellationToken)
     {
         var legacyRoles = await db.CommunityRoles
@@ -1053,6 +1409,82 @@ public static class DatabaseSeeder
             ]
         };
 
+        var scoutReportForm = new FormDefinition
+        {
+            Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002"),
+            Name = "Scout Degerlendirme Formu",
+            Description = "Scout ekibinin oyuncu raporunu ve ilk tavsiyesini kaydeder.",
+            CommunityId = SportCommunityId,
+            CreatedByUserId = FatihTerimId,
+            CreatedAt = DateTime.UtcNow.AddDays(-11),
+            Fields =
+            [
+                Field("aaaaaaaa-1100-0000-0000-000000000001", "raporOzeti", "Rapor Ozeti", FieldType.Text, true, 1),
+                Field(
+                    "aaaaaaaa-1100-0000-0000-000000000002",
+                    "scoutTavsiyesi",
+                    "Scout Tavsiyesi",
+                    FieldType.Select,
+                    true,
+                    2,
+                    ["Olumlu", "Olumsuz", "Takip Edilsin"]),
+                Field("aaaaaaaa-1100-0000-0000-000000000003", "izlemePuani", "Izleme Puani", FieldType.Number, true, 3)
+            ]
+        };
+
+        var technicalReviewForm = new FormDefinition
+        {
+            Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003"),
+            Name = "Teknik Degerlendirme Formu",
+            Description = "Teknik ekibin kadro uygunlugu kararini kaydeder.",
+            CommunityId = SportCommunityId,
+            CreatedByUserId = FatihTerimId,
+            CreatedAt = DateTime.UtcNow.AddDays(-10),
+            Fields =
+            [
+                Field(
+                    "aaaaaaaa-1200-0000-0000-000000000001",
+                    "teknikKarar",
+                    "Teknik Karar",
+                    FieldType.Select,
+                    true,
+                    1,
+                    ["Uygun", "Revize Edilmeli", "Uygun Degil"]),
+                Field("aaaaaaaa-1200-0000-0000-000000000002", "teknikNot", "Teknik Not", FieldType.Text, true, 2)
+            ]
+        };
+
+        var financeApprovalForm = new FormDefinition
+        {
+            Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000004"),
+            Name = "Mali Onay Formu",
+            Description = "Yuksek butceli transferlerde mali uygunluk kararini kaydeder.",
+            CommunityId = SportCommunityId,
+            CreatedByUserId = FatihTerimId,
+            CreatedAt = DateTime.UtcNow.AddDays(-9),
+            Fields =
+            [
+                Field("aaaaaaaa-1300-0000-0000-000000000001", "onaylananButce", "Onaylanan Butce", FieldType.Number, true, 1),
+                Field("aaaaaaaa-1300-0000-0000-000000000002", "maliNot", "Mali Not", FieldType.Text, true, 2)
+            ]
+        };
+
+        var transferOperationForm = new FormDefinition
+        {
+            Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000005"),
+            Name = "Transfer Operasyon Formu",
+            Description = "Sozlesme ve transfer tamamlama bilgilerini kaydeder.",
+            CommunityId = SportCommunityId,
+            CreatedByUserId = FatihTerimId,
+            CreatedAt = DateTime.UtcNow.AddDays(-8),
+            Fields =
+            [
+                Field("aaaaaaaa-1400-0000-0000-000000000001", "sozlesmeImzalandi", "Sozlesme Imzalandi", FieldType.Checkbox, true, 1),
+                Field("aaaaaaaa-1400-0000-0000-000000000002", "tamamlanmaTarihi", "Tamamlanma Tarihi", FieldType.Date, true, 2),
+                Field("aaaaaaaa-1400-0000-0000-000000000003", "operasyonNotu", "Operasyon Notu", FieldType.Text, false, 3)
+            ]
+        };
+
         var campForm = new FormDefinition
         {
             Id = Guid.Parse("bbbbbbbb-0000-0000-0000-000000000001"),
@@ -1113,6 +1545,26 @@ public static class DatabaseSeeder
             db.FormDefinitions.Add(transferForm);
         }
 
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == scoutReportForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(scoutReportForm);
+        }
+
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == technicalReviewForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(technicalReviewForm);
+        }
+
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == financeApprovalForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(financeApprovalForm);
+        }
+
+        if (!await db.FormDefinitions.AnyAsync(form => form.Id == transferOperationForm.Id, cancellationToken))
+        {
+            db.FormDefinitions.Add(transferOperationForm);
+        }
+
         if (!await db.FormDefinitions.AnyAsync(form => form.Id == campForm.Id, cancellationToken))
         {
             db.FormDefinitions.Add(campForm);
@@ -1165,6 +1617,7 @@ public static class DatabaseSeeder
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        await EnsureVersionedWorkflowSeedAsync(db, cancellationToken);
     }
 
     private static async Task EnsureExistingWorkflowCommunityScopeAsync(AppDbContext db, CancellationToken cancellationToken)

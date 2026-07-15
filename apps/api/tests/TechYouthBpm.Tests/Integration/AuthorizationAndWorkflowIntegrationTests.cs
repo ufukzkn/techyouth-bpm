@@ -144,4 +144,128 @@ public class AuthorizationAndWorkflowIntegrationTests
         Assert.Equal("InProgress", processPayload.GetProperty("status").GetString());
         Assert.Single(processPayload.GetProperty("tasks").EnumerateArray());
     }
+
+    [Fact]
+    public async Task Published_Dynamic_Workflow_Runs_Through_The_Http_Api()
+    {
+        using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateApiClient();
+        var (session, _) = await IntegrationTestHttp.LoginAsync(client);
+        var communityId = await factory.ExecuteDbAsync(db => db.Communities
+            .Where(community => community.IsActive)
+            .Select(community => community.Id)
+            .FirstAsync());
+
+        using var formRequest = IntegrationTestHttp.BearerRequest(HttpMethod.Post, "/api/forms", session.Token);
+        formRequest.Content = JsonContent.Create(new
+        {
+            name = $"Dynamic HTTP Form {Guid.NewGuid():N}",
+            description = "Starts a version-pinned workflow.",
+            communityId,
+            fields = new[]
+            {
+                new
+                {
+                    key = "amount",
+                    label = "Amount",
+                    type = "Number",
+                    required = true,
+                    sortOrder = 1,
+                    options = Array.Empty<string>(),
+                    validationRules = Array.Empty<object>()
+                }
+            }
+        });
+        using var formResponse = await client.SendAsync(formRequest);
+        Assert.True(formResponse.IsSuccessStatusCode, await formResponse.Content.ReadAsStringAsync());
+        var form = await formResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var formVersionId = form.GetProperty("latestPublishedVersionId").GetGuid();
+
+        using var definitionRequest = IntegrationTestHttp.BearerRequest(HttpMethod.Post, "/api/process-definitions", session.Token);
+        definitionRequest.Content = JsonContent.Create(new
+        {
+            name = $"Dynamic HTTP Workflow {Guid.NewGuid():N}",
+            description = "Controller pipeline test.",
+            communityId
+        });
+        using var definitionResponse = await client.SendAsync(definitionRequest);
+        Assert.True(definitionResponse.IsSuccessStatusCode, await definitionResponse.Content.ReadAsStringAsync());
+        var definition = await definitionResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var definitionId = definition.GetProperty("id").GetGuid();
+        var graph = new
+        {
+            schemaVersion = "1.0",
+            nodes = new object[]
+            {
+                new { key = "start", type = "Start", title = "Start", formDefinitionVersionId = formVersionId },
+                new
+                {
+                    key = "operation",
+                    type = "UserTask",
+                    title = "Operation",
+                    actions = new[] { "Complete" },
+                    assignment = new { type = "ProcessStarter" }
+                },
+                new { key = "completed", type = "CompletedEnd", title = "Completed" }
+            },
+            edges = new object[]
+            {
+                new { source = "start", target = "operation" },
+                new { source = "operation", target = "completed", action = "Complete" }
+            }
+        };
+
+        using var versionRequest = IntegrationTestHttp.BearerRequest(
+            HttpMethod.Post,
+            $"/api/process-definitions/{definitionId}/versions",
+            session.Token);
+        versionRequest.Content = JsonContent.Create(new { formDefinitionVersionId = formVersionId, graph });
+        using var versionResponse = await client.SendAsync(versionRequest);
+        Assert.True(versionResponse.IsSuccessStatusCode, await versionResponse.Content.ReadAsStringAsync());
+        var version = await versionResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var versionId = version.GetProperty("id").GetGuid();
+
+        using var publishRequest = IntegrationTestHttp.BearerRequest(
+            HttpMethod.Post,
+            $"/api/process-definitions/{definitionId}/versions/{versionId}/publish",
+            session.Token);
+        using var publishResponse = await client.SendAsync(publishRequest);
+        Assert.True(publishResponse.IsSuccessStatusCode, await publishResponse.Content.ReadAsStringAsync());
+        using var runnableRequest = IntegrationTestHttp.BearerRequest(
+            HttpMethod.Get,
+            "/api/process-definitions/runnable",
+            session.Token);
+        using var runnableResponse = await client.SendAsync(runnableRequest);
+        var runnable = await runnableResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        using var startRequest = IntegrationTestHttp.BearerRequest(HttpMethod.Post, "/api/processes/start/version", session.Token);
+        startRequest.Content = JsonContent.Create(new
+        {
+            processDefinitionVersionId = versionId,
+            formData = new { amount = 125000 }
+        });
+        using var startResponse = await client.SendAsync(startRequest);
+        Assert.True(startResponse.IsSuccessStatusCode, await startResponse.Content.ReadAsStringAsync());
+        var process = await startResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var taskId = process.GetProperty("tasks").EnumerateArray().Single().GetProperty("id").GetGuid();
+
+        using var actionRequest = IntegrationTestHttp.BearerRequest(
+            HttpMethod.Post,
+            $"/api/tasks/{taskId}/actions",
+            session.Token);
+        actionRequest.Content = JsonContent.Create(new { action = "Complete", note = "HTTP operation completed." });
+        using var actionResponse = await client.SendAsync(actionRequest);
+        var completed = await actionResponse.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.Created, formResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, definitionResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, versionResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, publishResponse.StatusCode);
+        Assert.Contains(runnable.EnumerateArray(), item =>
+            item.GetProperty("processDefinitionVersionId").GetGuid() == versionId);
+        Assert.Equal(HttpStatusCode.OK, startResponse.StatusCode);
+        Assert.Equal("InProgress", process.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.OK, actionResponse.StatusCode);
+        Assert.Equal("Completed", completed.GetProperty("status").GetString());
+    }
 }

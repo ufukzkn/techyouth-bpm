@@ -1,5 +1,11 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Processes;
+using TechYouthBpm.Application.Workflow;
 using TechYouthBpm.Infrastructure.Data;
 using TechYouthBpm.Domain.Enums;
+using TechYouthBpm.Infrastructure.Services;
 
 namespace TechYouthBpm.Tests.Auth;
 
@@ -83,5 +89,72 @@ public class DatabaseSeederTests
 
             Assert.Equal(8, activeMemberships.Count);
         }
+    }
+
+    [Fact]
+    public async Task SeedAsync_Creates_A_Valid_Multi_Team_Transfer_Workflow()
+    {
+        await using var db = TestDbFactory.Create();
+
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        var definition = await db.ProcessDefinitions
+            .Include(item => item.Versions)
+            .SingleAsync(item => item.Name == "Transfer Talep Akisi");
+        var version = Assert.Single(definition.Versions);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        var graph = JsonSerializer.Deserialize<ProcessGraphDto>(version.GraphJson, options)!;
+        var validation = await new ProcessGraphValidator(db).ValidateForPublishAsync(
+            graph,
+            definition.CommunityId,
+            version.FormDefinitionVersionId);
+
+        Assert.True(validation.IsSuccess, string.Join(" | ", validation.Errors));
+        Assert.Equal(4, graph.Nodes.Count(node => node.Type == ProcessNodeType.TeamSwimlane));
+        Assert.Equal(4, graph.Nodes.Count(node => node.Type == ProcessNodeType.UserTask));
+        Assert.Contains(graph.Edges, edge =>
+            edge.Condition?.Path == "start.bonservis"
+            && edge.Condition.Operator == GraphConditionOperator.GreaterThan);
+        Assert.Contains(graph.Nodes, node =>
+            node.Type == ProcessNodeType.UserTask
+            && node.Actions?.Contains(WorkflowAction.Complete) == true);
+
+        var starter = await db.Users
+            .Include(user => user.CommunityMemberships)
+            .ThenInclude(membership => membership.CommunityRole)
+            .ThenInclude(role => role!.Permissions)
+            .SingleAsync(user => user.Username == "fatih.terim");
+        var membership = starter.CommunityMemberships.Single(item => item.IsActive);
+        var starterDto = new TechYouthBpm.Application.Auth.UserDto(
+            starter.Id,
+            starter.Username,
+            starter.DisplayName,
+            starter.Email,
+            starter.Role,
+            starter.Status,
+            starter.IsEmailVerified,
+            starter.MustChangePassword,
+            membership.CommunityId,
+            "Sportif Faaliyetler",
+            membership.CommunityRoleId,
+            membership.CommunityRole!.Name,
+            membership.CommunityRole.Permissions.Select(permission => permission.Permission).ToArray());
+        using var formData = JsonDocument.Parse(
+            "{\"talepSahibi\":\"Fatih Terim\",\"oyuncuAdi\":\"Mario Gomez\",\"kulup\":\"Besiktas\",\"pozisyon\":\"Forvet\",\"bonservis\":7500000,\"acilMi\":false}");
+        var started = await new ProcessService(
+                db,
+                new FormService(db),
+                new ProcessStateMachine(),
+                new SystemAuditService(db))
+            .StartVersionAsync(new(version.Id, formData.RootElement.Clone()), starterDto);
+
+        Assert.True(started.IsSuccess, string.Join(" | ", started.Errors));
+        var firstTask = Assert.Single(started.Value!.Tasks.Where(task => task.Status == ProcessTaskStatus.Open));
+        Assert.Equal("scoutReview", firstTask.NodeKey);
+        Assert.Equal(TaskPriority.High, firstTask.Priority);
+        Assert.NotNull(firstTask.TaskForm);
+        Assert.Equal("Scout Degerlendirme Formu", firstTask.TaskForm.FormName);
+        Assert.Equal(3, firstTask.TaskForm.Pages.SelectMany(page => page.Fields).Count());
     }
 }
