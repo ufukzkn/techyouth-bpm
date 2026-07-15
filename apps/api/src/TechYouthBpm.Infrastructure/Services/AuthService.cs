@@ -1589,6 +1589,7 @@ public class AuthService(
                         user.DisplayName,
                         otp.DemoCode,
                         otp.ExpiresAt,
+                        verificationMinutes,
                         IsSandboxDelivery(user)),
                     user.Username,
                     true),
@@ -1623,11 +1624,13 @@ public class AuthService(
         string displayName,
         string code,
         DateTime expiresAt,
+        int verificationMinutes,
         bool isSandboxMode)
     {
         var safeName = WebUtility.HtmlEncode(displayName);
         var safeCode = WebUtility.HtmlEncode(code);
         var expiry = WebUtility.HtmlEncode(FormatTurkeyTime(expiresAt));
+        var validity = WebUtility.HtmlEncode(FormatValidityDuration(verificationMinutes));
         var deliveryNote = isSandboxMode
             ? "Gelistirme ortaminda bu e-posta Mailtrap Sandbox inbox icinde goruntulenir; gercek alici inbox teslimati icin production mail provider gerekir."
             : "Bu e-posta yapilandirilmis SMTP saglayicisi uzerinden gercek alici inbox teslimati icin gonderilmistir.";
@@ -1655,7 +1658,8 @@ public class AuthService(
                             <div style="font-size:12px;color:#647187;text-transform:uppercase;letter-spacing:.08em;">Dogrulama kodu</div>
                             <div style="margin-top:8px;font-size:34px;line-height:1;font-weight:800;letter-spacing:.18em;color:#d95f05;">{safeCode}</div>
                           </div>
-                          <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#647187;">Kod gecerliligi: <strong>{expiry}</strong></p>
+                          <p style="margin:0 0 4px;font-size:14px;line-height:1.6;color:#647187;">Bu kod <strong>{validity}</strong> gecerlidir.</p>
+                          <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#647187;">Son kullanim: <strong>{expiry}</strong></p>
                           <p style="margin:0 0 12px;font-size:13px;line-height:1.6;color:#647187;">{safeDeliveryNote}</p>
                           <p style="margin:0;font-size:13px;line-height:1.6;color:#647187;">Bu istegi sen baslatmadiysan e-postayi yok sayabilirsin.</p>
                         </td>
@@ -1667,6 +1671,23 @@ public class AuthService(
             </body>
             </html>
             """;
+    }
+
+    private static string FormatValidityDuration(int totalMinutes)
+    {
+        if (totalMinutes > 0 && totalMinutes % 1440 == 0)
+        {
+            var days = totalMinutes / 1440;
+            return days == 1 ? "24 saat" : $"{days} gun";
+        }
+
+        if (totalMinutes > 0 && totalMinutes % 60 == 0)
+        {
+            var hours = totalMinutes / 60;
+            return $"{hours} saat";
+        }
+
+        return $"{Math.Max(1, totalMinutes)} dakika";
     }
 
     private static string BuildTemporaryPasswordBody(string displayName, string username, string temporaryPassword)
