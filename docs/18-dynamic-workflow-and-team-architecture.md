@@ -24,6 +24,10 @@ Access rules:
 - Moving a user to another community deactivates old team memberships.
 - `Teams.View` and `Teams.Manage` are explicit permissions; `IsLead` grants neither.
 
+This foundation is implemented. `/management/teams` provides scoped team selection, create/edit, member search, candidate assignment, lead changes, removal and the virtual unassigned list. SuperAdmin can select any community; a Topluluk Admin remains locked to its own community. Lists are paged and searched on the server, cached data stays visible during refresh and destructive membership changes use confirmation plus card-local feedback.
+
+Implemented API contracts are `GET/POST /api/teams`, `GET/PATCH /api/teams/{id}`, paged member/candidate/unassigned queries and add/update/remove membership endpoints. Membership mutations write system audit and target-user notifications. The deterministic seed supplies 16 teams across five communities, including leaders, multi-team users and intentionally unassigned users.
+
 ## Planned Workflow Model
 
 The current state machine remains the production path until the dynamic runtime is ready. The planned model adds immutable published versions:
@@ -54,3 +58,5 @@ Integration order is contract first, team API second, form versions third and ru
 ## PDF Fit
 
 The PDF-required form components, validation, JSON submission, first task, assigned work, approve/reject, status dates, Swagger, EF Core and audit behavior remain intact. Teams and the visual workflow designer extend the bonus role assignment and drag/drop expectations without weakening the required baseline.
+
+The current verification baseline is 122 passing backend tests plus four frontend notification-store tests. Team coverage includes global/community scope, cross-community rejection, multi-team membership, virtual `Takimsiz`, non-authorizing leads, audit/notification writes and cleanup when a user changes community. Team-based workflow assignment remains deliberately deferred until the versioned workflow runtime is implemented.

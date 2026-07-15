@@ -110,6 +110,8 @@ Current tables:
 - `CommunityRoles`: custom roles inside one community.
 - `CommunityRolePermissions`: operation permissions attached to community roles.
 - `UserCommunityMemberships`: active user/community/role assignments.
+- `Teams`: community-scoped operational groups with normalized names, lifecycle state and creator metadata.
+- `TeamMemberships`: multi-team user membership, active state and informational lead state.
 - `FormDefinitions`: saved dynamic form definitions.
 - `FormFieldDefinitions`: fields belonging to a form definition.
 - `FieldValidationRules`: dependent validation rules such as required-when.
@@ -139,6 +141,8 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 | `volkan.demirel` | `volkan123` | User | Rejected | true |
 
 Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
+
+The same seed creates 16 operational teams across the five communities. Sportif Faaliyetler contains Scout, Technical, Finance and Transfer teams; the other communities contain three teams each. Seeded users include team leads, multi-team members and users with no active team. `Takimsiz` is calculated from those users at query time and is never inserted as a database row.
 
 Session tokens are stored as SHA-256 hashes. Active sessions include created time, last seen time, IP address, user agent and remembered-device state, then can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`. Remember-me sessions also create hashed rows in `RefreshTokens`; refresh tokens are rotated when used and revoked together with their access session.
 

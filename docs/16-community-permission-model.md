@@ -14,6 +14,8 @@ The first authorization model used fixed roles: `Admin`, `User` and `Approver`. 
 - `CommunityRole`: a custom role inside one community. Examples: `Topluluk Admin`, `Form Tasarimcisi`, `Surec Baslatici`, `Onay Sorumlusu`.
 - `CommunityRolePermission`: operation-level rights attached to a role.
 - `UserCommunityMembership`: connects a user to a community and a community role. V1 uses one active community per user, but the model can support multiple memberships later.
+- `Team`: an operational group inside a community. It does not create a second authorization hierarchy.
+- `TeamMembership`: lets one user join multiple teams and optionally be marked as lead. `IsLead` is context, not an implicit permission.
 
 ## Permission Set
 
@@ -30,6 +32,8 @@ The first permission set is operation-based:
 - `Tasks.View`
 - `Tasks.Act`
 - `Audit.View`
+- `Teams.View`
+- `Teams.Manage`
 
 The frontend receives the active user's community and permissions from `UserDto`. Navigation is filtered by `permissions`, not only by enum role. Direct API calls are still protected by backend service checks.
 
@@ -47,6 +51,8 @@ The frontend receives the active user's community and permissions from `UserDto`
 - Community management is separate from user management. It owns community metadata, invite code, active status, custom roles and role-distribution counts.
 - A custom role can be updated or removed. Role removal requires a replacement role and moves active memberships in one transaction. System roles, notably `Atanmadi`, are protected.
 - A deactivated community revokes member sessions and blocks member login plus new workflow writes. SuperAdmin retains management access to reactivate it; historical data remains available.
+- Team reads and writes stay inside the active community unless the actor is SuperAdmin. Cross-community membership is rejected, and changing a user's community deactivates old team memberships.
+- `Takimsiz` is a virtual view of active approved users without active team membership. It is not a role, team row or future workflow target.
 
 ## Demo Templates
 
@@ -84,4 +90,4 @@ SuperAdmin can edit every community setting. A Topluluk Admin can toggle only it
 
 ## Test Guarantees
 
-Service tests protect the important boundaries: registration assigns the supplied community's `Atanmadi` role, invalid invite codes persist nothing, existing users cannot become `SuperAdmin`, and only a current SuperAdmin can create a new SuperAdmin account. Community admins cannot read roles or move memberships across another community. Custom-role deletion moves active memberships to its replacement role. Notification reads are user-scoped, and community-scoped audit/task actions are blocked when access or the community is not valid.
+Service tests protect the important boundaries: registration assigns the supplied community's `Atanmadi` role, invalid invite codes persist nothing, existing users cannot become `SuperAdmin`, and only a current SuperAdmin can create a new SuperAdmin account. Community admins cannot read roles, teams or memberships across another community. Custom-role deletion moves active memberships to its replacement role. Team tests cover multi-team membership, virtual unassigned users, lead-without-permission, audit/notification writes and membership cleanup after a community move. Notification reads are user-scoped, and community-scoped audit/task actions are blocked when access or the community is not valid.

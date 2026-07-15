@@ -87,6 +87,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Compact dashboard actions only appear when the current user can open their target route.
 - Process/task refresh keeps the visible data on screen, shows inline button loading and reports success/error with a bottom-right toast.
 - The top bar places the compact session icon next to the active user identity. Clicking it opens session details: display name, username, role and expiry time.
+- Dashboard context and the session popover show the user's active team names without turning team leadership into an access rule.
 - The top bar includes a notification dropdown backed by `/api/notifications`, with unread count and `Tumunu okundu yap`.
 - Session details are informational only; actual session expiry handling stays in the centralized shell effect.
 - Active sessions can be listed and revoked from settings. Revoking the current session logs the user out.
@@ -95,7 +96,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Auth, registration, account, session and user-administration controllers now consume focused Application interfaces. The Infrastructure implementation may remain shared internally, but HTTP boundaries no longer depend on one oversized auth contract.
 - Community metadata/lifecycle and community-role CRUD use separate service contracts; user membership operations stay in user administration.
 - Inbox results now use a user/filter/page-scoped Zustand cache with stale-while-revalidate behavior. Returning to `/inbox` shows cached content immediately, optimistic read-state updates roll back on API failure and only post-baseline visible polling creates live notification toasts.
-- The next Ufuk package adds community-scoped teams, multi-team memberships and a virtual `Takimsiz` view. Team leadership is informational and never bypasses `Teams.View` or `Teams.Manage` checks.
+- `/management/teams` implements community-scoped teams, multi-team memberships and a virtual `Takimsiz` view. Team leadership is informational and never bypasses `Teams.View` or `Teams.Manage` checks.
 
 ## Current Dashboard Behavior
 
@@ -109,7 +110,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 ## Extensibility Notes
 
 - Adding a new screen should update `navigation.ts`, the matching route page under `apps/web/src/app` and any dashboard shortcuts that should point to it.
-- Admin-only access screens currently include `/management` for user/role management and `/logs` for categorized audit search.
+- Permission-scoped management routes include `/management/users`, `/management/communities` and `/management/teams`; `/logs` remains the categorized audit search.
 - Adding a new enum role should be rare; normal business access should be added through community roles and permission records.
 - Adding a new permission should update `PermissionNames`, backend service checks, `navigation.ts` and the management role-template UI.
 - Desktop navigation should stay fixed because the menu is short and should remain available during long workflow screens.

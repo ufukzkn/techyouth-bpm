@@ -237,6 +237,7 @@ Ana workspace route'lari:
 - `http://localhost:3000/tasks`
 - `http://localhost:3000/inbox`
 - `http://localhost:3000/management`
+- `http://localhost:3000/management/teams`
 - `http://localhost:3000/logs`
 - `http://localhost:3000/settings`
 
@@ -300,10 +301,11 @@ Remove-Item Env:TECHYOUTH_TEST_POSTGRES_CONNECTION
 
 Test benzersiz gecici bir PostgreSQL schema olusturur, migrations + seed + login/form smoke akisini calistirir ve schema'yi sonunda siler. Paylasilan demo tablolarina dokunmaz.
 
-Frontend lint ve production build:
+Frontend store testleri, lint ve production build:
 
 ```bash
 cd apps/web
+npm run test
 npm run lint
 npm run build
 ```
@@ -322,7 +324,7 @@ Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `Pending
 
 Admin kullanicisi `Loglar` ekraninda sistem gecmisini arayabilir. Loglar varsayilan olarak toplu dokulmez; kisi, surec, entity veya aksiyon aramasi ile server-side paginated sonuc ve ilgili kronolojik gecmis gorulur. Bu liste register, login/logout, rol/status degisikligi, form create/update, process start ve task approve/reject gibi kritik aksiyonlari kullanici, entity ve zaman bilgisiyle takip eder. Surec detay ekranindaki audit timeline ise ilgili surecin state history bilgisini gosterir; sureci baslatan kullanici kendi surec gecmisini, Admin/Approver ise gorebildigi sureclerin gecmisini inceleyebilir.
 
-Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari ve audit log ornekleriyle gelir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
+Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari, audit log ornekleri ve bes topluluga dagilmis 16 takimla gelir. Takim seed'i lider, coklu takim uyesi ve sanal `Takimsiz` sorgusunda gorunecek kullanicilari birlikte icerir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
 
 ## Current Demo Flow
 
@@ -334,6 +336,7 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 6. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
 7. Surec detayinda JSON veri ve audit log mantigini incele.
 8. Bildirim popover'inda son bes kaydi, `Gelen Kutusu` ekraninda arama/filtre/pagination ve okundu durumunu dene.
+9. `Yonetim > Takimlar` ekraninda topluluk takimlarini, uyeleri, adaylari, lider degisimini ve sanal `Takimsiz` listesini dene.
 
 ## Troubleshooting
 
@@ -357,3 +360,10 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 - `docs/10-ufuk-access-shell-flow.md`
 - `docs/11-i18n-language-support.md`
 - `docs/12-cagdas-process-flow.md`
+- `docs/13-frontend-ui-review.md`
+- `docs/14-backend-api-review.md`
+- `docs/15-product-readiness-and-defense.md`
+- `docs/16-community-permission-model.md`
+- `docs/17-docker-and-deployment.md`
+- `docs/18-dynamic-workflow-and-team-architecture.md`
+- `docs/19-ui-ux-system.md`

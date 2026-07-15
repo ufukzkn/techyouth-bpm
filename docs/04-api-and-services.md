@@ -148,7 +148,7 @@ Browser flows send cookies with `credentials: include`. Mutating cookie-authenti
 - `POST /api/notifications/read-all`
   - Marks all current-user notifications as read.
 
-Notifications are created for events such as pending registration, assigned tasks, process outcome changes, password reset and access updates. Access update audit and target-user notification commit inside the same database transaction. The topbar asks for five records and polls every 30 seconds while visible; `/inbox` uses ten-record server-side pages. V1 remains database-backed polling, so WebSocket/SSE can be added later without changing the notification table or public UI behavior.
+Notifications are created for events such as pending registration, assigned tasks, process outcome changes, password reset, access updates and team membership/lead changes. Access update and team membership mutations write audit plus target-user notification in the same service operation. The topbar asks for five records and polls every 30 seconds while visible; `/inbox` uses ten-record server-side pages. V1 remains database-backed polling, so WebSocket/SSE can be added later without changing the notification table or public UI behavior.
 
 ## Audit
 
@@ -235,6 +235,7 @@ Controllers should stay thin. Services own decisions:
 - `ProcessService`: process start, detail and listing. List queries return projected summary DTOs; detail queries load the full process graph.
 - `TaskService`: task listing and action execution.
 - `NotificationService`: current-user paged search/filter, count, read-state and read-all operations.
+- `ITeamService`: community-scoped team CRUD, paged members/candidates, virtual unassigned users and membership mutations.
 - `ProcessStateMachine`: allowed transitions.
 - `DatabaseSeeder`: local demo users and optional mock workflow data.
 
@@ -246,6 +247,7 @@ The frontend API client now exposes one method for each planned endpoint:
 - Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`, `resetUserPasswordByAdmin`
 - Communities: `listCommunities`, `createCommunity`, `updateCommunity`, `regenerateCommunityInviteCode`, `getCommunitySummary`, `listRoleTemplates`, `listCommunityRoles`, `createCommunityRole`, `updateCommunityRole`, `deleteCommunityRole`
 - Notifications: `listNotifications`, `markNotificationRead`, `setNotificationReadState`, `markAllNotificationsRead`
+- Teams: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `listTeamMembers`, `listTeamCandidates`, `listUnassignedTeamMembers`, `addTeamMember`, `updateTeamMember`, `removeTeamMember`
 - Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`
 - Processes: `startProcess`, `listProcesses`, `getProcess`
@@ -255,9 +257,9 @@ Feature components should call these client methods through feature-level orches
 
 The inbox uses a user/filter/page keyed in-memory LRU cache in its Zustand feature store. Cached data remains visible during background refresh, read-state changes are optimistic and API failures restore the previous snapshot. This state is cleared on logout or user change and is not persisted to disk.
 
-## Planned Team API
+## Team API
 
-The team package adds `Teams.View` and `Teams.Manage` plus these community-scoped contracts:
+The implemented team package uses `Teams.View` and `Teams.Manage` with these community-scoped contracts:
 
 - `GET/POST /api/teams`
 - `GET/PATCH /api/teams/{teamId}`
@@ -267,7 +269,7 @@ The team package adds `Teams.View` and `Teams.Manage` plus these community-scope
 - `POST /api/teams/{teamId}/members`
 - `PATCH/DELETE /api/teams/{teamId}/members/{userId}`
 
-List endpoints use server-side search and pagination. `Takimsiz` is computed from active approved community users without active team memberships; it is never stored as a team. Membership mutations must write system audit and notify the affected user.
+List endpoints use server-side search and pagination. `Takimsiz` is computed from active approved community users without active team memberships; it is never stored as a team. A user may be active in multiple teams, while `IsLead` is descriptive and grants no permission by itself. Membership add/remove/lead mutations write system audit and notify the affected user. Moving a user to another community deactivates memberships in the previous community.
 
 ## Community Management Additions
 

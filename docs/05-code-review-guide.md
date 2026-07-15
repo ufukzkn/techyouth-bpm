@@ -52,7 +52,7 @@ Use this file for the final code review presentation.
   - registration creates pending/unverified accounts.
   - repeated failed login attempts lock the account.
   - logout revokes the stored session.
-- The latest verified backend suite passes 84 tests across auth, community access, forms, workflow, task authorization, notifications, dashboard scope and audit behavior.
+- The latest verified backend suite passes 122 tests across auth, community/team access, forms, workflow, task authorization, notifications, dashboard scope and audit behavior. Four frontend Vitest cases protect notification cache and optimistic-update behavior.
 
 ## Current Frontend Story
 
