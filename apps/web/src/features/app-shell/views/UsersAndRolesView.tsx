@@ -15,9 +15,9 @@ import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
 import type { Community, CommunityRole, CommunitySummary, Language, Role, SystemAuditLog, User, UserAdmin, UserSession, UserStatus } from "@/lib/types";
+import { UserListPanel } from "@/features/management/UserListPanel";
+import { clearUserManagementCache, useUserManagement } from "@/features/management/useUserManagement";
 
-const minimumRefreshDelayMs = 500;
-const userPageCache = new Map<string, { items: UserAdmin[]; totalCount: number }>();
 const userCommunitySummaryCache = new Map<string, CommunitySummary>();
 const allCommunitiesUserCountCache = new Map<string, number>();
 
@@ -34,7 +34,6 @@ export function UsersAndRolesView({
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
-  const [users, setUsers] = useState<UserAdmin[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [communityRoles, setCommunityRoles] = useState<CommunityRole[]>([]);
   const [detailCommunityRoles, setDetailCommunityRoles] = useState<CommunityRole[]>([]);
@@ -47,10 +46,7 @@ export function UsersAndRolesView({
   const [isLoadingAllCommunitiesUserCount, setIsLoadingAllCommunitiesUserCount] = useState(false);
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | null>(activeUser.role === "SuperAdmin" ? null : activeUser.communityId ?? null);
   const [logs, setLogs] = useState<SystemAuditLog[]>([]);
-  const [totalUsers, setTotalUsers] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<UserStatus[]>(["PendingApproval"]);
   const [communityRoleFilter, setCommunityRoleFilter] = useState<string | null>(null);
   const [accessDraft, setAccessDraft] = useState<AccessDraft | null>(null);
   const [pendingAccessChange, setPendingAccessChange] = useState<PendingAccessChange | null>(null);
@@ -72,23 +68,17 @@ export function UsersAndRolesView({
   const [isPasswordResetConfirmOpen, setIsPasswordResetConfirmOpen] = useState(false);
   const [passwordResetFeedback, setPasswordResetFeedback] = useState<{ tone: "success" | "error" | "loading"; text: string } | null>(null);
   const [usesCustomTemporaryPassword, setUsesCustomTemporaryPassword] = useState(false);
-  const [page, setPage] = useState(1);
   const [detailSessionPage, setDetailSessionPage] = useState(1);
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<StatusTone>("info");
   const [createUserMessage, setCreateUserMessage] = useState<string | null>(null);
   const [createUserMessageTone, setCreateUserMessageTone] = useState<StatusTone>("info");
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasLoadedUsers, setHasLoadedUsers] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const [isLoadingUserLogs, setIsLoadingUserLogs] = useState(false);
   const [isUserLogHistoryOpen, setIsUserLogHistoryOpen] = useState(false);
   const [isLoadingUserSessions, setIsLoadingUserSessions] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [isCreateUserConfirmOpen, setIsCreateUserConfirmOpen] = useState(false);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
-  const pageSize = 4;
   const selectedCommunity = communities.find((community) => community.id === selectedCommunityId) ?? null;
   const userMessageClassName =
     messageTone === "error" ? "form-error" : messageTone === "success" ? "form-success" : "form-info";
@@ -105,72 +95,33 @@ export function UsersAndRolesView({
     setCreateUserMessageTone(tone);
   }, []);
 
-  useEffect(() => {
-    if (!toast) {
-      return;
-    }
+  const handleUserLoadError = useCallback((errorMessage: string) => {
+    showUserMessage(errorMessage, "error");
+  }, [showUserMessage]);
 
-    const timer = window.setTimeout(() => setToast(null), 3600);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  const loadUsers = useCallback(async (options: { manual?: boolean } = {}) => {
-    if (!token || token.startsWith("demo-")) {
-      return;
-    }
-
-    const query = searchQuery.trim();
-    const isManualRefresh = options.manual === true;
-    const refreshStartedAt = Date.now();
-    const statusCacheKey = [...selectedStatuses].sort().join(",") || "all";
-    const cacheKey = [selectedCommunityId ?? "all", communityRoleFilter ?? "all", statusCacheKey, query, page, pageSize].join("|");
-    const cached = userPageCache.get(cacheKey);
-    if (cached && !isManualRefresh) {
-      setUsers(cached.items);
-      setTotalUsers(cached.totalCount);
-      setHasLoadedUsers(true);
-      return;
-    }
-    if (isManualRefresh) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
-
-    try {
-      const userResult = await api.listUsers(token, {
-        query,
-        statuses: selectedStatuses,
-        communityId: selectedCommunityId,
-        communityRoleId: communityRoleFilter,
-        page,
-        pageSize,
-      });
-      setUsers(userResult.items ?? []);
-      setTotalUsers(userResult.totalCount ?? 0);
-      userPageCache.set(cacheKey, { items: userResult.items ?? [], totalCount: userResult.totalCount ?? 0 });
-      setHasLoadedUsers(true);
-      if (isManualRefresh) {
-        await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
-        setToast({ kind: "success", text: t("common.refreshed") });
-      }
-    } catch (error) {
-      const errorMessage = localizeApiError(error, language, t("common.refreshFailed"));
-      if (isManualRefresh) {
-        await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
-        setToast({ kind: "error", text: errorMessage });
-      } else {
-        showUserMessage(errorMessage, "error");
-      }
-      setHasLoadedUsers(true);
-    } finally {
-      if (isManualRefresh) {
-        setIsRefreshing(false);
-      } else {
-        setIsLoading(false);
-      }
-    }
-  }, [communityRoleFilter, language, page, pageSize, searchQuery, selectedCommunityId, selectedStatuses, showUserMessage, t, token]);
+  const {
+    currentPage,
+    hasLoaded: hasLoadedUsers,
+    isLoading,
+    isRefreshing,
+    load: loadUsers,
+    searchQuery,
+    selectedStatuses,
+    setPage,
+    setSearchQuery,
+    setSelectedStatuses,
+    toast,
+    totalPages,
+    users,
+  } = useUserManagement({
+    communityId: selectedCommunityId,
+    communityRoleId: communityRoleFilter,
+    language,
+    onError: handleUserLoadError,
+    refreshFailedText: t("common.refreshFailed"),
+    refreshedText: t("common.refreshed"),
+    token,
+  });
 
   const loadCommunityContext = useCallback(async () => {
     if (!token || token.startsWith("demo-")) {
@@ -252,7 +203,7 @@ export function UsersAndRolesView({
   }, [activeUser.role, selectedCommunityId, token]);
 
   function refreshUsers() {
-    userPageCache.clear();
+    clearUserManagementCache();
     if (selectedCommunityId) {
       userCommunitySummaryCache.delete(selectedCommunityId);
       void loadCommunitySummary(true);
@@ -332,16 +283,6 @@ export function UsersAndRolesView({
     return () => window.clearTimeout(timer);
   }, [activeUser.communityId, activeUser.role, createUserDraft.communityId, language, showCreateUserMessage, t, token]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadUsers();
-    }, 250);
-
-    return () => window.clearTimeout(timer);
-  }, [loadUsers]);
-
-  const totalPages = Math.max(1, Math.ceil(totalUsers / pageSize));
-  const currentPage = Math.min(page, totalPages);
   const visibleUsers = users;
   const shouldShowUserSkeleton = !hasLoadedUsers || isLoading;
   const selectedUser = selectedUserId ? users.find((managedUser) => managedUser.id === selectedUserId) ?? null : null;
@@ -494,7 +435,7 @@ export function UsersAndRolesView({
 
     try {
       await api.updateUserAccess(token, userId, status, communityId, communityRoleId);
-      userPageCache.clear();
+      clearUserManagementCache();
       allCommunitiesUserCountCache.clear();
       if (!selectedCommunityId) {
         void loadAllCommunitiesUserCount(true);
@@ -538,7 +479,7 @@ export function UsersAndRolesView({
         communityRoleId: getUnassignedRoleId(createCommunityRoles),
       });
       setUsesCustomTemporaryPassword(false);
-      userPageCache.clear();
+      clearUserManagementCache();
       allCommunitiesUserCountCache.clear();
       if (!selectedCommunityId) {
         void loadAllCommunitiesUserCount(true);
@@ -605,7 +546,7 @@ export function UsersAndRolesView({
         temporaryPassword: passwordResetDraft.useManualPassword ? passwordResetDraft.temporaryPassword : null,
       });
       setPasswordResetDraft({ useManualPassword: false, temporaryPassword: "" });
-      userPageCache.clear();
+      clearUserManagementCache();
       await loadUsers();
       setPasswordResetFeedback({ tone: "success", text: "Gecici sifre e-posta ile gonderildi." });
     } catch (error) {
@@ -640,7 +581,7 @@ export function UsersAndRolesView({
     try {
       await api.revokeUserSession(token, revoke.userId, revoke.sessionId);
       await loadSelectedUserSessions(revoke.userId);
-      userPageCache.clear();
+      clearUserManagementCache();
       await loadUsers();
       showUserMessage(t("settings.sessionRevoked"), "success");
     } catch (error) {
@@ -667,7 +608,7 @@ export function UsersAndRolesView({
       await api.deleteUser(token, deletion.userId);
       setSelectedUserId(null);
       setSelectedUserSessions([]);
-      userPageCache.clear();
+      clearUserManagementCache();
       allCommunitiesUserCountCache.clear();
       if (!selectedCommunityId) {
         void loadAllCommunitiesUserCount(true);
@@ -798,47 +739,19 @@ export function UsersAndRolesView({
 
       <div className="management-layout">
         <div className="management-left-column">
-        <section className="identity-section">
-          <div className="section-toolbar">
-            <div>
-              <span className="eyebrow">{t("users.listEyebrow")}</span>
-              <h3>{t("users.listTitle")}</h3>
-            </div>
-            <UserCog size={22} />
-          </div>
-          <div className="user-management-list">
-            {shouldShowUserSkeleton ? <UserManagementSkeleton /> : null}
-            {visibleUsers.map((managedUser) => (
-              <article className="settings-row user-management-row" key={managedUser.id}>
-                <div className="stacked-summary">
-                  <span className={`status-pill status-${managedUser.status.toLowerCase()}`}>
-                    {userStatusLabel(language, managedUser.status)}
-                  </span>
-                  <strong>{managedUser.displayName}</strong>
-                  <small>
-                    {managedUser.username} / {managedUser.email}
-                  </small>
-                </div>
-                <button
-                  className={`secondary-button context-button ${selectedUserId === managedUser.id ? "is-active" : ""}`}
-                  type="button"
-                  onClick={() => selectUser(managedUser)}
-                >
-                  {t("users.viewDetail")}
-                </button>
-              </article>
-            ))}
-            {!visibleUsers.length && hasLoadedUsers && !isLoading ? <p className="status-line">{t("users.empty")}</p> : null}
-          </div>
-          <PaginationControls
-            currentPage={currentPage}
-            language={language}
-            onNext={() => setPage((value) => Math.min(value + 1, totalPages))}
-            onPageChange={setPage}
-            onPrevious={() => setPage((value) => Math.max(value - 1, 1))}
-            totalPages={totalPages}
-          />
-        </section>
+        <UserListPanel
+          currentPage={currentPage}
+          isLoading={shouldShowUserSkeleton}
+          language={language}
+          onNextPage={() => setPage((value) => Math.min(value + 1, totalPages))}
+          onPageChange={setPage}
+          onPreviousPage={() => setPage((value) => Math.max(value - 1, 1))}
+          onSelect={selectUser}
+          selectedUserId={selectedUserId}
+          t={t}
+          totalPages={totalPages}
+          users={visibleUsers}
+        />
         <section className="identity-section user-create-disclosure user-create-left-panel">
           <div className="section-toolbar">
             <div>
@@ -1115,28 +1028,6 @@ export function UsersAndRolesView({
   );
 }
 
-function UserManagementSkeleton() {
-  return (
-    <>
-      {Array.from({ length: 4 }, (_, index) => (
-        <article className="settings-row user-management-row user-management-skeleton" key={index}>
-          <div className="stacked-summary">
-            <span />
-            <strong />
-            <small />
-          </div>
-          <span />
-        </article>
-      ))}
-    </>
-  );
-}
-
 function getUnassignedRoleId(roles: CommunityRole[]) {
   return roles.find((role) => role.templateKey === "unassigned")?.id ?? roles.find((role) => role.name.toLowerCase() === "atanmadi")?.id ?? "";
-}
-
-function waitForMinimumDelay(startedAt: number, minimumDelayMs: number) {
-  const remainingMs = minimumDelayMs - (Date.now() - startedAt);
-  return remainingMs > 0 ? new Promise((resolve) => window.setTimeout(resolve, remainingMs)) : Promise.resolve();
 }

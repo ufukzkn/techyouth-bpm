@@ -1,22 +1,22 @@
 "use client";
 
-import { BadgeCheck, Building2, ChevronDown, Landmark, Pencil, Plus, RefreshCw, Tags, Trash2, Users } from "lucide-react";
+import { BadgeCheck, Building2, Landmark, Pencil, Plus, RefreshCw, Tags, Trash2, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActionFeedback, InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
-import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
+import { ActionFeedback, InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { api } from "@/lib/api";
 import type { Community, CommunityRole, CommunitySummary, Language, PermissionName, RoleTemplate, User } from "@/lib/types";
+import {
+  CommunityCardSkeleton,
+  CommunityRolePanelSkeleton,
+  ManagementConfirmation,
+  permissionLabel,
+  RoleCountDisclosure,
+  type CommunityPendingAction,
+} from "@/features/management/CommunityManagementComponents";
 
 type Feedback = { tone: "success" | "error" | "loading"; text: string } | null;
-type PendingAction =
-  | { type: "create-community" }
-  | { type: "update-community" }
-  | { type: "regenerate-code" }
-  | { type: "create-role" }
-  | { type: "update-role"; roleId: string }
-  | { type: "delete-role"; roleId: string };
 
 const communitySummaryCache = new Map<string, CommunitySummary>();
 const allPermissions: PermissionName[] = [
@@ -45,7 +45,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
   const [rolesError, setRolesError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [pendingAction, setPendingAction] = useState<CommunityPendingAction | null>(null);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [replacementRoleId, setReplacementRoleId] = useState("");
   const [createDraft, setCreateDraft] = useState({ name: "", description: "", inviteCode: "" });
@@ -468,52 +468,14 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         </section>
       </div>
 
-      {pendingAction ? <ManagementConfirmation action={pendingAction} isDeactivating={!communityDraft.isActive} selectedCommunity={selectedCommunity} selectedRole={selectedRole} roles={roles} replacementRoleId={replacementRoleId} setReplacementRoleId={setReplacementRoleId} onCancel={() => setPendingAction(null)} onConfirm={() => void executePendingAction()} /> : null}
+      {pendingAction ? <ManagementConfirmation action={pendingAction} isDeactivating={!communityDraft.isActive} selectedRole={selectedRole} roles={roles} replacementRoleId={replacementRoleId} setReplacementRoleId={setReplacementRoleId} onCancel={() => setPendingAction(null)} onConfirm={() => void executePendingAction()} /> : null}
       {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
     </section>
   );
 }
 
-function CommunityCardSkeleton() {
-  return <div className="community-card-skeleton" aria-label="Topluluk bilgileri yukleniyor"><SkeletonBlock className="skeleton-input" /><SkeletonBlock className="skeleton-input" /><SkeletonBlock className="skeleton-input" /><SkeletonBlock className="skeleton-input" /></div>;
-}
-
-function CommunityRolePanelSkeleton() {
-  return <div className="community-role-skeleton" aria-label="Topluluk rolleri yukleniyor"><SkeletonBlock className="skeleton-input" /><SkeletonBlock className="skeleton-input" /><SkeletonBlock className="skeleton-chip-row" /><SkeletonBlock className="skeleton-chip-row" /></div>;
-}
-
-function RoleCountDisclosure({ summary }: { summary: CommunitySummary }) {
-  const [open, setOpen] = useState(false);
-  return <div className="role-count-disclosure"><button className="text-button" type="button" onClick={() => setOpen((value) => !value)}>Rol dagilimini gor <ChevronDown className={open ? "nav-group-chevron open" : "nav-group-chevron"} size={15} /></button>{open ? <div className="role-count-list">{summary.roleCounts.map((role) => <span key={role.communityRoleId}>{role.communityRoleName}<strong>{role.userCount}</strong></span>)}</div> : null}</div>;
-}
-
-function ManagementConfirmation({ action, isDeactivating, selectedRole, roles, replacementRoleId, setReplacementRoleId, onCancel, onConfirm }: { action: PendingAction; isDeactivating: boolean; selectedCommunity: Community | null; selectedRole: CommunityRole | null; roles: CommunityRole[]; replacementRoleId: string; setReplacementRoleId: (value: string) => void; onCancel: () => void; onConfirm: () => void }) {
-  if (action.type === "delete-role") {
-    return <ConfirmationDialog eyebrow="Rol silme" title={`${selectedRole?.name ?? "Rol"} silinsin mi?`} description="Bu roldeki aktif kullanicilar secilen hedef role tasinir; islem geri alinmaz." confirmLabel="Tasi ve sil" onCancel={onCancel} onConfirm={onConfirm}><label className="compact-form"><span>Hedef rol</span><select value={replacementRoleId} onChange={(event) => setReplacementRoleId(event.target.value)}>{roles.filter((role) => role.id !== selectedRole?.id).map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label></ConfirmationDialog>;
-  }
-  const isDeactivate = action.type === "update-community" && isDeactivating;
-  const copy = action.type === "create-community" ? ["Topluluk olustur", "Yeni topluluk ve varsayilan sistem rolleri olusturulacak.", "Olustur"] : action.type === "regenerate-code" ? ["Davet kodu", "Eski kayit kodu gecersiz olur; yeni kodla kayit alinabilir.", "Kodu yenile"] : action.type === "create-role" ? ["Rol olustur", "Rol izinleri bu topluluk kapsaminda kullanilabilir olacak.", "Rolu olustur"] : action.type === "update-role" ? ["Rol guncelle", "Rol izinleri ve adi guncellenecek.", "Guncelle"] : action.type === "update-community" ? [isDeactivate ? "Toplulugu pasife al" : "Toplulugu aktif et", isDeactivate ? "Normal uyelerin oturumlari kapatilacak; giris ve yeni workflow islemleri engellenecek." : "Topluluk uyeleri yeniden giris yaparak calisma alanina devam edebilecek.", isDeactivate ? "Pasife al" : "Aktif et"] : ["Rol sil", "Rol kullanicilari hedef role tasinarak silinecek.", "Sil"];
-  return <ConfirmationDialog eyebrow={copy[0]} title={`${copy[0]}?`} description={isDeactivate ? copy[1] : copy[1]} confirmLabel={copy[2]} tone={isDeactivate ? "danger" : "primary"} onCancel={onCancel} onConfirm={onConfirm} />;
-}
-
 function getUnassignedRoleId(roles: CommunityRole[]) {
   return roles.find((role) => role.templateKey === "unassigned")?.id ?? roles[0]?.id ?? "";
-}
-
-function permissionLabel(permission: PermissionName) {
-  return {
-    "Community.ManageUsers": "Kullanicilari yonetir",
-    "Community.ManageRoles": "Rolleri yonetir",
-    "Community.ManageAdmins": "Topluluk adminlerini yonetir",
-    "Forms.View": "Formlari gorur",
-    "Forms.Create": "Form olusturur",
-    "Forms.Update": "Form gunceller",
-    "Processes.View": "Surecleri gorur",
-    "Processes.Start": "Surec baslatir",
-    "Tasks.View": "Isleri gorur",
-    "Tasks.Act": "Is aksiyonu alir",
-    "Audit.View": "Gecmisi gorur",
-  }[permission];
 }
 
 function waitForMinimumDelay(startedAt: number, minimumMs: number) {

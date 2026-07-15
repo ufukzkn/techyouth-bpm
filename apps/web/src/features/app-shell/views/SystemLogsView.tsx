@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, History, RefreshCw, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { auditCategories, type AuditCategory, type AuditHistoryMode, type SelectedAuditHistory } from "@/features/app-shell/types";
 import { getAuditCategory, getAuditHistoryTitle, getAuditTargetLabel, getFocusedAuditLogs, formatAuditAction } from "@/features/app-shell/auditUtils";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
@@ -11,6 +11,7 @@ import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
 import type { Language, SystemAuditLog } from "@/lib/types";
+import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
 
 const minimumRefreshDelayMs = 500;
 
@@ -214,10 +215,6 @@ export function SystemLogsView({ language, token }: { language: Language; token:
     return getFocusedAuditLogs(logs, selectedLog, selectedLogCategory, selectedHistory.mode);
   }, [logs, selectedHistory, selectedLog, selectedLogCategory]);
   const shouldShowLogSkeleton = isLoading && shouldQueryLogs;
-  const activeHistoryOptionIndex = Math.max(
-    0,
-    historyFilterOptions.findIndex((option) => option.mode === selectedHistory?.mode),
-  );
 
   return (
     <section className="settings-panel">
@@ -354,42 +351,13 @@ export function SystemLogsView({ language, token }: { language: Language; token:
             <History size={22} />
           </div>
           {selectedLog && selectedHistory ? (
-            <div
-              className={`audit-radio-group audit-radio-active-${selectedHistory.mode}`}
-              style={
-                {
-                  "--audit-option-count": historyFilterOptions.length,
-                  "--audit-active-index": activeHistoryOptionIndex,
-                } as CSSProperties
-              }
-              aria-label={t("logs.historyFilterLabel")}
-              role="radiogroup"
-            >
-              {historyFilterOptions.map((option) => (
-                <div className="audit-radio-item" key={option.mode}>
-                  <input
-                    checked={selectedHistory.mode === option.mode}
-                    id={`audit-history-${selectedLog.id}-${option.mode}`}
-                    name={`audit-history-${selectedLog.id}`}
-                    onChange={() => setSelectedHistory({ logId: selectedLog.id, mode: option.mode })}
-                    type="radio"
-                    value={option.mode}
-                  />
-                  <label
-                    className="audit-radio-option"
-                    htmlFor={`audit-history-${selectedLog.id}-${option.mode}`}
-                    role="radio"
-                    aria-checked={selectedHistory.mode === option.mode}
-                  >
-                    {option.label}
-                  </label>
-                </div>
-              ))}
-              <div
-                className="audit-radio-slider"
-                aria-hidden="true"
-              />
-            </div>
+            <SlidingSegmentedControl
+              ariaLabel={t("logs.historyFilterLabel")}
+              name={`audit-history-${selectedLog.id}`}
+              onChange={(mode) => setSelectedHistory({ logId: selectedLog.id, mode })}
+              options={historyFilterOptions.map((option) => ({ value: option.mode, label: option.label }))}
+              value={selectedHistory.mode}
+            />
           ) : null}
           <SystemAuditTimeline
             key={selectedHistory ? `${selectedHistory.logId}-${selectedHistory.mode}` : "no-related-log"}

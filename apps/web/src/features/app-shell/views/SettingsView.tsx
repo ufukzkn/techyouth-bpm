@@ -1,15 +1,19 @@
-import { AlertTriangle, KeyRound, Save, ShieldCheck } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { AllSessionsRevokeDialog, OwnSessionRevokeDialog } from "@/features/app-shell/components/AccessDialogs";
-import { DisclosureSection } from "@/features/app-shell/components/DisclosureSection";
 import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
-import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
-import { formatCountdown, formatIpAddress, formatSessionExpiry, summarizeUserAgent } from "@/features/app-shell/sessionFormatters";
+import { formatCountdown } from "@/features/app-shell/sessionFormatters";
 import type { PendingSessionRevoke, SettingsSectionId, StatusTone } from "@/features/app-shell/types";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
 import type { Language, User, UserSession } from "@/lib/types";
+import {
+  EmailVerificationPanel,
+  SettingsAccountActions,
+  SettingsOverview,
+  SettingsSessionsPanel,
+} from "@/features/settings/SettingsSections";
 
 const emailVerificationResendCooldownMs = 5 * 60 * 1000;
 
@@ -297,91 +301,30 @@ export function SettingsView({
         </div>
         <p>{t("settings.description")}</p>
       </div>
-      <div className="settings-grid">
-        <article className="settings-row">
-          <span>{t("settings.profile")}</span>
-          <strong>{user.displayName}</strong>
-          <small>{user.email || t("settings.noEmail")}</small>
-        </article>
-        <article className="settings-row">
-          <span>{t("settings.emailStatus")}</span>
-          <strong className={user.isEmailVerified ? "verified-status" : undefined}>
-            {user.isEmailVerified ? (
-              <>
-                <ShieldCheck size={18} />
-                {t("settings.verified")}
-              </>
-            ) : (
-              t("settings.notVerified")
-            )}
-          </strong>
-          {!user.isEmailVerified ? (
-            <div className="settings-card-action">
-              <button
-                className="text-link-button"
-                type="button"
-                disabled={!isApiSession}
-                onClick={() => setIsEmailVerificationOpen((isOpen) => !isOpen)}
-              >
-                {t("settings.verifyEmail")}
-              </button>
-            </div>
-          ) : null}
-        </article>
-        <article className="settings-row">
-          <span>{t("settings.session")}</span>
-          <strong>{formatSessionExpiry(expiresAt, language)}</strong>
-        </article>
-      </div>
+      <SettingsOverview
+        expiresAt={expiresAt}
+        isApiSession={isApiSession}
+        language={language}
+        onToggleVerification={() => setIsEmailVerificationOpen((isOpen) => !isOpen)}
+        t={t}
+        user={user}
+      />
 
       {!user.isEmailVerified && isEmailVerificationOpen ? (
-        <section className="identity-section email-verification-section">
-          <div className="section-toolbar">
-            <div>
-              <span className="eyebrow">{t("settings.emailVerificationTitle")}</span>
-              <h3>{t("settings.verifyEmail")}</h3>
-            </div>
-            <ShieldCheck size={22} />
-          </div>
-          <div className="inline-verification-form">
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={!isApiSession || isRequestingVerification || isVerificationCooldownActive}
-              onClick={requestVerification}
-            >
-              {isRequestingVerification ? <span className="button-spinner" aria-hidden="true" /> : null}
-              {isVerificationCooldownActive
-                ? t("settings.resendAvailableIn", { value: verificationCooldownLabel })
-                : verificationExpiresAt
-                  ? t("settings.resendVerificationCode")
-                  : t("settings.sendVerificationCode")}
-            </button>
-            <small>
-              {verificationExpiresAt
-                ? t("settings.verificationValidUntil", {
-                    value: formatSessionExpiry(verificationExpiresAt, language),
-                  })
-                : t("settings.verificationValidityHint")}
-            </small>
-            {verificationExpiresAt ? (
-              <small>
-                {isVerificationCooldownActive
-                  ? t("settings.resendCooldownHint", { value: verificationCooldownLabel })
-                  : t("settings.resendReadyHint")}
-              </small>
-            ) : null}
-            <input
-              value={verificationCode}
-              onChange={(event) => setVerificationCode(event.target.value)}
-              placeholder={t("settings.verificationCode")}
-            />
-            <button className="primary-button" type="button" disabled={!isApiSession} onClick={confirmVerification}>
-              {t("settings.verifyEmail")}
-            </button>
-            {demoCode ? <small>{t("settings.demoVerificationCode", { code: demoCode })}</small> : null}
-          </div>
-        </section>
+        <EmailVerificationPanel
+          code={verificationCode}
+          cooldownLabel={verificationCooldownLabel}
+          demoCode={demoCode}
+          expiresAt={verificationExpiresAt}
+          isApiSession={isApiSession}
+          isCooldownActive={isVerificationCooldownActive}
+          isRequesting={isRequestingVerification}
+          language={language}
+          onCodeChange={setVerificationCode}
+          onConfirm={() => void confirmVerification()}
+          onRequest={() => void requestVerification()}
+          t={t}
+        />
       ) : null}
 
       {statusMessage ? <div className={statusClassName}>{statusMessage}</div> : null}
@@ -399,127 +342,43 @@ export function SettingsView({
         </section>
       ) : null}
 
-      <div className="settings-action-grid">
-        <DisclosureSection
-          eyebrow={t("settings.profile")}
-          icon={<Save size={20} />}
-          isOpen={openSettingsSections.profile}
-          onToggle={() => toggleSettingsSection("profile")}
-          title={t("settings.profileTitle")}
-          description={t("settings.profileDescription")}
-        >
-          <div className="compact-form">
-            <input
-              value={profileDisplayName}
-              onChange={(event) => setProfileDisplayName(event.target.value)}
-              placeholder={t("login.displayName")}
-            />
-            <input
-              value={profileEmail}
-              onChange={(event) => setProfileEmail(event.target.value)}
-              placeholder={t("login.email")}
-              type="email"
-            />
-            <button className="primary-button" type="button" disabled={!isApiSession || isSavingProfile} onClick={saveProfile}>
-              {isSavingProfile ? t("common.saving") : t("settings.saveProfile")}
-            </button>
-          </div>
-        </DisclosureSection>
+      <SettingsAccountActions
+        currentPassword={currentPassword}
+        isApiSession={isApiSession}
+        isChangingPassword={isChangingPassword}
+        isSavingProfile={isSavingProfile}
+        newPassword={newPassword}
+        onCurrentPasswordChange={setCurrentPassword}
+        onNewPasswordChange={setNewPassword}
+        onPasswordRequest={() => setIsPasswordChangeConfirmOpen(true)}
+        onProfileDisplayNameChange={setProfileDisplayName}
+        onProfileEmailChange={setProfileEmail}
+        onProfileSave={() => void saveProfile()}
+        onToggle={toggleSettingsSection}
+        openSections={openSettingsSections}
+        profileDisplayName={profileDisplayName}
+        profileEmail={profileEmail}
+        t={t}
+        user={user}
+      />
 
-        <DisclosureSection
-          eyebrow={t("settings.auth")}
-          icon={<KeyRound size={20} />}
-          isOpen={openSettingsSections.password}
-          onToggle={() => toggleSettingsSection("password")}
-          title={t("settings.passwordTitle")}
-          description={t("settings.passwordDescription")}
-          className={user.mustChangePassword ? "urgent-identity-section" : undefined}
-        >
-          <div className="compact-form">
-            <input
-              value={currentPassword}
-              onChange={(event) => setCurrentPassword(event.target.value)}
-              placeholder={t("settings.currentPassword")}
-              type="password"
-            />
-            <input
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              placeholder={t("settings.newPassword")}
-              type="password"
-            />
-            <button
-              className={user.mustChangePassword ? "primary-button danger-button" : "primary-button"}
-              type="button"
-              disabled={!isApiSession || isChangingPassword || !currentPassword || !newPassword}
-              onClick={() => setIsPasswordChangeConfirmOpen(true)}
-            >
-              {isChangingPassword ? t("common.saving") : t("settings.changePassword")}
-            </button>
-          </div>
-        </DisclosureSection>
-      </div>
-
-      <div className="settings-disclosure-stack">
-        <DisclosureSection
-          eyebrow={t("settings.sessions")}
-          icon={<ShieldCheck size={22} />}
-          isOpen={openSettingsSections.sessions}
-          onToggle={() => toggleSettingsSection("sessions")}
-          title={t("settings.sessionsTitle")}
-          description={t("settings.sessionsDescription")}
-        >
-        {isLoadingSettings ? <p className="status-line">{t("common.loading")}</p> : null}
-        <div className="session-list">
-          {visibleSessions.map((session) => (
-            <article className="settings-row session-row" key={session.id}>
-              <div className="stacked-summary">
-                <span>{session.isCurrent ? t("settings.currentSession") : t("settings.otherSession")}</span>
-                <strong>{formatSessionExpiry(session.expiresAt, language)}</strong>
-                <small>
-                  {session.lastSeenAt
-                    ? t("settings.lastSeen", { value: formatSessionExpiry(session.lastSeenAt, language) })
-                    : t("settings.notSeenYet")}
-                </small>
-                <small>{t("settings.createdAt", { value: formatSessionExpiry(session.createdAt, language) })}</small>
-                <small>{t("settings.device", { value: summarizeUserAgent(session.userAgent, language) })}</small>
-                <small>{t("settings.ipAddress", { value: formatIpAddress(session.ipAddress, language) })}</small>
-                <small>{t(session.rememberedDevice ? "settings.rememberedDevice" : "settings.standardSession")}</small>
-              </div>
-              <button
-                className="secondary-button danger-button"
-                type="button"
-                disabled={!isApiSession}
-                onClick={() => requestOwnSessionRevoke(session)}
-              >
-                {t("settings.revokeSession")}
-              </button>
-            </article>
-          ))}
-          {!sessions.length && !isLoadingSettings ? <p className="status-line">{t("settings.noSessions")}</p> : null}
-        </div>
-        {sessions.length > sessionPageSize ? (
-          <PaginationControls
-            currentPage={currentSessionPage}
-            language={language}
-            onNext={() => setSessionPage((value) => Math.min(value + 1, sessionTotalPages))}
-            onPageChange={setSessionPage}
-            onPrevious={() => setSessionPage((value) => Math.max(value - 1, 1))}
-            totalPages={sessionTotalPages}
-          />
-        ) : null}
-        <div className="session-danger-action">
-          <button
-            className="danger-button strong-danger-button"
-            type="button"
-            disabled={!isApiSession}
-            onClick={() => setIsAllSessionsRevokeOpen(true)}
-          >
-            {t("settings.revokeAllSessions")}
-          </button>
-        </div>
-        </DisclosureSection>
-      </div>
+      <SettingsSessionsPanel
+        currentPage={currentSessionPage}
+        isApiSession={isApiSession}
+        isLoading={isLoadingSettings}
+        isOpen={openSettingsSections.sessions}
+        language={language}
+        onNextPage={() => setSessionPage((value) => Math.min(value + 1, sessionTotalPages))}
+        onPageChange={setSessionPage}
+        onPreviousPage={() => setSessionPage((value) => Math.max(value - 1, 1))}
+        onRevokeAll={() => setIsAllSessionsRevokeOpen(true)}
+        onRevokeSession={requestOwnSessionRevoke}
+        onToggle={() => toggleSettingsSection("sessions")}
+        sessions={sessions}
+        t={t}
+        totalPages={sessionTotalPages}
+        visibleSessions={visibleSessions}
+      />
       {pendingOwnSessionRevoke ? (
         <OwnSessionRevokeDialog
           revoke={pendingOwnSessionRevoke}
