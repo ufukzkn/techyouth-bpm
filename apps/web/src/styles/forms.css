@@ -335,6 +335,146 @@
   overflow-wrap: anywhere;
 }
 
+/* Form workspace alignment and responsive polish. */
+@media (min-width: 1440px) and (max-width: 1599px) {
+  .designer-section .field-palette-rail {
+    position: static;
+    grid-column: 1 / -1;
+    grid-row: auto;
+    width: 100%;
+  }
+
+  .designer-section .field-palette-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1240px) {
+  .designer-section .field-editor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .designer-section .field-required-toggle {
+    align-self: stretch;
+  }
+}
+
+@media (max-width: 1100px) {
+  .designer-section .rule-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .designer-section .rule-row > .icon-button {
+    justify-self: end;
+  }
+
+  .runner-section .runner-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.75fr);
+  }
+}
+
+@media (max-width: 960px) {
+  .runner-section .runner-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .runner-section .runner-preview-panel {
+    width: 100%;
+  }
+}
+
+.designer-section .field-editor-header {
+  flex-wrap: wrap;
+}
+
+.designer-section .field-editor-header > div:first-child,
+.designer-section .rule-editor-header > div,
+.designer-section .option-editor-header > strong,
+.designer-section .designer-save-panel,
+.runner-section .runner-form,
+.runner-section .runner-preview-panel,
+.runner-section .runner-output {
+  min-width: 0;
+}
+
+.designer-section .field-editor-header > div:first-child {
+  flex: 1 1 220px;
+}
+
+.designer-section .field-editor-header strong,
+.designer-section .field-editor-header span,
+.designer-section .rule-editor-header strong,
+.designer-section .rule-editor-header span,
+.designer-section .option-editor-header strong,
+.designer-section .designer-save-panel,
+.runner-section .runner-preview-panel,
+.runner-section .runner-output {
+  overflow-wrap: anywhere;
+}
+
+.runner-section .runner-output {
+  max-width: 100%;
+}
+
+.runner-section .runner-file-upload,
+.runner-section .runner-file-summary,
+.runner-section .runner-file-summary span,
+.runner-section .runner-file-summary strong,
+.runner-section .runner-file-note {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .designer-section .field-editor-header,
+  .designer-section .option-editor-header,
+  .designer-section .rule-editor-header,
+  .designer-section .option-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .designer-section .field-editor-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .designer-section .field-editor-grid,
+  .designer-section .rule-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .designer-section .field-required-toggle {
+    width: 100%;
+  }
+
+  .designer-section .option-row > .icon-button,
+  .designer-section .rule-row > .icon-button {
+    justify-self: end;
+    align-self: end;
+  }
+
+  .runner-section .runner-file-button,
+  .runner-section .runner-file-summary .secondary-button {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
+@media (max-width: 430px) {
+  .designer-section .field-editor-actions > button,
+  .runner-section .runner-actions > button {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .runner-section .runner-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .json-preview-panel {
   grid-column: 1 / -1;
 }
@@ -914,7 +1054,7 @@
   }
 }
 
-@media (min-width: 1440px) {
+@media (min-width: 1600px) {
   .content-designer-wide {
     width: min(1460px, 100%);
     overflow: visible;
@@ -925,7 +1065,7 @@
   }
 
   .designer-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(280px, 320px);
+    grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(248px, 280px);
   }
 
   .designer-grid > .field-list,
@@ -939,7 +1079,7 @@
     grid-column: 3;
     grid-row: 1 / span 3;
     align-self: start;
-    width: min(100%, 304px);
+    width: min(100%, 272px);
     justify-self: center;
     overflow: visible;
   }
