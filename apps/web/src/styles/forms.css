@@ -1498,3 +1498,32 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+@media (max-width: 860px) {
+  .designer-section .field-editor-header {
+    align-content: start;
+    justify-content: flex-start;
+  }
+
+  .designer-section .field-editor-header > div:first-child {
+    width: 100%;
+    flex: 0 1 auto;
+  }
+
+  .designer-section .field-editor-actions {
+    width: fit-content;
+    max-width: 100%;
+    align-self: flex-start;
+    margin: 0;
+  }
+
+  .designer-section .field-editor-actions span {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .designer-section .field-editor-header {
+    gap: 6px;
+  }
+}
