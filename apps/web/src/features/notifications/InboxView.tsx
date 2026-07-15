@@ -4,8 +4,7 @@ import { Bell, CheckCheck, Circle, Inbox, Mail, MailOpen, RefreshCw, Search } fr
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
-import { SkeletonBlock } from "@/features/app-shell/components/AsyncState";
-import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
+import { ActionFeedback, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { EmptyState } from "@/features/ui/EmptyState";
 import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
@@ -39,6 +38,8 @@ export function InboxView({ language, token, userId }: { language: Language; tok
   } = useNotificationStore();
   const [queryDraft, setQueryDraft] = useState(inboxQuery);
   const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const [showInitialSkeleton, setShowInitialSkeleton] = useState(false);
+  const isInitialLoading = inboxStatus === "loading" && !inboxResult;
 
   useEffect(() => {
     if (!token || token.startsWith("demo-")) {
@@ -54,6 +55,14 @@ export function InboxView({ language, token, userId }: { language: Language; tok
     const timer = window.setTimeout(() => setToast(null), 2800);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setShowInitialSkeleton(isInitialLoading),
+      isInitialLoading ? 500 : 0,
+    );
+    return () => window.clearTimeout(timer);
+  }, [isInitialLoading]);
 
   async function updateReadState(notification: NotificationItem, isRead: boolean) {
     if (!token || token.startsWith("demo-")) {
@@ -108,7 +117,6 @@ export function InboxView({ language, token, userId }: { language: Language; tok
   }
 
   const totalPages = Math.max(1, Math.ceil((inboxResult?.totalCount ?? 0) / pageSize));
-  const isInitialLoading = inboxStatus === "loading" && !inboxResult;
   const readOptions = (["all", "unread", "read"] as NotificationReadStatus[]).map((value) => ({
     value,
     label: t(`inbox.${value}` as TranslationKey),
@@ -155,11 +163,12 @@ export function InboxView({ language, token, userId }: { language: Language; tok
           options={categoryOptions}
           value={inboxCategory}
         />
+        <div className="inbox-toolbar-feedback"><ActionFeedback feedback={toast ? { tone: toast.kind, text: toast.text } : null} /></div>
       </section>
 
       <section className="inbox-list-panel">
         {inboxStatus === "refreshing" && inboxResult ? <div className="inbox-background-refresh"><span className="button-spinner" />{t("common.refreshing")}</div> : null}
-        {isInitialLoading ? <InboxSkeleton /> : null}
+        {showInitialSkeleton ? <InboxSkeleton /> : null}
         {!isInitialLoading && inboxStatus === "error" && !inboxResult ? <EmptyState description={t("inbox.loadError")} icon={<Bell size={20} />} title={t("api.error.generic")} /> : null}
         {!isInitialLoading && inboxResult?.items.length === 0 ? <EmptyState description={t("inbox.emptyDescription")} icon={<Inbox size={20} />} title={t("inbox.emptyTitle")} /> : null}
         {inboxResult?.items.map((notification) => {
@@ -194,7 +203,6 @@ export function InboxView({ language, token, userId }: { language: Language; tok
           />
         ) : null}
       </section>
-      {toast ? <WorkspaceToast compact kind={toast.kind} text={toast.text} /> : null}
     </div>
   );
 }

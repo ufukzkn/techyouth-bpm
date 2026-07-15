@@ -46,6 +46,26 @@ describe("notificationStore", () => {
     expect(useNotificationStore.getState().inboxStatus).toBe("idle");
   });
 
+  it("keeps the visible page while an uncached filter is loading", async () => {
+    vi.mocked(api.listNotifications).mockResolvedValueOnce(unreadPage);
+    await useNotificationStore.getState().loadInbox("token", "user-1");
+
+    useNotificationStore.getState().setInboxFilters({ readStatus: "unread" });
+    let resolveRequest: ((page: NotificationPage) => void) | undefined;
+    vi.mocked(api.listNotifications).mockImplementationOnce(
+      () => new Promise<NotificationPage>((resolve) => { resolveRequest = resolve; }),
+    );
+    const reload = useNotificationStore.getState().loadInbox("token", "user-1");
+
+    const pendingFilter = useNotificationStore.getState();
+    expect(pendingFilter.inboxStatus).toBe("refreshing");
+    expect(pendingFilter.inboxResult?.items).toEqual(unreadPage.items);
+
+    resolveRequest?.({ ...unreadPage, items: [] });
+    await reload;
+    expect(useNotificationStore.getState().inboxResult?.items).toEqual([]);
+  });
+
   it("updates read state optimistically and clears the pending marker after success", async () => {
     vi.mocked(api.listNotifications).mockResolvedValue(unreadPage);
     let resolveRequest: (() => void) | undefined;
