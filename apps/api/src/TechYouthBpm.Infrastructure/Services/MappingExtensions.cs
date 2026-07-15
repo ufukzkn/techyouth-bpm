@@ -62,8 +62,14 @@ internal static class MappingExtensions
             dto.Teams);
     }
 
-    public static FormDefinitionDto ToDto(this FormDefinition form) =>
-        new(
+    public static FormDefinitionDto ToDto(this FormDefinition form)
+    {
+        var latestPublished = form.Versions
+            .Where(version => version.Status == DefinitionVersionStatus.Published)
+            .OrderByDescending(version => version.VersionNumber)
+            .FirstOrDefault();
+
+        return new(
             form.Id,
             form.Name,
             form.Description,
@@ -86,6 +92,73 @@ internal static class MappingExtensions
                         rule.DependsOnFieldKey,
                         rule.ExpectedValue,
                         rule.Message)).ToArray()))
+                .ToArray(),
+            latestPublished?.Id,
+            latestPublished?.VersionNumber);
+    }
+
+    public static FormDefinitionVersionDto ToDto(this FormDefinitionVersion version) =>
+        new(
+            version.Id,
+            version.FormDefinitionId,
+            version.FormDefinition?.Name ?? string.Empty,
+            version.VersionNumber,
+            version.Status,
+            version.CreatedByUserId,
+            version.CreatedAt,
+            version.PublishedByUserId,
+            version.PublishedAt,
+            version.Pages
+                .OrderBy(page => page.SortOrder)
+                .Select(page => new FormPageDto(
+                    page.Id,
+                    page.Key,
+                    page.Title,
+                    page.Description,
+                    page.SortOrder,
+                    page.Fields
+                        .OrderBy(field => field.SortOrder)
+                        .Select(field => new FormFieldDto(
+                            field.Id,
+                            field.Key,
+                            field.Label,
+                            field.Type,
+                            field.Required,
+                            field.SortOrder,
+                            JsonHelpers.Deserialize<IReadOnlyList<string>>(field.OptionsJson, []),
+                            field.ValidationRules.Select(rule => new ValidationRuleDto(
+                                rule.RuleType,
+                                rule.DependsOnFieldKey,
+                                rule.ExpectedValue,
+                                rule.Message)).ToArray()))
+                        .ToArray()))
+                .ToArray());
+
+    public static ProcessDefinitionVersionDto ToDto(this ProcessDefinitionVersion version) =>
+        new(
+            version.Id,
+            version.ProcessDefinitionId,
+            version.VersionNumber,
+            version.Status,
+            version.FormDefinitionVersionId,
+            JsonHelpers.Deserialize(version.GraphJson, new ProcessGraphDto("1.0", [], [])),
+            version.CreatedByUserId,
+            version.CreatedAt,
+            version.PublishedByUserId,
+            version.PublishedAt);
+
+    public static ProcessDefinitionDto ToDto(this ProcessDefinition definition) =>
+        new(
+            definition.Id,
+            definition.Name,
+            definition.Description,
+            definition.CommunityId,
+            definition.Community?.Name ?? string.Empty,
+            definition.CreatedByUserId,
+            definition.CreatedAt,
+            definition.Versions
+                .OrderByDescending(version => version.VersionNumber)
+                .Select(version => version.ToDto())
                 .ToArray());
 
     public static ProcessTaskDto ToDto(this ProcessTask task) =>
@@ -98,7 +171,20 @@ internal static class MappingExtensions
             task.Status,
             JsonHelpers.Deserialize<IReadOnlyList<WorkflowAction>>(task.AvailableActionsJson, []),
             task.CreatedAt,
-            task.CompletedAt);
+            task.CompletedAt,
+            task.NodeKey,
+            task.Attempt,
+            task.Title,
+            task.Priority,
+            task.AssignmentType,
+            task.AssignedUserId,
+            task.CandidateTeamId,
+            task.CandidateCommunityRoleId,
+            task.ClaimedByUserId,
+            task.ClaimedAt,
+            task.ClaimVersion,
+            task.FormDefinitionVersionId,
+            task.FormDefinitionVersion?.ToDto());
 
     public static ProcessSummaryDto ToSummaryDto(this ProcessInstance process) =>
         new(
@@ -109,7 +195,10 @@ internal static class MappingExtensions
             process.Community?.Name ?? string.Empty,
             process.Status,
             process.StartedAt,
-            process.CompletedAt);
+            process.CompletedAt,
+            process.ProcessDefinitionVersionId,
+            process.FormDefinitionVersionId,
+            process.CurrentNodeKey);
 
     public static ProcessDetailDto ToDetailDto(this ProcessInstance process) =>
         new(
@@ -132,7 +221,26 @@ internal static class MappingExtensions
                 log.User?.DisplayName ?? "Unknown user",
                 log.User?.Username ?? "unknown",
                 log.CreatedAt,
-                log.Note)).ToArray());
+                log.Note)).ToArray(),
+            process.ProcessDefinitionVersionId,
+            process.FormDefinitionVersionId,
+            process.CurrentNodeKey,
+            JsonHelpers.ToElement(process.VariablesJson),
+            process.StepExecutions
+                .OrderBy(step => step.EnteredAt)
+                .Select(step => new ProcessStepExecutionDto(
+                    step.Id,
+                    step.NodeKey,
+                    step.NodeType,
+                    step.Attempt,
+                    step.Status,
+                    step.EnteredAt,
+                    step.CompletedAt,
+                    step.CompletedByUserId,
+                    step.CompletedByUser?.DisplayName,
+                    step.Action,
+                    JsonHelpers.ToElement(step.OutputJson)))
+                .ToArray());
 
     public static CommunityDto ToDto(this Community community) =>
         new(community.Id, community.Name, community.Description, community.InviteCode, community.IsActive, community.CreatedAt);
