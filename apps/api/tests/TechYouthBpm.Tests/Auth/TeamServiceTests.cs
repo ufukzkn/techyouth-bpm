@@ -187,6 +187,56 @@ public class TeamServiceTests
         Assert.False(db.TeamMemberships.Single(item => item.TeamId == team.Id && item.UserId == member.Id).IsActive);
     }
 
+    [Fact]
+    public async Task ListRosterAsync_Allows_Member_Without_TeamsView_Only_For_Own_Team()
+    {
+        await using var db = TestDbFactory.Create();
+        var member = TestDbFactory.SeedUser(db, Role.User, "roster-member");
+        var teammate = TestDbFactory.SeedUser(db, Role.User, "roster-teammate");
+        var ownTeam = SeedTeam(db, TestDbFactory.CommunityId, "Scout Ekibi");
+        var otherTeam = SeedTeam(db, TestDbFactory.CommunityId, "Mali Isler");
+        db.TeamMemberships.AddRange(
+            Membership(ownTeam.Id, member.Id),
+            Membership(ownTeam.Id, teammate.Id));
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+        var memberDto = CommunityUserDto(member, []);
+
+        var ownRoster = await service.ListRosterAsync(ownTeam.Id, new TeamMemberSearchRequest(), memberDto);
+        var otherRoster = await service.ListRosterAsync(otherTeam.Id, new TeamMemberSearchRequest(), memberDto);
+
+        Assert.True(ownRoster.IsSuccess, string.Join(" | ", ownRoster.Errors));
+        Assert.Equal(2, ownRoster.Value!.TotalCount);
+        Assert.Contains(ownRoster.Value.Items, item => item.UserId == teammate.Id);
+        Assert.False(otherRoster.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ListUserMembershipsAsync_Uses_Self_Global_And_Community_Management_Scope()
+    {
+        await using var db = TestDbFactory.Create();
+        var communityAdmin = TestDbFactory.SeedUser(db, Role.Admin, "membership-admin");
+        var member = TestDbFactory.SeedUser(db, Role.User, "membership-target");
+        var team = SeedTeam(db, TestDbFactory.CommunityId, "Teknik Degerlendirme");
+        db.TeamMemberships.Add(Membership(team.Id, member.Id, isLead: true));
+        var other = SeedOtherCommunity(db);
+        var externalUser = SeedUserInCommunity(db, other.CommunityId, other.RoleId, "membership-external");
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var selfResult = await service.ListUserMembershipsAsync(member.Id, CommunityUserDto(member, []));
+        var adminResult = await service.ListUserMembershipsAsync(member.Id, TestDbFactory.CommunityAdminDto(communityAdmin));
+        var deniedResult = await service.ListUserMembershipsAsync(externalUser.Id, TestDbFactory.CommunityAdminDto(communityAdmin));
+        var globalResult = await service.ListUserMembershipsAsync(externalUser.Id, SuperAdminDto());
+
+        Assert.True(selfResult.IsSuccess);
+        Assert.True(adminResult.IsSuccess);
+        Assert.Single(adminResult.Value!);
+        Assert.True(adminResult.Value![0].IsLead);
+        Assert.False(deniedResult.IsSuccess);
+        Assert.True(globalResult.IsSuccess);
+    }
+
     private static TeamService CreateService(AppDbContext db) =>
         new(db, new SystemAuditService(db), new NotificationService(db));
 
@@ -206,6 +256,17 @@ public class TeamServiceTests
         db.Teams.Add(team);
         return team;
     }
+
+    private static TeamMembership Membership(Guid teamId, Guid userId, bool isLead = false) => new()
+    {
+        Id = Guid.NewGuid(),
+        TeamId = teamId,
+        UserId = userId,
+        IsLead = isLead,
+        IsActive = true,
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
 
     private static (Guid CommunityId, Guid RoleId) SeedOtherCommunity(AppDbContext db)
     {
