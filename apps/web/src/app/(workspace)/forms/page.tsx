@@ -1,7 +1,7 @@
 "use client";
 
-import { FormDesignerDraft } from "@/features/form-designer/FormDesignerDraft";
+import { VersionedFormDesignerView } from "@/features/forms/VersionedFormDesignerView";
 
 export default function FormsPage() {
-  return <FormDesignerDraft />;
+  return <VersionedFormDesignerView />;
 }

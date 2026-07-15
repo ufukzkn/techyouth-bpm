@@ -1,7 +1,7 @@
 "use client";
 
-import { FormRunnerDraft } from "@/features/form-runner/FormRunnerDraft";
+import { VersionedFormRunnerView } from "@/features/forms/VersionedFormRunnerView";
 
 export default function RunnerPage() {
-  return <FormRunnerDraft />;
+  return <VersionedFormRunnerView />;
 }
