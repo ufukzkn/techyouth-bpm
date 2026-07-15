@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlus2, ListTodo, PlayCircle, Workflow } from "lucide-react";
+import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, ListTodo, Workflow } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
@@ -41,7 +41,13 @@ export function DashboardView({
   );
   const [hoveredChartSegment, setHoveredChartSegment] = useState<string | null>(null);
   const [chartTooltipPosition, setChartTooltipPosition] = useState<{ x: number; y: number } | null>(null);
-  const { previewItems, isLoading: notificationsLoading, loadPreview, setReadState } = useNotificationStore();
+  const {
+    previewItems,
+    isLoading: notificationsLoading,
+    isPreviewRefreshing,
+    loadPreview,
+    setReadState,
+  } = useNotificationStore();
 
   useEffect(() => {
     let ignore = false;
@@ -108,6 +114,10 @@ export function DashboardView({
   const shouldShowMetricLoader = status === "loading" && !summary;
   const activeChartSegment = chartSegments.find((segment) => segment.key === hoveredChartSegment);
   const currentAccessLabel = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
+  const normalizedCommunityRole = user.communityRoleName.trim().toLocaleLowerCase("tr-TR");
+  const hasUnassignedCommunityRole = user.role !== "SuperAdmin"
+    && Boolean(user.communityId)
+    && (!normalizedCommunityRole || ["atanmadi", "atanmadı", "unassigned"].includes(normalizedCommunityRole));
   const showTaskFocus = canOpen("tasks");
 
   async function openNotification(notification: NotificationItem) {
@@ -136,7 +146,7 @@ export function DashboardView({
           <div className="dashboard-header-actions">
             {canOpen("runner") ? (
               <button className="primary-button" onClick={() => onNavigate("runner")} type="button">
-                <PlayCircle size={17} /> {t("dashboard.quick.start")}
+                <FilePlay size={17} /> {t("dashboard.quick.start")}
               </button>
             ) : null}
             {canOpen("forms") ? (
@@ -150,6 +160,9 @@ export function DashboardView({
 
       {user.communityId && user.isCommunityActive === false ? (
         <p className="dashboard-community-inactive" role="status">{t("dashboard.communityInactive")}</p>
+      ) : null}
+      {hasUnassignedCommunityRole ? (
+        <p className="dashboard-role-unassigned" role="status">{t("dashboard.roleUnassigned")}</p>
       ) : null}
 
       <section className="dashboard-focus-grid">
@@ -246,7 +259,13 @@ export function DashboardView({
 
       <section className="dashboard-work-card dashboard-notification-card">
         <div className="dashboard-card-heading">
-          <div><span className="eyebrow">{t("dashboard.activityEyebrow")}</span><h3>{t("dashboard.activityTitle")}</h3></div>
+          <div>
+            <span className="eyebrow">{t("dashboard.activityEyebrow")}</span>
+            <h3>
+              {t("dashboard.activityTitle")}
+              {isPreviewRefreshing ? <span aria-label={t("common.refreshing")} className="dashboard-heading-refresh button-spinner" role="status" /> : null}
+            </h3>
+          </div>
           <button className="dashboard-heading-action" onClick={() => onNavigate("inbox")} type="button">
             {t("dashboard.viewAll")} <ArrowRight size={15} />
           </button>

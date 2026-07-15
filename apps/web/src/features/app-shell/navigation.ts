@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, FilePlus2, FolderKanban, History, Inbox, LayoutDashboard, Settings, UsersRound, Workflow } from "lucide-react";
+import { Building2, ClipboardList, FilePlay, FilePlus2, FolderKanban, History, Inbox, LayoutDashboard, Settings, UsersRound, Workflow } from "lucide-react";
 import type { TranslationKey } from "@/features/i18n/translations";
 import type { PermissionName } from "@/lib/types";
 
@@ -49,7 +49,7 @@ export const navItems: NavItem[] = [
     labelKey: "nav.runner",
     viewId: "runner",
     path: "/runner",
-    icon: FilePlus2,
+    icon: FilePlay,
     permissions: ["Forms.View", "Processes.Start"],
     group: "forms",
   },
@@ -66,12 +66,6 @@ export const navItems: NavItem[] = [
     path: "/tasks",
     icon: ClipboardList,
     permissions: ["Tasks.View"],
-  },
-  {
-    labelKey: "nav.inbox",
-    viewId: "inbox",
-    path: "/inbox",
-    icon: Inbox,
   },
   {
     labelKey: "nav.managementUsers",
@@ -95,6 +89,12 @@ export const navItems: NavItem[] = [
     path: "/logs",
     icon: History,
     permissions: ["Audit.View"],
+  },
+  {
+    labelKey: "nav.inbox",
+    viewId: "inbox",
+    path: "/inbox",
+    icon: Inbox,
   },
   {
     labelKey: "nav.settings",
