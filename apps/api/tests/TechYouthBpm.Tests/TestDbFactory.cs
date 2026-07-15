@@ -209,6 +209,8 @@ internal static class TestDbFactory
                 PermissionNames.CommunityManageUsers,
                 PermissionNames.CommunityManageRoles,
                 PermissionNames.CommunityManageAdmins,
+                PermissionNames.TeamsView,
+                PermissionNames.TeamsManage,
                 PermissionNames.FormsView,
                 PermissionNames.FormsCreate,
                 PermissionNames.FormsUpdate,

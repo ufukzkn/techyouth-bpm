@@ -987,7 +987,7 @@ public class AuthService(
 
         await DeactivateTeamMembershipsIfCommunityChangedAsync(user.Id, currentCommunityId, communityId, cancellationToken);
 
-        user.CommunityMemberships.Add(new UserCommunityMembership
+        var newMembership = new UserCommunityMembership
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
@@ -995,7 +995,8 @@ public class AuthService(
             CommunityRoleId = request.CommunityRoleId,
             IsActive = request.IsActive,
             CreatedAt = DateTime.UtcNow
-        });
+        };
+        db.UserCommunityMemberships.Add(newMembership);
 
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
