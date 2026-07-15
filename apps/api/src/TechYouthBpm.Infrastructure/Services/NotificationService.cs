@@ -120,7 +120,8 @@ public class NotificationService(AppDbContext db) : INotificationService
             "access" => query.Where(notification =>
                 notification.Type == "User.AccessUpdated"
                 || notification.Type == "User.PendingApproval"
-                || notification.Type.StartsWith("Community.")),
+                || notification.Type.StartsWith("Community.")
+                || notification.Type.StartsWith("Team.")),
             "account" => query.Where(notification =>
                 notification.Type.StartsWith("User.")
                 && notification.Type != "User.AccessUpdated"

@@ -62,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<ICommunityRoleService>(provider =>
             (ICommunityRoleService)provider.GetRequiredService<ICommunityService>());
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<ITeamService, TeamService>();
         services.AddSingleton<ProcessStateMachine>();
 
         return services;

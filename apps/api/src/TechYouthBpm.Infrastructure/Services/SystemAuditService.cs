@@ -176,7 +176,8 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
                 log.Action == "Auth.AdminSessionRevoked"
                 || log.Action == "User.AccessUpdated"
                 || log.Action == "User.CreatedByAdmin"
-                || log.Action == "User.DeletedByAdmin"),
+                || log.Action == "User.DeletedByAdmin"
+                || log.Action.StartsWith("Team.")),
             "forms" => query.Where(log => log.Action.StartsWith("FormDefinition.") || log.EntityType == "FormDefinition"),
             "processes" => query.Where(log => log.Action.StartsWith("Process.") || log.EntityType == "ProcessInstance"),
             "tasks" => query.Where(log => log.Action.StartsWith("Task.") || log.EntityType == "ProcessTask"),

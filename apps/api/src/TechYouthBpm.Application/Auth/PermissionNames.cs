@@ -5,6 +5,8 @@ public static class PermissionNames
     public const string CommunityManageUsers = "Community.ManageUsers";
     public const string CommunityManageRoles = "Community.ManageRoles";
     public const string CommunityManageAdmins = "Community.ManageAdmins";
+    public const string TeamsView = "Teams.View";
+    public const string TeamsManage = "Teams.Manage";
     public const string FormsView = "Forms.View";
     public const string FormsCreate = "Forms.Create";
     public const string FormsUpdate = "Forms.Update";
@@ -19,6 +21,8 @@ public static class PermissionNames
         CommunityManageUsers,
         CommunityManageRoles,
         CommunityManageAdmins,
+        TeamsView,
+        TeamsManage,
         FormsView,
         FormsCreate,
         FormsUpdate,

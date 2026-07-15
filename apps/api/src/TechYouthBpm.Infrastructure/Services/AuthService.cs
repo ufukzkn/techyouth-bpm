@@ -979,10 +979,13 @@ public class AuthService(
             return Result<UserAdminDto>.Failure("Community role was not found.");
         }
 
+        var currentCommunityId = user.ToDto().CommunityId;
         foreach (var membership in user.CommunityMemberships)
         {
             membership.IsActive = false;
         }
+
+        await DeactivateTeamMembershipsIfCommunityChangedAsync(user.Id, currentCommunityId, communityId, cancellationToken);
 
         user.CommunityMemberships.Add(new UserCommunityMembership
         {
@@ -1083,6 +1086,12 @@ public class AuthService(
             {
                 membership.IsActive = false;
             }
+
+            await DeactivateTeamMembershipsIfCommunityChangedAsync(
+                user.Id,
+                userDto.CommunityId,
+                targetCommunityId.Value,
+                cancellationToken);
 
             await db.SaveChangesAsync(cancellationToken);
             db.UserCommunityMemberships.Add(new UserCommunityMembership
@@ -1852,11 +1861,36 @@ public class AuthService(
 
     private IQueryable<User> UserQuery() =>
         db.Users
+            .AsSplitQuery()
             .Include(user => user.CommunityMemberships)
             .ThenInclude(membership => membership.Community)
             .Include(user => user.CommunityMemberships)
             .ThenInclude(membership => membership.CommunityRole)
-            .ThenInclude(role => role!.Permissions);
+            .ThenInclude(role => role!.Permissions)
+            .Include(user => user.TeamMemberships)
+            .ThenInclude(teamMembership => teamMembership.Team);
+
+    private async Task DeactivateTeamMembershipsIfCommunityChangedAsync(
+        Guid userId,
+        Guid? currentCommunityId,
+        Guid targetCommunityId,
+        CancellationToken cancellationToken)
+    {
+        if (currentCommunityId is null || currentCommunityId == targetCommunityId)
+        {
+            return;
+        }
+
+        var memberships = await db.TeamMemberships
+            .Where(membership => membership.UserId == userId && membership.IsActive)
+            .ToListAsync(cancellationToken);
+        foreach (var membership in memberships)
+        {
+            membership.IsActive = false;
+            membership.IsLead = false;
+            membership.UpdatedAt = DateTime.UtcNow;
+        }
+    }
 
     private static bool HasActiveCommunityAccess(User user) =>
         user.Role == Role.SuperAdmin

@@ -14,6 +14,11 @@ internal static class MappingExtensions
         var permissions = user.Role == Role.SuperAdmin
             ? PermissionNames.All
             : membership?.CommunityRole?.Permissions.Select(permission => permission.Permission).Distinct().Order().ToArray() ?? [];
+        var teams = user.TeamMemberships
+            .Where(teamMembership => teamMembership.IsActive && teamMembership.Team?.IsActive == true)
+            .OrderBy(teamMembership => teamMembership.Team!.Name)
+            .Select(teamMembership => new UserTeamDto(teamMembership.TeamId, teamMembership.Team!.Name, teamMembership.IsLead))
+            .ToArray();
 
         return new UserDto(
             user.Id,
@@ -29,7 +34,8 @@ internal static class MappingExtensions
             membership?.CommunityRoleId,
             membership?.CommunityRole?.Name ?? string.Empty,
             permissions,
-            membership?.Community?.IsActive ?? true);
+            membership?.Community?.IsActive ?? true,
+            teams);
     }
 
     public static UserAdminDto ToAdminDto(this User user)
@@ -52,7 +58,8 @@ internal static class MappingExtensions
             dto.CommunityRoleId,
             dto.CommunityRoleName,
             dto.Permissions,
-            dto.IsCommunityActive);
+            dto.IsCommunityActive,
+            dto.Teams);
     }
 
     public static FormDefinitionDto ToDto(this FormDefinition form) =>
