@@ -212,9 +212,9 @@ The runner reads the same `validationRules` array and blocks submit before calli
 
 - Drag/drop behavior uses the existing `@dnd-kit/core`, `@dnd-kit/sortable` and `@dnd-kit/utilities` dependencies.
 - No new dependency was added for ordering or field creation.
-- The Form Designer includes a true sticky third-column field palette from 1440 CSS pixels upward. It stays below the topbar without overlaying the canvas. On narrower screens the palette falls back into normal page flow.
+- The Form Designer uses a sticky third-column palette rail when at least 1600 CSS pixels are available. Narrower and zoom-constrained layouts hide the inline palette and use the right-side FAB/drawer, so the palette no longer falls below the form.
 - Palette items use field-specific icons, localized field names and short Turkish descriptions.
-- Palette items do not create fields on click. A real drag/drop gesture is required before a new field is inserted.
+- Desktop rail palette items do not create fields on click; a real drag/drop gesture is required there. Drawer selection intentionally uses click-to-add.
 - While dragging from the palette, the field list shows an insertion indicator so users can see where the field will be added.
 - Dropping on an existing field inserts the new field at that visible position. Dropping on the general canvas/drop zone falls back to appending the field to the end.
 - Dropping a palette item back on the palette, outside the designer or on any other invalid target does not create a field. Cancelling a palette drag clears the insertion preview.
@@ -223,6 +223,14 @@ The runner reads the same `validationRules` array and blocks submit before calli
 - Move up/down feedback is presentation-only: the moved card uses a short primary ring and soft directional motion, while the swapped neighbor uses neutral, lower-distance motion. Reduced-motion users receive highlight-only feedback.
 - After drag/drop, move up/down or remove operations, the field list is normalized so `sortOrder` stays sequential.
 - JSON preview and save payload are generated from the current field order, so persisted form definitions follow the visible order.
+- The drawer provides click-to-add field selection. Desktop rail drag/drop remains available, and its active source can paint outside the scrollable palette list so the drag preview stays visible over the canvas. Insertion preview and invalid-drop guards are unchanged.
+
+## Responsive Designer And Palette
+
+- The Designer layout is hardened for the 1920, 1440, 1366, 1240, 1100, 1024, 860, 768 and 640 viewport bands. Medium layouts avoid two-column panel squeezing; field, rule and option editors and their scoped input/select controls use safe wrapping and width containment.
+- Form Designer content is centered within the workspace area without changing the global sidebar or app-shell layout. Drawer mode centers the form content without reserving inline palette width; desktop rail mode centers the combined canvas and rail.
+- The desktop rail is viewport-height constrained. Its palette list scrolls independently while the separate save/update panel remains in the rail's visible bottom row, including after the File Upload palette item increased the list length.
+- The right drawer is viewport-height constrained, scrolls its one-column themed item list and preserves backdrop, close, focus and body-scroll behavior. Drawer field creation is click-based for now.
 
 ## Supported Field Types
 
@@ -273,8 +281,9 @@ Select and Radio share option validation across the designer and backend definit
 
 ## Known Limitations / Deferred Items
 
-- Mixed-height field cards can still produce a distorted active drag preview in some reorder paths, especially when short fields cross long Select, Radio or `RequiredWhen` editors. Reorder behavior itself remains functional; this is deferred visual debt.
-- A palette item preview can drift away from the cursor when the page scrolls during an active palette drag. Palette field creation, invalid-drop guards and insertion indices remain functional; cursor/scroll alignment is deferred.
+- **Known follow-up:** Mixed-height field cards can still produce a distorted active drag preview when short fields cross long Select, Radio or `RequiredWhen` editors. Reorder remains functional; revisit this visual issue at the end of the form polish work.
+- **Known follow-up:** Drawer palette selection is click-to-add rather than drag/drop. This is accepted for now and can be researched in a separate isolated batch if required.
+- **Known follow-up:** A palette item may not track the cursor exactly when the page scrolls during an active desktop palette drag. Field creation, invalid-drop guards and insertion indices remain functional; reassess cursor/scroll alignment after the safer UI work is complete.
 - Previous experimental DragOverlay, fixed/max-height and compact-preview approaches that were restored are not completed features and should not be treated as the current implementation.
 
 ## Deferred Real Upload / Storage
@@ -290,6 +299,8 @@ Real file upload/storage was deliberately excluded from the foundation batch. It
 - Virus scanning, quarantine, orphan-upload cleanup and retention policy.
 
 Until that work is approved and implemented, File Upload must be described and treated only as metadata selection; it does not prove that a file was uploaded or retained.
+
+The current JSON-safe value contains only `name`, `size`, MIME `type` and `lastModified`. Binary transfer, storage, upload endpoints and attachment entities will be decided only after the responsible stakeholders answer the pending architecture and security questions.
 
 ## Files Changed
 
@@ -406,7 +417,7 @@ Frontend lint/build, the File Upload foundation backend build/test suite and `gi
 ## Latest Mobile And Navigation UX
 
 - `Form Tasarimi` and `Form Baslat` keep their native routes but now appear under one permission-aware `Formlar` sidebar disclosure.
-- At 860 CSS pixels and below, the long palette card is replaced by a draggable circular trigger. The trigger is constrained to the viewport, snaps to the nearest horizontal edge and remembers a normalized vertical position for the device.
-- The trigger opens an accessible bottom sheet from the viewport edge. Selecting a field type appends it through the existing palette insertion function, closes the sheet and scrolls the new field into view.
-- Tablet/desktop drag-and-drop and field-card move controls remain unchanged.
+- Below the 1600 CSS-pixel rail breakpoint, the inline palette is replaced by a draggable circular trigger. The trigger remains viewport-constrained, snaps to the nearest horizontal edge and remembers a normalized vertical position for the device.
+- The trigger opens an accessible right-side drawer. Selecting a field type appends it through the existing palette insertion function, closes the drawer and scrolls the new field into view.
+- Desktop rail drag-and-drop, field-card reorder and move controls remain unchanged.
 - Designer, runner and process-detail JSON now use the shared `JsonViewer`, which contains long values, limits vertical growth and provides copy plus expand/collapse actions.
