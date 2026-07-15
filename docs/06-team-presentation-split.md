@@ -25,6 +25,8 @@ Production tasks:
 - Dashboard shortcuts that route users to role-available workflow screens.
 - Session expiry visibility in the top bar and settings screen.
 - Settings page draft for theme and user preferences.
+- Community-scoped team and multi-team membership management.
+- Virtual `Takimsiz` user view, team audit and membership notifications.
 
 Backend/API touchpoints:
 
@@ -33,6 +35,7 @@ Backend/API touchpoints:
 - Role data returned from auth response.
 - Community and permission data returned from auth response.
 - Community and custom role APIs.
+- Team and team-membership APIs.
 
 Frontend files and areas:
 
@@ -147,6 +150,8 @@ How BPM is modeled with statuses, tasks, actions and traceable transitions.
 Current ownership note:
 
 Cagdas owns the final process/task permission story. The first backend permission checks are in place; the next refinement is process definition level assignment, such as a logistics step that requires a more specific task permission or community role.
+
+Task priority (`Low`, `Normal`, `High`, `Critical`), candidate task claiming and workflow-node assignment remain in Cagdas's future dynamic workflow package. Ufuk supplies team contracts and scope rules but does not change the current task model in the team-foundation package.
 
 ## Integration Rules
 

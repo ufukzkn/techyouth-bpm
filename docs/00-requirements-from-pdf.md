@@ -63,6 +63,7 @@ The PDF marks some items as bonus or optional. For this project, these are treat
 - State transition audit logs.
 - Transaction handling around form/process updates.
 - Unit tests for state machine transitions.
+- Community roles and team membership as an extensible foundation for user/group task assignment.
 
 ## Later Production-Readiness Roadmap
 
@@ -76,3 +77,5 @@ These items are not required by the PDF, but they fit the goal of building the m
 ## Important Evaluation Point
 
 The evaluator explicitly expects more than "a working UI". The architecture must be readable, modular, and easy to extend without breaking unrelated parts of the system.
+
+Team management and the planned visual workflow designer are extensions, not replacements for the required baseline. The current form, process, task and audit flow must keep working while these capabilities are introduced progressively.

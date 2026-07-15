@@ -4,7 +4,7 @@
 
 The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, permission-aware access, community/custom role management, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
-The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, backend services own business rules, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional and the real HTTP pipeline is covered for cookie/CSRF, Bearer, refresh, rate limit and authorization behavior. The main remaining production gaps are browser E2E, task concurrency protection, CI and final responsive/accessibility QA.
+The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional and the real HTTP pipeline is covered for cookie/CSRF, Bearer, refresh, rate limit and authorization behavior. The main remaining production gaps are browser E2E, task concurrency protection, dynamic workflow runtime, CI and final responsive/accessibility QA.
 
 ## PDF Compliance Matrix
 
@@ -74,6 +74,8 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 **Why opaque sessions instead of JWT?** This BPM system needs central revoke, pending approval, lockout, session visibility and suspicious refresh reuse detection. Opaque DB-backed sessions make those direct. JWT would still need server-side state for these features.
 
 **Why community/custom roles?** Real BPM systems usually need team-specific permissions. `SuperAdmin` manages the platform, while `CommunityRolePermission` records let each community define roles such as form designer, process starter or logistics operator without new code.
+
+**Why are teams separate from roles?** A team answers where work is performed, while a role answers what a user may do. Keeping them separate allows one user to work in multiple operational teams without duplicating permissions or inventing a second authorization system.
 
 **How are passwords protected?** Passwords are stored as PBKDF2 hashes. Raw passwords are only used at verification time or as temporary admin-created credentials before forced change.
 

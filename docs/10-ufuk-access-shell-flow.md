@@ -92,6 +92,10 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Active sessions can be listed and revoked from settings. Revoking the current session logs the user out.
 - Settings includes a `Tum cihazlardan cikis yap` action, which revokes non-current sessions first and then revokes the current session.
 - Identity/access actions are written to `SystemAuditLogs` so Admin can review who registered, signed in, changed access, updated profile/email, changed password, verified email, created users or revoked sessions.
+- Auth, registration, account, session and user-administration controllers now consume focused Application interfaces. The Infrastructure implementation may remain shared internally, but HTTP boundaries no longer depend on one oversized auth contract.
+- Community metadata/lifecycle and community-role CRUD use separate service contracts; user membership operations stay in user administration.
+- Inbox results now use a user/filter/page-scoped Zustand cache with stale-while-revalidate behavior. Returning to `/inbox` shows cached content immediately, optimistic read-state updates roll back on API failure and only post-baseline visible polling creates live notification toasts.
+- The next Ufuk package adds community-scoped teams, multi-team memberships and a virtual `Takimsiz` view. Team leadership is informational and never bypasses `Teams.View` or `Teams.Manage` checks.
 
 ## Current Dashboard Behavior
 
@@ -115,6 +119,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - The current token model stays as opaque server-side sessions plus rotating refresh tokens because pending approval, lockout, refresh reuse detection and revoke all need server-side state. JWT can be considered later only if it keeps equivalent refresh-token rotation and explicit session/device management.
 - Theme ownership should stay centralized in `sessionStore`; feature screens should read the active theme only through shared styling tokens.
 - Static shell/login/dashboard/process text should use the shared i18n dictionary instead of inline copy.
+- Team and workflow boundaries must remain distinct: teams describe where work is performed, community roles describe what is allowed, and future task priority/claim behavior remains in Cagdas's workflow scope.
 
 ## Files Changed
 

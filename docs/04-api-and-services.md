@@ -218,7 +218,13 @@ Most endpoints require `Authorization: Bearer <token>`. Use `POST /api/auth/logi
 
 Controllers should stay thin. Services own decisions:
 
-- `AuthService`: registration, profile updates, password changes, password hash verification, lockout, session-token hashing, session metadata, session revoke, email verification orchestration and admin user access.
+- `IAuthenticationService`: login, refresh, token/session validation and current-user resolution.
+- `IRegistrationService`: registration and public email verification.
+- `IAccountService`: profile, password, password recovery and authenticated verification operations.
+- `ISessionService`: logout, session listing and revoke operations.
+- `IUserAdministrationService`: paged user search, user creation, access changes, deletion and admin password reset.
+- `ICommunityService`: community metadata, lifecycle, invite code and summary operations.
+- `ICommunityRoleService`: role templates and community-role CRUD.
 - `OtpService`: six-digit email verification code generation, hashed OTP storage and expiry/code validation.
 - `IEmailSender` implementations:
   - `DemoEmailSender`: no external dependency; exposes the generated OTP for local demo and no-ops admin temporary-password emails.
@@ -246,6 +252,22 @@ The frontend API client now exposes one method for each planned endpoint:
 - Tasks: `listMyTasks`, `executeTaskAction`
 
 Feature components should call these client methods through feature-level orchestration instead of calling `fetch` directly.
+
+The inbox uses a user/filter/page keyed in-memory LRU cache in its Zustand feature store. Cached data remains visible during background refresh, read-state changes are optimistic and API failures restore the previous snapshot. This state is cleared on logout or user change and is not persisted to disk.
+
+## Planned Team API
+
+The team package adds `Teams.View` and `Teams.Manage` plus these community-scoped contracts:
+
+- `GET/POST /api/teams`
+- `GET/PATCH /api/teams/{teamId}`
+- `GET /api/teams/{teamId}/members`
+- `GET /api/teams/{teamId}/candidates`
+- `GET /api/teams/unassigned/members`
+- `POST /api/teams/{teamId}/members`
+- `PATCH/DELETE /api/teams/{teamId}/members/{userId}`
+
+List endpoints use server-side search and pagination. `Takimsiz` is computed from active approved community users without active team memberships; it is never stored as a team. Membership mutations must write system audit and notify the affected user.
 
 ## Community Management Additions
 

@@ -76,3 +76,21 @@ The first access model used fixed enum roles. The current model keeps enum roles
 - Navigation reads `UserDto.permissions`; backend services still enforce the same permissions server-side.
 
 Detailed permission notes are tracked in `docs/16-community-permission-model.md`.
+
+## Focused Application Boundaries
+
+The identity implementation may share one Infrastructure class while controllers depend on focused Application contracts:
+
+- `IAuthenticationService`: login, refresh and current-user resolution.
+- `IRegistrationService`: registration and public email verification.
+- `IAccountService`: profile, password and recovery operations.
+- `ISessionService`: logout, session listing and revoke.
+- `IUserAdministrationService`: paged user management and admin operations.
+- `ICommunityService`: community metadata, lifecycle, invite code and summary.
+- `ICommunityRoleService`: role templates and community-role CRUD.
+
+This is a pragmatic layered architecture, influenced by Clean Architecture dependency direction: Domain is independent, Application defines contracts, Infrastructure implements them and API exposes HTTP. A generic repository is intentionally avoided because EF Core `DbContext` already supplies repository/unit-of-work behavior.
+
+## Team Extension Boundary
+
+Teams are community-scoped operational groups, not a second role system. A user can have multiple `TeamMembership` records while retaining one community role. `Takimsiz` is computed from missing active memberships. The future workflow runtime can target a person, team, community role or team-plus-role intersection without changing the platform-level access model. See `docs/18-dynamic-workflow-and-team-architecture.md`.
