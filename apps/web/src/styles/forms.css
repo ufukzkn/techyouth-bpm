@@ -754,8 +754,30 @@
 }
 
 .field-palette-item-dragging {
-  opacity: 0.72;
-  box-shadow: 0 14px 30px rgba(24, 36, 58, 0.16);
+  opacity: 0.38;
+  box-shadow: none;
+}
+
+.field-palette-drag-ghost {
+  position: fixed;
+  z-index: 1000;
+  width: clamp(220px, 18vw, 260px);
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.field-palette-drag-ghost-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
+  cursor: grabbing;
+  opacity: 1;
+  visibility: visible;
+  border-style: solid;
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
 }
 
 .designer-save-panel {
@@ -1215,26 +1237,6 @@
   .designer-section .designer-save-panel {
     max-height: min(38dvh, 300px);
     overflow-y: auto;
-  }
-
-  .designer-section .field-palette-rail:has(.field-palette-item-dragging),
-  .designer-section .field-palette:has(.field-palette-item-dragging),
-  .designer-section .field-palette-grid:has(.field-palette-item-dragging) {
-    overflow: visible;
-  }
-
-  .designer-section .field-palette-rail:has(.field-palette-item-dragging) {
-    z-index: 4;
-  }
-
-  .designer-section .field-palette:has(.field-palette-item-dragging) {
-    position: relative;
-    z-index: 4;
-  }
-
-  .designer-section .field-palette-item-dragging {
-    position: relative;
-    z-index: 5;
   }
 }
 

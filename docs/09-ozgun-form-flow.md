@@ -215,15 +215,18 @@ The runner reads the same `validationRules` array and blocks submit before calli
 - The Form Designer uses a sticky third-column palette rail when at least 1600 CSS pixels are available. Narrower and zoom-constrained layouts hide the inline palette and use the right-side FAB/drawer, so the palette no longer falls below the form.
 - Palette items use field-specific icons, localized field names and short Turkish descriptions.
 - Desktop rail palette items do not create fields on click; a real drag/drop gesture is required there. Drawer selection intentionally uses click-to-add.
-- While dragging from the palette, the field list shows an insertion indicator so users can see where the field will be added.
-- Dropping on an existing field inserts the new field at that visible position. Dropping on the general canvas/drop zone falls back to appending the field to the end.
+- Palette drags use pointer-based `pointerWithin` collision detection, prioritize field droppables over the parent canvas and use pointer Y for upper/lower-half insertion. Existing-field reorder continues to use its previous `closestCenter` behavior.
+- While dragging from the palette, the field list shows the authoritative insertion indicator. Drag end uses the last displayed `paletteInsertIndex` and does not estimate the index again; if no preview/index exists, no field is created.
+- A populated canvas has no general `fields.length` fallback. An empty canvas still inserts at index `0`; the last field's lower half appends normally, and a controlled 24px region immediately below only the last field makes the same end insertion slightly easier. Distant or ambiguous canvas space remains invalid.
 - Dropping a palette item back on the palette, outside the designer or on any other invalid target does not create a field. Cancelling a palette drag clears the insertion preview.
+- Palette drag visuals do not use dnd-kit `DragOverlay`. A presentation-only `position: fixed` ghost is rendered through a `document.body` portal and follows a palette-only `window.pointermove` listener with `pointer-events: none`; it does not participate in collision, preview or index calculation.
+- The source palette item stays in place as a low-opacity placeholder with its drag transform disabled. The palette list keeps its own scroll boundary and cannot expand over the separate save/update panel during a drag.
 - Text Area and Radio Button field creation use the same default field helper as the manual fallback.
 - Move up/down controls remain available as a fallback and accessibility-friendly ordering path.
 - Move up/down feedback is presentation-only: the moved card uses a short primary ring and soft directional motion, while the swapped neighbor uses neutral, lower-distance motion. Reduced-motion users receive highlight-only feedback.
 - After drag/drop, move up/down or remove operations, the field list is normalized so `sortOrder` stays sequential.
 - JSON preview and save payload are generated from the current field order, so persisted form definitions follow the visible order.
-- The drawer provides click-to-add field selection. Desktop rail drag/drop remains available, and its active source can paint outside the scrollable palette list so the drag preview stays visible over the canvas. Insertion preview and invalid-drop guards are unchanged.
+- Existing reorder, move up/down, drawer/FAB click-to-add, field editing, options, `RequiredWhen`, File Upload metadata and save/update/Runner payload behavior remain unchanged.
 
 ## Responsive Designer And Palette
 
@@ -270,7 +273,7 @@ Select and Radio share option validation across the designer and backend definit
 - Actionable Designer/Runner warnings use scoped, more visible panels with a short fade/translate highlight. Existing live-region semantics remain intact and reduced-motion preferences are respected.
 - Manual `Add field` shows a short overlay/spinner on its own panel while preserving immediate field creation and input reset behavior. Starting a new form uses matching short feedback over the Form Information panel. The saved-form selection overlay remains unchanged.
 - Palette-created fields still require a valid canvas or existing-field target. Returning to the palette, cancelling, dropping outside the designer or using another invalid target creates no field.
-- Palette insertion feedback uses the same decorative, non-interactive preview at top, middle and bottom indices. The improved bottom preview and the shared insertion rendering do not change index resolution or field creation rules.
+- Palette insertion feedback uses the same decorative, non-interactive preview at top, middle and bottom indices. Index resolution and field creation follow the authoritative-preview safeguards and the narrow last-field tolerance documented above.
 - Existing field reorder, move up/down feedback, sequential `sortOrder` normalization, JSON preview order and save/update payload order remain aligned. The DnD context, sortable/draggable setup and handler algorithms were not unnecessarily redesigned during this polish work.
 
 ## Validation Feedback
@@ -283,8 +286,7 @@ Select and Radio share option validation across the designer and backend definit
 
 - **Known follow-up:** Mixed-height field cards can still produce a distorted active drag preview when short fields cross long Select, Radio or `RequiredWhen` editors. Reorder remains functional; revisit this visual issue at the end of the form polish work.
 - **Known follow-up:** Drawer palette selection is click-to-add rather than drag/drop. This is accepted for now and can be researched in a separate isolated batch if required.
-- **Known follow-up:** A palette item may not track the cursor exactly when the page scrolls during an active desktop palette drag. Field creation, invalid-drop guards and insertion indices remain functional; reassess cursor/scroll alignment after the safer UI work is complete.
-- Previous experimental DragOverlay, fixed/max-height and compact-preview approaches that were restored are not completed features and should not be treated as the current implementation.
+- **Known follow-up:** Real binary File Upload transfer, storage, endpoint and attachment-entity design remains deferred until the responsible stakeholders provide the required architecture and security decisions.
 
 ## Deferred Real Upload / Storage
 
