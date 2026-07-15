@@ -55,6 +55,8 @@
 }
 
 .inbox-search input {
+  flex: 1;
+  width: 100%;
   min-width: 0;
   height: 40px;
   padding: 0;
@@ -63,30 +65,71 @@
   box-shadow: none;
 }
 
-.inbox-read-tabs {
-  display: inline-grid;
-  grid-auto-flow: column;
-  gap: 4px;
-  padding: 4px;
+.inbox-toolbar .sliding-segmented-control {
+  min-width: 270px;
+}
+
+.notification-category-menu {
+  position: relative;
+  min-width: 190px;
+}
+
+.notification-category-trigger {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  color: var(--foreground);
   background: var(--surface-muted);
+  text-align: left;
 }
 
-.inbox-read-tabs button {
-  min-height: 34px;
-  padding: 0 12px;
+.notification-category-trigger > svg:last-child {
+  transition: transform var(--motion-fast) ease;
+}
+
+.notification-category-trigger > svg:last-child.open {
+  transform: rotate(180deg);
+}
+
+.notification-category-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 7px);
+  right: 0;
+  width: max(100%, 220px);
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  animation: disclosure-enter var(--motion-normal) ease both;
+}
+
+.notification-category-popover button {
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 5px;
-  color: var(--muted);
+  border-radius: 6px;
+  color: var(--foreground);
   background: transparent;
-  font-size: 13px;
-  font-weight: 800;
+  text-align: left;
 }
 
-.inbox-read-tabs button.active {
-  color: #ffffff;
-  background: var(--primary);
+.notification-category-popover button:hover,
+.notification-category-popover button[aria-checked="true"] {
+  background: var(--surface-muted);
 }
 
 .inbox-list-panel {
@@ -152,7 +195,18 @@
 }
 
 .inbox-read-action {
-  white-space: nowrap;
+  justify-self: end;
+}
+
+.inbox-background-refresh {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .inbox-skeleton {
@@ -187,9 +241,9 @@
     justify-content: flex-start;
   }
 
-  .inbox-read-tabs {
+  .inbox-toolbar .sliding-segmented-control {
     width: 100%;
-    grid-template-columns: repeat(3, 1fr);
+    min-width: 0;
   }
 
   .inbox-read-action {

@@ -601,6 +601,17 @@
   overflow: hidden;
 }
 
+.toast-info {
+  border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.toast-compact {
+  min-height: 42px;
+  padding: 9px 12px;
+}
+
 .sliding-segmented-item {
   position: relative;
   z-index: 2;

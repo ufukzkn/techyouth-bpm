@@ -11,6 +11,7 @@ import { ThemeToggleButton } from "@/features/app-shell/ThemeToggleButton";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { getNotificationTarget } from "@/features/notifications/notificationNavigation";
 import { useNotificationStore } from "@/features/notifications/notificationStore";
+import { NotificationLiveToasts } from "@/features/notifications/NotificationLiveToasts";
 import type { Language, NotificationItem, ThemeMode, User } from "@/lib/types";
 
 type WorkspaceTopbarProps = {
@@ -46,7 +47,9 @@ export function WorkspaceTopbar({
     unreadCount,
     isLoading: isNotificationsLoading,
     loadPreview,
+    liveToasts,
     markAllRead,
+    dismissLiveToast,
     reset: resetNotifications,
     setReadState,
   } = useNotificationStore();
@@ -55,29 +58,29 @@ export function WorkspaceTopbar({
     [language],
   );
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (source: "initial" | "poll" | "visibility" | "popover") => {
     if (!token || token.startsWith("demo-")) {
       resetNotifications(user.id);
       return;
     }
 
     try {
-      await loadPreview(token, user.id);
+      await loadPreview(token, user.id, source);
     } catch {
       // The workspace keeps running when notification refresh fails.
     }
   }, [loadPreview, resetNotifications, token, user.id]);
 
   useEffect(() => {
-    void loadNotifications();
+    void loadNotifications("initial");
     const interval = window.setInterval(() => {
       if (document.visibilityState === "visible") {
-        void loadNotifications();
+        void loadNotifications("poll");
       }
     }, 30_000);
     function handleVisibilityChange() {
       if (document.visibilityState === "visible") {
-        void loadNotifications();
+        void loadNotifications("visibility");
       }
     }
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -89,7 +92,7 @@ export function WorkspaceTopbar({
 
   useEffect(() => {
     if (isNotificationsOpen) {
-      void loadNotifications();
+      void loadNotifications("popover");
     }
   }, [isNotificationsOpen, loadNotifications]);
 
@@ -114,6 +117,18 @@ export function WorkspaceTopbar({
     }
 
     await markAllRead(token);
+  }
+
+  async function openLiveNotification(notification: NotificationItem) {
+    dismissLiveToast(notification.id);
+    if (token && !token.startsWith("demo-") && !notification.readAt) {
+      try {
+        await setReadState(token, notification.id, true);
+      } catch {
+        return;
+      }
+    }
+    router.push(getNotificationTarget(notification) ?? "/inbox");
   }
 
   const effectiveRole = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
@@ -183,6 +198,11 @@ export function WorkspaceTopbar({
           <LogOut size={18} />
         </button>
       </div>
+      <NotificationLiveToasts
+        onDismiss={dismissLiveToast}
+        onSelect={(notification) => void openLiveNotification(notification)}
+        toasts={liveToasts}
+      />
     </header>
   );
 }

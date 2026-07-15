@@ -1,14 +1,15 @@
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 
 type WorkspaceToastProps = {
-  kind: "success" | "error";
+  compact?: boolean;
+  kind: "success" | "error" | "info";
   text: string;
 };
 
-export function WorkspaceToast({ kind, text }: WorkspaceToastProps) {
+export function WorkspaceToast({ compact = false, kind, text }: WorkspaceToastProps) {
   return (
-    <div className={`toast toast-${kind}`} role="status" aria-live="polite">
-      {kind === "success" ? <CheckCircle2 size={17} /> : <AlertTriangle size={17} />}
+    <div className={`toast toast-${kind}${compact ? " toast-compact" : ""}`} role="status" aria-live="polite">
+      {kind === "success" ? <CheckCircle2 size={17} /> : kind === "info" ? <Info size={17} /> : <AlertTriangle size={17} />}
       <span>{text}</span>
     </div>
   );

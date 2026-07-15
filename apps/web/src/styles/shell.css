@@ -547,3 +547,75 @@
   background: color-mix(in srgb, var(--danger) 88%, #1b1b1b);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--danger) 34%, transparent);
 }
+.notification-live-toast-stack {
+  position: fixed;
+  z-index: 120;
+  right: 20px;
+  bottom: 20px;
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  gap: 9px;
+  pointer-events: none;
+}
+
+.notification-live-toast {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  animation: toast-enter var(--motion-normal) ease both;
+}
+
+.notification-live-toast-main {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 6px;
+  border: 0;
+  color: var(--foreground);
+  background: transparent;
+  text-align: left;
+}
+
+.notification-live-toast-main > svg {
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+.notification-live-toast-main span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.notification-live-toast-main small {
+  color: var(--muted);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.notification-live-toast-close {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+}
+
+.notification-live-toast-close:hover {
+  color: var(--foreground);
+  background: var(--surface-muted);
+}
