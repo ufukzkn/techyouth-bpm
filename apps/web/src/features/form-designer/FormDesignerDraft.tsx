@@ -23,6 +23,7 @@ import {
   closestCenter,
   type CollisionDetection,
   DndContext,
+  DragOverlay,
   type DragCancelEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -147,6 +148,7 @@ export function FormDesignerDraft() {
   const [moveFeedback, setMoveFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [displacedFeedback, setDisplacedFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
+  const [activePaletteFieldType, setActivePaletteFieldType] = useState<FieldType | null>(null);
   const lastPalettePointerYRef = useRef<number | null>(null);
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
@@ -292,6 +294,8 @@ export function FormDesignerDraft() {
 
   function handleDragStart(event: DragStartEvent) {
     if (isPaletteDragId(event.active.id)) {
+      const fieldType = event.active.data.current?.fieldType;
+      setActivePaletteFieldType(isSupportedFieldType(fieldType) ? fieldType : null);
       setPaletteInsertIndex(null);
       lastPalettePointerYRef.current = null;
     }
@@ -307,6 +311,7 @@ export function FormDesignerDraft() {
 
   function handleDragCancel(event: DragCancelEvent) {
     if (isPaletteDragId(event.active.id)) {
+      setActivePaletteFieldType(null);
       setPaletteInsertIndex(null);
       lastPalettePointerYRef.current = null;
     }
@@ -328,6 +333,7 @@ export function FormDesignerDraft() {
       ) {
         addFieldFromPalette(fieldType, paletteInsertIndex);
       }
+      setActivePaletteFieldType(null);
       setPaletteInsertIndex(null);
       lastPalettePointerYRef.current = null;
       return;
@@ -1134,6 +1140,11 @@ export function FormDesignerDraft() {
             </div>
           </FieldPaletteRail>
         </div>
+        <DragOverlay dropAnimation={null}>
+          {activePaletteFieldType ? (
+            <PaletteFieldTypeDragPreview fieldType={activePaletteFieldType} language={language} />
+          ) : null}
+        </DragOverlay>
       </DndContext>
       <MobileFieldPalette
         closeLabel={t("common.close")}
@@ -1221,9 +1232,7 @@ function PaletteFieldTypeCard({
     id: `${fieldPalettePrefix}${fieldType}`,
     data: { fieldType },
   });
-  const style = {
-    transform: CSS.Translate.toString(transform),
-  };
+  const style = isDragging ? undefined : { transform: CSS.Translate.toString(transform) };
 
   return (
     <div
@@ -1242,6 +1251,25 @@ function PaletteFieldTypeCard({
         <span>{description}</span>
       </span>
       <GripVertical className="field-palette-grip" size={16} aria-hidden="true" />
+    </div>
+  );
+}
+
+function PaletteFieldTypeDragPreview({ fieldType, language }: { fieldType: FieldType; language: Language }) {
+  const label = fieldTypeLabel(language, fieldType);
+  const description = translate(language, `form.designer.fieldType${fieldType}Description` as TranslationKey);
+  const FieldTypeIcon = fieldTypeIcons[fieldType];
+
+  return (
+    <div className="field-palette-item field-palette-drag-overlay" aria-hidden="true">
+      <span className="field-palette-icon">
+        <FieldTypeIcon size={18} />
+      </span>
+      <span className="field-palette-item-copy">
+        <strong>{label}</strong>
+        <span>{description}</span>
+      </span>
+      <GripVertical className="field-palette-grip" size={16} />
     </div>
   );
 }
