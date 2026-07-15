@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
@@ -17,23 +18,38 @@ public class ProcessService(
     ProcessStateMachine stateMachine,
     ISystemAuditService auditService) : IProcessService
 {
-    public async Task<IReadOnlyList<ProcessSummaryDto>> ListAsync(UserDto user, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ProcessSummaryDto>> ListAsync(
+        UserDto user,
+        CancellationToken cancellationToken = default)
     {
-        if (!user.HasPermission(PermissionNames.ProcessesView))
+        if (!user.HasPermission(PermissionNames.ProcessesView)
+            && !user.HasPermission(PermissionNames.ProcessesViewAll))
         {
             return [];
         }
 
         var query = db.ProcessInstances.AsNoTracking();
-
-        if (!user.IsSuperAdmin() && user.CommunityId is not null)
+        if (!user.IsSuperAdmin())
         {
             query = query.Where(process => process.CommunityId == user.CommunityId);
         }
 
-        if (!user.HasPermission(PermissionNames.TasksView))
+        if (!user.IsSuperAdmin() && !user.HasPermission(PermissionNames.ProcessesViewAll))
         {
-            query = query.Where(process => process.StartedByUserId == user.Id);
+            var teamIds = (user.Teams ?? []).Select(team => team.Id).ToArray();
+            var roleId = user.CommunityRoleId;
+            var canAct = user.HasPermission(PermissionNames.TasksAct);
+            query = query.Where(process =>
+                process.StartedByUserId == user.Id
+                || process.Tasks.Any(task =>
+                    task.AssignedUserId == user.Id
+                    || task.ClaimedByUserId == user.Id
+                    || (task.AssignmentType == null && canAct)
+                    || (canAct && task.AssignmentType == TaskAssignmentType.Team && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty))
+                    || (canAct && task.AssignmentType == TaskAssignmentType.CommunityRole && task.CandidateCommunityRoleId == roleId)
+                    || (canAct && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
+                        && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty)
+                        && task.CandidateCommunityRoleId == roleId)));
         }
 
         return await query
@@ -46,15 +62,19 @@ public class ProcessService(
                 process.Community != null ? process.Community.Name : string.Empty,
                 process.Status,
                 process.StartedAt,
-                process.CompletedAt))
+                process.CompletedAt,
+                process.ProcessDefinitionVersionId,
+                process.FormDefinitionVersionId,
+                process.CurrentNodeKey))
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<ProcessDetailDto?> GetAsync(Guid id, UserDto user, CancellationToken cancellationToken = default)
+    public async Task<ProcessDetailDto?> GetAsync(
+        Guid id,
+        UserDto user,
+        CancellationToken cancellationToken = default)
     {
-        var process = await ProcessQuery()
-            .SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-
+        var process = await ProcessQuery().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
         if (process is null || !CanSeeProcess(process, user))
         {
             return null;
@@ -63,7 +83,10 @@ public class ProcessService(
         return process.ToDetailDto();
     }
 
-    public async Task<Result<ProcessDetailDto>> StartAsync(StartProcessRequest request, UserDto user, CancellationToken cancellationToken = default)
+    public async Task<Result<ProcessDetailDto>> StartAsync(
+        StartProcessRequest request,
+        UserDto user,
+        CancellationToken cancellationToken = default)
     {
         if (!user.HasPermission(PermissionNames.ProcessesStart))
         {
@@ -76,10 +99,9 @@ public class ProcessService(
             return Result<ProcessDetailDto>.Failure("Form definition was not found.");
         }
 
-        var isCommunityActive = await db.Communities.AnyAsync(
-            community => community.Id == form.CommunityId && community.IsActive,
-            cancellationToken);
-        if (!isCommunityActive)
+        if (!await db.Communities.AnyAsync(
+                community => community.Id == form.CommunityId && community.IsActive,
+                cancellationToken))
         {
             return Result<ProcessDetailDto>.Failure("The process community is not active.");
         }
@@ -90,21 +112,38 @@ public class ProcessService(
             return Result<ProcessDetailDto>.Failure(validationErrors);
         }
 
-        var now = DateTime.UtcNow;
         var startResult = stateMachine.Move(ProcessStatus.Pending, WorkflowAction.Start);
         if (!startResult.IsSuccess)
         {
             return Result<ProcessDetailDto>.Failure(startResult.Errors);
         }
 
+        var formEntity = await db.FormDefinitions
+            .Include(item => item.Fields)
+            .ThenInclude(field => field.ValidationRules)
+            .Include(item => item.Versions)
+            .SingleAsync(item => item.Id == form.Id, cancellationToken);
+        var publishedFormVersion = formEntity.Versions
+            .Where(version => version.Status == DefinitionVersionStatus.Published)
+            .OrderByDescending(version => version.VersionNumber)
+            .FirstOrDefault();
+        var now = DateTime.UtcNow;
+        if (publishedFormVersion is null)
+        {
+            publishedFormVersion = FormVersionModel.BuildLegacyPublishedVersion(formEntity, 1, user.Id, now);
+            db.FormDefinitionVersions.Add(publishedFormVersion);
+        }
+
         var process = new ProcessInstance
         {
             Id = Guid.NewGuid(),
             FormDefinitionId = request.FormDefinitionId,
+            FormDefinitionVersionId = publishedFormVersion.Id,
             CommunityId = form.CommunityId,
             StartedByUserId = user.Id,
             Status = startResult.Value,
             FormDataJson = request.FormData.GetRawText(),
+            VariablesJson = BuildVariablesJson(request.FormData.GetRawText()),
             StartedAt = now,
             Tasks =
             [
@@ -113,8 +152,11 @@ public class ProcessService(
                     Id = Guid.NewGuid(),
                     AssignedRole = Role.User,
                     RequiredPermission = PermissionNames.TasksAct,
+                    Title = "Approval",
+                    Priority = TaskPriority.Normal,
                     Status = ProcessTaskStatus.Open,
                     AvailableActionsJson = JsonHelpers.Serialize(new[] { WorkflowAction.Approve, WorkflowAction.Reject }),
+                    ClaimVersion = Guid.NewGuid(),
                     CreatedAt = now
                 }
             ],
@@ -136,11 +178,7 @@ public class ProcessService(
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         db.ProcessInstances.Add(process);
         await db.SaveChangesAsync(cancellationToken);
-        await NotifyTaskCandidatesAsync(
-            process.CommunityId,
-            process.Id,
-            form.Name,
-            cancellationToken);
+        await NotifyLegacyTaskCandidatesAsync(process.CommunityId, process.Id, form.Name, cancellationToken);
         await auditService.LogAsync(
             user,
             "Process.Started",
@@ -150,8 +188,99 @@ public class ProcessService(
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
-        var saved = await GetAsync(process.Id, user, cancellationToken);
-        return Result<ProcessDetailDto>.Success(saved!);
+        return Result<ProcessDetailDto>.Success((await GetAsync(process.Id, user, cancellationToken))!);
+    }
+
+    public async Task<Result<ProcessDetailDto>> StartVersionAsync(
+        StartProcessVersionRequest request,
+        UserDto user,
+        CancellationToken cancellationToken = default)
+    {
+        if (!user.HasPermission(PermissionNames.ProcessesStart))
+        {
+            return Result<ProcessDetailDto>.Failure("Current user cannot start processes.");
+        }
+
+        var version = await db.ProcessDefinitionVersions
+            .Include(item => item.ProcessDefinition)
+            .ThenInclude(definition => definition!.Community)
+            .Include(item => item.FormDefinitionVersion)
+            .ThenInclude(formVersion => formVersion!.FormDefinition)
+            .Include(item => item.FormDefinitionVersion)
+            .ThenInclude(formVersion => formVersion!.Pages)
+            .ThenInclude(page => page.Fields)
+            .ThenInclude(field => field.ValidationRules)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(item => item.Id == request.ProcessDefinitionVersionId, cancellationToken);
+
+        if (version is null || version.Status != DefinitionVersionStatus.Published)
+        {
+            return Result<ProcessDetailDto>.Failure("Published process definition version was not found.");
+        }
+
+        var definition = version.ProcessDefinition!;
+        if ((!user.IsSuperAdmin() && definition.CommunityId != user.CommunityId)
+            || definition.Community?.IsActive != true)
+        {
+            return Result<ProcessDetailDto>.Failure("The process definition is outside the current active community.");
+        }
+
+        var formVersion = version.FormDefinitionVersion!;
+        var formDto = formVersion.ToDto();
+        var validationErrors = FormDataValidator.Validate(formDto, request.FormData);
+        if (validationErrors.Count > 0)
+        {
+            return Result<ProcessDetailDto>.Failure(validationErrors);
+        }
+
+        var graph = JsonHelpers.Deserialize(version.GraphJson, new ProcessGraphDto("", [], []));
+        var now = DateTime.UtcNow;
+        var process = new ProcessInstance
+        {
+            Id = Guid.NewGuid(),
+            FormDefinitionId = formVersion.FormDefinitionId,
+            FormDefinitionVersionId = formVersion.Id,
+            ProcessDefinitionVersionId = version.Id,
+            CommunityId = definition.CommunityId,
+            StartedByUserId = user.Id,
+            Status = ProcessStatus.InProgress,
+            FormDataJson = request.FormData.GetRawText(),
+            VariablesJson = BuildVariablesJson(request.FormData.GetRawText()),
+            StartedAt = now,
+            AuditLogs =
+            [
+                new AuditLog
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    Action = WorkflowAction.Start,
+                    FromStatus = ProcessStatus.Pending,
+                    ToStatus = ProcessStatus.InProgress,
+                    CreatedAt = now,
+                    Note = $"Process started with definition version {version.VersionNumber}."
+                }
+            ]
+        };
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        db.ProcessInstances.Add(process);
+        var routeResult = await new DynamicWorkflowEngine(db).StartAsync(process, graph, cancellationToken);
+        if (!routeResult.IsSuccess)
+        {
+            return Result<ProcessDetailDto>.Failure(routeResult.Errors);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            user,
+            "Process.Started",
+            "ProcessInstance",
+            process.Id.ToString(),
+            $"Process '{definition.Name}' version {version.VersionNumber} was started.",
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Result<ProcessDetailDto>.Success((await GetAsync(process.Id, user, cancellationToken))!);
     }
 
     private IQueryable<ProcessInstance> ProcessQuery() =>
@@ -162,16 +291,62 @@ public class ProcessService(
             .Include(process => process.Community)
             .Include(process => process.Tasks)
             .ThenInclude(task => task.AssignedCommunityRole)
+            .Include(process => process.Tasks)
+            .ThenInclude(task => task.FormDefinitionVersion)
+            .ThenInclude(version => version!.FormDefinition)
+            .Include(process => process.Tasks)
+            .ThenInclude(task => task.FormDefinitionVersion)
+            .ThenInclude(version => version!.Pages)
+            .ThenInclude(page => page.Fields)
+            .ThenInclude(field => field.ValidationRules)
+            .Include(process => process.StepExecutions)
+            .ThenInclude(step => step.CompletedByUser)
             .Include(process => process.AuditLogs)
             .ThenInclude(log => log.User);
 
-    private static bool CanSeeProcess(ProcessInstance process, UserDto user) =>
-        user.IsSuperAdmin()
-        || (process.CommunityId == user.CommunityId
-            && (user.HasPermission(PermissionNames.ProcessesView)
-                || process.StartedByUserId == user.Id));
+    private static bool CanSeeProcess(ProcessInstance process, UserDto user)
+    {
+        if (user.IsSuperAdmin())
+        {
+            return true;
+        }
 
-    private async Task NotifyTaskCandidatesAsync(Guid communityId, Guid processId, string formName, CancellationToken cancellationToken)
+        if (process.CommunityId != user.CommunityId
+            || (!user.HasPermission(PermissionNames.ProcessesView)
+                && !user.HasPermission(PermissionNames.ProcessesViewAll)))
+        {
+            return false;
+        }
+
+        if (user.HasPermission(PermissionNames.ProcessesViewAll) || process.StartedByUserId == user.Id)
+        {
+            return true;
+        }
+
+        var teamIds = (user.Teams ?? []).Select(team => team.Id).ToHashSet();
+        return process.Tasks.Any(task =>
+            task.AssignedUserId == user.Id
+            || task.ClaimedByUserId == user.Id
+            || (task.AssignmentType is null && user.HasPermission(task.RequiredPermission))
+            || (user.HasPermission(PermissionNames.TasksAct)
+                && task.AssignmentType == TaskAssignmentType.Team
+                && task.CandidateTeamId is { } teamId
+                && teamIds.Contains(teamId))
+            || (user.HasPermission(PermissionNames.TasksAct)
+                && task.AssignmentType == TaskAssignmentType.CommunityRole
+                && task.CandidateCommunityRoleId == user.CommunityRoleId)
+            || (user.HasPermission(PermissionNames.TasksAct)
+                && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
+                && task.CandidateTeamId is { } intersectionTeamId
+                && teamIds.Contains(intersectionTeamId)
+                && task.CandidateCommunityRoleId == user.CommunityRoleId));
+    }
+
+    private async Task NotifyLegacyTaskCandidatesAsync(
+        Guid communityId,
+        Guid processId,
+        string formName,
+        CancellationToken cancellationToken)
     {
         var userIds = await db.Users
             .Where(user => user.Status == UserStatus.Active
@@ -203,5 +378,15 @@ public class ProcessService(
         {
             await db.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private static string BuildVariablesJson(string formDataJson)
+    {
+        var variables = new JsonObject
+        {
+            ["start"] = JsonNode.Parse(formDataJson),
+            ["steps"] = new JsonObject()
+        };
+        return variables.ToJsonString();
     }
 }

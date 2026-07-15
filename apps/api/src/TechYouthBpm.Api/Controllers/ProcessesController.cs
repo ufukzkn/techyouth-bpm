@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TechYouthBpm.Application.Forms;
+using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Services;
 
 namespace TechYouthBpm.Api.Controllers;
@@ -45,6 +46,20 @@ public class ProcessesController(
         }
 
         var result = await processService.StartAsync(request, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpPost("start/version")]
+    [HttpPost("start-version")]
+    public async Task<IActionResult> StartVersion(StartProcessVersionRequest request, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await processService.StartVersionAsync(request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 }
