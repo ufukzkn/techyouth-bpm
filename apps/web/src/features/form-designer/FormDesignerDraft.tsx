@@ -68,6 +68,7 @@ const fieldPalettePrefix = "palette:";
 const fieldCanvasDropId = "field-canvas";
 const fieldPaletteDropId = "field-palette-drop-zone";
 const paletteDragDistanceThreshold = 8;
+const paletteEndInsertTolerance = 24;
 const fieldTypeIcons: Record<FieldType, LucideIcon> = {
   Text: Type,
   TextArea: AlignLeft,
@@ -1385,6 +1386,7 @@ function SortableFieldCard({
   return (
     <div
       ref={setNodeRef}
+      data-designer-field-id={id}
       className={`sortable-field-card${isDragging ? " sortable-field-card-dragging" : ""}`}
       style={style}
     >
@@ -1430,7 +1432,20 @@ function resolvePaletteInsertIndex(
   const targetFieldId = directlyOverField ? over.id : fieldCollision?.id;
   const overFieldIndex = fields.findIndex((field) => field.id === targetFieldId);
   if (overFieldIndex < 0) {
-    return null;
+    if (over.id !== fieldCanvasDropId || palettePointerY === null) {
+      return null;
+    }
+
+    const lastField = fields[fields.length - 1];
+    const lastFieldRect = lastField ? getDesignerFieldRect(lastField.id) : null;
+    if (!lastFieldRect) {
+      return null;
+    }
+
+    const isWithinEndTolerance =
+      palettePointerY >= lastFieldRect.bottom &&
+      palettePointerY <= lastFieldRect.bottom + paletteEndInsertTolerance;
+    return isWithinEndTolerance ? fields.length : null;
   }
 
   const targetRect = directlyOverField ? over.rect : fieldCollision?.data?.droppableContainer?.rect.current;
@@ -1447,6 +1462,17 @@ function resolvePaletteInsertIndex(
 
   const targetMiddleY = targetRect.top + targetRect.height / 2;
   return activeAnchorY > targetMiddleY ? overFieldIndex + 1 : overFieldIndex;
+}
+
+function getDesignerFieldRect(fieldId: string) {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  const fieldElement = Array.from(document.querySelectorAll<HTMLElement>("[data-designer-field-id]")).find(
+    (element) => element.dataset.designerFieldId === fieldId,
+  );
+  return fieldElement?.getBoundingClientRect() ?? null;
 }
 
 function isSupportedFieldType(value: unknown): value is FieldType {
