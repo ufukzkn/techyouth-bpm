@@ -11,7 +11,12 @@ public static class PermissionNames
     public const string FormsCreate = "Forms.Create";
     public const string FormsUpdate = "Forms.Update";
     public const string ProcessesView = "Processes.View";
+    public const string ProcessesViewAll = "Processes.ViewAll";
     public const string ProcessesStart = "Processes.Start";
+    public const string WorkflowsView = "Workflows.View";
+    public const string WorkflowsCreate = "Workflows.Create";
+    public const string WorkflowsUpdate = "Workflows.Update";
+    public const string WorkflowsPublish = "Workflows.Publish";
     public const string TasksView = "Tasks.View";
     public const string TasksAct = "Tasks.Act";
     public const string AuditView = "Audit.View";
@@ -27,7 +32,12 @@ public static class PermissionNames
         FormsCreate,
         FormsUpdate,
         ProcessesView,
+        ProcessesViewAll,
         ProcessesStart,
+        WorkflowsView,
+        WorkflowsCreate,
+        WorkflowsUpdate,
+        WorkflowsPublish,
         TasksView,
         TasksAct,
         AuditView

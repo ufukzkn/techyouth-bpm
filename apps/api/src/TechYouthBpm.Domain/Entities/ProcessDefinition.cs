@@ -1,6 +1,6 @@
 namespace TechYouthBpm.Domain.Entities;
 
-public class FormDefinition
+public class ProcessDefinition
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
@@ -13,6 +13,5 @@ public class FormDefinition
     public Guid? UpdatedByUserId { get; set; }
     public User? UpdatedByUser { get; set; }
     public DateTime? UpdatedAt { get; set; }
-    public List<FormFieldDefinition> Fields { get; set; } = [];
-    public List<FormDefinitionVersion> Versions { get; set; } = [];
+    public List<ProcessDefinitionVersion> Versions { get; set; } = [];
 }
