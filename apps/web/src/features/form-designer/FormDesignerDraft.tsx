@@ -21,12 +21,14 @@ import {
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   closestCenter,
+  type CollisionDetection,
   DndContext,
   type DragCancelEvent,
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
   KeyboardSensor,
+  pointerWithin,
   PointerSensor,
   useDraggable,
   useDroppable,
@@ -145,6 +147,7 @@ export function FormDesignerDraft() {
   const [moveFeedback, setMoveFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [displacedFeedback, setDisplacedFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
+  const lastPalettePointerYRef = useRef<number | null>(null);
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const fieldErrorSummary = useMemo(
@@ -162,6 +165,34 @@ export function FormDesignerDraft() {
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
+  );
+  const paletteAwareCollisionDetection = useCallback<CollisionDetection>(
+    (args) => {
+      if (!isPaletteDragId(args.active.id)) {
+        return closestCenter(args);
+      }
+
+      lastPalettePointerYRef.current = args.pointerCoordinates?.y ?? null;
+      const collisions = pointerWithin(args);
+
+      return collisions.sort((left, right) => {
+        const leftIsField = fields.some((field) => field.id === left.id);
+        const rightIsField = fields.some((field) => field.id === right.id);
+        if (leftIsField !== rightIsField) {
+          return leftIsField ? -1 : 1;
+        }
+
+        if (left.id === fieldCanvasDropId && right.id !== fieldCanvasDropId) {
+          return 1;
+        }
+        if (right.id === fieldCanvasDropId && left.id !== fieldCanvasDropId) {
+          return -1;
+        }
+
+        return 0;
+      });
+    },
+    [fields],
   );
 
   useEffect(
@@ -262,6 +293,7 @@ export function FormDesignerDraft() {
   function handleDragStart(event: DragStartEvent) {
     if (isPaletteDragId(event.active.id)) {
       setPaletteInsertIndex(null);
+      lastPalettePointerYRef.current = null;
     }
   }
 
@@ -270,12 +302,13 @@ export function FormDesignerDraft() {
       return;
     }
 
-    setPaletteInsertIndex(resolvePaletteInsertIndex(event, fields));
+    setPaletteInsertIndex(resolvePaletteInsertIndex(event, fields, lastPalettePointerYRef.current));
   }
 
   function handleDragCancel(event: DragCancelEvent) {
     if (isPaletteDragId(event.active.id)) {
       setPaletteInsertIndex(null);
+      lastPalettePointerYRef.current = null;
     }
   }
 
@@ -284,11 +317,19 @@ export function FormDesignerDraft() {
 
     if (isPaletteDragId(active.id)) {
       const fieldType = active.data.current?.fieldType;
-      const insertIndex = resolvePaletteInsertIndex(event, fields);
-      if (insertIndex !== null && hasPaletteDragDistance(event.delta) && isSupportedFieldType(fieldType)) {
-        addFieldFromPalette(fieldType, insertIndex);
+      const hasValidDropTarget = Boolean(
+        over && (over.id === fieldCanvasDropId || fields.some((field) => field.id === over.id)),
+      );
+      if (
+        paletteInsertIndex !== null &&
+        hasValidDropTarget &&
+        hasPaletteDragDistance(event.delta) &&
+        isSupportedFieldType(fieldType)
+      ) {
+        addFieldFromPalette(fieldType, paletteInsertIndex);
       }
       setPaletteInsertIndex(null);
+      lastPalettePointerYRef.current = null;
       return;
     }
 
@@ -677,7 +718,7 @@ export function FormDesignerDraft() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={paletteAwareCollisionDetection}
         onDragCancel={handleDragCancel}
         onDragEnd={handleDragEnd}
         onDragOver={handleDragOver}
@@ -1280,29 +1321,44 @@ function hasPaletteDragDistance(delta: DragEndEvent["delta"]) {
   return Math.hypot(delta.x, delta.y) >= paletteDragDistanceThreshold;
 }
 
-function resolvePaletteInsertIndex(event: DragOverEvent | DragEndEvent, fields: DesignerField[]) {
+function resolvePaletteInsertIndex(
+  event: DragOverEvent | DragEndEvent,
+  fields: DesignerField[],
+  palettePointerY: number | null,
+) {
   const over = event.over;
   if (!over) {
     return null;
   }
 
-  if (over.id === fieldCanvasDropId) {
-    return fields.length;
+  if (over.id === fieldCanvasDropId && fields.length === 0) {
+    return 0;
   }
 
-  const overFieldIndex = fields.findIndex((field) => field.id === over.id);
+  const directlyOverField = fields.some((field) => field.id === over.id);
+  const fieldCollision = directlyOverField
+    ? null
+    : event.collisions?.find((collision) => fields.some((field) => field.id === collision.id));
+  const targetFieldId = directlyOverField ? over.id : fieldCollision?.id;
+  const overFieldIndex = fields.findIndex((field) => field.id === targetFieldId);
   if (overFieldIndex < 0) {
     return null;
   }
 
-  const translatedRect = event.active.rect.current.translated;
-  if (!translatedRect) {
-    return overFieldIndex;
+  const targetRect = directlyOverField ? over.rect : fieldCollision?.data?.droppableContainer?.rect.current;
+  if (!targetRect) {
+    return null;
   }
 
-  const activeCenterY = translatedRect.top + translatedRect.height / 2;
-  const overMiddleY = over.rect.top + over.rect.height / 2;
-  return activeCenterY > overMiddleY ? overFieldIndex + 1 : overFieldIndex;
+  const activeRect = event.active.rect.current.translated;
+  const activeAnchorY =
+    palettePointerY ?? (activeRect ? activeRect.top + Math.min(activeRect.height / 2, 28) : null);
+  if (activeAnchorY === null) {
+    return null;
+  }
+
+  const targetMiddleY = targetRect.top + targetRect.height / 2;
+  return activeAnchorY > targetMiddleY ? overFieldIndex + 1 : overFieldIndex;
 }
 
 function isSupportedFieldType(value: unknown): value is FieldType {
