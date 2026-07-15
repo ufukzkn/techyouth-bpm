@@ -1259,7 +1259,7 @@
 
 .sortable-field-card-dragging {
   position: relative;
-  z-index: 2;
+  z-index: 10;
   isolation: isolate;
 }
 
@@ -1276,14 +1276,10 @@
 
 .sortable-field-card-dragging .option-editor,
 .sortable-field-card-dragging .rule-editor {
-  max-height: 28px;
-  overflow: hidden;
-  opacity: 0.12;
-  filter: grayscale(1);
+  opacity: 0.76;
+  filter: grayscale(0.35);
   pointer-events: none;
-  transition:
-    max-height 120ms ease-out,
-    opacity 100ms ease-out;
+  transition: opacity 100ms ease-out;
 }
 
 .field-editor {
@@ -1329,9 +1325,10 @@
 }
 
 .field-editor-dragging {
-  opacity: 0.78;
-  border-color: color-mix(in srgb, var(--primary) 55%, var(--border));
-  box-shadow: 0 14px 32px rgba(24, 36, 58, 0.16);
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--primary) 68%, var(--border));
+  background: var(--surface);
+  box-shadow: 0 18px 40px rgba(24, 36, 58, 0.22);
 }
 
 .field-editor {
