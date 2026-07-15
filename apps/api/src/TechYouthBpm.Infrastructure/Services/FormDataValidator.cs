@@ -24,10 +24,21 @@ internal static class FormDataValidator
     };
 
     public static IReadOnlyList<string> Validate(FormDefinitionDto form, JsonElement formData)
+        => ValidateFields(form.Fields, formData);
+
+    public static IReadOnlyList<string> Validate(FormDefinitionVersionDto form, JsonElement formData)
+        => ValidateFields(form.Pages.SelectMany(page => page.Fields), formData);
+
+    private static IReadOnlyList<string> ValidateFields(IEnumerable<FormFieldDto> fields, JsonElement formData)
     {
         var errors = new List<string>();
 
-        foreach (var field in form.Fields)
+        if (formData.ValueKind != JsonValueKind.Object)
+        {
+            return ["Form data must be a JSON object."];
+        }
+
+        foreach (var field in fields)
         {
             var hasValue = TryGetValue(formData, field.Key, out var value) && !IsEmpty(value);
 

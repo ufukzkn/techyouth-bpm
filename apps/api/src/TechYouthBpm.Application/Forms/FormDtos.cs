@@ -44,7 +44,8 @@ public record CreateFormRequest(
     string Name,
     string Description,
     IReadOnlyList<CreateFormFieldRequest> Fields,
-    Guid? CommunityId = null);
+    Guid? CommunityId = null,
+    bool CreatePublishedVersion = true);
 
 public record StartProcessRequest(Guid FormDefinitionId, JsonElement FormData);
 

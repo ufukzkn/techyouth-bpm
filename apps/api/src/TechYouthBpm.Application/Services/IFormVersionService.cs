@@ -35,4 +35,10 @@ public interface IFormVersionService
         Guid versionId,
         UserDto user,
         CancellationToken cancellationToken = default);
+
+    Task<Result<FormDefinitionVersionDto>> ArchiveAsync(
+        Guid formDefinitionId,
+        Guid versionId,
+        UserDto user,
+        CancellationToken cancellationToken = default);
 }
