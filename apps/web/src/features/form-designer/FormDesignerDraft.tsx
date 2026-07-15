@@ -179,7 +179,19 @@ export function FormDesignerDraft() {
   const paletteAwareCollisionDetection = useCallback<CollisionDetection>(
     (args) => {
       if (!isPaletteDragId(args.active.id)) {
-        return closestCenter(args);
+        const isExistingFieldDrag = fields.some((field) => field.id === args.active.id);
+        if (!isExistingFieldDrag) {
+          return closestCenter(args);
+        }
+
+        const pointerFieldCollisions = pointerWithin(args).filter((collision) =>
+          fields.some((field) => field.id === collision.id),
+        );
+        if (pointerFieldCollisions.length > 0) {
+          return pointerFieldCollisions;
+        }
+
+        return closestCenter(args).filter((collision) => fields.some((field) => field.id === collision.id));
       }
 
       lastPalettePointerYRef.current = args.pointerCoordinates?.y ?? null;
@@ -1364,6 +1376,14 @@ type SortableFieldCardRenderProps = Pick<
   "attributes" | "listeners" | "setActivatorNodeRef" | "isDragging"
 >;
 
+function getSortableFieldCardTransform(transform: ReturnType<typeof useSortable>["transform"]) {
+  if (!transform) {
+    return undefined;
+  }
+
+  return CSS.Transform.toString({ ...transform, scaleX: 1, scaleY: 1 });
+}
+
 function SortableFieldCard({
   id,
   children,
@@ -1379,7 +1399,7 @@ function SortableFieldCard({
     },
   });
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: getSortableFieldCardTransform(transform),
     transition,
   };
 

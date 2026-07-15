@@ -215,18 +215,21 @@ The runner reads the same `validationRules` array and blocks submit before calli
 - The Form Designer uses a sticky third-column palette rail when at least 1600 CSS pixels are available. Narrower and zoom-constrained layouts hide the inline palette and use the right-side FAB/drawer, so the palette no longer falls below the form.
 - Palette items use field-specific icons, localized field names and short Turkish descriptions.
 - Desktop rail palette items do not create fields on click; a real drag/drop gesture is required there. Drawer selection intentionally uses click-to-add.
-- Palette drags use pointer-based `pointerWithin` collision detection, prioritize field droppables over the parent canvas and use pointer Y for upper/lower-half insertion. Existing-field reorder continues to use its previous `closestCenter` behavior.
+- Palette drags use pointer-based `pointerWithin` collision detection, prioritize field droppables over the parent canvas and use pointer Y for upper/lower-half insertion. Existing-field reorder uses a separate field-only collision path: pointer collisions are preferred and keyboard/no-pointer operation falls back to `closestCenter`, with both result sets filtered to current field IDs.
 - While dragging from the palette, the field list shows the authoritative insertion indicator. Drag end uses the last displayed `paletteInsertIndex` and does not estimate the index again; if no preview/index exists, no field is created.
 - A populated canvas has no general `fields.length` fallback. An empty canvas still inserts at index `0`; the last field's lower half appends normally, and a controlled 24px region immediately below only the last field makes the same end insertion slightly easier. Distant or ambiguous canvas space remains invalid.
 - Dropping a palette item back on the palette, outside the designer or on any other invalid target does not create a field. Cancelling a palette drag clears the insertion preview.
 - Palette drag visuals do not use dnd-kit `DragOverlay`. A presentation-only `position: fixed` ghost is rendered through a `document.body` portal and follows a palette-only `window.pointermove` listener with `pointer-events: none`; it does not participate in collision, preview or index calculation.
 - The source palette item stays in place as a low-opacity placeholder with its drag transform disabled. The palette list keeps its own scroll boundary and cannot expand over the separate save/update panel during a drag.
+- Existing-field drag keeps each editor's natural height; the previous active option/rule collapse was removed so long Select, Radio, `RequiredWhen` and File Upload cards no longer change the sortable slot geometry. The active card remains opaque and is separated with a clearer border, shadow and stacking level.
+- Existing-only collision filtering prevents `field-canvas`, the palette rail and other parent droppables from becoming reorder targets. Keyboard reorder retains the field-only `closestCenter` fallback, while the palette collision branch remains unchanged.
+- The existing `SortableFieldCard` preserves the x/y translation from `useSortable` but normalizes `scaleX` and `scaleY` to `1`, preventing short cards from visually growing over tall targets. Reorder still uses the same `arrayMove`, sequential `sortOrder` normalization and move up/down controls.
 - Text Area and Radio Button field creation use the same default field helper as the manual fallback.
 - Move up/down controls remain available as a fallback and accessibility-friendly ordering path.
 - Move up/down feedback is presentation-only: the moved card uses a short primary ring and soft directional motion, while the swapped neighbor uses neutral, lower-distance motion. Reduced-motion users receive highlight-only feedback.
 - After drag/drop, move up/down or remove operations, the field list is normalized so `sortOrder` stays sequential.
 - JSON preview and save payload are generated from the current field order, so persisted form definitions follow the visible order.
-- Existing reorder, move up/down, drawer/FAB click-to-add, field editing, options, `RequiredWhen`, File Upload metadata and save/update/Runner payload behavior remain unchanged.
+- Palette field creation, cursor ghost, authoritative insertion preview/index, no-preview/no-create guard, bottom insertion tolerance and drawer/FAB click-to-add remain unchanged. Existing move up/down, field editing, options, `RequiredWhen`, File Upload metadata and save/update/Runner payload behavior also remain unchanged.
 
 ## Responsive Designer And Palette
 
@@ -274,7 +277,7 @@ Select and Radio share option validation across the designer and backend definit
 - Manual `Add field` shows a short overlay/spinner on its own panel while preserving immediate field creation and input reset behavior. Starting a new form uses matching short feedback over the Form Information panel. The saved-form selection overlay remains unchanged.
 - Palette-created fields still require a valid canvas or existing-field target. Returning to the palette, cancelling, dropping outside the designer or using another invalid target creates no field.
 - Palette insertion feedback uses the same decorative, non-interactive preview at top, middle and bottom indices. Index resolution and field creation follow the authoritative-preview safeguards and the narrow last-field tolerance documented above.
-- Existing field reorder, move up/down feedback, sequential `sortOrder` normalization, JSON preview order and save/update payload order remain aligned. The DnD context, sortable/draggable setup and handler algorithms were not unnecessarily redesigned during this polish work.
+- Existing field reorder, move up/down feedback, sequential `sortOrder` normalization, JSON preview order and save/update payload order remain aligned. The drag polish is limited to active-card presentation, existing-only collision selection and wrapper scale normalization; reorder handlers and persisted ordering behavior are unchanged.
 
 ## Validation Feedback
 
@@ -284,7 +287,7 @@ Select and Radio share option validation across the designer and backend definit
 
 ## Known Limitations / Deferred Items
 
-- **Known follow-up:** Mixed-height field cards can still produce a distorted active drag preview when short fields cross long Select, Radio or `RequiredWhen` editors. Reorder remains functional; revisit this visual issue at the end of the form polish work.
+- **Known follow-up:** Mixed-height existing-field drag visuals are improved; continue manual verification across browser and zoom combinations.
 - **Known follow-up:** Drawer palette selection is click-to-add rather than drag/drop. This is accepted for now and can be researched in a separate isolated batch if required.
 - **Known follow-up:** Real binary File Upload transfer, storage, endpoint and attachment-entity design remains deferred until the responsible stakeholders provide the required architecture and security decisions.
 
