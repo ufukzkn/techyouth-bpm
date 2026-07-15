@@ -758,13 +758,24 @@
   box-shadow: none;
 }
 
-.field-palette-drag-overlay {
+.field-palette-drag-ghost {
+  position: fixed;
+  z-index: 1000;
   width: clamp(220px, 18vw, 260px);
   max-width: calc(100vw - 24px);
   box-sizing: border-box;
   pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.field-palette-drag-ghost-card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
   cursor: grabbing;
-  opacity: 0.98;
+  opacity: 1;
+  visibility: visible;
   border-style: solid;
   box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
 }

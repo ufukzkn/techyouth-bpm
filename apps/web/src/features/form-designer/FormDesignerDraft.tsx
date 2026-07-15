@@ -19,11 +19,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   closestCenter,
   type CollisionDetection,
   DndContext,
-  DragOverlay,
   type DragCancelEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -43,7 +43,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { MobileFieldPalette } from "@/features/form-designer/MobileFieldPalette";
 import { JsonViewer } from "@/features/ui/JsonViewer";
@@ -148,8 +148,15 @@ export function FormDesignerDraft() {
   const [moveFeedback, setMoveFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [displacedFeedback, setDisplacedFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
-  const [activePaletteFieldType, setActivePaletteFieldType] = useState<FieldType | null>(null);
+  const [paletteDragGhost, setPaletteDragGhost] = useState<{
+    fieldType: FieldType;
+    x: number;
+    y: number;
+  } | null>(null);
+  const paletteGhostFrameRef = useRef<number | null>(null);
+  const pendingPaletteGhostCoordinatesRef = useRef<{ x: number; y: number } | null>(null);
   const lastPalettePointerYRef = useRef<number | null>(null);
+  const activePaletteGhostFieldType = paletteDragGhost?.fieldType ?? null;
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const fieldErrorSummary = useMemo(
@@ -208,6 +215,44 @@ export function FormDesignerDraft() {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!activePaletteGhostFieldType) {
+      return;
+    }
+
+    function handlePalettePointerMove(event: PointerEvent) {
+      pendingPaletteGhostCoordinatesRef.current = { x: event.clientX, y: event.clientY };
+      if (paletteGhostFrameRef.current !== null) {
+        return;
+      }
+
+      paletteGhostFrameRef.current = window.requestAnimationFrame(() => {
+        paletteGhostFrameRef.current = null;
+        const coordinates = pendingPaletteGhostCoordinatesRef.current;
+        if (!coordinates) {
+          return;
+        }
+
+        setPaletteDragGhost((current) =>
+          current?.fieldType === activePaletteGhostFieldType
+            ? { ...current, x: coordinates.x, y: coordinates.y }
+            : current,
+        );
+      });
+    }
+
+    window.addEventListener("pointermove", handlePalettePointerMove, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointermove", handlePalettePointerMove);
+      if (paletteGhostFrameRef.current !== null) {
+        window.cancelAnimationFrame(paletteGhostFrameRef.current);
+        paletteGhostFrameRef.current = null;
+      }
+      pendingPaletteGhostCoordinatesRef.current = null;
+    };
+  }, [activePaletteGhostFieldType]);
 
   const formModel = useMemo<CreateFormRequest>(
     () => ({
@@ -293,12 +338,20 @@ export function FormDesignerDraft() {
   }, [displacedFeedback]);
 
   function handleDragStart(event: DragStartEvent) {
-    if (isPaletteDragId(event.active.id)) {
-      const fieldType = event.active.data.current?.fieldType;
-      setActivePaletteFieldType(isSupportedFieldType(fieldType) ? fieldType : null);
-      setPaletteInsertIndex(null);
-      lastPalettePointerYRef.current = null;
+    if (!isPaletteDragId(event.active.id)) {
+      setPaletteDragGhost(null);
+      return;
     }
+
+    const fieldType = event.active.data.current?.fieldType;
+    const pointerCoordinates = getEventCoordinates(event.activatorEvent);
+    setPaletteDragGhost(
+      isSupportedFieldType(fieldType) && pointerCoordinates
+        ? { fieldType, x: pointerCoordinates.x, y: pointerCoordinates.y }
+        : null,
+    );
+    setPaletteInsertIndex(null);
+    lastPalettePointerYRef.current = null;
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -311,7 +364,7 @@ export function FormDesignerDraft() {
 
   function handleDragCancel(event: DragCancelEvent) {
     if (isPaletteDragId(event.active.id)) {
-      setActivePaletteFieldType(null);
+      setPaletteDragGhost(null);
       setPaletteInsertIndex(null);
       lastPalettePointerYRef.current = null;
     }
@@ -333,7 +386,7 @@ export function FormDesignerDraft() {
       ) {
         addFieldFromPalette(fieldType, paletteInsertIndex);
       }
-      setActivePaletteFieldType(null);
+      setPaletteDragGhost(null);
       setPaletteInsertIndex(null);
       lastPalettePointerYRef.current = null;
       return;
@@ -1140,12 +1193,19 @@ export function FormDesignerDraft() {
             </div>
           </FieldPaletteRail>
         </div>
-        <DragOverlay dropAnimation={null}>
-          {activePaletteFieldType ? (
-            <PaletteFieldTypeDragPreview fieldType={activePaletteFieldType} language={language} />
-          ) : null}
-        </DragOverlay>
       </DndContext>
+      {paletteDragGhost && typeof document !== "undefined" && document.body
+        ? createPortal(
+            <div
+              className="field-palette-drag-ghost"
+              style={{ left: paletteDragGhost.x, top: paletteDragGhost.y }}
+              aria-hidden="true"
+            >
+              <PaletteFieldTypeDragGhost fieldType={paletteDragGhost.fieldType} language={language} />
+            </div>,
+            document.body,
+          )
+        : null}
       <MobileFieldPalette
         closeLabel={t("common.close")}
         description={t("form.designer.mobilePaletteDescription")}
@@ -1255,13 +1315,13 @@ function PaletteFieldTypeCard({
   );
 }
 
-function PaletteFieldTypeDragPreview({ fieldType, language }: { fieldType: FieldType; language: Language }) {
+function PaletteFieldTypeDragGhost({ fieldType, language }: { fieldType: FieldType; language: Language }) {
   const label = fieldTypeLabel(language, fieldType);
   const description = translate(language, `form.designer.fieldType${fieldType}Description` as TranslationKey);
   const FieldTypeIcon = fieldTypeIcons[fieldType];
 
   return (
-    <div className="field-palette-item field-palette-drag-overlay" aria-hidden="true">
+    <div className="field-palette-item field-palette-drag-ghost-card">
       <span className="field-palette-icon">
         <FieldTypeIcon size={18} />
       </span>
