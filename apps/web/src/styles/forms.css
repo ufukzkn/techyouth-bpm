@@ -15,8 +15,15 @@
   align-self: center;
 }
 
+main:has(> .workspace-route-content > .runner-section) {
+  margin-inline: auto;
+  align-self: center;
+}
+
 .runner-section {
   max-width: 1180px;
+  min-width: 0;
+  container: form-runner / inline-size;
 }
 
 .designer-grid {
@@ -493,6 +500,22 @@
   }
 }
 
+@container form-runner (max-width: 1100px) {
+  .runner-section .runner-grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(260px, 0.75fr);
+  }
+}
+
+@container form-runner (max-width: 960px) {
+  .runner-section .runner-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .runner-section .runner-preview-panel {
+    width: 100%;
+  }
+}
+
 .designer-section .field-editor-header {
   flex-wrap: wrap;
 }
@@ -501,6 +524,7 @@
 .designer-section .rule-editor-header > div,
 .designer-section .option-editor-header > strong,
 .designer-section .designer-save-panel,
+.runner-section .runner-grid,
 .runner-section .runner-form,
 .runner-section .runner-preview-panel,
 .runner-section .runner-output {
