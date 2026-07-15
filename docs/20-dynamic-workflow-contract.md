@@ -1,0 +1,72 @@
+# Dynamic Workflow Contract
+
+## Boundary And Versioning
+
+`Community` remains the tenant and authorization boundary. `Team` is an operational group inside one community, while `CommunityRole` is a reusable permission bundle. A workflow cannot reference users, teams, roles or forms from another community.
+
+`FormDefinition` and `ProcessDefinition` are logical identities. Their draft versions may change; published versions are immutable. A running process stores the exact process and form version identifiers used at start, so publishing a new version never changes an active instance.
+
+## Graph Contract
+
+`ProcessDefinitionVersion.GraphJson` is typed JSON with `schemaVersion`, `nodes` and `edges`.
+
+- Node types: `Start`, `UserTask`, `ExclusiveGateway`, `CompletedEnd`, `RejectedEnd`, `TeamSwimlane`.
+- Runtime nodes have stable string keys. Swimlanes are visual containers and are not executed.
+- Nodes persist their canvas position and optional width/height together with the parent swimlane key. Saving and reopening a draft must reproduce the same layout.
+- User tasks contain title, optional published form version, priority, action set and assignment.
+- Assignment types: `ProcessStarter`, `SpecificUser`, `Team`, `CommunityRole`, `TeamAndCommunityRole`.
+- Edges may contain an action, a typed condition, a default marker and deterministic order.
+- Conditions reference published form paths such as `start.amount` or `steps.financeApproval.approvedBudget`; arbitrary code is forbidden.
+
+Publish validation requires exactly one start, at least one end, reachable runtime nodes, valid same-community references, complete user-task assignments, action edges and a default gateway edge. Automatic routing is limited to 100 hops. `SendBack` may target an earlier user task, but creates a new execution attempt instead of reopening history.
+
+The React Flow editor owns richer presentation state, while the API owns the provider-neutral graph contract. A dedicated adapter converts between these models; editor-only objects are never posted directly to the runtime API.
+
+## Form Contract
+
+A form version owns ordered pages; pages own ordered fields and validation rules. Field keys are unique across the whole version. A published version cannot be edited. Editing a published form clones it into a new draft version.
+
+The runner validates the current page before navigation and the backend validates the complete submitted payload. Process variables are namespaced:
+
+```json
+{
+  "start": { "amount": 125000 },
+  "steps": {
+    "financeApproval": { "approvedBudget": 120000 }
+  }
+}
+```
+
+## Task And Runtime Contract
+
+Direct assignments (`ProcessStarter`, `SpecificUser`) do not require a separate claim. Team and role assignments are candidate pools and require `Tasks.Act` plus live membership/role eligibility. `TeamAndCommunityRole` uses the intersection. Candidate eligibility is checked again when claiming; `IsLead` grants no implicit permission.
+
+Only one user may claim a task. A provider-independent concurrency token protects simultaneous SQLite and PostgreSQL updates. Task priority values are `Low`, `Normal`, `High` and `Critical`.
+
+Process start, task creation, process variables, step execution, notifications and audit entries share a transaction. Task action, next-node routing and completion use a second atomic transaction. Any failure rolls the whole operation back.
+
+Runtime actions are `Approve`, `Reject`, `Complete`, `Escalate` and `SendBack`. A task persists only the actions configured on its published node. Process lifecycle status remains controlled by `ProcessStateMachine`; graph navigation is owned by `DynamicWorkflowEngine`.
+
+## HTTP Contract
+
+- `GET/POST /api/process-definitions`: scoped workflow identities.
+- `GET /api/process-definitions/runnable`: latest published versions available to `Processes.Start` users.
+- `POST /api/process-definitions/{id}/versions`: create draft graph version.
+- `PUT /api/process-definitions/{id}/versions/{versionId}`: update a draft or clone a published version.
+- `POST /api/process-definitions/{id}/validate`: validate without publishing.
+- `POST /api/process-definitions/{id}/versions/{versionId}/publish`: make a validated version immutable.
+- `POST /api/processes/start/version`: start from an exact process-definition version.
+- `POST /api/tasks/{id}/claim` and `POST|DELETE /api/tasks/{id}/release|claim`: candidate-pool ownership.
+- `POST /api/tasks/{id}/actions`: submit action, note and optional task-form data.
+
+Process detail returns the active node, pinned version IDs, task attempts and `ProcessStepExecution` history including completing actor and output JSON.
+
+## Compatibility And Ownership
+
+The legacy form-id start contract remains available through a seeded `Legacy Basic Approval` definition for compatibility. New development uses process-definition-version identifiers. The seeded `Transfer Talep Akisi` exercises the dynamic path through Scout, Technical Review, conditional Finance and Transfer Operation stages.
+
+- Ufuk owns team contracts, permission scope, navigation, notifications and dashboard integration.
+- Ozgun owns form versions, multi-page designer/runner and task-form field binding.
+- Cagdas owns graph validation, visual modeler, runtime, claim/action, priority and process history.
+
+The integration branch is `feature/dynamic-workflow`. Cross-owner changes stay here until unit, HTTP integration, frontend build and provider migration checks pass; commits are then split by capability/owner before merge.
