@@ -4,6 +4,7 @@ import type { PermissionName } from "@/lib/types";
 
 export type ViewId =
   | "dashboard"
+  | "myTeams"
   | "forms"
   | "runner"
   | "processes"
@@ -37,6 +38,12 @@ export const navItems: NavItem[] = [
     viewId: "dashboard",
     path: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    labelKey: "nav.myTeams",
+    viewId: "myTeams",
+    path: "/teams",
+    icon: UsersRound,
   },
   {
     labelKey: "nav.forms",

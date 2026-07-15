@@ -368,6 +368,24 @@ export type TeamMember = {
 
 export type TeamMemberPage = PagedResult<TeamMember>;
 
+export type UserTeamMembership = {
+  teamId: string;
+  teamName: string;
+  teamIsActive: boolean;
+  isLead: boolean;
+  joinedAt: string;
+};
+
+export type TeamRosterMember = {
+  userId: string;
+  username: string;
+  displayName: string;
+  communityRoleName: string;
+  isLead: boolean;
+};
+
+export type TeamRosterPage = PagedResult<TeamRosterMember>;
+
 export type TeamCandidate = {
   userId: string;
   username: string;

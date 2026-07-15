@@ -39,7 +39,9 @@ import type {
   TeamCandidatePage,
   TeamMember,
   TeamMemberPage,
+  TeamRosterPage,
   TeamPage,
+  UserTeamMembership,
   UpdateTeamRequest,
 } from "@/lib/types";
 
@@ -394,6 +396,13 @@ export const api = {
   listTeamMembers(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
     const search = buildTeamMemberSearch(params);
     return request<TeamMemberPage>(`/api/teams/${teamId}/members${search.size ? `?${search}` : ""}`, { token });
+  },
+  listTeamRoster(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
+    const search = buildTeamMemberSearch(params);
+    return request<TeamRosterPage>(`/api/teams/${teamId}/roster${search.size ? `?${search}` : ""}`, { token });
+  },
+  listUserTeamMemberships(token: string, userId: string) {
+    return request<UserTeamMembership[]>(`/api/users/${userId}/team-memberships`, { token });
   },
   listTeamCandidates(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
     const search = buildTeamMemberSearch(params);
