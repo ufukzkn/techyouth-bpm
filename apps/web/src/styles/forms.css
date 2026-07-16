@@ -292,8 +292,78 @@
 }
 
 .runner-section .runner-form {
+  --runner-control-error-color: color-mix(in srgb, var(--danger) 76%, #7f1d1d);
   position: relative;
   isolation: isolate;
+}
+
+.runner-section .runner-field-control {
+  min-width: 0;
+}
+
+.runner-section .runner-field-control-error input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.runner-section .runner-field-control-error select,
+.runner-section .runner-field-control-error textarea {
+  border: 2px solid var(--runner-control-error-color);
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--runner-control-error-color) 58%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--runner-control-error-color) 18%, transparent);
+}
+
+.runner-section .runner-field-control-error input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.runner-section .runner-field-control-error input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus-visible,
+.runner-section .runner-field-control-error select:focus,
+.runner-section .runner-field-control-error select:focus-visible,
+.runner-section .runner-field-control-error textarea:focus,
+.runner-section .runner-field-control-error textarea:focus-visible {
+  border-color: var(--runner-control-error-color);
+  outline: 3px solid color-mix(in srgb, var(--runner-control-error-color) 44%, transparent);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--runner-control-error-color) 72%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--runner-control-error-color) 24%, transparent);
+}
+
+.runner-section .runner-field-control-error .runner-checkbox > input[type="checkbox"] {
+  accent-color: var(--runner-control-error-color);
+  outline: 2px solid color-mix(in srgb, var(--runner-control-error-color) 72%, transparent);
+  outline-offset: 2px;
+}
+
+.runner-section .runner-field-control-error .runner-checkbox > input[type="checkbox"]:focus,
+.runner-section .runner-field-control-error .runner-checkbox > input[type="checkbox"]:focus-visible,
+.runner-section .runner-field-control-error .runner-radio-option input:focus,
+.runner-section .runner-field-control-error .runner-radio-option input:focus-visible {
+  outline-color: var(--runner-control-error-color);
+}
+
+.runner-section .runner-field-control-error .runner-radio-options {
+  border-radius: 8px;
+  outline: 2px solid var(--runner-control-error-color);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--danger) 4%, transparent);
+}
+
+.runner-section .runner-field-control-error .runner-file-button {
+  border: 2px solid var(--runner-control-error-color);
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--runner-control-error-color) 18%, transparent);
+}
+
+.runner-section .runner-field-control-error .runner-file-button:hover,
+.runner-section .runner-field-control-error .runner-file-button:focus-within {
+  border-color: var(--runner-control-error-color);
+  outline: 3px solid color-mix(in srgb, var(--runner-control-error-color) 44%, transparent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+}
+
+.runner-section .runner-field-control-error .field-error {
+  color: var(--runner-control-error-color);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .runner-section .runner-form-processing-overlay {
@@ -1374,10 +1444,57 @@
 }
 
 .field-editor {
+  --field-editor-control-error-color: color-mix(in srgb, var(--danger) 76%, #7f1d1d);
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
     opacity 180ms ease;
+}
+
+.designer-section .field-editor input.field-editor-control-save-error,
+.designer-section .field-editor select.field-editor-control-save-error,
+.designer-section .field-editor textarea.field-editor-control-save-error,
+.designer-section .field-editor-rule-save-error input,
+.designer-section .field-editor-rule-save-error select,
+.designer-section .field-editor-rule-save-error textarea {
+  border: 2px solid var(--field-editor-control-error-color);
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--field-editor-control-error-color) 58%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--field-editor-control-error-color) 18%, transparent);
+}
+
+.designer-section .field-editor input.field-editor-control-save-error:focus,
+.designer-section .field-editor input.field-editor-control-save-error:focus-visible,
+.designer-section .field-editor select.field-editor-control-save-error:focus,
+.designer-section .field-editor select.field-editor-control-save-error:focus-visible,
+.designer-section .field-editor textarea.field-editor-control-save-error:focus,
+.designer-section .field-editor textarea.field-editor-control-save-error:focus-visible,
+.designer-section .field-editor-rule-save-error input:focus,
+.designer-section .field-editor-rule-save-error input:focus-visible,
+.designer-section .field-editor-rule-save-error select:focus,
+.designer-section .field-editor-rule-save-error select:focus-visible,
+.designer-section .field-editor-rule-save-error textarea:focus,
+.designer-section .field-editor-rule-save-error textarea:focus-visible {
+  border-color: var(--field-editor-control-error-color);
+  outline: 3px solid color-mix(in srgb, var(--field-editor-control-error-color) 44%, transparent);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--field-editor-control-error-color) 72%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--field-editor-control-error-color) 24%, transparent);
+}
+
+.designer-section .field-editor .field-error.field-editor-inline-error {
+  color: var(--field-editor-control-error-color);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.designer-section .option-editor.option-editor-save-error,
+.designer-section .field-editor-rule-save-error {
+  border-color: color-mix(in srgb, var(--danger) 62%, var(--border));
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
 }
 
 .field-editor-grid {

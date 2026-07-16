@@ -101,10 +101,13 @@ import {
 } from "@/features/form-designer/formDesignerModel";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { Community, CreateFormRequest, FieldType, FormDefinition, Language, ValidationRule } from "@/lib/types";
 
 type SaveState = "idle" | "saving" | "publishing" | "archiving" | "success" | "error";
+type DesignerSaveFieldErrorSource = "client" | "api";
+type DesignerSaveFieldError = DesignerFieldErrors[string] & { source: DesignerSaveFieldErrorSource };
+type DesignerSaveFieldErrors = Record<string, DesignerSaveFieldError>;
 
 export type FormDesignerDraftProps = {
   versionAdapter?: FormVersionAdapter;
@@ -141,6 +144,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const manualFieldFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newFormFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveFieldErrors, setSaveFieldErrors] = useState<DesignerSaveFieldErrors>({});
   const [isArchiveConfirmationOpen, setIsArchiveConfirmationOpen] = useState(false);
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
   const [highlightedFieldId, setHighlightedFieldId] = useState("");
@@ -555,6 +559,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
 
   function updateField(id: string, patch: Partial<Omit<DesignerField, "id">>) {
     setPages((current) => updateDesignerField(current, id, (field) => ({ ...field, ...patch })));
+    clearSaveFieldError(id);
     markUnsaved();
   }
 
@@ -576,6 +581,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         };
       }),
     );
+    clearSaveFieldError(id);
     markUnsaved();
   }
 
@@ -585,6 +591,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         current.map((page) => ({ ...page, fields: page.fields.filter((field) => field.id !== id) })),
       ),
     );
+    clearSaveFieldError(id);
     markUnsaved();
   }
 
@@ -592,6 +599,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     setPages((current) =>
       updateDesignerField(current, id, (field) => ({ ...field, required: !field.required })),
     );
+    clearSaveFieldError(id);
     markUnsaved();
   }
 
@@ -613,6 +621,54 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   function triggerFieldHighlight(id: string) {
     setHighlightedFieldId("");
     window.requestAnimationFrame(() => setHighlightedFieldId(id));
+  }
+
+  function clearSaveFieldError(fieldId: string) {
+    setSaveFieldErrors((current) => {
+      if (!current[fieldId]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[fieldId];
+      return next;
+    });
+  }
+
+  function revealSaveFieldErrors(
+    nextErrors: DesignerFieldErrors,
+    source: DesignerSaveFieldErrorSource = "client",
+  ) {
+    const sourcedErrors = Object.fromEntries(
+      Object.entries(nextErrors).map(([fieldId, error]) => [fieldId, { ...error, source }]),
+    ) as DesignerSaveFieldErrors;
+    setSaveFieldErrors(sourcedErrors);
+    const firstInvalidField = fields.find((field) => sourcedErrors[field.id]);
+    if (!firstInvalidField) {
+      return;
+    }
+
+    const location = findDesignerFieldLocation(pages, firstInvalidField.id);
+    if (location && location.page.id !== activePageId) {
+      setActivePageId(location.page.id);
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+        document.getElementById(`designer-field-${firstInvalidField.id}`)?.scrollIntoView({
+          behavior,
+          block: "center",
+        });
+      });
+    });
+  }
+
+  function handlePersistError(error: unknown) {
+    const localizedMessage = localizeApiError(error, language, t("form.designer.saveFailed"));
+    revealSaveFieldErrors(mapApiErrorToDesignerFields(error, fields, localizedMessage), "api");
+    setSaveState("error");
+    setMessage(localizedMessage);
   }
 
   function addPage() {
@@ -689,6 +745,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         options: [...field.options, `Secenek ${field.options.length + 1}`],
       })),
     );
+    clearSaveFieldError(fieldId);
     markUnsaved();
   }
 
@@ -699,6 +756,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         options: field.options.map((option, index) => (index === optionIndex ? value : option)),
       })),
     );
+    clearSaveFieldError(fieldId);
     markUnsaved();
   }
 
@@ -709,6 +767,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         options: field.options.filter((_, index) => index !== optionIndex),
       })),
     );
+    clearSaveFieldError(fieldId);
     markUnsaved();
   }
 
@@ -731,6 +790,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         return { ...field, validationRules: [...field.validationRules, rule] };
       });
     });
+    clearSaveFieldError(fieldId);
     markUnsaved();
   }
 
@@ -743,6 +803,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         ),
       })),
     );
+    clearSaveFieldError(fieldId);
     markUnsaved();
   }
 
@@ -769,6 +830,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         };
       });
     });
+    clearSaveFieldError(fieldId);
     markUnsaved();
   }
 
@@ -779,6 +841,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         validationRules: field.validationRules.filter((_, index) => index !== ruleIndex),
       })),
     );
+    clearSaveFieldError(fieldId);
     markUnsaved();
   }
 
@@ -798,6 +861,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
 
   async function loadSavedForm(id: string) {
     setSelectedFormId(id);
+    setSaveFieldErrors({});
     setIsSwitchingForm(true);
     const minimumTransition = new Promise<void>((resolve) => window.setTimeout(resolve, 240));
 
@@ -860,6 +924,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     setPages(nextPages);
     setActivePageId(nextPages[0].id);
     setVersionState({ version: 1, status: "draft" });
+    setSaveFieldErrors({});
     setSaveState("idle");
     setMessage(t("form.designer.draftReady"));
   }
@@ -878,12 +943,14 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
 
   async function saveDraft() {
     if (!token) {
+      setSaveFieldErrors({});
       setSaveState("error");
       setMessage(t("form.designer.sessionRequiredSave"));
       return;
     }
 
     if (hasCommunityError) {
+      setSaveFieldErrors({});
       setShowCommunityError(true);
       setSaveState("error");
       setMessage(t("form.designer.communityRequired"));
@@ -891,12 +958,14 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     }
 
     if (hasFieldErrors) {
+      revealSaveFieldErrors(fieldErrors);
       setSaveState("error");
       setMessage(fieldErrorSummary.text);
       return;
     }
 
     try {
+      setSaveFieldErrors({});
       setSaveState("saving");
       const isUpdate = selectedFormId.length > 0;
       const draftLayout: VersionedFormLayout =
@@ -917,8 +986,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         }),
       );
     } catch (error) {
-      setSaveState("error");
-      setMessage(localizeApiError(error, language, t("form.designer.saveFailed")));
+      handlePersistError(error);
     }
   }
 
@@ -928,12 +996,14 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     }
 
     if (!token) {
+      setSaveFieldErrors({});
       setSaveState("error");
       setMessage(t("form.designer.sessionRequiredSave"));
       return;
     }
 
     if (hasCommunityError) {
+      setSaveFieldErrors({});
       setShowCommunityError(true);
       setSaveState("error");
       setMessage(t("form.designer.communityRequired"));
@@ -941,12 +1011,14 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     }
 
     if (hasFieldErrors) {
+      revealSaveFieldErrors(fieldErrors);
       setSaveState("error");
       setMessage(fieldErrorSummary.text);
       return;
     }
 
     try {
+      setSaveFieldErrors({});
       setSaveState("publishing");
       const publishLayout: VersionedFormLayout = { ...layoutModel, status: "published" };
       const saved = await persistFlatForm();
@@ -958,8 +1030,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       setSaveState("success");
       setMessage(pagingCopy.publishedMessage);
     } catch (error) {
-      setSaveState("error");
-      setMessage(localizeApiError(error, language, t("form.designer.saveFailed")));
+      handlePersistError(error);
     }
   }
 
@@ -997,6 +1068,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   function applyPersistedForm(form: FormDefinition, layout: VersionedFormLayout) {
     const resolved = toDesignerPages(form, layout, pagingCopy.page);
     const nextActivePage = resolved.pages.find((page) => page.id === activePageId) ?? resolved.pages[0];
+    setSaveFieldErrors({});
     setPages(resolved.pages);
     setActivePageId(nextActivePage.id);
     setVersionState({
@@ -1265,8 +1337,23 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                     <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
                   ) : null}
                   <SortableFieldCard id={field.id} pageId={activePage?.id ?? ""}>
-                    {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
-                      <>
+                    {({ attributes, listeners, setActivatorNodeRef, isDragging }) => {
+                      const saveFieldError = saveFieldErrors[field.id];
+                      const liveFieldError = fieldErrors[field.id];
+                      const isApiSaveError = saveFieldError?.source === "api";
+                      const keyErrorMessage =
+                        liveFieldError?.key ?? (isApiSaveError ? saveFieldError?.key : undefined);
+                      const labelErrorMessage =
+                        liveFieldError?.label ?? (isApiSaveError ? saveFieldError?.label : undefined);
+                      const optionsErrorMessage =
+                        liveFieldError?.options ?? (isApiSaveError ? saveFieldError?.options : undefined);
+                      const hasKeyError = Boolean(keyErrorMessage);
+                      const hasLabelError = Boolean(labelErrorMessage);
+                      const hasOptionsError = Boolean(optionsErrorMessage);
+                      const optionErrorIndexes = getDesignerInvalidOptionIndexes(field, hasOptionsError);
+                      const showOptionEditorError = hasOptionsError && optionErrorIndexes.size === 0;
+
+                      return (
                       <article
                         className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
                           highlightedFieldId === field.id ? " field-editor-highlighted" : ""
@@ -1348,16 +1435,37 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                         <label>
                           Key
                           <input
+                            aria-invalid={hasKeyError}
+                            className={
+                              hasKeyError
+                                ? "field-editor-control-error field-editor-control-save-error"
+                                : undefined
+                            }
                             value={field.key}
                             onChange={(event) => updateField(field.id, { key: event.target.value })}
                           />
-                          {fieldErrors[field.id]?.key ? <span className="field-error">{fieldErrors[field.id]?.key}</span> : null}
+                          {keyErrorMessage ? (
+                            <span className="field-error field-editor-inline-error">
+                              {keyErrorMessage}
+                            </span>
+                          ) : null}
                         </label>
                         <label>
                           {t("form.designer.label")}
-                          <input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />
-                          {fieldErrors[field.id]?.label ? (
-                            <span className="field-error">{fieldErrors[field.id]?.label}</span>
+                          <input
+                            aria-invalid={hasLabelError}
+                            className={
+                              hasLabelError
+                                ? "field-editor-control-error field-editor-control-save-error"
+                                : undefined
+                            }
+                            value={field.label}
+                            onChange={(event) => updateField(field.id, { label: event.target.value })}
+                          />
+                          {labelErrorMessage ? (
+                            <span className="field-error field-editor-inline-error">
+                              {labelErrorMessage}
+                            </span>
                           ) : null}
                         </label>
                         <label>
@@ -1377,7 +1485,11 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                       </div>
 
                       {fieldTypeUsesOptions(field.type) ? (
-                        <div className="option-editor">
+                        <div
+                          className={`option-editor${
+                            showOptionEditorError ? " option-editor-error option-editor-save-error" : ""
+                          }`}
+                        >
                           <div className="option-editor-header">
                             <strong>{t("form.designer.options")}</strong>
                             <button className="secondary-button" type="button" onClick={() => addOption(field.id)}>
@@ -1385,15 +1497,29 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                               {t("form.designer.addOption")}
                             </button>
                           </div>
-                          {fieldErrors[field.id]?.options ? (
-                            <span className="field-error">{fieldErrors[field.id]?.options}</span>
+                          {optionsErrorMessage ? (
+                            <span className="field-error field-editor-inline-error">
+                              {optionsErrorMessage}
+                            </span>
                           ) : null}
                           <div className="option-list">
-                            {field.options.map((option, optionIndex) => (
+                            {field.options.map((option, optionIndex) => {
+                              const hasOptionError = optionErrorIndexes.has(optionIndex);
+
+                              return (
                               <div className="option-row" key={`${field.id}-${optionIndex}`}>
                                 <label>
                                   {t("form.designer.optionLabel")}
-                                  <input value={option} onChange={(event) => updateOption(field.id, optionIndex, event.target.value)} />
+                                  <input
+                                    aria-invalid={hasOptionError}
+                                    className={
+                                      hasOptionError
+                                        ? "field-editor-control-error field-editor-control-save-error"
+                                        : undefined
+                                    }
+                                    value={option}
+                                    onChange={(event) => updateOption(field.id, optionIndex, event.target.value)}
+                                  />
                                 </label>
                                 <button
                                   className="icon-button"
@@ -1404,7 +1530,8 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                                   <Trash2 size={16} />
                                 </button>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       ) : null}
@@ -1441,13 +1568,28 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                           {field.validationRules.map((rule, ruleIndex) => {
                             const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey);
                             const candidates = getDependencyCandidates(fields, field);
-                            const ruleError = fieldErrors[field.id]?.rules?.[ruleIndex];
+                            const liveRuleError = liveFieldError?.rules?.[ruleIndex];
+                            const saveRuleErrorMessage = saveFieldError?.rules?.[ruleIndex];
+                            const ruleErrorMessage =
+                              liveRuleError ?? (isApiSaveError ? saveRuleErrorMessage : undefined);
+                            const hasRuleError = Boolean(ruleErrorMessage);
 
                             return (
-                              <div className="rule-row" key={`${field.id}-rule-${ruleIndex}`}>
+                              <div
+                                className={`rule-row${
+                                  hasRuleError ? " field-editor-rule-error field-editor-rule-save-error" : ""
+                                }`}
+                                key={`${field.id}-rule-${ruleIndex}`}
+                              >
                                 <label>
                                   {t("form.designer.dependencyField")}
                                   <select
+                                    aria-invalid={hasRuleError}
+                                    className={
+                                      hasRuleError
+                                        ? "field-editor-control-error field-editor-control-save-error"
+                                        : undefined
+                                    }
                                     value={rule.dependsOnFieldKey}
                                     onChange={(event) => updateRuleDependency(field.id, ruleIndex, event.target.value)}
                                   >
@@ -1470,6 +1612,12 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                                 <label>
                                   {t("form.designer.message")}
                                   <input
+                                    aria-invalid={hasRuleError}
+                                    className={
+                                      hasRuleError
+                                        ? "field-editor-control-error field-editor-control-save-error"
+                                        : undefined
+                                    }
                                     value={rule.message}
                                     onChange={(event) => updateRequiredWhenRule(field.id, ruleIndex, { message: event.target.value })}
                                   />
@@ -1484,15 +1632,19 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                                   <Trash2 size={16} />
                                 </button>
 
-                                {ruleError ? <span className="field-error rule-error">{ruleError}</span> : null}
+                                {ruleErrorMessage ? (
+                                  <span className="field-error rule-error field-editor-inline-error">
+                                    {ruleErrorMessage}
+                                  </span>
+                                ) : null}
                               </div>
                             );
                           })}
                         </div>
                       </div>
                       </article>
-                    </>
-                    )}
+                      );
+                    }}
                   </SortableFieldCard>
                 </Fragment>
               ))}
@@ -1701,4 +1853,117 @@ function buildDesignerErrorSummary(
     remainingCount,
     text: textParts.join(" ") || translate(language, "form.designer.blockingErrors"),
   };
+}
+
+function getDesignerInvalidOptionIndexes(field: DesignerField, hasOptionsError: boolean) {
+  const invalidIndexes = new Set<number>();
+  if (!hasOptionsError) {
+    return invalidIndexes;
+  }
+
+  const normalizedOptions = field.options.map((option) => option.trim().toLocaleLowerCase("tr"));
+  const optionCounts = normalizedOptions.reduce<Record<string, number>>((counts, option) => {
+    if (option) {
+      counts[option] = (counts[option] ?? 0) + 1;
+    }
+    return counts;
+  }, {});
+
+  normalizedOptions.forEach((option, index) => {
+    if (!option || optionCounts[option] > 1) {
+      invalidIndexes.add(index);
+    }
+  });
+
+  return invalidIndexes;
+}
+
+function mapApiErrorToDesignerFields(
+  error: unknown,
+  fields: DesignerField[],
+  localizedMessage: string,
+): DesignerFieldErrors {
+  if (!(error instanceof ApiError)) {
+    return {};
+  }
+
+  return error.errors.reduce<DesignerFieldErrors>((mappedErrors, rawMessage) => {
+    const target = resolveApiFieldErrorTarget(rawMessage, fields);
+    if (!target) {
+      return mappedErrors;
+    }
+
+    if (!target.control) {
+      return mappedErrors;
+    }
+
+    const current = mappedErrors[target.fieldId] ?? {};
+    const next: DesignerFieldErrors[string] = { ...current };
+    if (target.control === "key") {
+      next.key = localizedMessage;
+    } else if (target.control === "label") {
+      next.label = localizedMessage;
+    } else if (target.control === "options") {
+      next.options = localizedMessage;
+    } else if (target.control === "rules" && target.ruleIndex !== undefined) {
+      next.rules = { ...next.rules, [target.ruleIndex]: localizedMessage };
+    }
+
+    mappedErrors[target.fieldId] = next;
+    return mappedErrors;
+  }, {});
+}
+
+function resolveApiFieldErrorTarget(message: string, fields: DesignerField[]) {
+  const indexedPath = message.match(
+    /\b(?:fields|fieldDefinitions|formFields)\s*(?:\[\s*(\d+)\s*\]|\.\s*(\d+))/i,
+  );
+  if (indexedPath) {
+    const fieldIndex = Number(indexedPath[1] ?? indexedPath[2]);
+    const field = fields[fieldIndex];
+    if (!field) {
+      return undefined;
+    }
+
+    const remainder = message.slice((indexedPath.index ?? 0) + indexedPath[0].length);
+    const property = remainder.match(/^\s*\.\s*([a-zA-Z]+)/)?.[1]?.toLowerCase();
+    const ruleIndexMatch = remainder.match(/validationRules\s*(?:\[\s*(\d+)\s*\]|\.\s*(\d+))/i);
+    const ruleIndexValue = ruleIndexMatch?.[1] ?? ruleIndexMatch?.[2];
+
+    return {
+      fieldId: field.id,
+      control: resolveApiFieldErrorControl(property),
+      ruleIndex: ruleIndexValue === undefined ? undefined : Number(ruleIndexValue),
+    };
+  }
+
+  const fieldIdMatch =
+    message.match(/\bfieldId\s*[:=]\s*["']?([a-zA-Z0-9_-]+)["']?/i)
+    ?? message.match(/\bfield\s+id\s*(?:[:=]|is)\s*["'`]([^"'`]+)["'`]/i);
+  if (fieldIdMatch) {
+    const field = fields.find((candidate) => candidate.id === fieldIdMatch[1]);
+    if (field) {
+      return { fieldId: field.id };
+    }
+  }
+
+  const fieldKeyMatch =
+    message.match(/\bfieldKey\s*[:=]\s*["']?([a-zA-Z0-9_.-]+)["']?/i)
+    ?? message.match(/\bfield\s+key\s*(?:[:=]|is)\s*["'`]([^"'`]+)["'`]/i);
+  if (!fieldKeyMatch) {
+    return undefined;
+  }
+
+  const matchingFields = fields.filter(
+    (field) => field.key.trim().toLocaleLowerCase("tr") === fieldKeyMatch[1].trim().toLocaleLowerCase("tr"),
+  );
+  return matchingFields.length === 1 ? { fieldId: matchingFields[0].id, control: "key" as const } : undefined;
+}
+
+function resolveApiFieldErrorControl(property?: string) {
+  if (property === "key") return "key" as const;
+  if (property === "label") return "label" as const;
+  if (property === "options") return "options" as const;
+  if (property === "validationrules" || property === "rules") return "rules" as const;
+  return undefined;
 }
