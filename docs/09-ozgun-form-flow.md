@@ -318,10 +318,15 @@ The current JSON-safe value contains only `name`, `size`, MIME `type` and `lastM
 Frontend form-flow files:
 
 - `apps/web/src/features/form-designer/FormDesignerDraft.tsx`
+- `apps/web/src/features/form-designer/FormDesignerComponents.tsx`
+- `apps/web/src/features/form-designer/formDesignerModel.ts`
+- `apps/web/src/features/form-designer/formDesignerModel.test.ts`
 - `apps/web/src/features/form-runner/FormRunnerDraft.tsx`
 - `apps/web/src/features/forms/fieldTypes.ts`
 - `apps/web/src/features/forms/fieldRenderer.tsx`
 - `apps/web/src/features/forms/formValidation.ts`
+- `apps/web/src/features/forms/formVersioning.ts`
+- `apps/web/src/features/forms/useFormVersionAdapters.ts`
 - `apps/web/src/features/forms/formValues.ts`
 - `apps/web/src/features/i18n/translations.ts`
 - `apps/web/src/app/globals.css`
@@ -362,11 +367,12 @@ These areas were intentionally not changed:
 
 - Make small UI fixes if the team review finds presentation issues.
 - Address any PR review feedback.
-- Run a final end-to-end smoke test before merge if the integration baseline changes.
-- Check integration with the process/task/audit flow after the teammate-owned process/task/audit work is complete.
-- Decide whether form definitions should become immutable once processes are started. The current demo behavior updates the form definition in place so form editing is easy to demonstrate.
+- Add Playwright coverage for publish -> workflow bind -> task form execution.
+- Keep gateway field-picker and task-form binding tests current as graph capabilities expand.
 - Prepare a demo scenario if needed, for example: if request type is Satın Alma, approval note becomes required.
 - Keep focused validation tests current if field types or process-start payload rules change.
+
+The task action dialog now receives the exact published task-form snapshot from the task DTO, renders its pages and fields with the shared field renderer, and performs immediate frontend validation. The backend remains authoritative and validates the submitted task `formData` again before the workflow can advance.
 
 ## Verification
 
@@ -405,7 +411,7 @@ npm run build
 git diff --check
 ```
 
-All checks passed. Lint still reports the same five pre-existing unused-symbol warnings in `ProcessListView.tsx`; that file was not changed by this branch.
+All checks passed. The later dynamic workflow integration removed the old `ProcessListView.tsx` unused-symbol warnings.
 
 The latest feedback, insertion-preview and validation-readability polish uses the same verification baseline. No backend, API endpoint, field-helper, auth/session, process/task/audit, package or dependency changes were part of that batch.
 
@@ -432,3 +438,14 @@ Frontend lint/build, the File Upload foundation backend build/test suite and `gi
 - The trigger opens an accessible right-side drawer. Selecting a field type appends it through the existing palette insertion function, closes the drawer and scrolls the new field into view.
 - Desktop rail drag-and-drop, field-card reorder and move controls remain unchanged.
 - Designer, runner and process-detail JSON now use the shared `JsonViewer`, which contains long values, limits vertical growth and provides copy plus expand/collapse actions.
+
+## Versioned Multi-Page Form Flow
+
+- `FormDefinition` is now a logical identity; `FormDefinitionVersion` owns immutable published or editable draft content.
+- A version contains ordered `FormPage` records, and fields may be moved within or between pages with dnd-kit.
+- Editing a published version creates a new draft instead of mutating the schema used by running processes.
+- A published version can be archived; it stays inspectable while new process starts use only published versions.
+- Runner displays a stepper, validates the active page before advancing and submits the complete versioned payload.
+- Start nodes and User Task nodes bind exact published form-version ids.
+- Gateway field selection is generated from bound form fields and produces namespaced paths such as `start.bonservis` or `steps.financeApproval.onaylananButce`.
+- The backend repeats complete form validation, so bypassing the frontend cannot create invalid process variables.
