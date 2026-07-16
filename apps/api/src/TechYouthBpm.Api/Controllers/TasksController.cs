@@ -11,7 +11,7 @@ public class TasksController(
     IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet("my")]
-    public async Task<IActionResult> MyTasks(CancellationToken cancellationToken)
+    public async Task<IActionResult> MyTasks([FromQuery] TaskListRequest request, CancellationToken cancellationToken)
     {
         var user = await CurrentUserAsync(cancellationToken);
         if (user is null)
@@ -19,7 +19,7 @@ public class TasksController(
             return UnauthorizedProblem();
         }
 
-        return Ok(await taskService.ListMyTasksAsync(user, cancellationToken));
+        return Ok(await taskService.ListMyTasksAsync(request, user, cancellationToken));
     }
 
     [HttpPost("{id:guid}/actions")]

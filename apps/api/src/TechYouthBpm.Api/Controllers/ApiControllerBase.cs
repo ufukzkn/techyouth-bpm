@@ -36,4 +36,7 @@ public abstract class ApiControllerBase(IAuthenticationService authenticationSer
 
     protected IActionResult ValidationProblem(IReadOnlyList<string> errors) =>
         BadRequest(new { errors });
+
+    protected IActionResult ForbiddenProblem(IReadOnlyList<string> errors) =>
+        StatusCode(StatusCodes.Status403Forbidden, new { errors });
 }

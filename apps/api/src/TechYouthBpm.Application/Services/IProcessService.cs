@@ -8,6 +8,7 @@ namespace TechYouthBpm.Application.Services;
 public interface IProcessService
 {
     Task<IReadOnlyList<ProcessSummaryDto>> ListAsync(UserDto user, CancellationToken cancellationToken = default);
+    Task<PagedResult<ProcessSummaryDto>> ListAsync(ProcessListRequest request, UserDto user, CancellationToken cancellationToken = default);
     Task<ProcessDetailDto?> GetAsync(Guid id, UserDto user, CancellationToken cancellationToken = default);
     Task<Result<ProcessDetailDto>> StartAsync(StartProcessRequest request, UserDto user, CancellationToken cancellationToken = default);
     Task<Result<ProcessDetailDto>> StartVersionAsync(StartProcessVersionRequest request, UserDto user, CancellationToken cancellationToken = default);

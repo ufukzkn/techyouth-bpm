@@ -16,44 +16,70 @@ public class ProcessService(
     AppDbContext db,
     IFormService formService,
     ProcessStateMachine stateMachine,
-    ISystemAuditService auditService) : IProcessService
+    ISystemAuditService auditService,
+    IWorkflowVisibilityService workflowVisibilityService) : IProcessService
 {
+    public ProcessService(
+        AppDbContext db,
+        IFormService formService,
+        ProcessStateMachine stateMachine,
+        ISystemAuditService auditService)
+        : this(db, formService, stateMachine, auditService, new WorkflowVisibilityService())
+    {
+    }
+
     public async Task<IReadOnlyList<ProcessSummaryDto>> ListAsync(
+        UserDto user,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await ListAsync(new ProcessListRequest(PageSize: 50), user, cancellationToken);
+        return result.Items;
+    }
+
+    public async Task<PagedResult<ProcessSummaryDto>> ListAsync(
+        ProcessListRequest request,
         UserDto user,
         CancellationToken cancellationToken = default)
     {
         if (!user.HasPermission(PermissionNames.ProcessesView)
             && !user.HasPermission(PermissionNames.ProcessesViewAll))
         {
-            return [];
+            return new PagedResult<ProcessSummaryDto>([], 1, NormalizePageSize(request.PageSize), 0);
         }
 
-        var query = db.ProcessInstances.AsNoTracking();
-        if (!user.IsSuperAdmin())
+        var page = Math.Max(1, request.Page);
+        var pageSize = NormalizePageSize(request.PageSize);
+        var resolvedScope = workflowVisibilityService.ResolveScope(request.Scope, user);
+        if (!resolvedScope.IsSuccess)
         {
-            query = query.Where(process => process.CommunityId == user.CommunityId);
+            return new PagedResult<ProcessSummaryDto>([], page, pageSize, 0);
         }
 
-        if (!user.IsSuperAdmin() && !user.HasPermission(PermissionNames.ProcessesViewAll))
+        var query = workflowVisibilityService.ApplyProcessScope(
+            db.ProcessInstances.AsNoTracking(),
+            user,
+            resolvedScope.Value);
+
+        if (request.Status is { } status)
         {
-            var teamIds = (user.Teams ?? []).Select(team => team.Id).ToArray();
-            var roleId = user.CommunityRoleId;
-            var canAct = user.HasPermission(PermissionNames.TasksAct);
-            query = query.Where(process =>
-                process.StartedByUserId == user.Id
-                || process.Tasks.Any(task =>
-                    task.AssignedUserId == user.Id
-                    || task.ClaimedByUserId == user.Id
-                    || (task.AssignmentType == null && canAct)
-                    || (canAct && task.AssignmentType == TaskAssignmentType.Team && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty))
-                    || (canAct && task.AssignmentType == TaskAssignmentType.CommunityRole && task.CandidateCommunityRoleId == roleId)
-                    || (canAct && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
-                        && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty)
-                        && task.CandidateCommunityRoleId == roleId)));
+            query = query.Where(process => process.Status == status);
         }
 
-        return await query
-            .OrderByDescending(process => process.StartedAt)
+        if (string.Equals(request.Scope, "startedByMe", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(process => process.StartedByUserId == user.Id);
+        }
+        else if (string.Equals(request.Scope, "assignedToMe", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(process => process.Tasks.Any(task =>
+                task.AssignedUserId == user.Id || task.ClaimedByUserId == user.Id));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var ordered = ApplyProcessOrdering(query, request.SortBy, request.SortDirection);
+        var items = await ordered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(process => new ProcessSummaryDto(
                 process.Id,
                 process.FormDefinitionId,
@@ -65,9 +91,58 @@ public class ProcessService(
                 process.CompletedAt,
                 process.ProcessDefinitionVersionId,
                 process.FormDefinitionVersionId,
-                process.CurrentNodeKey))
+                process.CurrentNodeKey,
+                process.ProcessDefinitionVersion != null && process.ProcessDefinitionVersion.ProcessDefinition != null
+                    ? process.ProcessDefinitionVersion.ProcessDefinition.Name
+                    : string.Empty,
+                process.Tasks
+                    .Where(task => (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                        && task.DueAt.HasValue)
+                    .Min(task => task.DueAt),
+                process.Tasks
+                    .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                    .Max(task => (TaskPriority?)task.Priority)))
             .ToListAsync(cancellationToken);
+
+        return new PagedResult<ProcessSummaryDto>(items, page, pageSize, totalCount);
     }
+
+    private static IOrderedQueryable<ProcessInstance> ApplyProcessOrdering(
+        IQueryable<ProcessInstance> query,
+        string? sortBy,
+        string? sortDirection)
+    {
+        var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        var normalizedSort = sortBy?.Trim().ToLowerInvariant();
+        return normalizedSort switch
+        {
+            "dueat" or "nearestdeadline" => descending
+                ? query.OrderByDescending(process => process.Tasks
+                    .Where(task => (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed) && task.DueAt.HasValue)
+                    .Min(task => task.DueAt)).ThenByDescending(process => process.StartedAt)
+                : query.OrderBy(process => !process.Tasks.Any(task =>
+                        (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed) && task.DueAt.HasValue))
+                    .ThenBy(process => process.Tasks
+                        .Where(task => (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed) && task.DueAt.HasValue)
+                        .Min(task => task.DueAt))
+                    .ThenByDescending(process => process.StartedAt),
+            "priority" => descending
+                ? query.OrderByDescending(process => process.Tasks
+                    .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                    .Max(task => (TaskPriority?)task.Priority)).ThenByDescending(process => process.StartedAt)
+                : query.OrderBy(process => process.Tasks
+                    .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                    .Max(task => (TaskPriority?)task.Priority)).ThenByDescending(process => process.StartedAt),
+            "status" => descending
+                ? query.OrderByDescending(process => process.Status).ThenByDescending(process => process.StartedAt)
+                : query.OrderBy(process => process.Status).ThenByDescending(process => process.StartedAt),
+            _ => descending
+                ? query.OrderByDescending(process => process.StartedAt)
+                : query.OrderBy(process => process.StartedAt)
+        };
+    }
+
+    private static int NormalizePageSize(int pageSize) => Math.Clamp(pageSize, 1, 50);
 
     public async Task<ProcessDetailDto?> GetAsync(
         Guid id,
@@ -75,7 +150,7 @@ public class ProcessService(
         CancellationToken cancellationToken = default)
     {
         var process = await ProcessQuery().SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
-        if (process is null || !CanSeeProcess(process, user))
+        if (process is null || !workflowVisibilityService.CanViewProcess(process, user))
         {
             return null;
         }
@@ -289,6 +364,8 @@ public class ProcessService(
             .AsSplitQuery()
             .Include(process => process.FormDefinition)
             .Include(process => process.Community)
+            .Include(process => process.ProcessDefinitionVersion)
+            .ThenInclude(version => version!.ProcessDefinition)
             .Include(process => process.Tasks)
             .ThenInclude(task => task.AssignedCommunityRole)
             .Include(process => process.Tasks)
@@ -303,44 +380,6 @@ public class ProcessService(
             .ThenInclude(step => step.CompletedByUser)
             .Include(process => process.AuditLogs)
             .ThenInclude(log => log.User);
-
-    private static bool CanSeeProcess(ProcessInstance process, UserDto user)
-    {
-        if (user.IsSuperAdmin())
-        {
-            return true;
-        }
-
-        if (process.CommunityId != user.CommunityId
-            || (!user.HasPermission(PermissionNames.ProcessesView)
-                && !user.HasPermission(PermissionNames.ProcessesViewAll)))
-        {
-            return false;
-        }
-
-        if (user.HasPermission(PermissionNames.ProcessesViewAll) || process.StartedByUserId == user.Id)
-        {
-            return true;
-        }
-
-        var teamIds = (user.Teams ?? []).Select(team => team.Id).ToHashSet();
-        return process.Tasks.Any(task =>
-            task.AssignedUserId == user.Id
-            || task.ClaimedByUserId == user.Id
-            || (task.AssignmentType is null && user.HasPermission(task.RequiredPermission))
-            || (user.HasPermission(PermissionNames.TasksAct)
-                && task.AssignmentType == TaskAssignmentType.Team
-                && task.CandidateTeamId is { } teamId
-                && teamIds.Contains(teamId))
-            || (user.HasPermission(PermissionNames.TasksAct)
-                && task.AssignmentType == TaskAssignmentType.CommunityRole
-                && task.CandidateCommunityRoleId == user.CommunityRoleId)
-            || (user.HasPermission(PermissionNames.TasksAct)
-                && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
-                && task.CandidateTeamId is { } intersectionTeamId
-                && teamIds.Contains(intersectionTeamId)
-                && task.CandidateCommunityRoleId == user.CommunityRoleId));
-    }
 
     private async Task NotifyLegacyTaskCandidatesAsync(
         Guid communityId,

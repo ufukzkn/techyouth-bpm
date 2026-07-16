@@ -15,10 +15,19 @@ namespace TechYouthBpm.Infrastructure.Services;
 public class TaskService(
     AppDbContext db,
     ProcessStateMachine stateMachine,
-    ISystemAuditService auditService) : ITaskService
+    ISystemAuditService auditService,
+    IWorkflowVisibilityService workflowVisibilityService) : ITaskService
 {
     public TaskService(AppDbContext db, ProcessStateMachine stateMachine)
-        : this(db, stateMachine, new SystemAuditService(db))
+        : this(db, stateMachine, new SystemAuditService(db), new WorkflowVisibilityService())
+    {
+    }
+
+    public TaskService(
+        AppDbContext db,
+        ProcessStateMachine stateMachine,
+        ISystemAuditService auditService)
+        : this(db, stateMachine, auditService, new WorkflowVisibilityService())
     {
     }
 
@@ -26,31 +35,68 @@ public class TaskService(
         UserDto user,
         CancellationToken cancellationToken = default)
     {
-        var tasks = await TaskQuery()
-            .AsNoTracking()
-            .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
-            .Where(task => user.IsSuperAdmin()
-                || (task.ProcessInstance != null && task.ProcessInstance.CommunityId == user.CommunityId))
-            .OrderByDescending(task => task.Priority)
-            .ThenBy(task => task.CreatedAt)
-            .ToListAsync(cancellationToken);
+        var result = await ListMyTasksAsync(new TaskListRequest(PageSize: 50), user, cancellationToken);
+        return result.Items;
+    }
 
-        var resolver = new TaskAssignmentResolver(db);
-        var visible = new List<ProcessTaskDto>();
-        foreach (var task in tasks)
+    public async Task<PagedResult<ProcessTaskDto>> ListMyTasksAsync(
+        TaskListRequest request,
+        UserDto user,
+        CancellationToken cancellationToken = default)
+    {
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        if (!user.HasPermission(PermissionNames.TasksView))
         {
-            if ((!user.HasPermission(PermissionNames.TasksView)
-                    && task.AssignedUserId != user.Id
-                    && !user.IsSuperAdmin())
-                || !await resolver.CanSeeAsync(task, user, cancellationToken))
-            {
-                continue;
-            }
-
-            visible.Add(task.ToDto());
+            return new PagedResult<ProcessTaskDto>([], page, pageSize, 0);
         }
 
-        return visible;
+        var query = workflowVisibilityService.ApplyTaskScope(
+            TaskQuery()
+            .AsNoTracking()
+            .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed),
+            user,
+            WorkflowVisibilityScope.Personal);
+
+        if (request.Priority is { } priority)
+        {
+            query = query.Where(task => task.Priority == priority);
+        }
+
+        if (request.TaskId is { } taskId)
+        {
+            query = query.Where(task => task.Id == taskId);
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var ordered = ApplyTaskOrdering(query, request.SortBy, request.SortDirection);
+        var tasks = await ordered
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<ProcessTaskDto>(tasks.Select(task => task.ToDto()).ToArray(), page, pageSize, totalCount);
+    }
+
+    private static IOrderedQueryable<ProcessTask> ApplyTaskOrdering(
+        IQueryable<ProcessTask> query,
+        string? sortBy,
+        string? sortDirection)
+    {
+        var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        return sortBy?.Trim().ToLowerInvariant() switch
+        {
+            "priority" => descending
+                ? query.OrderByDescending(task => task.Priority).ThenBy(task => task.DueAt == null).ThenBy(task => task.DueAt)
+                : query.OrderBy(task => task.Priority).ThenBy(task => task.DueAt == null).ThenBy(task => task.DueAt),
+            "createdat" or "newest" => descending
+                ? query.OrderByDescending(task => task.CreatedAt)
+                : query.OrderBy(task => task.CreatedAt),
+            "oldest" => query.OrderBy(task => task.CreatedAt),
+            _ => descending
+                ? query.OrderByDescending(task => task.DueAt).ThenByDescending(task => task.Priority).ThenByDescending(task => task.CreatedAt)
+                : query.OrderBy(task => task.DueAt == null).ThenBy(task => task.DueAt).ThenByDescending(task => task.Priority).ThenBy(task => task.CreatedAt)
+        };
     }
 
     public async Task<Result<ProcessTaskDto>> ClaimAsync(
@@ -403,6 +449,12 @@ public class TaskService(
         db.ProcessTasks
             .Include(task => task.AssignedCommunityRole)
             .Include(task => task.ProcessInstance)
+            .ThenInclude(process => process!.FormDefinition)
+            .Include(task => task.ProcessInstance)
+            .ThenInclude(process => process!.Community)
+            .Include(task => task.ProcessInstance)
+            .ThenInclude(process => process!.ProcessDefinitionVersion)
+            .ThenInclude(version => version!.ProcessDefinition)
             .Include(task => task.FormDefinitionVersion)
             .ThenInclude(version => version!.FormDefinition)
             .Include(task => task.FormDefinitionVersion)
@@ -418,6 +470,7 @@ public class TaskService(
             .ThenInclude(process => process!.FormDefinition)
             .Include(task => task.ProcessInstance)
             .ThenInclude(process => process!.ProcessDefinitionVersion)
+            .ThenInclude(version => version!.ProcessDefinition)
             .Include(task => task.ProcessInstance)
             .ThenInclude(process => process!.StepExecutions)
             .ThenInclude(step => step.CompletedByUser)
@@ -437,6 +490,8 @@ public class TaskService(
             .AsNoTracking()
             .Include(item => item.FormDefinition)
             .Include(item => item.Community)
+            .Include(item => item.ProcessDefinitionVersion)
+            .ThenInclude(version => version!.ProcessDefinition)
             .Include(item => item.Tasks)
             .ThenInclude(task => task.AssignedCommunityRole)
             .Include(item => item.Tasks)

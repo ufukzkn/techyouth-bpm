@@ -184,7 +184,13 @@ internal static class MappingExtensions
             task.ClaimedAt,
             task.ClaimVersion,
             task.FormDefinitionVersionId,
-            task.FormDefinitionVersion?.ToDto());
+            task.FormDefinitionVersion?.ToDto(),
+            task.DueAt,
+            task.ProcessInstance?.ProcessDefinitionVersion?.ProcessDefinition?.Name ?? string.Empty,
+            task.FormDefinitionVersion?.FormDefinition?.Name
+                ?? task.ProcessInstance?.FormDefinition?.Name
+                ?? string.Empty,
+            task.ProcessInstance?.Community?.Name ?? string.Empty);
 
     public static ProcessSummaryDto ToSummaryDto(this ProcessInstance process) =>
         new(
@@ -198,7 +204,18 @@ internal static class MappingExtensions
             process.CompletedAt,
             process.ProcessDefinitionVersionId,
             process.FormDefinitionVersionId,
-            process.CurrentNodeKey);
+            process.CurrentNodeKey,
+            process.ProcessDefinitionVersion?.ProcessDefinition?.Name ?? string.Empty,
+            process.Tasks
+                .Where(task => (task.Status is ProcessTaskStatus.Open or ProcessTaskStatus.Claimed) && task.DueAt.HasValue)
+                .OrderBy(task => task.DueAt)
+                .Select(task => task.DueAt)
+                .FirstOrDefault(),
+            process.Tasks
+                .Where(task => task.Status is ProcessTaskStatus.Open or ProcessTaskStatus.Claimed)
+                .OrderByDescending(task => task.Priority)
+                .Select(task => (TaskPriority?)task.Priority)
+                .FirstOrDefault());
 
     public static ProcessDetailDto ToDetailDto(this ProcessInstance process) =>
         new(

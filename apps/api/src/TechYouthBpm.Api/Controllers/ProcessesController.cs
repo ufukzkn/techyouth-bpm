@@ -9,10 +9,11 @@ namespace TechYouthBpm.Api.Controllers;
 [Route("api/processes")]
 public class ProcessesController(
     IProcessService processService,
+    IWorkflowVisibilityService workflowVisibilityService,
     IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken cancellationToken)
+    public async Task<IActionResult> List([FromQuery] ProcessListRequest request, CancellationToken cancellationToken)
     {
         var user = await CurrentUserAsync(cancellationToken);
         if (user is null)
@@ -20,7 +21,13 @@ public class ProcessesController(
             return UnauthorizedProblem();
         }
 
-        return Ok(await processService.ListAsync(user, cancellationToken));
+        var resolvedScope = workflowVisibilityService.ResolveScope(request.Scope, user);
+        if (!resolvedScope.IsSuccess)
+        {
+            return ForbiddenProblem(resolvedScope.Errors);
+        }
+
+        return Ok(await processService.ListAsync(request, user, cancellationToken));
     }
 
     [HttpGet("{id:guid}")]

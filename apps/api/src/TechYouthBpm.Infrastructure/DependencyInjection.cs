@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IFormVersionService, FormVersionService>();
         services.AddScoped<IProcessGraphValidator, ProcessGraphValidator>();
         services.AddScoped<IProcessDefinitionService, ProcessDefinitionService>();
+        services.AddScoped<IWorkflowVisibilityService, WorkflowVisibilityService>();
         services.AddScoped<IProcessService, ProcessService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ITaskService, TaskService>();

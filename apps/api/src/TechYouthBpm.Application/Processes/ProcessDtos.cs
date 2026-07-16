@@ -37,7 +37,11 @@ public record ProcessTaskDto(
     DateTime? ClaimedAt = null,
     Guid? ClaimVersion = null,
     Guid? FormDefinitionVersionId = null,
-    FormDefinitionVersionDto? TaskForm = null);
+    FormDefinitionVersionDto? TaskForm = null,
+    DateTime? DueAt = null,
+    string WorkflowName = "",
+    string FormName = "",
+    string CommunityName = "");
 
 public record ProcessSummaryDto(
     Guid Id,
@@ -50,7 +54,33 @@ public record ProcessSummaryDto(
     DateTime? CompletedAt,
     Guid? ProcessDefinitionVersionId = null,
     Guid? FormDefinitionVersionId = null,
-    string CurrentNodeKey = "");
+    string CurrentNodeKey = "",
+    string WorkflowName = "",
+    DateTime? NearestOpenTaskDueAt = null,
+    TaskPriority? HighestOpenTaskPriority = null);
+
+public enum WorkflowVisibilityScope
+{
+    Personal = 1,
+    Community = 2,
+    Global = 3
+}
+
+public record ProcessListRequest(
+    int Page = 1,
+    int PageSize = 10,
+    ProcessStatus? Status = null,
+    string Scope = "personal",
+    string SortBy = "startedAt",
+    string SortDirection = "desc");
+
+public record TaskListRequest(
+    int Page = 1,
+    int PageSize = 10,
+    TaskPriority? Priority = null,
+    Guid? TaskId = null,
+    string SortBy = "dueAt",
+    string SortDirection = "asc");
 
 public record ProcessStepExecutionDto(
     Guid Id,
