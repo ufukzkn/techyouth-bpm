@@ -107,4 +107,21 @@ describe("validateWorkflow", () => {
 
     expect(issues.some((item) => item.code === "gateway.condition.future-step")).toBe(true);
   });
+
+  it.each([0, 525601])("rejects task SLA outside the supported range: %s", (slaDurationMinutes) => {
+    const draft = createStarterWorkflowDraft();
+    draft.nodes = draft.nodes.map((node): WorkflowNode => node.type === "userTask"
+      ? {
+          ...node,
+          data: {
+            ...node.data,
+            slaDurationMinutes,
+          } satisfies UserTaskNodeData,
+        }
+      : node);
+
+    const issues = validateWorkflow(draft);
+
+    expect(issues.some((item) => item.code === "task.sla.range")).toBe(true);
+  });
 });

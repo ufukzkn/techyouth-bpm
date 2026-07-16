@@ -14,6 +14,8 @@ describe("workflow API graph adapter", () => {
       ...task.data,
       assignment: { type: "processStarter" },
       actions: [...task.data.actions, "SendBack"],
+      slaDurationMinutes: 1440,
+      slaUnit: "days",
     } satisfies UserTaskNodeData;
 
     const graph = toApiProcessGraph(draft);
@@ -30,6 +32,7 @@ describe("workflow API graph adapter", () => {
       positionY: 66,
       width: 230,
       height: 112,
+      slaDurationMinutes: 1440,
     });
     expect(apiTask?.actions).toContain("SendBack");
     const apiLane = graph.nodes.find((node) => node.key === "lane-review");
@@ -55,6 +58,7 @@ describe("workflow API graph adapter", () => {
         positionY: 54,
         width: 240,
         height: 120,
+        slaDurationMinutes: 720,
       }, {
         key: "finance",
         type: "TeamSwimlane",
@@ -86,6 +90,7 @@ describe("workflow API graph adapter", () => {
       priority: "Critical",
       actions: ["Approve", "SendBack"],
       assignment: { type: "person", personId: "user-1" },
+      slaDurationMinutes: 720,
     });
   });
 

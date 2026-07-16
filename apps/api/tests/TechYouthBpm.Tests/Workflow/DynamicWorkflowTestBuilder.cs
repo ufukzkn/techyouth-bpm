@@ -33,7 +33,8 @@ internal static class DynamicWorkflowTestBuilder
         User admin,
         TaskAssignmentDto assignment,
         TaskPriority priority = TaskPriority.Normal,
-        IReadOnlyList<WorkflowAction>? actions = null)
+        IReadOnlyList<WorkflowAction>? actions = null,
+        int? slaDurationMinutes = null)
     {
         var user = TestDbFactory.CommunityAdminDto(admin);
         var form = await new FormService(db).CreateAsync(
@@ -72,7 +73,8 @@ internal static class DynamicWorkflowTestBuilder
                     PositionY: 70,
                     Width: 220,
                     Height: 96,
-                    Description: "Approval description"),
+                    Description: "Approval description",
+                    SlaDurationMinutes: slaDurationMinutes),
                 new ProcessNodeDto(
                     "completed",
                     ProcessNodeType.CompletedEnd,

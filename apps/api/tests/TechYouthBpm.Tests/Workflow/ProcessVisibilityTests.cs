@@ -1,4 +1,5 @@
 using TechYouthBpm.Application.Auth;
+using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Workflow;
 using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Services;
@@ -27,12 +28,17 @@ public class ProcessVisibilityTests
             PermissionNames.ProcessesViewAll);
 
         var ownResults = await service.ListAsync(ownOnly);
-        var allResults = await service.ListAsync(viewAll);
+        var viewAllPersonalResults = await service.ListAsync(viewAll);
+        var allResults = await service.ListAsync(
+            new ProcessListRequest(PageSize: 50, Scope: "community"),
+            viewAll);
 
         Assert.Single(ownResults);
         Assert.Equal(firstProcess.Id, ownResults[0].Id);
-        Assert.Contains(allResults, process => process.Id == firstProcess.Id);
-        Assert.Contains(allResults, process => process.Id == secondProcess.Id);
+        Assert.Single(viewAllPersonalResults);
+        Assert.Equal(firstProcess.Id, viewAllPersonalResults[0].Id);
+        Assert.Contains(allResults.Items, process => process.Id == firstProcess.Id);
+        Assert.Contains(allResults.Items, process => process.Id == secondProcess.Id);
     }
 
     private static UserDto UserWithPermissions(TechYouthBpm.Domain.Entities.User user, params string[] permissions) =>

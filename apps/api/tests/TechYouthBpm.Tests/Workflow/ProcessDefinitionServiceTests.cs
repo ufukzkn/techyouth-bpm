@@ -147,6 +147,35 @@ public class ProcessDefinitionServiceTests
         Assert.Contains(result.Errors, error => error.Contains("width", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(525601)]
+    public void Validation_Rejects_UserTask_Sla_Outside_Allowed_Range(int slaDurationMinutes)
+    {
+        using var db = TestDbFactory.Create();
+        var graph = new ProcessGraphDto(
+            "1.0",
+            [
+                new ProcessNodeDto("start", ProcessNodeType.Start),
+                new ProcessNodeDto(
+                    "approval",
+                    ProcessNodeType.UserTask,
+                    Actions: [WorkflowAction.Approve],
+                    Assignment: new(TaskAssignmentType.ProcessStarter),
+                    SlaDurationMinutes: slaDurationMinutes),
+                new ProcessNodeDto("end", ProcessNodeType.CompletedEnd)
+            ],
+            [
+                new ProcessEdgeDto("start", "approval"),
+                new ProcessEdgeDto("approval", "end", WorkflowAction.Approve)
+            ]);
+
+        var result = new ProcessGraphValidator(db).ValidateStructure(graph);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.Contains("SLA", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void Validation_Rejects_Condition_Path_Outside_Namespaced_Variables()
     {

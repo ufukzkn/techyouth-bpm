@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Forms;
 using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Workflow;
 using TechYouthBpm.Domain.Entities;
@@ -12,6 +13,57 @@ namespace TechYouthBpm.Tests.Workflow;
 
 public class DynamicWorkflowRuntimeTests
 {
+    [Fact]
+    public async Task UserTask_Sla_Creates_DueAt_From_Task_Creation_Time()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "sla-admin");
+        var version = await DynamicWorkflowTestBuilder.CreatePublishedAsync(
+            db,
+            admin,
+            new TaskAssignmentDto(TaskAssignmentType.ProcessStarter),
+            slaDurationMinutes: 180);
+        using var data = JsonDocument.Parse("{\"amount\":100}");
+
+        var started = await new ProcessService(
+                db,
+                new FormService(db),
+                new ProcessStateMachine(),
+                new SystemAuditService(db))
+            .StartVersionAsync(
+                new StartProcessVersionRequest(version.Id, data.RootElement.Clone()),
+                TestDbFactory.CommunityAdminDto(admin));
+
+        Assert.True(started.IsSuccess, string.Join(" | ", started.Errors));
+        var task = Assert.Single(started.Value!.Tasks);
+        Assert.NotNull(task.DueAt);
+        Assert.Equal(task.CreatedAt.AddMinutes(180), task.DueAt!.Value, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task UserTask_Without_Sla_Leaves_DueAt_Empty()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "no-sla-admin");
+        var version = await DynamicWorkflowTestBuilder.CreatePublishedAsync(
+            db,
+            admin,
+            new TaskAssignmentDto(TaskAssignmentType.ProcessStarter));
+        using var data = JsonDocument.Parse("{\"amount\":100}");
+
+        var started = await new ProcessService(
+                db,
+                new FormService(db),
+                new ProcessStateMachine(),
+                new SystemAuditService(db))
+            .StartVersionAsync(
+                new StartProcessVersionRequest(version.Id, data.RootElement.Clone()),
+                TestDbFactory.CommunityAdminDto(admin));
+
+        Assert.True(started.IsSuccess, string.Join(" | ", started.Errors));
+        Assert.Null(Assert.Single(started.Value!.Tasks).DueAt);
+    }
+
     [Fact]
     public async Task Competing_Claim_Snapshots_Allow_Only_One_Winner()
     {
@@ -268,7 +320,8 @@ public class DynamicWorkflowRuntimeTests
                         "draftReview",
                         ProcessNodeType.UserTask,
                         actions: [WorkflowAction.Approve],
-                        assignment: new TaskAssignmentDto(TaskAssignmentType.ProcessStarter)),
+                        assignment: new TaskAssignmentDto(TaskAssignmentType.ProcessStarter),
+                        slaDurationMinutes: 60),
                     Node(
                         "finalReview",
                         ProcessNodeType.UserTask,
@@ -310,6 +363,8 @@ public class DynamicWorkflowRuntimeTests
         var reopenedNode = sentBack.Value.Tasks.Single(task => task.Status == ProcessTaskStatus.Open);
         Assert.Equal("draftReview", reopenedNode.NodeKey);
         Assert.Equal(2, reopenedNode.Attempt);
+        Assert.NotNull(reopenedNode.DueAt);
+        Assert.Equal(reopenedNode.CreatedAt.AddMinutes(60), reopenedNode.DueAt!.Value, TimeSpan.FromSeconds(1));
         Assert.Contains(sentBack.Value.Tasks, task =>
             task.NodeKey == "draftReview"
             && task.Attempt == 1
@@ -358,12 +413,69 @@ public class DynamicWorkflowRuntimeTests
         Assert.Contains(completed.Value.AuditLogs, log => log.Action == WorkflowAction.Complete);
     }
 
+    [Fact]
+    public async Task Task_Form_Is_Validated_And_Persisted_Under_The_Node_Variable_Path()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "task-form-admin");
+        var user = TestDbFactory.CommunityAdminDto(admin);
+        var taskForm = await new FormService(db).CreateAsync(
+            new CreateFormRequest(
+                "Task decision form",
+                "Required decision output",
+                [new CreateFormFieldRequest("decision", "Decision", FieldType.Text, true, 1, [], [])]),
+            user);
+        var taskFormVersionId = taskForm.Value!.LatestPublishedVersionId!.Value;
+        var version = await DynamicWorkflowTestBuilder.CreatePublishedGraphAsync(
+            db,
+            admin,
+            startFormVersionId => new ProcessGraphDto(
+                "1.0",
+                [
+                    Node("start", ProcessNodeType.Start, formVersionId: startFormVersionId),
+                    Node(
+                        "review",
+                        ProcessNodeType.UserTask,
+                        formVersionId: taskFormVersionId,
+                        actions: [WorkflowAction.Approve],
+                        assignment: new TaskAssignmentDto(TaskAssignmentType.ProcessStarter)),
+                    Node("completed", ProcessNodeType.CompletedEnd)
+                ],
+                [
+                    new ProcessEdgeDto("start", "review"),
+                    new ProcessEdgeDto("review", "completed", WorkflowAction.Approve)
+                ]));
+        using var startData = JsonDocument.Parse("{\"amount\":100}");
+        var started = await new ProcessService(db, new FormService(db), new ProcessStateMachine(), new SystemAuditService(db))
+            .StartVersionAsync(new(version.Id, startData.RootElement.Clone()), user);
+        var task = Assert.Single(started.Value!.Tasks);
+        var taskService = new TaskService(db, new ProcessStateMachine());
+
+        var missing = await taskService.ExecuteActionAsync(
+            task.Id,
+            new TaskActionRequest(WorkflowAction.Approve, null),
+            user);
+        using var output = JsonDocument.Parse("{\"decision\":\"approved\"}");
+        var completed = await taskService.ExecuteActionAsync(
+            task.Id,
+            new TaskActionRequest(WorkflowAction.Approve, null, output.RootElement.Clone()),
+            user);
+
+        Assert.False(missing.IsSuccess);
+        Assert.Contains(missing.Errors, error => error.Contains("form data is required", StringComparison.OrdinalIgnoreCase));
+        Assert.True(completed.IsSuccess, string.Join(" | ", completed.Errors));
+        Assert.Equal("approved", completed.Value!.Variables.GetProperty("steps").GetProperty("review").GetProperty("decision").GetString());
+        var reviewStep = completed.Value.StepExecutions!.Single(step => step.NodeKey == "review");
+        Assert.Equal("approved", reviewStep.Output.GetProperty("decision").GetString());
+    }
+
     private static ProcessNodeDto Node(
         string key,
         ProcessNodeType type,
         Guid? formVersionId = null,
         IReadOnlyList<WorkflowAction>? actions = null,
-        TaskAssignmentDto? assignment = null) =>
+        TaskAssignmentDto? assignment = null,
+        int? slaDurationMinutes = null) =>
         new(
             key,
             type,
@@ -374,7 +486,8 @@ public class DynamicWorkflowRuntimeTests
             PositionX: type == ProcessNodeType.Start ? 40 : 300,
             PositionY: 80,
             Width: 180,
-            Height: 80);
+            Height: 80,
+            SlaDurationMinutes: slaDurationMinutes);
 
     private static TeamMembership TeamMember(Guid teamId, Guid userId) => new()
     {
