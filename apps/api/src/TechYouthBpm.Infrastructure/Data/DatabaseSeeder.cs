@@ -1618,6 +1618,7 @@ public static class DatabaseSeeder
 
         await db.SaveChangesAsync(cancellationToken);
         await EnsureVersionedWorkflowSeedAsync(db, cancellationToken);
+        await DemoFormSeeder.SeedAsync(db, cancellationToken);
     }
 
     private static async Task EnsureExistingWorkflowCommunityScopeAsync(AppDbContext db, CancellationToken cancellationToken)
