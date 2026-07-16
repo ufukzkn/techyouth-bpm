@@ -1581,44 +1581,10 @@ public static class DatabaseSeeder
         }
 
         await EnsureExistingWorkflowCommunityScopeAsync(db, cancellationToken);
-
-        var existingProcessIds = await db.ProcessInstances
-            .Select(process => process.Id)
-            .ToListAsync(cancellationToken);
-        var existingProcessIdSet = existingProcessIds.ToHashSet();
-        var missingProcesses = BuildMockProcesses(transferForm.Id, campForm.Id, leaveForm.Id, purchaseForm.Id)
-            .Where(process => !existingProcessIdSet.Contains(process.Id))
-            .ToArray();
-        if (missingProcesses.Length > 0)
-        {
-            db.ProcessInstances.AddRange(missingProcesses);
-        }
-
-        var existingSystemLogIds = await db.SystemAuditLogs
-            .Select(log => log.Id)
-            .ToListAsync(cancellationToken);
-        var existingSystemLogIdSet = existingSystemLogIds.ToHashSet();
-        var missingSystemLogs = BuildMockSystemAuditLogs()
-            .Where(log => !existingSystemLogIdSet.Contains(log.Id))
-            .ToArray();
-        if (missingSystemLogs.Length > 0)
-        {
-            db.SystemAuditLogs.AddRange(missingSystemLogs);
-        }
-
-        var existingNotificationIds = await db.Notifications.Select(notification => notification.Id).ToListAsync(cancellationToken);
-        var existingNotificationIdSet = existingNotificationIds.ToHashSet();
-        var missingNotifications = BuildMockNotifications()
-            .Where(notification => !existingNotificationIdSet.Contains(notification.Id))
-            .ToArray();
-        if (missingNotifications.Length > 0)
-        {
-            db.Notifications.AddRange(missingNotifications);
-        }
-
         await db.SaveChangesAsync(cancellationToken);
         await EnsureVersionedWorkflowSeedAsync(db, cancellationToken);
         await DemoFormSeeder.SeedAsync(db, cancellationToken);
+        await DemoWorkflowSeeder.SeedAsync(db, cancellationToken);
     }
 
     private static async Task EnsureExistingWorkflowCommunityScopeAsync(AppDbContext db, CancellationToken cancellationToken)
