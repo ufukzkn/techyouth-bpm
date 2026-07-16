@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDot,
+  FileUp,
   GripVertical,
   Hash,
   List,
@@ -42,6 +43,7 @@ export const fieldTypeIcons: Record<FieldType, LucideIcon> = {
   Radio: CircleDot,
   Checkbox: SquareCheck,
   Date: Calendar,
+  FileUpload: FileUp,
 };
 
 export function FormDesignerOpeningSkeleton({ label }: { label: string }) {

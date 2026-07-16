@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Play, RotateCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
@@ -33,6 +34,7 @@ export type FormRunnerDraftProps = {
 };
 
 export function FormRunnerDraft({ versionAdapter }: FormRunnerDraftProps = {}) {
+  const router = useRouter();
   const token = useSessionStore((state) => state.token);
   const language = useSessionStore((state) => state.language);
   const t = useCallback(
@@ -318,6 +320,7 @@ export function FormRunnerDraft({ versionAdapter }: FormRunnerDraftProps = {}) {
       setSubmitStatus("success");
       setSubmitResult(process);
       setMessage(t("form.runner.started", { id: process.id }));
+      router.push(`/processes?processId=${encodeURIComponent(process.id)}&started=1`);
     } catch (error) {
       setSubmitStatus("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.runner.startFailed"));

@@ -337,7 +337,7 @@ export function upsertForm(forms: FormDefinition[], form: FormDefinition) {
   return exists ? forms.map((item) => (item.id === form.id ? form : item)) : [form, ...forms];
 }
 
-type DesignerFieldErrors = Record<string, { key?: string; label?: string; options?: string; rules?: Record<number, string> }>;
+export type DesignerFieldErrors = Record<string, { key?: string; label?: string; options?: string; rules?: Record<number, string> }>;
 
 export function validateDesignerFields(fields: DesignerField[], language: Language) {
   const errors: DesignerFieldErrors = {};

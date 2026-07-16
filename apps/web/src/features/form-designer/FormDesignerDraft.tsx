@@ -95,13 +95,14 @@ import {
   upsertForm,
   validateDesignerFields,
   type DesignerField,
+  type DesignerFieldErrors,
   type DesignerPage,
   type DesignerVersionState,
 } from "@/features/form-designer/formDesignerModel";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api } from "@/lib/api";
-import type { Community, CreateFormRequest, FieldType, FormDefinition, ValidationRule } from "@/lib/types";
+import type { Community, CreateFormRequest, FieldType, FormDefinition, Language, ValidationRule } from "@/lib/types";
 
 type SaveState = "idle" | "saving" | "publishing" | "archiving" | "success" | "error";
 
@@ -132,9 +133,13 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const [showCommunityError, setShowCommunityError] = useState(false);
   const [hasLoadedForms, setHasLoadedForms] = useState(false);
   const [isSwitchingForm, setIsSwitchingForm] = useState(false);
+  const [isCreatingNewForm, setIsCreatingNewForm] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
   const [type, setType] = useState<FieldType>("Text");
   const [required, setRequired] = useState(false);
+  const [isAddingManualField, setIsAddingManualField] = useState(false);
+  const manualFieldFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const newFormFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [isArchiveConfirmationOpen, setIsArchiveConfirmationOpen] = useState(false);
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
@@ -160,6 +165,10 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasPageErrors = pages.some((page) => page.title.trim().length === 0);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0 || hasPageErrors;
+  const fieldErrorSummary = useMemo(
+    () => buildDesignerErrorSummary(fields, fieldErrors, language, hasPageErrors ? pagingCopy.pageTitleRequired : undefined),
+    [fieldErrors, fields, hasPageErrors, language, pagingCopy.pageTitleRequired],
+  );
   const isSuperAdmin = user?.role === "SuperAdmin";
   const hasCommunityError = Boolean(isSuperAdmin && !selectedCommunityId);
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
@@ -238,6 +247,18 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       pages: layoutModel.pages,
     }),
     [formModel, layoutModel],
+  );
+
+  useEffect(
+    () => () => {
+      if (manualFieldFeedbackTimeoutRef.current) {
+        clearTimeout(manualFieldFeedbackTimeoutRef.current);
+      }
+      if (newFormFeedbackTimeoutRef.current) {
+        clearTimeout(newFormFeedbackTimeoutRef.current);
+      }
+    },
+    [],
   );
 
   useEffect(() => {
@@ -522,6 +543,14 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     setSaveState("idle");
     setMessage(t("form.designer.unsaved"));
     markVersionAsDraft();
+    setIsAddingManualField(true);
+    if (manualFieldFeedbackTimeoutRef.current) {
+      clearTimeout(manualFieldFeedbackTimeoutRef.current);
+    }
+    manualFieldFeedbackTimeoutRef.current = setTimeout(() => {
+      setIsAddingManualField(false);
+      manualFieldFeedbackTimeoutRef.current = null;
+    }, 240);
   }
 
   function updateField(id: string, patch: Partial<Omit<DesignerField, "id">>) {
@@ -835,6 +864,18 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     setMessage(t("form.designer.draftReady"));
   }
 
+  function startNewForm() {
+    resetDesigner();
+    setIsCreatingNewForm(true);
+    if (newFormFeedbackTimeoutRef.current) {
+      clearTimeout(newFormFeedbackTimeoutRef.current);
+    }
+    newFormFeedbackTimeoutRef.current = setTimeout(() => {
+      setIsCreatingNewForm(false);
+      newFormFeedbackTimeoutRef.current = null;
+    }, 240);
+  }
+
   async function saveDraft() {
     if (!token) {
       setSaveState("error");
@@ -851,7 +892,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
 
     if (hasFieldErrors) {
       setSaveState("error");
-      setMessage(t("form.designer.fixErrorsBeforeSave"));
+      setMessage(fieldErrorSummary.text);
       return;
     }
 
@@ -901,7 +942,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
 
     if (hasFieldErrors) {
       setSaveState("error");
-      setMessage(t("form.designer.fixErrorsBeforeSave"));
+      setMessage(fieldErrorSummary.text);
       return;
     }
 
@@ -986,11 +1027,13 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         onDragStart={handleDragStart}
       >
         <div className="designer-grid">
-          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm}>
-            {isSwitchingForm ? (
+          <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm || isCreatingNewForm}>
+            {isSwitchingForm || isCreatingNewForm ? (
               <div className="designer-form-transition-overlay" role="status" aria-live="polite">
                 <span className="designer-form-transition-indicator">
-                  <InlineValueLoader label={t("form.designer.loadingForms")} />
+                  <InlineValueLoader
+                    label={isCreatingNewForm ? t("form.designer.preparingNewForm") : t("form.designer.loadingForms")}
+                  />
                 </span>
               </div>
             ) : null}
@@ -1070,11 +1113,35 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                 ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
                 : t("form.designer.createOnSave")}
             </p>
+            <div className="designer-primary-version-actions" aria-label={pagingCopy.version}>
+              <button className="primary-button" disabled={isPersisting} type="button" onClick={saveDraft}>
+                <Save size={17} />
+                {saveState === "saving" ? t("form.designer.saving") : pagingCopy.saveDraft}
+              </button>
+              <button
+                className="success-button"
+                disabled={isPersisting || !versionAdapter?.publish || versionState.status !== "draft"}
+                type="button"
+                onClick={publishForm}
+              >
+                <Send size={17} />
+                {saveState === "publishing" ? pagingCopy.publishing : pagingCopy.publish}
+              </button>
+              <button
+                className="secondary-button"
+                disabled={isPersisting || !versionAdapter?.archive || versionState.status !== "published"}
+                type="button"
+                onClick={() => setIsArchiveConfirmationOpen(true)}
+              >
+                <Archive size={17} />
+                {saveState === "archiving" ? pagingCopy.archiving : pagingCopy.archive}
+              </button>
+            </div>
             <button
               className="secondary-button"
               disabled={isPersisting}
               type="button"
-              onClick={resetDesigner}
+              onClick={startNewForm}
             >
               <Plus size={18} />
               {t("form.designer.newForm")}
@@ -1087,7 +1154,15 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
             </ol>
           </div>
 
-          <div className="tool-panel">
+          <div className="tool-panel designer-manual-field-panel" aria-busy={isAddingManualField}>
+            {isAddingManualField ? (
+              <div className="designer-manual-field-overlay" role="status" aria-live="polite">
+                <span className="designer-manual-field-indicator">
+                  <InlineValueLoader label={t("form.designer.addingField")} />
+                  <span>{t("form.designer.addingField")}</span>
+                </span>
+              </div>
+            ) : null}
             <h3>{t("form.designer.addFieldTitle")}</h3>
             <label>
               {t("form.designer.label")}
@@ -1185,10 +1260,13 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
               </div>
               {activeFields.length === 0 ? <p className="empty-state designer-page-empty">{pagingCopy.emptyPage}</p> : null}
               {activeFields.map((field, index) => (
-                <SortableFieldCard id={field.id} key={field.id} pageId={activePage?.id ?? ""}>
-                  {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
-                    <>
-                      {paletteInsertIndex === index ? <div className="field-insert-indicator" /> : null}
+                <Fragment key={field.id}>
+                  {paletteInsertIndex === index ? (
+                    <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
+                  ) : null}
+                  <SortableFieldCard id={field.id} pageId={activePage?.id ?? ""}>
+                    {({ attributes, listeners, setActivatorNodeRef, isDragging }) => (
+                      <>
                       <article
                         className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
                           highlightedFieldId === field.id ? " field-editor-highlighted" : ""
@@ -1331,6 +1409,14 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                         </div>
                       ) : null}
 
+                      {field.type === "FileUpload" ? (
+                        <div className="file-upload-policy-note">
+                          <strong>{t("form.fileUpload.policyTitle")}</strong>
+                          <span>{t("form.fileUpload.policyDescription")}</span>
+                          <span>{t("form.fileUpload.metadataNote")}</span>
+                        </div>
+                      ) : null}
+
                       <div className="rule-editor">
                         <div className="rule-editor-header">
                           <div>
@@ -1406,10 +1492,13 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                       </div>
                       </article>
                     </>
-                  )}
-                </SortableFieldCard>
+                    )}
+                  </SortableFieldCard>
+                </Fragment>
               ))}
-              {paletteInsertIndex === activeFields.length ? <div className="field-insert-indicator" /> : null}
+              {paletteInsertIndex === activeFields.length ? (
+                <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
+              ) : null}
             </FieldCanvasDropZone>
           </SortableContext>
 
@@ -1444,12 +1533,19 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                 </strong>
               </div>
               <div className="designer-version-actions">
-                <button className="primary-button" disabled={isPersisting} type="button" onClick={saveDraft}>
+                <button
+                  aria-label={saveState === "saving" ? t("form.designer.saving") : pagingCopy.saveDraft}
+                  className="icon-button designer-version-icon-action"
+                  disabled={isPersisting}
+                  title={saveState === "saving" ? t("form.designer.saving") : pagingCopy.saveDraft}
+                  type="button"
+                  onClick={saveDraft}
+                >
                   <Save size={18} />
-                  {saveState === "saving" ? t("form.designer.saving") : pagingCopy.saveDraft}
                 </button>
                 <button
-                  className="success-button"
+                  aria-label={saveState === "publishing" ? pagingCopy.publishing : pagingCopy.publish}
+                  className="icon-button designer-version-icon-action designer-version-icon-action-success"
                   disabled={isPersisting || !versionAdapter?.publish || versionState.status !== "draft"}
                   title={
                     !versionAdapter?.publish
@@ -1464,21 +1560,40 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                   onClick={publishForm}
                 >
                   <Send size={18} />
-                  {saveState === "publishing" ? pagingCopy.publishing : pagingCopy.publish}
                 </button>
                 <button
-                  className="secondary-button"
+                  aria-label={saveState === "archiving" ? pagingCopy.archiving : pagingCopy.archive}
+                  className="icon-button designer-version-icon-action"
                   disabled={isPersisting || !versionAdapter?.archive || versionState.status !== "published"}
+                  title={saveState === "archiving" ? pagingCopy.archiving : pagingCopy.archive}
                   type="button"
                   onClick={() => setIsArchiveConfirmationOpen(true)}
                 >
                   <Archive size={18} />
-                  {saveState === "archiving" ? pagingCopy.archiving : pagingCopy.archive}
                 </button>
               </div>
               {!versionAdapter?.saveDraft ? <p className="helper-copy">{pagingCopy.layoutPersistenceUnavailable}</p> : null}
               {!versionAdapter?.publish ? <p className="helper-copy">{pagingCopy.publishUnavailable}</p> : null}
-              {hasFieldErrors ? <p className="field-error">{t("form.designer.blockingErrors")}</p> : null}
+              {hasFieldErrors ? (
+                <div className="field-error designer-blocking-error" role="alert">
+                  <strong>{t("form.designer.saveBlockedTitle")}</strong>
+                  {fieldErrorSummary.messages.length === 1 ? (
+                    <span>{fieldErrorSummary.messages[0]}</span>
+                  ) : (
+                    <ul>
+                      {fieldErrorSummary.messages.map((errorMessage) => (
+                        <li key={errorMessage}>{errorMessage}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {fieldErrorSummary.remainingCount > 0 ? (
+                    <span className="designer-blocking-error-more">
+                      {t("form.designer.moreErrors", { count: fieldErrorSummary.remainingCount })}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {showCommunityError ? <p className="field-error">{t("form.designer.communityRequired")}</p> : null}
               <p className={`status-line status-line-${saveState}`} aria-live="polite">
                 {message}
               </p>
@@ -1523,4 +1638,67 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       ) : null}
     </section>
   );
+}
+
+function buildDesignerErrorSummary(
+  fields: DesignerField[],
+  errors: DesignerFieldErrors,
+  language: Language,
+  pageError?: string,
+) {
+  const messages: string[] = pageError ? [pageError] : [];
+
+  for (const field of fields) {
+    const error = errors[field.id];
+    if (!error) {
+      continue;
+    }
+
+    const fieldName = field.label.trim() || field.key.trim() || translate(language, "form.designer.untitledField");
+    if (error.key) {
+      messages.push(
+        field.key.trim()
+          ? translate(language, "form.designer.errorDuplicateKey", { key: field.key.trim() })
+          : translate(language, "form.designer.errorEmptyKey"),
+      );
+    }
+    if (error.label) {
+      messages.push(translate(language, "form.designer.errorEmptyLabel"));
+    }
+    if (error.options) {
+      const filledOptions = field.options.map((option) => option.trim()).filter(Boolean);
+      const duplicateOption = filledOptions.find(
+        (option, index) =>
+          filledOptions.findIndex(
+            (candidate) => candidate.toLocaleLowerCase("tr") === option.toLocaleLowerCase("tr"),
+          ) !== index,
+      );
+
+      if (filledOptions.length === 0) {
+        messages.push(translate(language, "form.designer.errorOptionsRequired", { field: fieldName }));
+      } else if (field.options.some((option) => !option.trim())) {
+        messages.push(translate(language, "form.designer.errorEmptyOption", { field: fieldName }));
+      } else if (duplicateOption) {
+        messages.push(
+          translate(language, "form.designer.errorDuplicateOption", { field: fieldName, option: duplicateOption }),
+        );
+      }
+    }
+    for (const ruleError of Object.values(error.rules ?? {})) {
+      messages.push(translate(language, "form.designer.errorDependentRule", { field: fieldName, error: ruleError }));
+    }
+  }
+
+  const visibleMessages = messages.slice(0, 3);
+  const remainingCount = Math.max(messages.length - visibleMessages.length, 0);
+  const textParts = [...visibleMessages];
+  if (remainingCount > 0) {
+    textParts.push(translate(language, "form.designer.moreErrors", { count: remainingCount }));
+  }
+
+  return {
+    messages: visibleMessages,
+    remainingCount,
+    text: textParts.join(" ") || translate(language, "form.designer.blockingErrors"),
+  };
 }
