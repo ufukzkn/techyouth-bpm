@@ -519,8 +519,9 @@ export const api = {
 
     return request<SystemAuditCategoryCounts>(`/api/audit/system/counts${search.size ? `?${search}` : ""}`, { token });
   },
-  getDashboardSummary(token: string) {
-    return request<DashboardSummary>("/api/dashboard/summary", { token });
+  getDashboardSummary(token: string, scope: "personal" | "community" | "global" = "personal") {
+    const search = new URLSearchParams({ scope });
+    return request<DashboardSummary>(`/api/dashboard/summary?${search}`, { token });
   },
   listForms(token: string) {
     return request<FormDefinition[]>("/api/forms", { token });

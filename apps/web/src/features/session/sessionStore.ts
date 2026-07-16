@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { clearProcessBoardCaches } from "@/features/processes/processBoardCache";
 import type { Language, LoginResponse, ThemeMode, User } from "@/lib/types";
 
 type SessionState = {
@@ -45,17 +46,23 @@ export const useSessionStore = create<SessionState>()(
       language: "tr",
       sessionNotice: null,
       hasHydrated: false,
-      setSession: (session) =>
+      setSession: (session) => {
+        if (get().user?.id && get().user?.id !== session.user.id) {
+          clearProcessBoardCaches();
+        }
         set({
           token: session.token,
           csrfToken: session.csrfToken,
           user: session.user,
           expiresAt: session.expiresAt,
           sessionNotice: null,
-        }),
+        });
+      },
       setUser: (user) => set({ user }),
-      expireSession: (message) =>
-        set({ token: null, csrfToken: null, user: null, expiresAt: null, sessionNotice: message }),
+      expireSession: (message) => {
+        clearProcessBoardCaches();
+        set({ token: null, csrfToken: null, user: null, expiresAt: null, sessionNotice: message });
+      },
       clearSessionNotice: () => set({ sessionNotice: null }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
       syncSystemTheme: (theme) => {
@@ -64,7 +71,10 @@ export const useSessionStore = create<SessionState>()(
         }
       },
       toggleLanguage: () => set({ language: get().language === "tr" ? "en" : "tr" }),
-      logout: () => set({ token: null, csrfToken: null, user: null, expiresAt: null, sessionNotice: null }),
+      logout: () => {
+        clearProcessBoardCaches();
+        set({ token: null, csrfToken: null, user: null, expiresAt: null, sessionNotice: null });
+      },
       toggleTheme: () => {
         const nextTheme = get().theme === "light" ? "dark" : "light";
         set({ theme: nextTheme, themePreference: nextTheme });

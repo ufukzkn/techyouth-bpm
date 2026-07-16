@@ -601,6 +601,57 @@
   overflow: hidden;
 }
 
+.workflow-scope-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.workflow-scope-toolbar > div:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.workflow-scope-toolbar strong {
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+.workflow-scope-toolbar small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workflow-scope-toolbar .sliding-segmented-control {
+  flex: 0 1 360px;
+  min-width: min(300px, 100%);
+}
+
+.workflow-scope-toolbar .sliding-segmented-option {
+  min-height: 36px;
+  padding-inline: 10px;
+}
+
+@media (max-width: 680px) {
+  .workflow-scope-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workflow-scope-toolbar .sliding-segmented-control {
+    flex-basis: auto;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
 .toast-info {
   border-color: color-mix(in srgb, var(--primary) 36%, var(--border));
   color: var(--foreground);

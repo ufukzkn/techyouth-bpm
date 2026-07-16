@@ -2,7 +2,7 @@
 
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
 import { MyTasksView } from "@/features/processes/MyTasksView";
 import { ProcessDetailPanel } from "@/features/processes/ProcessDetailPanel";
@@ -14,7 +14,9 @@ import {
   processPageCache,
   taskPageCache,
 } from "@/features/processes/processBoardCache";
+import { getAvailableWorkflowScopes, resolveWorkflowScope } from "@/features/processes/workflowVisibility";
 import { useSessionStore } from "@/features/session/sessionStore";
+import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
 import { actionLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { api, ApiError } from "@/lib/api";
 import type {
@@ -26,6 +28,7 @@ import type {
   ProcessTask,
   TaskListParams,
   TaskPriority,
+  WorkflowVisibilityScope,
   WorkflowAction,
 } from "@/lib/types";
 
@@ -39,8 +42,10 @@ const pageSize = 10;
 const minimumRefreshDelayMs = 500;
 export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const token = useSessionStore((state) => state.token);
-  const activeUserId = useSessionStore((state) => state.user?.id ?? "");
+  const activeUser = useSessionStore((state) => state.user);
+  const activeUserId = activeUser?.id ?? "";
   const language = useSessionStore((state) => state.language);
+  const router = useRouter();
   const searchParams = useSearchParams();
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const [processResult, setProcessResult] = useState<PagedResult<ProcessSummary> | null>(null);
@@ -61,10 +66,14 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
+  const availableScopes = activeUser ? getAvailableWorkflowScopes(activeUser) : ["personal"] as WorkflowVisibilityScope[];
+  const processScope = resolveWorkflowScope(searchParams.get("scope"), availableScopes);
+
   const processParams: ProcessListParams = {
     page: processPage,
     pageSize,
     status: processStatus,
+    scope: processScope,
     sortBy: processSortBy,
     sortDirection: processSortDirection,
   };
@@ -79,6 +88,16 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const taskCacheKey = createProcessCacheKey(activeUserId, taskParams);
   const requestedProcessId = searchParams.get("processId") ?? "";
   const requestedTaskId = searchParams.get("taskId") ?? "";
+
+  function changeProcessScope(nextScope: WorkflowVisibilityScope) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("scope", nextScope);
+    params.delete("processId");
+    setProcessPage(1);
+    setSelectedProcessId("");
+    setDetail(null);
+    router.replace(`/processes?${params.toString()}`);
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -271,6 +290,23 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
         <p>{t("process.description")}</p>
       </div>
 
+      {mode === "processes" && availableScopes.length > 1 ? (
+        <div className="workflow-scope-toolbar process-scope-toolbar">
+          <div>
+            <span className="eyebrow">{t("workflowScope.eyebrow")}</span>
+            <strong>{t(`workflowScope.${processScope}` as TranslationKey)}</strong>
+            <small>{t(`workflowScope.${processScope}Description` as TranslationKey)}</small>
+          </div>
+          <SlidingSegmentedControl
+            ariaLabel={t("workflowScope.ariaLabel")}
+            name="process-workflow-scope"
+            onChange={changeProcessScope}
+            options={availableScopes.map((item) => ({ value: item, label: t(`workflowScope.${item}` as TranslationKey) }))}
+            value={processScope}
+          />
+        </div>
+      ) : null}
+
       <div className="section-toolbar">
         <p className={`status-line status-line-${status}`} aria-live="polite">{message}</p>
         <button
@@ -289,7 +325,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
           <>
             {mode === "processes" && processResult ? (
               <ProcessListView
-                cacheScope={`${activeUserId}:personal:${processPage}:${processStatus}:${processSortBy}:${processSortDirection}`}
+                cacheScope={`${activeUserId}:${processScope}:${processPage}:${processStatus}:${processSortBy}:${processSortDirection}`}
                 language={language}
                 onNextPage={() => setProcessPage((value) => Math.min(totalPages, value + 1))}
                 onPageChange={setProcessPage}

@@ -200,8 +200,10 @@
   width: 126px;
   aspect-ratio: 1;
   display: grid;
+  align-self: start;
   place-items: center;
   position: relative;
+  margin-top: 52px;
   border-radius: 999px;
 }
 
@@ -301,6 +303,8 @@
 }
 
 .dashboard-metric-legend button {
+  width: min(100%, 320px);
+  justify-self: start;
   min-height: 38px;
   display: flex;
   align-items: center;
@@ -668,7 +672,9 @@
   }
 
   .dashboard-donut {
+    align-self: center;
     justify-self: center;
+    margin-top: 0;
   }
 
   .dashboard-notification-list {
