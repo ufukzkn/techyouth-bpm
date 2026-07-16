@@ -271,6 +271,9 @@ public class AuthService(
             .ThenInclude(user => user!.CommunityMemberships)
             .ThenInclude(membership => membership.CommunityRole)
             .ThenInclude(role => role!.Permissions)
+            .Include(token => token.User)
+            .ThenInclude(user => user!.TeamMemberships)
+            .ThenInclude(teamMembership => teamMembership.Team)
             .Include(token => token.UserSession)
             .SingleOrDefaultAsync(token => token.Token == refreshTokenHash, cancellationToken);
 
@@ -373,6 +376,9 @@ public class AuthService(
             .ThenInclude(user => user!.CommunityMemberships)
             .ThenInclude(membership => membership.CommunityRole)
             .ThenInclude(role => role!.Permissions)
+            .Include(item => item.User)
+            .ThenInclude(user => user!.TeamMemberships)
+            .ThenInclude(teamMembership => teamMembership.Team)
             .SingleOrDefaultAsync(
                 item => item.Token == tokenHash && item.ExpiresAt > DateTime.UtcNow && item.RevokedAt == null,
                 cancellationToken);

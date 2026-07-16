@@ -1,33 +1,43 @@
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Dashboard;
+using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Data;
 
 namespace TechYouthBpm.Infrastructure.Services;
 
-public class DashboardService(AppDbContext db) : IDashboardService
+public class DashboardService(
+    AppDbContext db,
+    IWorkflowVisibilityService workflowVisibilityService) : IDashboardService
 {
-    public async Task<DashboardSummaryDto> GetSummaryAsync(UserDto user, CancellationToken cancellationToken = default)
+    public DashboardService(AppDbContext db)
+        : this(db, new WorkflowVisibilityService())
+    {
+    }
+
+    public Task<DashboardSummaryDto> GetSummaryAsync(
+        UserDto user,
+        CancellationToken cancellationToken = default) =>
+        GetSummaryAsync(user, WorkflowVisibilityScope.Personal, cancellationToken);
+
+    public async Task<DashboardSummaryDto> GetSummaryAsync(
+        UserDto user,
+        WorkflowVisibilityScope scope,
+        CancellationToken cancellationToken = default)
     {
         var openTaskCount = 0;
         IReadOnlyList<DashboardTaskItemDto> recentOpenTasks = [];
         if (user.HasPermission(PermissionNames.TasksView))
         {
-            var taskQuery = db.ProcessTasks
+            var taskQuery = workflowVisibilityService.ApplyTaskScope(
+                db.ProcessTasks
                 .AsNoTracking()
-                .Where(task => task.Status == ProcessTaskStatus.Open);
-
-            if (!user.IsSuperAdmin())
-            {
-                var permissions = user.Permissions ?? [];
-                taskQuery = user.CommunityId is null
-                    ? taskQuery.Where(_ => false)
-                    : taskQuery.Where(task => task.ProcessInstance != null
-                        && task.ProcessInstance.CommunityId == user.CommunityId
-                        && permissions.Contains(task.RequiredPermission));
-            }
+                .Where(task => task.Status == ProcessTaskStatus.Open
+                    || task.Status == ProcessTaskStatus.Claimed),
+                user,
+                scope);
 
             openTaskCount = await taskQuery.CountAsync(cancellationToken);
             recentOpenTasks = await taskQuery
@@ -49,21 +59,14 @@ public class DashboardService(AppDbContext db) : IDashboardService
             return new DashboardSummaryDto(openTaskCount, 0, 0, recentOpenTasks, []);
         }
 
-        var processQuery = db.ProcessInstances.AsNoTracking();
-        if (!user.IsSuperAdmin())
-        {
-            processQuery = user.CommunityId is null
-                ? processQuery.Where(_ => false)
-                : processQuery.Where(process => process.CommunityId == user.CommunityId);
-        }
-
-        if (!user.HasPermission(PermissionNames.TasksView))
-        {
-            processQuery = processQuery.Where(process => process.StartedByUserId == user.Id);
-        }
+        var processQuery = workflowVisibilityService.ApplyProcessScope(
+            db.ProcessInstances.AsNoTracking(),
+            user,
+            scope);
 
         var inProgressProcessCount = await processQuery.CountAsync(
-            process => process.Status == ProcessStatus.InProgress,
+            process => process.Status == ProcessStatus.InProgress
+                || process.Status == ProcessStatus.Escalated,
             cancellationToken);
         var completedProcessCount = await processQuery.CountAsync(
             process => process.Status == ProcessStatus.Completed,
