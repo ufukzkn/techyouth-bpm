@@ -128,6 +128,21 @@
   overflow-x: hidden;
 }
 
+.content {
+  --workspace-content-max: 1400px;
+  --workspace-content-gutter: 16px;
+  --workspace-safe-inset: calc(var(--sidebar-width) + var(--workspace-content-gutter));
+
+  position: relative;
+  left: calc(var(--sidebar-width) / -2);
+  width: min(var(--workspace-content-max), calc(100vw - (var(--workspace-safe-inset) * 2)));
+  display: grid;
+  gap: 22px;
+  margin-inline: auto;
+  padding: 28px;
+  overflow: hidden;
+}
+
 .topbar {
   min-height: 72px;
   display: flex;

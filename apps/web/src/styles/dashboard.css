@@ -1,14 +1,5 @@
 /* dashboard styles */
 
-.content {
-  width: min(1180px, 100%);
-  display: grid;
-  gap: 22px;
-  padding: 28px;
-  justify-self: center;
-  overflow: hidden;
-}
-
 .view-panel {
   display: grid;
   gap: 22px;
@@ -562,6 +553,39 @@
   background: linear-gradient(90deg, var(--surface-muted), color-mix(in srgb, var(--border) 70%, var(--surface)), var(--surface-muted));
   background-size: 220% 100%;
   animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+@media (min-width: 1520px) and (max-width: 1599px) {
+  .dashboard-focus-grid,
+  .dashboard-work-grid {
+    gap: 20px;
+  }
+
+  .dashboard-chart-card,
+  .dashboard-context-card,
+  .dashboard-work-card,
+  .dashboard-quick-section {
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .dashboard-chart-card-prominent,
+  .dashboard-priority-card {
+    min-height: 188px;
+  }
+
+  .dashboard-donut {
+    width: 112px;
+  }
+
+  .dashboard-activity-list {
+    gap: 10px;
+  }
+
+  .dashboard-activity-item {
+    min-height: 52px;
+    padding: 7px 9px;
+  }
 }
 
 @media (max-width: 860px) {

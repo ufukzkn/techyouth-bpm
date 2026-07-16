@@ -7,17 +7,16 @@
 }
 
 .designer-section {
-  max-width: 1460px;
+  max-width: 1628px;
 }
 
 .content-designer-wide {
-  margin-inline: auto;
-  align-self: center;
+  left: 0;
+  width: min(1628px, calc(100% - 32px));
 }
 
 main:has(> .workspace-route-content > .runner-section) {
-  margin-inline: auto;
-  align-self: center;
+  --workspace-content-max: 1180px;
 }
 
 .runner-section {
@@ -501,20 +500,6 @@ main:has(> .workspace-route-content > .runner-section) {
 @media (max-width: 430px) {
   .designer-section .field-editor-actions > button {
     width: auto;
-  }
-}
-
-/* Form workspace alignment and responsive polish. */
-@media (min-width: 1440px) and (max-width: 1599px) {
-  .designer-section .field-palette-rail {
-    position: static;
-    grid-column: 1 / -1;
-    grid-row: auto;
-    width: 100%;
-  }
-
-  .designer-section .field-palette-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1267,10 +1252,8 @@ main:has(> .workspace-route-content > .runner-section) {
   }
 }
 
-@media (min-width: 1600px) {
+@media (min-width: 1440px) {
   .content-designer-wide {
-    width: min(1460px, 100%);
-    max-width: 100%;
     overflow: visible;
   }
 
@@ -1625,7 +1608,7 @@ main:has(> .workspace-route-content > .runner-section) {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 1599px) {
+@media (max-width: 1439px) {
   .designer-section .field-palette {
     display: none;
   }
