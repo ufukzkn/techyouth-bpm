@@ -28,6 +28,7 @@ const apiErrorKeys: Record<string, TranslationKey> = {
   "The user's community is not active.": "api.error.communityInactive",
   "A community is required for the new user.": "api.error.communityRequired",
   "A community is required.": "api.error.communityRequired",
+  "A community is required for form definitions.": "api.error.communityRequired",
   "Only SuperAdmin users can create SuperAdmin accounts.": "api.error.superAdminCreateOnly",
   "Existing users cannot be promoted to SuperAdmin.": "api.error.superAdminPromoteDenied",
   "SuperAdmin users must stay active.": "api.error.superAdminMustStayActive",

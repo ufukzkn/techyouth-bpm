@@ -50,6 +50,7 @@ import {
   fieldTypeIcons,
 } from "@/features/form-designer/FormDesignerComponents";
 import { JsonViewer } from "@/features/ui/JsonViewer";
+import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import {
   createDefaultField,
   createDefaultOptions,
@@ -99,8 +100,8 @@ import {
 } from "@/features/form-designer/formDesignerModel";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
-import { api, ApiError } from "@/lib/api";
-import type { CreateFormRequest, FieldType, FormDefinition, ValidationRule } from "@/lib/types";
+import { api } from "@/lib/api";
+import type { Community, CreateFormRequest, FieldType, FormDefinition, ValidationRule } from "@/lib/types";
 
 type SaveState = "idle" | "saving" | "publishing" | "archiving" | "success" | "error";
 
@@ -110,6 +111,7 @@ export type FormDesignerDraftProps = {
 
 export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {}) {
   const token = useSessionStore((state) => state.token);
+  const user = useSessionStore((state) => state.user);
   const language = useSessionStore((state) => state.language);
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
@@ -123,7 +125,11 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const [description, setDescription] = useState("Frontend tarafında tasarlanan form modeli");
   const [savedForms, setSavedForms] = useState<FormDefinition[]>([]);
   const [selectedFormId, setSelectedFormId] = useState("");
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [selectedCommunityId, setSelectedCommunityId] = useState(() => user?.communityId ?? "");
   const [isLoadingForms, setIsLoadingForms] = useState(false);
+  const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
+  const [showCommunityError, setShowCommunityError] = useState(false);
   const [hasLoadedForms, setHasLoadedForms] = useState(false);
   const [isSwitchingForm, setIsSwitchingForm] = useState(false);
   const [label, setLabel] = useState("Masraf merkezi");
@@ -154,6 +160,8 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const fieldErrors = useMemo(() => validateDesignerFields(fields, language), [fields, language]);
   const hasPageErrors = pages.some((page) => page.title.trim().length === 0);
   const hasFieldErrors = Object.keys(fieldErrors).length > 0 || hasPageErrors;
+  const isSuperAdmin = user?.role === "SuperAdmin";
+  const hasCommunityError = Boolean(isSuperAdmin && !selectedCommunityId);
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
   const isInitialDesignerLoading = Boolean(token) && !hasLoadedForms;
   const isPersisting = saveState === "saving" || saveState === "publishing";
@@ -200,6 +208,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     () => ({
       name: formName,
       description,
+      communityId: selectedCommunityId || user?.communityId || undefined,
       fields: fields.map((field, index) => ({
         key: createDesignerFieldKey(field.key, index + 1),
         label: field.label.trim(),
@@ -215,7 +224,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         })),
       })),
     }),
-    [description, fields, formName],
+    [description, fields, formName, selectedCommunityId, user?.communityId],
   );
   const layoutModel = useMemo(
     () => createVersionedLayout(pages, formModel, versionState),
@@ -277,7 +286,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         }
       } catch (error) {
         if (!ignore) {
-          setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.loadFailed"));
+          setMessage(localizeApiError(error, language, t("form.designer.loadFailed")));
         }
       } finally {
         if (!ignore) {
@@ -293,6 +302,39 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       ignore = true;
     };
   }, [token, language, t]);
+
+  useEffect(() => {
+    if (!token || !isSuperAdmin) {
+      return;
+    }
+
+    let ignore = false;
+    const activeToken = token;
+
+    async function loadCommunities() {
+      try {
+        setIsLoadingCommunities(true);
+        const result = await api.listCommunities(activeToken);
+        if (!ignore) {
+          setCommunities(result);
+        }
+      } catch (error) {
+        if (!ignore) {
+          setMessage(localizeApiError(error, language, t("form.designer.communityLoadFailed")));
+        }
+      } finally {
+        if (!ignore) {
+          setIsLoadingCommunities(false);
+        }
+      }
+    }
+
+    loadCommunities();
+
+    return () => {
+      ignore = true;
+    };
+  }, [isSuperAdmin, language, token, t]);
 
   useEffect(() => {
     if (!highlightedFieldId) {
@@ -749,6 +791,8 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       setIsLoadingForms(true);
       const [form] = await Promise.all([api.getForm(token, id), minimumTransition]);
       setSelectedFormId(form.id);
+      setSelectedCommunityId(form.communityId);
+      setShowCommunityError(false);
       setFormName(form.name);
       setDescription(form.description);
       const adapterVersion = versionAdapter?.resolveVersion?.(form);
@@ -770,7 +814,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     } catch (error) {
       await minimumTransition;
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.formLoadFailed"));
+      setMessage(localizeApiError(error, language, t("form.designer.formLoadFailed")));
     } finally {
       setIsLoadingForms(false);
       setIsSwitchingForm(false);
@@ -780,6 +824,8 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   function resetDesigner() {
     const nextPages = createInitialDesignerPages(language);
     setSelectedFormId("");
+    setSelectedCommunityId(user?.communityId ?? "");
+    setShowCommunityError(false);
     setFormName("Demo Süreç Formu");
     setDescription("Frontend tarafında tasarlanan form modeli");
     setPages(nextPages);
@@ -793,6 +839,13 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     if (!token) {
       setSaveState("error");
       setMessage(t("form.designer.sessionRequiredSave"));
+      return;
+    }
+
+    if (hasCommunityError) {
+      setShowCommunityError(true);
+      setSaveState("error");
+      setMessage(t("form.designer.communityRequired"));
       return;
     }
 
@@ -824,7 +877,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       );
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.saveFailed"));
+      setMessage(localizeApiError(error, language, t("form.designer.saveFailed")));
     }
   }
 
@@ -836,6 +889,13 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     if (!token) {
       setSaveState("error");
       setMessage(t("form.designer.sessionRequiredSave"));
+      return;
+    }
+
+    if (hasCommunityError) {
+      setShowCommunityError(true);
+      setSaveState("error");
+      setMessage(t("form.designer.communityRequired"));
       return;
     }
 
@@ -858,7 +918,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       setMessage(pagingCopy.publishedMessage);
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.saveFailed"));
+      setMessage(localizeApiError(error, language, t("form.designer.saveFailed")));
     }
   }
 
@@ -879,7 +939,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       setMessage(pagingCopy.archivedMessage);
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.designer.saveFailed"));
+      setMessage(localizeApiError(error, language, t("form.designer.saveFailed")));
     }
   }
 
@@ -947,11 +1007,44 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                 <option value="">{isLoadingForms ? t("form.designer.loadingForms") : t("form.designer.newDraft")}</option>
                 {savedForms.map((form) => (
                   <option key={form.id} value={form.id}>
-                    {form.name}
+                    {form.name}{isSuperAdmin ? ` · ${form.communityName}` : ""}
                   </option>
                 ))}
               </select>
             </label>
+            {isSuperAdmin ? (
+              <label>
+                {t("form.designer.communityLabel")}
+                <select
+                  disabled={isLoadingCommunities || Boolean(selectedFormId)}
+                  value={selectedCommunityId}
+                  onChange={(event) => {
+                    setSelectedCommunityId(event.target.value);
+                    setShowCommunityError(false);
+                    markUnsaved();
+                  }}
+                >
+                  <option value="">
+                    {isLoadingCommunities
+                      ? t("form.designer.loadingCommunities")
+                      : t("form.designer.selectCommunity")}
+                  </option>
+                  {communities
+                    .filter((community) => community.isActive || community.id === selectedCommunityId)
+                    .map((community) => (
+                      <option key={community.id} value={community.id}>
+                        {community.name}{community.isActive ? "" : ` (${t("form.designer.inactiveCommunity")})`}
+                      </option>
+                    ))}
+                </select>
+                <span className="helper-copy">
+                  {selectedFormId
+                    ? t("form.designer.communityLocked")
+                    : t("form.designer.communityHelp")}
+                </span>
+                {showCommunityError ? <span className="field-error">{t("form.designer.communityRequired")}</span> : null}
+              </label>
+            ) : null}
             <label>
               {t("form.designer.formName")}
               <input
