@@ -133,8 +133,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
     }
 
-    const hasItems = get().previewItems.length > 0;
-    set(hasItems ? { isPreviewRefreshing: true } : { isLoading: true });
+    const hasLoadedBaseline = hasPreviewBaseline;
+    set(hasLoadedBaseline
+      ? { isLoading: false, isPreviewRefreshing: true }
+      : { isLoading: true, isPreviewRefreshing: false });
     try {
       const page = await api.listNotifications(token, { page: 1, pageSize: 5 });
       if (get().userId !== userId) {

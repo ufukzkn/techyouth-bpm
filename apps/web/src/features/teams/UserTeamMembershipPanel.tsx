@@ -4,6 +4,7 @@ import { Crown, Network, Plus, Trash2, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActionFeedback, InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
+import { DisclosureSection } from "@/features/app-shell/components/DisclosureSection";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { api } from "@/lib/api";
 import type { Language, Team, User, UserAdmin, UserTeamMembership } from "@/lib/types";
@@ -34,7 +35,9 @@ export function UserTeamMembershipPanel({
   const [memberships, setMemberships] = useState<UserTeamMembership[]>([]);
   const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -70,17 +73,15 @@ export function UserTeamMembershipPanel({
       });
     } finally {
       setIsLoading(false);
+      setHasLoaded(true);
     }
   }, [canManage, isTr, language, selectedUser, token]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setFeedback(null);
-      setSelectedTeamId("");
-      void load();
-    }, 0);
+    if (!isOpen || hasLoaded) return;
+    const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [hasLoaded, isOpen, load]);
 
   const joinableTeams = useMemo(() => {
     const memberTeamIds = new Set(memberships.map((membership) => membership.teamId));
@@ -123,70 +124,72 @@ export function UserTeamMembershipPanel({
       : null;
 
   return (
-    <section className="identity-section nested-identity-section user-team-membership-panel">
-      <div className="section-toolbar">
-        <div>
-          <span className="eyebrow">{isTr ? "Organizasyon" : "Organization"}</span>
-          <h3>{isTr ? "Takim uyelikleri" : "Team memberships"}</h3>
-        </div>
-        <Network size={21} />
-      </div>
-
-      {isLoading ? (
-        <div className="team-membership-skeleton" aria-label={isTr ? "Takim uyelikleri yukleniyor" : "Loading team memberships"}>
-          <SkeletonBlock className="team-membership-row-skeleton" />
-          <SkeletonBlock className="team-membership-row-skeleton" />
-        </div>
-      ) : memberships.length ? (
-        <div className="user-team-membership-list">
-          {memberships.map((membership) => (
-            <article className="settings-row user-team-membership-row" key={membership.teamId}>
-              <div className="stacked-summary">
-                <span>{membership.teamIsActive ? (isTr ? "Aktif takim" : "Active team") : (isTr ? "Pasif takim" : "Inactive team")}</span>
-                <strong><UsersRound size={15} /> {membership.teamName}</strong>
-                {membership.isLead ? <small className="team-lead-label"><Crown size={13} /> {isTr ? "Takim sorumlusu" : "Team lead"}</small> : null}
-              </div>
-              {canManage ? (
-                <div className="compact-icon-actions">
-                  <button
-                    className="icon-button"
-                    disabled={isWorking}
-                    onClick={() => setPendingAction({ type: "lead", membership })}
-                    title={membership.isLead ? (isTr ? "Sorumlulugu kaldir" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}
-                    type="button"
-                  >
-                    <Crown size={16} />
-                  </button>
-                  <button
-                    className="icon-button danger-icon-button"
-                    disabled={isWorking}
-                    onClick={() => setPendingAction({ type: "remove", membership })}
-                    title={isTr ? "Takimdan cikar" : "Remove from team"}
-                    type="button"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+    <>
+      <DisclosureSection
+        className="nested-identity-section user-team-membership-panel"
+        description={isTr ? "Kullanicinin takimlarini goruntuleyin ve yetkiniz varsa yonetin." : "View the user's teams and manage them when authorized."}
+        eyebrow={isTr ? "Organizasyon" : "Organization"}
+        icon={<Network size={21} />}
+        isOpen={isOpen}
+        onToggle={() => setIsOpen((value) => !value)}
+        title={isTr ? "Takim uyelikleri" : "Team memberships"}
+      >
+        {isLoading ? (
+          <div className="team-membership-skeleton" aria-label={isTr ? "Takim uyelikleri yukleniyor" : "Loading team memberships"}>
+            <SkeletonBlock className="team-membership-row-skeleton" />
+            <SkeletonBlock className="team-membership-row-skeleton" />
+          </div>
+        ) : memberships.length ? (
+          <div className="user-team-membership-list">
+            {memberships.map((membership) => (
+              <article className="settings-row user-team-membership-row" key={membership.teamId}>
+                <div className="stacked-summary">
+                  <span>{membership.teamIsActive ? (isTr ? "Aktif takim" : "Active team") : (isTr ? "Pasif takim" : "Inactive team")}</span>
+                  <strong><UsersRound size={15} /> {membership.teamName}</strong>
+                  {membership.isLead ? <small className="team-lead-label"><Crown size={13} /> {isTr ? "Takim sorumlusu" : "Team lead"}</small> : null}
                 </div>
-              ) : null}
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="status-line">{isTr ? "Kullanici henuz bir takima atanmadi." : "The user has not been assigned to a team yet."}</p>
-      )}
+                {canManage ? (
+                  <div className="compact-icon-actions">
+                    <button
+                      className="icon-button"
+                      disabled={isWorking}
+                      onClick={() => setPendingAction({ type: "lead", membership })}
+                      title={membership.isLead ? (isTr ? "Sorumlulugu kaldir" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}
+                      type="button"
+                    >
+                      <Crown size={16} />
+                    </button>
+                    <button
+                      className="icon-button danger-icon-button"
+                      disabled={isWorking}
+                      onClick={() => setPendingAction({ type: "remove", membership })}
+                      title={isTr ? "Takimdan cikar" : "Remove from team"}
+                      type="button"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="status-line">{isTr ? "Kullanici henuz bir takima atanmadi." : "The user has not been assigned to a team yet."}</p>
+        )}
 
-      {canManage && !blockedReason ? (
-        <div className="team-membership-add-row">
-          <select aria-label={isTr ? "Eklenecek takimi sec" : "Select team to add"} onChange={(event) => setSelectedTeamId(event.target.value)} value={selectedTeamId}>
-            <option value="">{isTr ? "Takim secin" : "Select a team"}</option>
-            {joinableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-          </select>
-          <button className="success-button" disabled={!selectedTeam || isWorking} onClick={() => selectedTeam && setPendingAction({ type: "add", team: selectedTeam })} type="button">
-            {isWorking ? <InlineValueLoader /> : <Plus size={16} />} {isTr ? "Takima ekle" : "Add to team"}
-          </button>
-        </div>
-      ) : blockedReason ? <p className="helper-copy">{blockedReason}</p> : null}
-      <ActionFeedback feedback={feedback} />
+        {canManage && !blockedReason ? (
+          <div className="team-membership-add-row">
+            <select aria-label={isTr ? "Eklenecek takimi sec" : "Select team to add"} onChange={(event) => setSelectedTeamId(event.target.value)} value={selectedTeamId}>
+              <option value="">{isTr ? "Takim secin" : "Select a team"}</option>
+              {joinableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+            </select>
+            <button className="success-button" disabled={!selectedTeam || isWorking} onClick={() => selectedTeam && setPendingAction({ type: "add", team: selectedTeam })} type="button">
+              {isWorking ? <InlineValueLoader /> : <Plus size={16} />} {isTr ? "Takima ekle" : "Add to team"}
+            </button>
+          </div>
+        ) : blockedReason ? <p className="helper-copy">{blockedReason}</p> : null}
+        <ActionFeedback feedback={feedback} />
+      </DisclosureSection>
 
       {pendingAction ? (
         <ConfirmationDialog
@@ -203,6 +206,6 @@ export function UserTeamMembershipPanel({
           tone={pendingAction.type === "remove" ? "danger" : "primary"}
         />
       ) : null}
-    </section>
+    </>
   );
 }

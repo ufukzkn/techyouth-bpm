@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown, Network, RefreshCw, Search, UsersRound } from "lucide-react";
+import { Crown, Handshake, RefreshCw, Search, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
@@ -44,7 +44,7 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
       setIsLoadingTeams(false);
       return;
     }
-    setIsLoadingTeams(true);
+    setIsLoadingTeams(!cached);
     const result = await api.listUserTeamMemberships(token, activeUser.id);
     membershipCache.set(activeUser.id, result);
     setMemberships(result);
@@ -95,7 +95,6 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
   async function refresh() {
     setIsRefreshing(true);
     try {
-      membershipCache.delete(activeUser.id);
       for (const key of rosterCache.keys()) if (key.startsWith(`${activeUser.id}:`)) rosterCache.delete(key);
       await loadMemberships(true);
       await loadRoster(true);
@@ -112,16 +111,16 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
   return (
     <section className="settings-panel my-teams-page">
       <div className="section-heading">
-        <div><span className="eyebrow">{activeUser.communityName}</span><h2>{isTr ? "Takimlarim" : "My teams"}</h2><p>{isTr ? "Dahil oldugunuz operasyon takimlarini ve takim arkadaslarinizi goruntuleyin." : "View your operational teams and teammates."}</p></div>
+        <div><span className="eyebrow">{activeUser.communityName}</span><h2>{isTr ? "Takim" : "Team"}</h2><p>{isTr ? "Dahil oldugunuz operasyon takimlarini ve takim arkadaslarinizi goruntuleyin." : "View your operational teams and teammates."}</p></div>
         <button className="secondary-button refresh-button" disabled={isRefreshing} onClick={() => void refresh()} type="button"><RefreshCw className={isRefreshing ? "spin-icon" : undefined} size={16} />{isTr ? "Yenile" : "Refresh"}</button>
       </div>
 
       {isLoadingTeams ? <div className="my-teams-loading"><SkeletonBlock className="my-team-card-skeleton" /><SkeletonBlock className="my-team-card-skeleton" /></div> : !memberships.length ? (
-        <EmptyState description={isTr ? "Topluluk yoneticiniz sizi bir takima eklediginde takim arkadaslariniz burada gorunecek." : "Your teammates will appear here after a community administrator assigns you to a team."} icon={<Network size={22} />} title={isTr ? "Henuz bir takima atanmadiniz" : "You are not assigned to a team yet"} />
+        <EmptyState description={isTr ? "Topluluk yoneticiniz sizi bir takima eklediginde takim arkadaslariniz burada gorunecek." : "Your teammates will appear here after a community administrator assigns you to a team."} icon={<Handshake size={22} />} title={isTr ? "Henuz bir takima atanmadiniz" : "You are not assigned to a team yet"} />
       ) : (
         <div className="my-teams-layout">
           <section className="identity-section my-team-selector">
-            <div className="section-toolbar"><div><span className="eyebrow">{isTr ? "Uyelikler" : "Memberships"}</span><h3>{isTr ? "Takimlar" : "Teams"}</h3></div><Network size={20} /></div>
+            <div className="section-toolbar"><div><span className="eyebrow">{isTr ? "Uyelikler" : "Memberships"}</span><h3>{isTr ? "Takimlar" : "Teams"}</h3></div><Handshake size={20} /></div>
             <div className="my-team-list">
               {memberships.map((membership) => <button className={membership.teamId === selectedTeamId ? "my-team-option is-active" : "my-team-option"} key={membership.teamId} onClick={() => { setSelectedTeamId(membership.teamId); setPage(1); setQuery(""); }} type="button"><span><UsersRound size={17} />{membership.teamName}</span>{membership.isLead ? <small><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</small> : null}</button>)}
             </div>

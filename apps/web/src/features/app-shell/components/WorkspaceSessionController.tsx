@@ -14,35 +14,15 @@ export function WorkspaceSessionController() {
     user,
     token,
     expiresAt,
-    theme,
     language,
     hasHydrated,
     expireSession,
     setSession,
-    syncSystemTheme,
   } = useSessionStore();
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
-  useEffect(() => {
-    document.documentElement.lang = language;
-    document.title = "TechYouth BPM Wizard";
-  }, [language]);
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const syncTheme = () => syncSystemTheme(mediaQuery.matches ? "dark" : "light");
-
-    syncTheme();
-    mediaQuery.addEventListener("change", syncTheme);
-    return () => mediaQuery.removeEventListener("change", syncTheme);
-  }, [syncSystemTheme]);
 
   useEffect(() => {
     let hasHandledUnauthorized = false;

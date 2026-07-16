@@ -889,6 +889,7 @@ export function UsersAndRolesView({
               {selectedUser.role !== "SuperAdmin" ? (
                 <UserTeamMembershipPanel
                   activeUser={activeUser}
+                  key={selectedUser.id}
                   language={language}
                   onChanged={refreshUsers}
                   selectedUser={selectedUser}

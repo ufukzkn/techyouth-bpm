@@ -1,20 +1,24 @@
 "use client";
 
-import { ArrowRight, Bell, LoaderCircle } from "lucide-react";
+import { ArrowRight, Bell, LoaderCircle, Mail, MailOpen } from "lucide-react";
 import type { NotificationItem } from "@/lib/types";
 
 type NotificationMenuProps = {
   isOpen: boolean;
   items: NotificationItem[];
   label: string;
+  markReadLabel: string;
+  markUnreadLabel: string;
   emptyLabel: string;
   inboxLabel: string;
   isLoading: boolean;
   markAllLabel: string;
   unreadCount: number;
+  pendingReadIds: Record<string, true>;
   onMarkAllRead: () => void;
   onOpenInbox: () => void;
   onSelect: (notification: NotificationItem) => void;
+  onSetReadState: (notification: NotificationItem, isRead: boolean) => void;
   onToggle: () => void;
 };
 
@@ -22,14 +26,18 @@ export function NotificationMenu({
   isOpen,
   items,
   label,
+  markReadLabel,
+  markUnreadLabel,
   emptyLabel,
   inboxLabel,
   isLoading,
   markAllLabel,
   unreadCount,
+  pendingReadIds,
   onMarkAllRead,
   onOpenInbox,
   onSelect,
+  onSetReadState,
   onToggle,
 }: NotificationMenuProps) {
   return (
@@ -54,17 +62,32 @@ export function NotificationMenu({
             </button>
           </div>
           <div className="notification-list">
-            {items.slice(0, 8).map((notification) => (
-              <button
+            {items.slice(0, 8).map((notification) => {
+              const isPending = Boolean(pendingReadIds[notification.id]);
+              const isRead = Boolean(notification.readAt);
+              const readLabel = isRead ? markUnreadLabel : markReadLabel;
+              return (
+              <article
                 className={notification.readAt ? "notification-item" : "notification-item is-unread"}
                 key={notification.id}
-                onClick={() => onSelect(notification)}
-                type="button"
               >
-                <strong>{notification.title}</strong>
-                <span>{notification.message}</span>
-              </button>
-            ))}
+                <button className="notification-item-main" onClick={() => onSelect(notification)} type="button">
+                  <strong>{notification.title}</strong>
+                  <span>{notification.message}</span>
+                </button>
+                <button
+                  aria-label={readLabel}
+                  className="icon-button notification-read-action"
+                  disabled={isPending}
+                  onClick={() => onSetReadState(notification, !isRead)}
+                  title={readLabel}
+                  type="button"
+                >
+                  {isPending ? <span aria-hidden="true" className="button-spinner" /> : isRead ? <Mail size={16} /> : <MailOpen size={16} />}
+                </button>
+              </article>
+              );
+            })}
             {isLoading && !items.length ? <p className="notification-loading"><LoaderCircle className="spin-icon" size={18} /> {label}</p> : null}
             {!isLoading && !items.length ? <p className="status-line">{emptyLabel}</p> : null}
           </div>

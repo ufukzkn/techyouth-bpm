@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, FilePlay, FilePlus2, FolderKanban, GitBranch, History, Inbox, LayoutDashboard, Network, Settings, UsersRound, Workflow } from "lucide-react";
+import { Building2, ClipboardList, FilePlay, FilePlus2, FolderKanban, GitBranch, Handshake, History, Inbox, LayoutDashboard, Network, Settings, UsersRound, Workflow } from "lucide-react";
 import type { TranslationKey } from "@/features/i18n/translations";
 import type { PermissionName } from "@/lib/types";
 
@@ -45,7 +45,7 @@ export const navItems: NavItem[] = [
     labelKey: "nav.myTeams",
     viewId: "myTeams",
     path: "/teams",
-    icon: UsersRound,
+    icon: Handshake,
   },
   {
     labelKey: "nav.forms",

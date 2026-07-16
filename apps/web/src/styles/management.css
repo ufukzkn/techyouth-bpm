@@ -868,8 +868,17 @@
 }
 
 .team-lead-label {
+  justify-content: center;
   color: var(--orange);
   font-weight: 750;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.team-lead-label svg,
+.team-lead-pill svg {
+  display: block;
+  flex: 0 0 auto;
 }
 
 .compact-icon-actions {
@@ -955,6 +964,20 @@
 .my-team-option small {
   color: var(--orange);
   font-weight: 750;
+  line-height: 1;
+}
+
+.my-team-option small svg,
+.team-roster-row .status-pill svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.team-roster-row .status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  line-height: 1;
 }
 
 .team-roster-count {
@@ -1030,12 +1053,15 @@
 }
 
 .team-lead-pill {
+  justify-content: center;
   padding: 4px 7px;
   border-radius: 999px;
   color: #8a5200;
   background: color-mix(in srgb, var(--orange) 14%, var(--surface));
   font-size: 10px;
   font-weight: 850;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .team-person-actions {
