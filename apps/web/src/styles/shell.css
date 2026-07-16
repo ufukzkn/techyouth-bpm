@@ -98,7 +98,7 @@
 
 .workspace-route-content {
   min-width: 0;
-  animation: workspace-route-enter 150ms ease-out both;
+  animation: workspace-route-enter 150ms ease-out;
 }
 
 @keyframes workspace-route-enter {
@@ -376,12 +376,12 @@
 
 .notification-item {
   display: grid;
-  gap: 4px;
-  padding: 10px;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--foreground);
-  text-align: left;
   background: var(--surface-muted);
 }
 
@@ -390,10 +390,33 @@
   background: color-mix(in srgb, var(--orange) 8%, var(--surface));
 }
 
-.notification-item span {
+.notification-item-main {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 4px;
+  border: 0;
+  color: var(--foreground);
+  text-align: left;
+  background: transparent;
+}
+
+.notification-item-main span {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.notification-read-action {
+  width: 34px;
+  height: 34px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+
+.notification-read-action:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .text-button {

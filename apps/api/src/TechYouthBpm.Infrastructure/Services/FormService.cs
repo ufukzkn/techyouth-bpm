@@ -79,7 +79,12 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             CreatedAt = DateTime.UtcNow,
         };
         form.Fields = BuildFields(request, form.Id);
+        if (request.CreatePublishedVersion)
+        {
+            form.Versions.Add(FormVersionModel.BuildLegacyPublishedVersion(form, 1, user.Id, form.CreatedAt));
+        }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         db.FormDefinitions.Add(form);
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
@@ -89,6 +94,7 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
             form.Id.ToString(),
             $"Form definition '{form.Name}' was created.",
             cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var saved = await GetAsync(form.Id, user, cancellationToken);
         return Result<FormDefinitionDto>.Success(saved!);
@@ -129,15 +135,28 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
         form.UpdatedByUserId = user.Id;
         form.UpdatedAt = DateTime.UtcNow;
 
-        var oldFields = form.Fields.ToList();
+        var oldFields = form.Fields.ToArray();
         db.FieldValidationRules.RemoveRange(oldFields.SelectMany(field => field.ValidationRules));
         db.FormFieldDefinitions.RemoveRange(oldFields);
         form.Fields.Clear();
-
         await db.SaveChangesAsync(cancellationToken);
 
         db.ChangeTracker.Clear();
-        db.FormFieldDefinitions.AddRange(BuildFields(request, formId));
+
+        var replacementFields = BuildFields(request, formId);
+        form.Fields.AddRange(replacementFields);
+        db.FormFieldDefinitions.AddRange(replacementFields);
+        if (request.CreatePublishedVersion)
+        {
+            var nextVersion = (await db.FormDefinitionVersions
+                .Where(version => version.FormDefinitionId == formId)
+                .MaxAsync(version => (int?)version.VersionNumber, cancellationToken) ?? 0) + 1;
+            db.FormDefinitionVersions.Add(FormVersionModel.BuildLegacyPublishedVersion(
+                form,
+                nextVersion,
+                user.Id,
+                DateTime.UtcNow));
+        }
 
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
@@ -164,6 +183,7 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
     private IQueryable<FormDefinition> FormQuery() =>
         db.FormDefinitions
             .Include(form => form.Community)
+            .Include(form => form.Versions)
             .Include(form => form.Fields)
             .ThenInclude(field => field.ValidationRules);
 

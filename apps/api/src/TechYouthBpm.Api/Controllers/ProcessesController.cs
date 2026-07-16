@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using TechYouthBpm.Application.Forms;
+using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Services;
 
 namespace TechYouthBpm.Api.Controllers;
@@ -8,10 +9,11 @@ namespace TechYouthBpm.Api.Controllers;
 [Route("api/processes")]
 public class ProcessesController(
     IProcessService processService,
+    IWorkflowVisibilityService workflowVisibilityService,
     IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet]
-    public async Task<IActionResult> List(CancellationToken cancellationToken)
+    public async Task<IActionResult> List([FromQuery] ProcessListRequest request, CancellationToken cancellationToken)
     {
         var user = await CurrentUserAsync(cancellationToken);
         if (user is null)
@@ -19,7 +21,13 @@ public class ProcessesController(
             return UnauthorizedProblem();
         }
 
-        return Ok(await processService.ListAsync(user, cancellationToken));
+        var resolvedScope = workflowVisibilityService.ResolveScope(request.Scope, user);
+        if (!resolvedScope.IsSuccess)
+        {
+            return ForbiddenProblem(resolvedScope.Errors);
+        }
+
+        return Ok(await processService.ListAsync(request, user, cancellationToken));
     }
 
     [HttpGet("{id:guid}")]
@@ -45,6 +53,20 @@ public class ProcessesController(
         }
 
         var result = await processService.StartAsync(request, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpPost("start/version")]
+    [HttpPost("start-version")]
+    public async Task<IActionResult> StartVersion(StartProcessVersionRequest request, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await processService.StartVersionAsync(request, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 }

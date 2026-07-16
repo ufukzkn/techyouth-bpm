@@ -49,9 +49,10 @@ Implemented frontend folders:
 - `src/features/auth`: login view and demo-user fallback.
 - `src/features/app-shell`: role-aware navigation, authenticated layout, dashboard/settings/access/log views and shared shell components.
 - `src/features/forms`: shared field metadata, field renderer, form value helpers and frontend validation.
-- `src/features/form-designer`: admin-facing dynamic form definition editor.
+- `src/features/form-designer`: admin-facing dynamic form editor plus a separately tested pure page/field ordering and validation model.
 - `src/features/form-runner`: saved-form runner that starts process instances.
 - `src/features/processes`: process list, task list, task action dialog, process detail, audit timeline and status badge components.
+- `src/features/workflows`: React Flow canvas, typed graph adapter, Zustand draft store, node inspector and publish validation.
 
 The App Router route group `apps/web/src/app/(workspace)` owns the authenticated shared layout. Its layout keeps sidebar and topbar mounted while only route content changes. Session verification, navigation, notifications and loading chrome are focused components under `features/app-shell/components`; route pages read their required Zustand state and import only their own feature view. This preserves code-splitting without rebuilding the workspace chrome on every navigation.
 
@@ -61,7 +62,7 @@ The App Router route group `apps/web/src/app/(workspace)` owns the authenticated
 - Adding a new process action should be handled in the backend state machine and exposed to the frontend as available task actions.
 - Adding a new role should be centralized in auth/authorization rules and menu visibility logic.
 - Adding community-specific access should use `CommunityRolePermission` records instead of hardcoding every role in controllers or frontend screens.
-- Strengthening auth should preserve centralized session handling: password hashing, token hashing, session expiry and future remember-me/refresh-token behavior belong in the auth/session boundary.
+- Strengthening auth should preserve centralized session handling: password hashing, token hashing, session expiry and rotating remember-me/refresh-token behavior belong in the auth/session boundary.
 - Changing persistence provider should stay inside Infrastructure configuration and EF Core package setup.
 - Adding a new screen should update the navigation model, route/screen ownership and team presentation notes.
 
@@ -93,4 +94,17 @@ This is a pragmatic layered architecture, influenced by Clean Architecture depen
 
 ## Team Extension Boundary
 
-Teams are community-scoped operational groups, not a second role system. A user can have multiple `TeamMembership` records while retaining one community role. `Takimsiz` is computed from missing active memberships. The future workflow runtime can target a person, team, community role or team-plus-role intersection without changing the platform-level access model. See `docs/18-dynamic-workflow-and-team-architecture.md`.
+Teams are community-scoped operational groups, not a second role system. A user can have multiple `TeamMembership` records while retaining one community role. `Takimsiz` is computed from missing active memberships. The workflow runtime targets a process starter, person, team, community role or team-plus-role intersection without changing the platform-level access model. See `docs/18-dynamic-workflow-and-team-architecture.md`.
+
+## Dynamic Workflow Boundary
+
+The workflow stack keeps editor, contract and runtime responsibilities separate:
+
+- React Flow owns canvas interaction and visual node state.
+- `apiGraphAdapter` converts editor nodes to the provider-neutral `ProcessGraphDto` contract.
+- `ProcessGraphValidator` rejects incomplete assignments, missing routes, unsafe cycles and cross-community references before publish.
+- `DynamicWorkflowEngine` navigates the pinned graph and creates task/step records.
+- `ProcessStateMachine` continues to own top-level lifecycle transitions.
+- EF Core transactions commit process, task, variables, notification and audit changes atomically.
+
+This is still a layered architecture: Domain contains entities/enums, Application contains DTOs/contracts, Infrastructure implements persistence/runtime, and API exposes controllers. The React Flow library never leaks into backend contracts.

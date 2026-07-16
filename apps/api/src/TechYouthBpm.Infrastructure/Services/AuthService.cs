@@ -271,6 +271,9 @@ public class AuthService(
             .ThenInclude(user => user!.CommunityMemberships)
             .ThenInclude(membership => membership.CommunityRole)
             .ThenInclude(role => role!.Permissions)
+            .Include(token => token.User)
+            .ThenInclude(user => user!.TeamMemberships)
+            .ThenInclude(teamMembership => teamMembership.Team)
             .Include(token => token.UserSession)
             .SingleOrDefaultAsync(token => token.Token == refreshTokenHash, cancellationToken);
 
@@ -373,6 +376,9 @@ public class AuthService(
             .ThenInclude(user => user!.CommunityMemberships)
             .ThenInclude(membership => membership.CommunityRole)
             .ThenInclude(role => role!.Permissions)
+            .Include(item => item.User)
+            .ThenInclude(user => user!.TeamMemberships)
+            .ThenInclude(teamMembership => teamMembership.Team)
             .SingleOrDefaultAsync(
                 item => item.Token == tokenHash && item.ExpiresAt > DateTime.UtcNow && item.RevokedAt == null,
                 cancellationToken);
@@ -979,12 +985,15 @@ public class AuthService(
             return Result<UserAdminDto>.Failure("Community role was not found.");
         }
 
+        var currentCommunityId = user.ToDto().CommunityId;
         foreach (var membership in user.CommunityMemberships)
         {
             membership.IsActive = false;
         }
 
-        user.CommunityMemberships.Add(new UserCommunityMembership
+        await DeactivateTeamMembershipsIfCommunityChangedAsync(user.Id, currentCommunityId, communityId, cancellationToken);
+
+        var newMembership = new UserCommunityMembership
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
@@ -992,7 +1001,8 @@ public class AuthService(
             CommunityRoleId = request.CommunityRoleId,
             IsActive = request.IsActive,
             CreatedAt = DateTime.UtcNow
-        });
+        };
+        db.UserCommunityMemberships.Add(newMembership);
 
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
@@ -1083,6 +1093,12 @@ public class AuthService(
             {
                 membership.IsActive = false;
             }
+
+            await DeactivateTeamMembershipsIfCommunityChangedAsync(
+                user.Id,
+                userDto.CommunityId,
+                targetCommunityId.Value,
+                cancellationToken);
 
             await db.SaveChangesAsync(cancellationToken);
             db.UserCommunityMemberships.Add(new UserCommunityMembership
@@ -1852,11 +1868,36 @@ public class AuthService(
 
     private IQueryable<User> UserQuery() =>
         db.Users
+            .AsSplitQuery()
             .Include(user => user.CommunityMemberships)
             .ThenInclude(membership => membership.Community)
             .Include(user => user.CommunityMemberships)
             .ThenInclude(membership => membership.CommunityRole)
-            .ThenInclude(role => role!.Permissions);
+            .ThenInclude(role => role!.Permissions)
+            .Include(user => user.TeamMemberships)
+            .ThenInclude(teamMembership => teamMembership.Team);
+
+    private async Task DeactivateTeamMembershipsIfCommunityChangedAsync(
+        Guid userId,
+        Guid? currentCommunityId,
+        Guid targetCommunityId,
+        CancellationToken cancellationToken)
+    {
+        if (currentCommunityId is null || currentCommunityId == targetCommunityId)
+        {
+            return;
+        }
+
+        var memberships = await db.TeamMemberships
+            .Where(membership => membership.UserId == userId && membership.IsActive)
+            .ToListAsync(cancellationToken);
+        foreach (var membership in memberships)
+        {
+            membership.IsActive = false;
+            membership.IsLead = false;
+            membership.UpdatedAt = DateTime.UtcNow;
+        }
+    }
 
     private static bool HasActiveCommunityAccess(User user) =>
         user.Role == Role.SuperAdmin

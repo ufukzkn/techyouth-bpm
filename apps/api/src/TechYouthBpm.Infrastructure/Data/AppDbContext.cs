@@ -11,14 +11,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<CommunityRole> CommunityRoles => Set<CommunityRole>();
     public DbSet<CommunityRolePermission> CommunityRolePermissions => Set<CommunityRolePermission>();
     public DbSet<UserCommunityMembership> UserCommunityMemberships => Set<UserCommunityMembership>();
+    public DbSet<Team> Teams => Set<Team>();
+    public DbSet<TeamMembership> TeamMemberships => Set<TeamMembership>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
     public DbSet<FormFieldDefinition> FormFieldDefinitions => Set<FormFieldDefinition>();
     public DbSet<FieldValidationRule> FieldValidationRules => Set<FieldValidationRule>();
+    public DbSet<FormDefinitionVersion> FormDefinitionVersions => Set<FormDefinitionVersion>();
+    public DbSet<FormPageDefinition> FormPageDefinitions => Set<FormPageDefinition>();
+    public DbSet<FormVersionFieldDefinition> FormVersionFieldDefinitions => Set<FormVersionFieldDefinition>();
+    public DbSet<FormVersionFieldValidationRule> FormVersionFieldValidationRules => Set<FormVersionFieldValidationRule>();
+    public DbSet<ProcessDefinition> ProcessDefinitions => Set<ProcessDefinition>();
+    public DbSet<ProcessDefinitionVersion> ProcessDefinitionVersions => Set<ProcessDefinitionVersion>();
     public DbSet<ProcessInstance> ProcessInstances => Set<ProcessInstance>();
     public DbSet<ProcessTask> ProcessTasks => Set<ProcessTask>();
+    public DbSet<ProcessStepExecution> ProcessStepExecutions => Set<ProcessStepExecution>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<SystemAuditLog> SystemAuditLogs => Set<SystemAuditLog>();
 
@@ -33,6 +42,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<CommunityRole>().HasIndex(role => new { role.CommunityId, role.Name }).IsUnique();
         modelBuilder.Entity<CommunityRolePermission>().HasIndex(permission => new { permission.CommunityRoleId, permission.Permission }).IsUnique();
         modelBuilder.Entity<UserCommunityMembership>().HasIndex(membership => new { membership.UserId, membership.IsActive });
+        modelBuilder.Entity<Team>().HasIndex(team => new { team.CommunityId, team.NormalizedName }).IsUnique();
+        modelBuilder.Entity<TeamMembership>().HasIndex(membership => new { membership.TeamId, membership.UserId }).IsUnique();
+        modelBuilder.Entity<TeamMembership>().HasIndex(membership => new { membership.UserId, membership.IsActive });
+        modelBuilder.Entity<FormDefinitionVersion>().HasIndex(version => new { version.FormDefinitionId, version.VersionNumber }).IsUnique();
+        modelBuilder.Entity<FormDefinitionVersion>().HasIndex(version => new { version.FormDefinitionId, version.Status });
+        modelBuilder.Entity<FormPageDefinition>().HasIndex(page => new { page.FormDefinitionVersionId, page.Key }).IsUnique();
+        modelBuilder.Entity<FormPageDefinition>().HasIndex(page => new { page.FormDefinitionVersionId, page.SortOrder });
+        modelBuilder.Entity<FormVersionFieldDefinition>().HasIndex(field => new { field.FormPageDefinitionId, field.Key }).IsUnique();
+        modelBuilder.Entity<ProcessDefinition>().HasIndex(definition => new { definition.CommunityId, definition.Name });
+        modelBuilder.Entity<ProcessDefinitionVersion>().HasIndex(version => new { version.ProcessDefinitionId, version.VersionNumber }).IsUnique();
+        modelBuilder.Entity<ProcessDefinitionVersion>().HasIndex(version => new { version.ProcessDefinitionId, version.Status });
+        modelBuilder.Entity<ProcessStepExecution>().HasIndex(step => new { step.ProcessInstanceId, step.NodeKey, step.Attempt }).IsUnique();
+        modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.Status, task.DueAt, task.Priority, task.CreatedAt });
+        modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.AssignedUserId, task.Status });
+        modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.ClaimedByUserId, task.Status });
+        modelBuilder.Entity<ProcessTask>().Property(task => task.ClaimVersion).IsConcurrencyToken();
 
         modelBuilder.Entity<Community>()
             .HasMany(community => community.Roles)
@@ -63,6 +88,30 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(membership => membership.CommunityRoleId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Community>()
+            .HasMany(community => community.Teams)
+            .WithOne(team => team.Community)
+            .HasForeignKey(team => team.CommunityId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Team>()
+            .HasOne(team => team.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(team => team.CreatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Team>()
+            .HasMany(team => team.Memberships)
+            .WithOne(membership => membership.Team)
+            .HasForeignKey(membership => membership.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasMany(user => user.TeamMemberships)
+            .WithOne(membership => membership.User)
+            .HasForeignKey(membership => membership.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Notification>()
             .HasOne(notification => notification.User)
@@ -112,16 +161,106 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasForeignKey(field => field.FormDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<FormDefinition>()
+            .HasMany(form => form.Versions)
+            .WithOne(version => version.FormDefinition)
+            .HasForeignKey(version => version.FormDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FormDefinitionVersion>()
+            .HasOne(version => version.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(version => version.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<FormDefinitionVersion>()
+            .HasOne(version => version.PublishedByUser)
+            .WithMany()
+            .HasForeignKey(version => version.PublishedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<FormDefinitionVersion>()
+            .HasMany(version => version.Pages)
+            .WithOne(page => page.FormDefinitionVersion)
+            .HasForeignKey(page => page.FormDefinitionVersionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FormPageDefinition>()
+            .HasMany(page => page.Fields)
+            .WithOne(field => field.FormPageDefinition)
+            .HasForeignKey(field => field.FormPageDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<FormVersionFieldDefinition>()
+            .HasMany(field => field.ValidationRules)
+            .WithOne(rule => rule.Field)
+            .HasForeignKey(rule => rule.FormVersionFieldDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         modelBuilder.Entity<FormFieldDefinition>()
             .HasMany(field => field.ValidationRules)
             .WithOne(rule => rule.Field)
             .HasForeignKey(rule => rule.FormFieldDefinitionId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<ProcessDefinition>()
+            .HasOne(definition => definition.Community)
+            .WithMany()
+            .HasForeignKey(definition => definition.CommunityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProcessDefinition>()
+            .HasOne(definition => definition.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(definition => definition.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProcessDefinition>()
+            .HasOne(definition => definition.UpdatedByUser)
+            .WithMany()
+            .HasForeignKey(definition => definition.UpdatedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ProcessDefinition>()
+            .HasMany(definition => definition.Versions)
+            .WithOne(version => version.ProcessDefinition)
+            .HasForeignKey(version => version.ProcessDefinitionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProcessDefinitionVersion>()
+            .HasOne(version => version.FormDefinitionVersion)
+            .WithMany()
+            .HasForeignKey(version => version.FormDefinitionVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProcessDefinitionVersion>()
+            .HasOne(version => version.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(version => version.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProcessDefinitionVersion>()
+            .HasOne(version => version.PublishedByUser)
+            .WithMany()
+            .HasForeignKey(version => version.PublishedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         modelBuilder.Entity<ProcessInstance>()
             .HasOne(process => process.Community)
             .WithMany()
             .HasForeignKey(process => process.CommunityId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProcessInstance>()
+            .HasOne(process => process.FormDefinitionVersion)
+            .WithMany()
+            .HasForeignKey(process => process.FormDefinitionVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProcessInstance>()
+            .HasOne(process => process.ProcessDefinitionVersion)
+            .WithMany()
+            .HasForeignKey(process => process.ProcessDefinitionVersionId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<ProcessInstance>()
@@ -134,6 +273,48 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasOne(task => task.AssignedCommunityRole)
             .WithMany()
             .HasForeignKey(task => task.AssignedCommunityRoleId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ProcessTask>()
+            .HasOne(task => task.AssignedUser)
+            .WithMany()
+            .HasForeignKey(task => task.AssignedUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ProcessTask>()
+            .HasOne(task => task.CandidateTeam)
+            .WithMany()
+            .HasForeignKey(task => task.CandidateTeamId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ProcessTask>()
+            .HasOne(task => task.CandidateCommunityRole)
+            .WithMany()
+            .HasForeignKey(task => task.CandidateCommunityRoleId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ProcessTask>()
+            .HasOne(task => task.ClaimedByUser)
+            .WithMany()
+            .HasForeignKey(task => task.ClaimedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ProcessTask>()
+            .HasOne(task => task.FormDefinitionVersion)
+            .WithMany()
+            .HasForeignKey(task => task.FormDefinitionVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProcessInstance>()
+            .HasMany(process => process.StepExecutions)
+            .WithOne(step => step.ProcessInstance)
+            .HasForeignKey(step => step.ProcessInstanceId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProcessStepExecution>()
+            .HasOne(step => step.CompletedByUser)
+            .WithMany()
+            .HasForeignKey(step => step.CompletedByUserId)
             .OnDelete(DeleteBehavior.SetNull);
 
         modelBuilder.Entity<ProcessInstance>()

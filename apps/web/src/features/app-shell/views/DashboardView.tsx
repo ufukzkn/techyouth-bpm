@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, ListTodo, Workflow } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, ListTodo, Network, Workflow } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import type { ViewId } from "@/features/app-shell/navigation";
@@ -9,10 +9,12 @@ import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { getNotificationTarget } from "@/features/notifications/notificationNavigation";
 import { useNotificationStore } from "@/features/notifications/notificationStore";
 import { StatusBadge } from "@/features/processes/StatusBadge";
+import { getAvailableWorkflowScopes, resolveWorkflowScope } from "@/features/processes/workflowVisibility";
 import { EmptyState } from "@/features/ui/EmptyState";
+import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
 import { api } from "@/lib/api";
 import { formatApiDateTime } from "@/lib/dateTime";
-import type { DashboardSummary, Language, NotificationItem, User } from "@/lib/types";
+import type { DashboardSummary, Language, NotificationItem, User, WorkflowVisibilityScope } from "@/lib/types";
 
 const dashboardMetricsCache = new Map<string, DashboardSummary>();
 
@@ -30,11 +32,14 @@ export function DashboardView({
   onNavigate: (viewId: ViewId) => void;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
-  const dashboardCacheKey = `${user.id}:${user.communityId ?? "platform"}:${user.communityRoleId ?? user.role}`;
+  const availableScopes = useMemo(() => getAvailableWorkflowScopes(user), [user]);
+  const scope = resolveWorkflowScope(searchParams.get("scope"), availableScopes);
+  const dashboardCacheKey = `${user.id}:${user.communityId ?? "platform"}:${user.communityRoleId ?? user.role}:${scope}`;
   const [summary, setSummary] = useState<DashboardSummary | null>(() => dashboardMetricsCache.get(dashboardCacheKey) ?? null);
   const [status, setStatus] = useState<"loading" | "refreshing" | "idle" | "error">(
     dashboardMetricsCache.has(dashboardCacheKey) ? "refreshing" : "loading",
@@ -63,7 +68,7 @@ export function DashboardView({
         const cached = dashboardMetricsCache.get(dashboardCacheKey);
         setSummary(cached ?? null);
         setStatus(cached ? "refreshing" : "loading");
-        const dashboardSummary = await api.getDashboardSummary(token);
+        const dashboardSummary = await api.getDashboardSummary(token, scope);
         if (!ignore) {
           dashboardMetricsCache.set(dashboardCacheKey, dashboardSummary);
           setSummary(dashboardSummary);
@@ -76,7 +81,7 @@ export function DashboardView({
 
     void loadMetrics();
     return () => { ignore = true; };
-  }, [dashboardCacheKey, token]);
+  }, [dashboardCacheKey, scope, token]);
 
   useEffect(() => {
     if (!token || token.startsWith("demo-")) return;
@@ -118,7 +123,27 @@ export function DashboardView({
   const hasUnassignedCommunityRole = user.role !== "SuperAdmin"
     && Boolean(user.communityId)
     && (!normalizedCommunityRole || ["atanmadi", "atanmadı", "unassigned"].includes(normalizedCommunityRole));
-  const showTaskFocus = canOpen("tasks");
+  const showTaskFocus = scope === "personal" && canOpen("tasks");
+  const focusEyebrowKey: TranslationKey = showTaskFocus
+    ? "dashboard.priorityEyebrow"
+    : scope === "personal" ? "dashboard.recentEyebrow" : "dashboard.scopeProcessesEyebrow";
+  const focusTitleKey: TranslationKey = showTaskFocus
+    ? "dashboard.priorityTitle"
+    : scope === "personal" ? "dashboard.recentTitle" : "dashboard.scopeProcessesTitle";
+
+  function changeScope(nextScope: WorkflowVisibilityScope) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("scope", nextScope);
+    window.history.replaceState(null, "", `/dashboard?${params.toString()}`);
+  }
+
+  function openChartSegment(segmentKey: string) {
+    if (segmentKey === "open") {
+      if (scope === "personal" && canOpen("tasks")) router.push("/tasks");
+      return;
+    }
+    if (canOpen("processes")) router.push(`/processes?scope=${scope}`);
+  }
 
   async function openNotification(notification: NotificationItem) {
     if (token && !token.startsWith("demo-") && !notification.readAt) {
@@ -134,6 +159,15 @@ export function DashboardView({
           <span className="eyebrow">{t("dashboard.eyebrow")}</span>
           <h1>{t("dashboard.welcome", { name: user.displayName })}</h1>
           {user.communityName ? <p className="dashboard-community-label"><span>{t("dashboard.communityLabel")}</span><strong>{user.communityName}</strong></p> : null}
+          {user.communityId ? (
+            <div className="dashboard-team-context" aria-label={t("dashboard.teams")}>
+              <Network size={15} />
+              <span>{t("dashboard.teams")}</span>
+              {(user.teams ?? []).length
+                ? (user.teams ?? []).map((team) => <strong key={team.id}>{team.name}{team.isLead ? ` · ${t("dashboard.teamLead")}` : ""}</strong>)
+                : <strong>{t("dashboard.unassignedTeam")}</strong>}
+            </div>
+          ) : null}
         </div>
         <div className="dashboard-header-side">
           <p>
@@ -165,6 +199,23 @@ export function DashboardView({
         <p className="dashboard-role-unassigned" role="status">{t("dashboard.roleUnassigned")}</p>
       ) : null}
 
+      {availableScopes.length > 1 ? (
+        <div className="workflow-scope-toolbar">
+          <div>
+            <span className="eyebrow">{t("workflowScope.eyebrow")}</span>
+            <strong>{t(`workflowScope.${scope}` as TranslationKey)}</strong>
+            <small>{t(`workflowScope.${scope}Description` as TranslationKey)}</small>
+          </div>
+          <SlidingSegmentedControl
+            ariaLabel={t("workflowScope.ariaLabel")}
+            name="dashboard-workflow-scope"
+            onChange={changeScope}
+            options={availableScopes.map((item) => ({ value: item, label: t(`workflowScope.${item}` as TranslationKey) }))}
+            value={scope}
+          />
+        </div>
+      ) : null}
+
       <section className="dashboard-focus-grid">
         <article className="dashboard-chart-card dashboard-chart-card-prominent">
           <div className="dashboard-chart-copy">
@@ -173,9 +224,9 @@ export function DashboardView({
             <div className="chart-legend dashboard-metric-legend">
               {chartSegments.map((segment) => (
                 <button
-                  disabled={!canOpen(segment.viewId)}
+                  disabled={segment.key === "open" ? scope !== "personal" || !canOpen("tasks") : !canOpen("processes")}
                   key={segment.key}
-                  onClick={() => onNavigate(segment.viewId)}
+                  onClick={() => openChartSegment(segment.key)}
                   type="button"
                 >
                   <span><i className={`legend-${segment.key}`} /> {segment.label}</span>
@@ -226,15 +277,15 @@ export function DashboardView({
 
         <article className="dashboard-work-card dashboard-priority-card">
           <div className="dashboard-card-heading">
-            <div><span className="eyebrow">{t("dashboard.priorityEyebrow")}</span><h3>{t("dashboard.priorityTitle")}</h3></div>
-            <button className="dashboard-heading-action" onClick={() => onNavigate(showTaskFocus ? "tasks" : "processes")} type="button">
+            <div><span className="eyebrow">{t(focusEyebrowKey)}</span><h3>{t(focusTitleKey)}</h3></div>
+            <button className="dashboard-heading-action" onClick={() => router.push(showTaskFocus ? "/tasks" : `/processes?scope=${scope}`)} type="button">
               {t("dashboard.viewAll")} <ArrowRight size={15} />
             </button>
           </div>
           {status === "loading" && !summary ? <DashboardListSkeleton /> : showTaskFocus && recentOpenTasks.length > 0 ? (
             <div className="dashboard-activity-list">
               {recentOpenTasks.map((task) => (
-                <button className="dashboard-activity-item" key={task.id} onClick={() => onNavigate("tasks")} type="button">
+                <button className="dashboard-activity-item" key={task.id} onClick={() => router.push(`/tasks?taskId=${task.id}`)} type="button">
                   <span className="dashboard-activity-icon"><ListTodo size={17} /></span>
                   <span className="dashboard-activity-copy"><strong>{task.formName}</strong><small><Clock3 size={13} /> {formatApiDateTime(task.createdAt, language)}</small></span>
                   <ArrowRight size={16} aria-hidden="true" />
@@ -244,7 +295,7 @@ export function DashboardView({
           ) : !showTaskFocus && recentProcesses.length > 0 ? (
             <div className="dashboard-activity-list">
               {recentProcesses.map((process) => (
-                <button className="dashboard-activity-item" key={process.id} onClick={() => onNavigate("processes")} type="button">
+                <button className="dashboard-activity-item" key={process.id} onClick={() => router.push(`/processes?scope=${scope}&processId=${process.id}`)} type="button">
                   <span className="dashboard-activity-icon"><Workflow size={17} /></span>
                   <span className="dashboard-activity-copy"><strong>{process.formName}</strong><small>{formatApiDateTime(process.startedAt, language)}</small></span>
                   <span className="dashboard-activity-status"><StatusBadge language={language} status={process.status} /></span>
@@ -252,7 +303,11 @@ export function DashboardView({
               ))}
             </div>
           ) : (
-            <EmptyState description={t("dashboard.priorityEmptyDescription")} icon={<CircleCheckBig size={20} />} title={t("dashboard.priorityEmptyTitle")} />
+            <EmptyState
+              description={t(showTaskFocus ? "dashboard.priorityEmptyDescription" : "dashboard.recentEmptyDescription")}
+              icon={<CircleCheckBig size={20} />}
+              title={t(showTaskFocus ? "dashboard.priorityEmptyTitle" : "dashboard.recentEmptyTitle")}
+            />
           )}
         </article>
       </section>

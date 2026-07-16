@@ -7,6 +7,8 @@ Use this file for the final code review presentation.
 - The project separates UI, API communication, domain logic and persistence.
 - Form definitions are stored as models, not hardcoded screens.
 - Process status changes are controlled by a state machine.
+- Published form/workflow versions are immutable and running processes pin exact version ids.
+- React Flow editor state is converted to a typed API graph before persistence.
 - Role checks exist in both UI visibility and backend authorization.
 - Identity lifecycle includes pending approval, verified email state, session revoke, rate limiting and account lockout.
 - Audit logs explain who changed a process and when.
@@ -19,8 +21,8 @@ Use this file for the final code review presentation.
 2. Explain monorepo structure.
 3. Demo login and role-based layout.
 4. Demo form design and validation.
-5. Demo process start and task action.
-6. Review state machine code.
+5. Demo workflow canvas publish, process start, claim and task action.
+6. Review graph validator, runtime and state machine boundaries.
 7. Review API service boundaries.
 8. Review tests and commit history.
 
@@ -52,7 +54,10 @@ Use this file for the final code review presentation.
   - registration creates pending/unverified accounts.
   - repeated failed login attempts lock the account.
   - logout revokes the stored session.
-- The latest verified backend suite passes 84 tests across auth, community access, forms, workflow, task authorization, notifications, dashboard scope and audit behavior.
+- The latest verified backend suite passes 166 tests across auth, community/team access, form/workflow versioning, graph validation, SLA/deadline calculation, server-side process/task paging, runtime rollback, claim concurrency, HTTP security, notifications, shared workflow visibility, deterministic demo scenarios and audit behavior. Frontend Vitest passes 40 tests across notification cache, process cache isolation, scope options, form versioning/validation, designer page movement and workflow graph/store/SLA behavior.
+- `ProcessDefinitionServiceTests` proves publish validation, geometry round-trip, namespace-safe conditions, cycle rejection and permission separation.
+- `DynamicWorkflowRuntimeTests` proves conditional routing, send-back attempts, task forms, no-candidate rollback, `Complete` and stale-snapshot claim competition.
+- `AuthorizationAndWorkflowIntegrationTests` publishes and runs a dynamic workflow through real HTTP controllers, not direct service calls.
 
 ## Current Frontend Story
 
@@ -75,7 +80,8 @@ Use this file for the final code review presentation.
 - Process details continue to show process-specific audit history to Admin/Approver and the user who started that process.
 - `FormDesignerDraft` edits a backend-ready definition model, including field keys, labels, field types, options, ordering and dependent validation rules.
 - Saved form definitions can be loaded back into the designer and updated through the API instead of being create-only drafts.
-- `FormRunnerDraft` loads saved form definitions, renders fields through the shared `FieldRenderer`, validates with shared helpers and starts a process through the API.
+- `FormRunnerDraft` loads published form versions, renders pages through shared helpers, validates each step and starts a compatible published workflow version.
+- `WorkflowWorkspaceView` coordinates definition/version persistence; `WorkflowEditor` and its Zustand draft store own canvas edits, while `apiGraphAdapter` isolates React Flow from the backend contract.
 - `ProcessBoardDraft` coordinates persisted process/task data and delegates UI to `ProcessListView`, `MyTasksView`, `ProcessDetailPanel`, `TaskActionDialog`, `AuditTimeline` and `StatusBadge`.
 - Task approve/reject actions collect an action note before calling the backend state machine endpoint.
 
@@ -92,3 +98,6 @@ Use this file for the final code review presentation.
 - Why opaque session tokens instead of JWT?
 - How does pending approval affect login?
 - What protects login/register against repeated abuse?
+- Why use a custom typed runtime instead of Camunda deployment?
+- How do version pinning and immutable publish protect running processes?
+- What prevents two users from claiming the same team task?

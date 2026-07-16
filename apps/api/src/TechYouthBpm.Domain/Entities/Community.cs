@@ -9,4 +9,5 @@ public class Community
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public List<CommunityRole> Roles { get; set; } = [];
+    public List<Team> Teams { get; set; } = [];
 }

@@ -1,20 +1,23 @@
-import { Building2, ClipboardList, FilePlay, FilePlus2, FolderKanban, History, Inbox, LayoutDashboard, Settings, UsersRound, Workflow } from "lucide-react";
+import { Building2, ClipboardList, FilePlay, FilePlus2, FolderKanban, GitBranch, Handshake, History, Inbox, LayoutDashboard, Network, Settings, UsersRound, Workflow } from "lucide-react";
 import type { TranslationKey } from "@/features/i18n/translations";
 import type { PermissionName } from "@/lib/types";
 
 export type ViewId =
   | "dashboard"
+  | "myTeams"
   | "forms"
   | "runner"
+  | "workflows"
   | "processes"
   | "tasks"
   | "inbox"
   | "managementUsers"
   | "managementCommunities"
+  | "managementTeams"
   | "logs"
   | "settings";
 
-export type NavGroupId = "forms" | "management";
+export type NavGroupId = "forms" | "processes" | "management";
 
 export type NavItem = {
   labelKey: TranslationKey;
@@ -27,6 +30,7 @@ export type NavItem = {
 
 export const navGroups: Record<NavGroupId, { icon: typeof LayoutDashboard; labelKey: TranslationKey }> = {
   forms: { icon: FolderKanban, labelKey: "nav.formGroup" },
+  processes: { icon: Workflow, labelKey: "nav.processGroup" },
   management: { icon: UsersRound, labelKey: "nav.management" },
 };
 
@@ -36,6 +40,12 @@ export const navItems: NavItem[] = [
     viewId: "dashboard",
     path: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    labelKey: "nav.myTeams",
+    viewId: "myTeams",
+    path: "/teams",
+    icon: Handshake,
   },
   {
     labelKey: "nav.forms",
@@ -54,11 +64,20 @@ export const navItems: NavItem[] = [
     group: "forms",
   },
   {
+    labelKey: "nav.workflows",
+    viewId: "workflows",
+    path: "/workflows",
+    icon: GitBranch,
+    permissions: ["Workflows.View", "Workflows.Create", "Workflows.Update"],
+    group: "processes",
+  },
+  {
     labelKey: "nav.processes",
     viewId: "processes",
     path: "/processes",
     icon: Workflow,
     permissions: ["Processes.View"],
+    group: "processes",
   },
   {
     labelKey: "nav.tasks",
@@ -66,6 +85,7 @@ export const navItems: NavItem[] = [
     path: "/tasks",
     icon: ClipboardList,
     permissions: ["Tasks.View"],
+    group: "processes",
   },
   {
     labelKey: "nav.managementUsers",
@@ -81,6 +101,14 @@ export const navItems: NavItem[] = [
     path: "/management/communities",
     icon: Building2,
     permissions: ["Community.ManageRoles"],
+    group: "management",
+  },
+  {
+    labelKey: "nav.managementTeams",
+    viewId: "managementTeams",
+    path: "/management/teams",
+    icon: Network,
+    permissions: ["Teams.View"],
     group: "management",
   },
   {

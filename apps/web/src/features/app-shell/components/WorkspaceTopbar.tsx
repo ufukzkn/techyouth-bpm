@@ -46,6 +46,7 @@ export function WorkspaceTopbar({
     previewItems,
     unreadCount,
     isLoading: isNotificationsLoading,
+    pendingReadIds,
     loadPreview,
     liveToasts,
     markAllRead,
@@ -119,6 +120,18 @@ export function WorkspaceTopbar({
     await markAllRead(token);
   }
 
+  async function setNotificationReadState(notification: NotificationItem, isRead: boolean) {
+    if (!token || token.startsWith("demo-")) {
+      return;
+    }
+
+    try {
+      await setReadState(token, notification.id, isRead);
+    } catch {
+      // Keep the popover open and let the optimistic store state roll back on a failed request.
+    }
+  }
+
   async function openLiveNotification(notification: NotificationItem) {
     dismissLiveToast(notification.id);
     if (token && !token.startsWith("demo-") && !notification.readAt) {
@@ -161,6 +174,7 @@ export function WorkspaceTopbar({
               <div><span>{t("session.username")}</span><strong>{user.username}</strong></div>
               <div><span>{t("session.role")}</span><strong>{effectiveRole}</strong></div>
               {user.communityName ? <div><span>{t("session.community")}</span><strong>{user.communityName}</strong></div> : null}
+              {user.communityId ? <div><span>{t("session.teams")}</span><strong>{(user.teams ?? []).length ? (user.teams ?? []).map((team) => team.name).join(", ") : t("dashboard.unassignedTeam")}</strong></div> : null}
               <div><span>{t("session.activeUntil")}</span><strong>{formatSessionExpiry(expiresAt, language)}</strong></div>
             </div>
           ) : null}
@@ -180,6 +194,9 @@ export function WorkspaceTopbar({
           items={previewItems}
           label={t("notifications.title")}
           markAllLabel={t("notifications.markAllRead")}
+          markReadLabel={t("inbox.markRead")}
+          markUnreadLabel={t("inbox.markUnread")}
+          pendingReadIds={pendingReadIds}
           unreadCount={unreadCount}
           onMarkAllRead={() => void markAllNotificationsRead()}
           onOpenInbox={() => {
@@ -187,6 +204,7 @@ export function WorkspaceTopbar({
             router.push("/inbox");
           }}
           onSelect={(notification) => void openNotification(notification)}
+          onSetReadState={(notification, isRead) => void setNotificationReadState(notification, isRead)}
           onToggle={() => {
             setIsNotificationsOpen((isOpen) => !isOpen);
             setIsSessionDetailsOpen(false);

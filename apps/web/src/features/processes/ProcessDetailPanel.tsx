@@ -1,6 +1,7 @@
 "use client";
 
 import { AuditTimeline } from "@/features/processes/AuditTimeline";
+import { ProcessStepTimeline } from "@/features/processes/ProcessStepTimeline";
 
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { StatusBadge } from "@/features/processes/StatusBadge";
@@ -37,7 +38,7 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
     );
   }
 
-  const openTaskCount = detail.tasks.filter((t) => t.status === "Open").length;
+  const openTaskCount = detail.tasks.filter((t) => t.status === "Open" || t.status === "Claimed").length;
   const completedTaskCount = detail.tasks.filter((t) => t.status === "Completed").length;
 
   return (
@@ -72,10 +73,35 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
             <dt>{t("process.tasks")}</dt>
             <dd>{t("process.taskSummary", { open: openTaskCount, completed: completedTaskCount })}</dd>
           </div>
+          {detail.currentNodeKey ? (
+            <div>
+              <dt>{t("process.currentNode")}</dt>
+              <dd>{detail.currentNodeKey}</dd>
+            </div>
+          ) : null}
+          {detail.processDefinitionVersionId ? (
+            <div>
+              <dt>{t("process.definitionVersion")}</dt>
+              <dd title={detail.processDefinitionVersionId}>{detail.processDefinitionVersionId.slice(0, 8)}</dd>
+            </div>
+          ) : null}
         </dl>
 
         <JsonViewer className="compact-json" language={language} value={detail.formData} />
+        {detail.variables && Object.keys(detail.variables).length > 0 ? (
+          <div className="process-variables">
+            <span className="eyebrow">{t("process.variables")}</span>
+            <JsonViewer className="compact-json" language={language} value={detail.variables} />
+          </div>
+        ) : null}
       </article>
+
+      {detail.stepExecutions ? (
+        <article className="process-card process-step-card">
+          <span className="eyebrow">{t("process.executionHistory")}</span>
+          <ProcessStepTimeline executions={detail.stepExecutions} language={language} />
+        </article>
+      ) : null}
 
       <article className="process-card audit-card">
         <span className="eyebrow">{t("process.auditRecords", { count: detail.auditLogs.length })}</span>

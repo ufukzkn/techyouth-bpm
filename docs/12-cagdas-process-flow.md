@@ -19,6 +19,23 @@ The scope includes:
 - Audit log creation and timeline display.
 - Backend test coverage for authorization and audit behavior.
 
+## Dynamic Workflow Extension
+
+The original one-step state-machine flow remains as a compatibility path, but the primary process path is now versioned and graph-driven:
+
+- `ProcessDefinitionVersion` stores a published typed graph with Start, User Task, Exclusive Gateway and End nodes.
+- `DynamicWorkflowEngine` routes the exact version pinned to the process instance.
+- User tasks support priority, optional task form, action set and ProcessStarter/SpecificUser/Team/CommunityRole/TeamAndCommunityRole assignment.
+- Task list/detail responses include the pinned published task-form snapshot; the action dialog submits its validated `formData` together with the selected workflow action and note.
+- Candidate-pool tasks must be claimed. `ClaimVersion` optimistic concurrency allows only one stale client to win.
+- `SendBack` creates a new node attempt; completed history is never reopened or rewritten, and invalidated downstream `steps.*` values are cleared before routing resumes.
+- Gateway conditions can reference only fields produced before that gateway and the backend validates field/value/operator type compatibility before publish.
+- `ProcessStepExecution` records node, attempt, actor, action, timestamps and task-form output.
+- Start/action transactions include process state, task, variables, notification and both audit channels.
+- `Complete` supports operational tasks in addition to approval-oriented actions.
+
+The visual graph editor is implemented under `/workflows` with `@xyflow/react`; the backend contract remains independent from that library.
+
 ## Completed Work
 
 - Split the monolithic `ProcessBoardDraft.tsx` (246 lines) into 6 focused components.
@@ -37,14 +54,18 @@ The scope includes:
 - **Drag-and-Drop Process Reordering**: Implemented a drag-and-drop feature to allow users to visually reorder processes in `ProcessListView` using `@dnd-kit`. Extracted `SortableProcessCard`, added ghost overlay during dragging, persisted ordering logic to `localStorage` to save the customized view state per user, and added keyboard accessible move up/down controls.
 - **Escalation Workflow**: Added `Escalate` action and `Escalated` status. Updated `ProcessStateMachine` to handle transitions (`InProgress → Escalated`, `Escalated → Approve/Reject`) and updated `TaskService` to automatically spawn an Admin review task upon escalation.
 
+Escalation is initiated by the explicit user action. Persisted SLA deadlines support overdue display and sorting but do not run a timer-based auto-escalation job.
+
 ## Current Process Flow Capabilities
 
 ### Process List
 
-- All processes are loaded from `GET /api/processes` with role-based visibility (User sees only their own, Admin/Approver see all).
+- Processes are loaded one server page at a time from `GET /api/processes`; visibility follows community, permission, starter and task-assignment scope rather than the retired platform Admin/User/Approver model.
 - The list endpoint returns summary DTOs through EF Core projection, so it does not load every task and audit log while rendering the board.
-- Status filter chips allow narrowing the list by Pending, InProgress, Completed or Rejected.
-- Filtered count and total count are shown in the card header.
+- Status, scope, sorting and page are query parameters; the backend sorts before pagination.
+- The default scope is `personal`: processes started by the user or containing a direct, claimed or eligible team-plus-role task. `community` requires `Processes.ViewAll`; `global` is SuperAdmin-only. Unauthorized wider scopes return `403`.
+- Summaries expose workflow name, nearest open-task deadline and highest open-task priority.
+- Drag/drop order is intentionally local to the currently visible page.
 - Clicking a process loads its full detail from `GET /api/processes/{id}`.
 
 ### Process Detail
@@ -57,8 +78,11 @@ The scope includes:
 
 ### My Tasks
 
-- Open tasks are loaded from `GET /api/tasks/my` filtered by the current user's role.
-- Each task shows a process context label, task ID prefix, assigned role and creation date.
+- Open tasks are loaded one server page at a time from `GET /api/tasks/my`, filtered by direct assignment or live team/community-role candidate eligibility.
+- Management permission alone never places work in `Islerim`; the current user must be a direct assignee, claimant or live team/role candidate.
+- Each task shows workflow, form and community context plus priority, creation time and optional GMT+3 deadline.
+- Deadline/priority/created-time ordering happens before pagination; tasks with no deadline appear after dated tasks in nearest-deadline order.
+- A notification task deep link queries the exact task ID and opens its related process instead of selecting the first process in the list.
 - Approve and Reject buttons open a `TaskActionDialog` modal.
 
 ### Task Action Dialog
@@ -91,7 +115,7 @@ The `ProcessStateMachine` defines allowed transitions as a simple dictionary:
 | Escalated | Approve | Completed |
 | Escalated | Reject | Rejected |
 
-Any other combination returns a validation error. This is the core BPM correctness guarantee.
+Any other combination returns a validation error. This remains the lifecycle guarantee for legacy and dynamic processes. Dynamic node routing adds a second guarantee: an action must exist on the published task node and have exactly one valid graph edge. Graph navigation never directly replaces lifecycle validation.
 
 ## Test Coverage
 
@@ -147,23 +171,21 @@ Documentation files:
 
 ## Out of Scope
 
-These areas were intentionally not changed:
+These capabilities remain intentionally deferred:
 
-- Core process/task state-transition rules.
-- Backend state machine rules.
-- Form designer or form runner behavior.
-- Login/session flow.
-- Dashboard behavior.
-- App shell navigation structure.
-- Package files such as `package.json` and `package-lock.json`.
+- Parallel gateway execution and join semantics.
+- Automatic timer jobs, SLA breach escalation and reminder scheduling. Static User Task SLA and persisted `DueAt` are implemented; no background scheduler runs yet.
+- Service tasks and external ERP integrations.
+- BPMN XML import/export or Camunda deployment.
+- Cross-community workflow routing.
 
 ## Presentation Talking Points
 
-1. **Why a state machine?** Instead of scattered if/else checks, transitions are defined as a dictionary. Adding a new action means adding one line, not hunting through service code.
+1. **Why a state machine plus runtime?** The state machine owns process lifecycle, while the runtime owns graph navigation. This prevents canvas routing rules from scattering status mutations across controllers.
 
-2. **End-to-end approve flow:** Frontend button → `TaskActionDialog` (note input) → `api.executeTaskAction()` → `TasksController` → `TaskService.ExecuteActionAsync()` → `ProcessStateMachine.Move()` → audit log write → response reload.
+2. **End-to-end action flow:** UI note/task form → API client → `TasksController` → authorization/claim/form validation → `DynamicWorkflowEngine.ContinueAsync()` → next task/end → audit/notification commit → detail reload.
 
-3. **Three layers of authorization:** Role check in `TaskService`, available-actions check from persisted JSON, and state machine validation. All three must pass.
+3. **Authorization layers:** community scope, permission/candidate membership, claim ownership, persisted available action, graph edge and lifecycle validation must all pass.
 
 4. **Why separate audit logs?** They are a separate table, not just a status field. You can trace who did what, when, with which note. This is real BPM traceability.
 
@@ -177,6 +199,9 @@ These areas were intentionally not changed:
 - Why split process audit and system audit?
 - How would a new workflow action (e.g. Escalate) be added?
 - Why collect action notes before approve/reject?
+- Why create a new attempt on SendBack instead of reopening history?
+- How does `ClaimVersion` prevent a double claim?
+- Why keep React Flow objects out of the API DTO?
 
 ## Verification
 
@@ -193,3 +218,5 @@ Backend checks:
 ```bash
 dotnet test apps/api/TechYouthBpm.slnx
 ```
+
+The current suite also covers graph validation, gateway conditions, rollback, candidate resolution, claim competition, HTTP workflow publish/start/complete and provider migrations. The exact baseline is tracked in `docs/01-agent-notes.md`.

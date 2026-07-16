@@ -1,4 +1,4 @@
-import type { FormDefinition } from "@/lib/types";
+import type { FormDefinition, FormFieldDefinition } from "@/lib/types";
 import type { FormValues } from "@/features/forms/formValues";
 import { translate } from "@/features/i18n/translations";
 import type { Language } from "@/lib/types";
@@ -12,9 +12,13 @@ import {
 export type FormValidationErrors = Record<string, string>;
 
 export function validateFormValues(form: FormDefinition, values: FormValues, language: Language = "tr") {
+  return validateFormFields(form.fields, values, language);
+}
+
+export function validateFormFields(fields: FormFieldDefinition[], values: FormValues, language: Language = "tr") {
   const nextErrors: FormValidationErrors = {};
 
-  for (const field of form.fields) {
+  for (const field of fields) {
     const value = values[field.key];
     const isEmpty = isEmptyValue(value, field.type);
 

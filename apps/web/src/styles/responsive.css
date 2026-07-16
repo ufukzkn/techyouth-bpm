@@ -139,6 +139,26 @@
     grid-template-columns: 1fr;
   }
 
+  .team-filter-row,
+  .team-management-layout,
+  .team-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-description-field,
+  .team-save-actions {
+    grid-column: auto;
+  }
+
+  .team-person-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .team-person-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+
   .status-checkbox-filters {
     width: 100%;
     justify-content: flex-end;
@@ -213,6 +233,31 @@
 
   .content {
     padding: 18px;
+  }
+}
+
+@media (max-width: 540px) {
+  .team-list-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .team-card-metrics,
+  .team-card-count {
+    grid-column: 2;
+    justify-self: start;
+    display: inline-flex;
+    gap: 10px;
+  }
+
+  .team-person-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .team-lead-pill,
+  .team-add-member-button,
+  .team-person-actions {
+    grid-column: 2;
+    justify-self: start;
   }
 }
 

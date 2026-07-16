@@ -1,5 +1,8 @@
 import type {
   CreateFormRequest,
+  CreateFormVersionRequest,
+  CreateProcessDefinitionRequest,
+  CreateProcessDefinitionVersionRequest,
   CreateCommunityRequest,
   CreateCommunityRoleRequest,
   CreateUserAdminRequest,
@@ -9,6 +12,7 @@ import type {
   ForgotPasswordRequest,
   ForgotPasswordResponse,
   FormDefinition,
+  FormDefinitionVersion,
   Community,
   CommunityRole,
   CommunitySummary,
@@ -18,8 +22,14 @@ import type {
   NotificationPage,
   PagedResult,
   ProcessDetail,
+  ProcessDefinition,
+  ProcessDefinitionSummary,
+  ProcessDefinitionVersion,
+  RunnableProcessDefinition,
   ProcessSummary,
   ProcessTask,
+  ProcessListParams,
+  TaskListParams,
   RegisterResponse,
   RoleTemplate,
   ResetPasswordRequest,
@@ -34,6 +44,16 @@ import type {
   UserSession,
   UserStatus,
   ChangePasswordRequest,
+  ClaimTaskRequest,
+  CreateTeamRequest,
+  Team,
+  TeamCandidatePage,
+  TeamMember,
+  TeamMemberPage,
+  TeamRosterPage,
+  TeamPage,
+  UserTeamMembership,
+  UpdateTeamRequest,
 } from "@/lib/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5291";
@@ -166,6 +186,14 @@ function normalizePagedResult<T>(value: PagedResult<T> | T[], page = 1, pageSize
     ...value,
     items: Array.isArray(value.items) ? value.items : [],
   };
+}
+
+function buildTeamMemberSearch(params: { query?: string; page?: number; pageSize?: number }) {
+  const search = new URLSearchParams();
+  if (params.query?.trim()) search.set("query", params.query.trim());
+  if (params.page) search.set("page", String(params.page));
+  if (params.pageSize) search.set("pageSize", String(params.pageSize));
+  return search;
 }
 
 export const api = {
@@ -355,6 +383,67 @@ export const api = {
       body: JSON.stringify({ replacementRoleId }),
     });
   },
+  listTeams(
+    token: string,
+    params: { communityId?: string | null; query?: string; isActive?: boolean | null; page?: number; pageSize?: number } = {},
+  ) {
+    const search = new URLSearchParams();
+    if (params.communityId) search.set("communityId", params.communityId);
+    if (params.query?.trim()) search.set("query", params.query.trim());
+    if (params.isActive !== null && params.isActive !== undefined) search.set("isActive", String(params.isActive));
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    return request<TeamPage>(`/api/teams${search.size ? `?${search}` : ""}`, { token });
+  },
+  getTeam(token: string, teamId: string) {
+    return request<Team>(`/api/teams/${teamId}`, { token });
+  },
+  createTeam(token: string, payload: CreateTeamRequest) {
+    return request<Team>("/api/teams", { method: "POST", token, body: JSON.stringify(payload) });
+  },
+  updateTeam(token: string, teamId: string, payload: UpdateTeamRequest) {
+    return request<Team>(`/api/teams/${teamId}`, { method: "PATCH", token, body: JSON.stringify(payload) });
+  },
+  listTeamMembers(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
+    const search = buildTeamMemberSearch(params);
+    return request<TeamMemberPage>(`/api/teams/${teamId}/members${search.size ? `?${search}` : ""}`, { token });
+  },
+  listTeamRoster(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
+    const search = buildTeamMemberSearch(params);
+    return request<TeamRosterPage>(`/api/teams/${teamId}/roster${search.size ? `?${search}` : ""}`, { token });
+  },
+  listUserTeamMemberships(token: string, userId: string) {
+    return request<UserTeamMembership[]>(`/api/users/${userId}/team-memberships`, { token });
+  },
+  listTeamCandidates(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
+    const search = buildTeamMemberSearch(params);
+    return request<TeamCandidatePage>(`/api/teams/${teamId}/candidates${search.size ? `?${search}` : ""}`, { token });
+  },
+  listUnassignedTeamMembers(
+    token: string,
+    params: { communityId: string; query?: string; page?: number; pageSize?: number },
+  ) {
+    const search = buildTeamMemberSearch(params);
+    search.set("communityId", params.communityId);
+    return request<TeamCandidatePage>(`/api/teams/unassigned/members?${search}`, { token });
+  },
+  addTeamMember(token: string, teamId: string, userId: string, isLead = false) {
+    return request<TeamMember>(`/api/teams/${teamId}/members`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ userId, isLead }),
+    });
+  },
+  updateTeamMember(token: string, teamId: string, userId: string, isLead: boolean) {
+    return request<TeamMember>(`/api/teams/${teamId}/members/${userId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ isLead }),
+    });
+  },
+  removeTeamMember(token: string, teamId: string, userId: string) {
+    return request<void>(`/api/teams/${teamId}/members/${userId}`, { method: "DELETE", token });
+  },
   deleteUser(token: string, userId: string) {
     return request<void>(`/api/users/${userId}`, { method: "DELETE", token });
   },
@@ -430,8 +519,9 @@ export const api = {
 
     return request<SystemAuditCategoryCounts>(`/api/audit/system/counts${search.size ? `?${search}` : ""}`, { token });
   },
-  getDashboardSummary(token: string) {
-    return request<DashboardSummary>("/api/dashboard/summary", { token });
+  getDashboardSummary(token: string, scope: "personal" | "community" | "global" = "personal") {
+    const search = new URLSearchParams({ scope });
+    return request<DashboardSummary>(`/api/dashboard/summary?${search}`, { token });
   },
   listForms(token: string) {
     return request<FormDefinition[]>("/api/forms", { token });
@@ -453,6 +543,81 @@ export const api = {
   getForm(token: string, id: string) {
     return request<FormDefinition>(`/api/forms/${id}`, { token });
   },
+  listFormVersions(token: string, formId: string) {
+    return request<FormDefinitionVersion[]>(`/api/forms/${formId}/versions`, { token });
+  },
+  getFormVersion(token: string, formId: string, versionId: string) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}`, { token });
+  },
+  createFormVersion(token: string, formId: string, payload: CreateFormVersionRequest) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateFormVersion(token: string, formId: string, versionId: string, payload: CreateFormVersionRequest) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  publishFormVersion(token: string, formId: string, versionId: string) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}/publish`, {
+      method: "POST",
+      token,
+    });
+  },
+  archiveFormVersion(token: string, formId: string, versionId: string) {
+    return request<FormDefinitionVersion>(`/api/forms/${formId}/versions/${versionId}/archive`, {
+      method: "POST",
+      token,
+    });
+  },
+  listProcessDefinitions(token: string) {
+    return request<ProcessDefinitionSummary[]>("/api/process-definitions", { token });
+  },
+  listRunnableProcessDefinitions(token: string) {
+    return request<RunnableProcessDefinition[]>("/api/process-definitions/runnable", { token });
+  },
+  getProcessDefinition(token: string, id: string) {
+    return request<ProcessDefinition>(`/api/process-definitions/${id}`, { token });
+  },
+  createProcessDefinition(token: string, payload: CreateProcessDefinitionRequest) {
+    return request<ProcessDefinition>("/api/process-definitions", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateProcessDefinition(token: string, id: string, payload: Pick<CreateProcessDefinitionRequest, "name" | "description">) {
+    return request<ProcessDefinition>(`/api/process-definitions/${id}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  createProcessDefinitionVersion(token: string, id: string, payload: CreateProcessDefinitionVersionRequest) {
+    return request<ProcessDefinitionVersion>(`/api/process-definitions/${id}/versions`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  updateProcessDefinitionVersion(token: string, id: string, versionId: string, payload: CreateProcessDefinitionVersionRequest) {
+    return request<ProcessDefinitionVersion>(`/api/process-definitions/${id}/versions/${versionId}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  publishProcessDefinitionVersion(token: string, id: string, versionId: string) {
+    return request<ProcessDefinitionVersion>(`/api/process-definitions/${id}/versions/${versionId}/publish`, {
+      method: "POST",
+      token,
+    });
+  },
   startProcess(token: string, payload: StartProcessRequest) {
     return request<ProcessDetail>("/api/processes/start", {
       method: "POST",
@@ -460,14 +625,55 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  listProcesses(token: string) {
-    return request<ProcessSummary[]>("/api/processes", { token });
+  listProcesses(token: string, params: ProcessListParams = {}) {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    if (params.status && params.status !== "all") search.set("status", params.status);
+    if (params.scope) search.set("scope", params.scope);
+    if (params.sortBy) search.set("sortBy", params.sortBy);
+    if (params.sortDirection) search.set("sortDirection", params.sortDirection);
+    return request<PagedResult<ProcessSummary> | ProcessSummary[]>(
+      `/api/processes${search.size ? `?${search}` : ""}`,
+      { token },
+    ).then((result) => normalizePagedResult(result, params.page, params.pageSize));
   },
   getProcess(token: string, id: string) {
     return request<ProcessDetail>(`/api/processes/${id}`, { token });
   },
-  listMyTasks(token: string) {
-    return request<ProcessTask[]>("/api/tasks/my", { token });
+  listMyTasks(token: string, params: TaskListParams = {}) {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    if (params.priority && params.priority !== "all") search.set("priority", params.priority);
+    if (params.taskId) search.set("taskId", params.taskId);
+    if (params.sortBy) search.set("sortBy", params.sortBy);
+    if (params.sortDirection) search.set("sortDirection", params.sortDirection);
+    return request<PagedResult<ProcessTask> | ProcessTask[]>(
+      `/api/tasks/my${search.size ? `?${search}` : ""}`,
+      { token },
+    ).then((result) => normalizePagedResult(result, params.page, params.pageSize));
+  },
+  startProcessVersion(token: string, processDefinitionVersionId: string, formData: Record<string, unknown>) {
+    return request<ProcessDetail>("/api/processes/start/version", {
+      method: "POST",
+      token,
+      body: JSON.stringify({ processDefinitionVersionId, formData }),
+    });
+  },
+  claimTask(token: string, taskId: string, payload: ClaimTaskRequest = {}) {
+    return request<ProcessTask>(`/api/tasks/${taskId}/claim`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  releaseTask(token: string, taskId: string, payload: ClaimTaskRequest = {}) {
+    return request<ProcessTask>(`/api/tasks/${taskId}/claim`, {
+      method: "DELETE",
+      token,
+      body: JSON.stringify(payload),
+    });
   },
   executeTaskAction(token: string, taskId: string, payload: TaskActionRequest) {
     return request<ProcessDetail>(`/api/tasks/${taskId}/actions`, {

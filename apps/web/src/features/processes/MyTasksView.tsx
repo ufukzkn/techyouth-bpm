@@ -1,32 +1,95 @@
 "use client";
 
-import { ArrowUpRight, CheckCircle2, CircleDot, XCircle } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpRight,
+  CheckCheck,
+  CheckCircle2,
+  CircleDot,
+  Clock3,
+  Hand,
+  Undo2,
+  UserRoundCheck,
+  XCircle,
+} from "lucide-react";
 import { useState } from "react";
+import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { TaskActionDialog } from "@/features/processes/TaskActionDialog";
 import { formatApiDateTime } from "@/lib/dateTime";
-import type { Language, ProcessTask, WorkflowAction } from "@/lib/types";
+import type {
+  Language,
+  PagedResult,
+  ProcessTask,
+  TaskListParams,
+  TaskPriority,
+  WorkflowAction,
+} from "@/lib/types";
 
 type MyTasksViewProps = {
-  tasks: ProcessTask[];
+  result: PagedResult<ProcessTask>;
+  activeUserId: string;
   language: Language;
+  selectedTaskId: string;
+  priorityFilter: TaskPriority | "all";
+  sortBy: NonNullable<TaskListParams["sortBy"]>;
+  sortDirection: "asc" | "desc";
   status: "loading" | "refreshing" | "idle" | "acting" | "error";
-  onExecuteTask: (taskId: string, action: Exclude<WorkflowAction, "Start">, note: string) => void;
+  onClaimTask: (taskId: string, claimVersion?: string | null) => void;
+  onReleaseTask: (taskId: string, claimVersion?: string | null) => void;
+  onSelectTask: (task: ProcessTask) => void;
+  onPriorityChange: (value: TaskPriority | "all") => void;
+  onSortByChange: (value: NonNullable<TaskListParams["sortBy"]>) => void;
+  onSortDirectionChange: (value: "asc" | "desc") => void;
+  onNextPage: () => void;
+  onPageChange: (page: number) => void;
+  onPreviousPage: () => void;
+  onExecuteTask: (
+    taskId: string,
+    action: Exclude<WorkflowAction, "Start">,
+    note: string,
+    formData?: Record<string, unknown>,
+  ) => Promise<boolean>;
 };
 
-export function MyTasksView({ tasks, language, status, onExecuteTask }: MyTasksViewProps) {
+const priorities: Array<TaskPriority | "all"> = ["all", "Critical", "High", "Normal", "Low"];
+
+export function MyTasksView({
+  result,
+  activeUserId,
+  language,
+  selectedTaskId,
+  priorityFilter,
+  sortBy,
+  sortDirection,
+  status,
+  onClaimTask,
+  onReleaseTask,
+  onSelectTask,
+  onPriorityChange,
+  onSortByChange,
+  onSortDirectionChange,
+  onNextPage,
+  onPageChange,
+  onPreviousPage,
+  onExecuteTask,
+}: MyTasksViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
-  const openTasks = tasks.filter((task) => task.status === "Open");
+  const isTr = language === "tr";
+  const tasks = result.items;
+  const [renderedAt] = useState(() => Date.now());
   const [pendingAction, setPendingAction] = useState<{
     taskId: string;
     action: Exclude<WorkflowAction, "Start">;
   } | null>(null);
+  const totalPages = Math.max(1, Math.ceil(result.totalCount / result.pageSize));
 
-  function handleConfirm(note: string) {
-    if (pendingAction) {
-      onExecuteTask(pendingAction.taskId, pendingAction.action, note);
-      setPendingAction(null);
-    }
+  async function handleConfirm(note: string, formData?: Record<string, unknown>) {
+    if (!pendingAction) return false;
+    const succeeded = await onExecuteTask(pendingAction.taskId, pendingAction.action, note, formData);
+    if (succeeded) setPendingAction(null);
+    return succeeded;
   }
 
   return (
@@ -35,72 +98,154 @@ export function MyTasksView({ tasks, language, status, onExecuteTask }: MyTasksV
         <div className="process-card-header">
           <div>
             <span className="eyebrow">{t("process.myTasks")}</span>
-            <strong>{t("process.openTaskCount", { count: openTasks.length })}</strong>
+            <strong>{t("process.openTaskCount", { count: result.totalCount })}</strong>
           </div>
           <CircleDot size={22} />
         </div>
 
-        {openTasks.length > 0 ? (
+        <div className="task-query-toolbar">
+          <label>
+            <span>{isTr ? "Öncelik" : "Priority"}</span>
+            <select value={priorityFilter} onChange={(event) => onPriorityChange(event.target.value as TaskPriority | "all")}>
+              {priorities.map((priority) => (
+                <option key={priority} value={priority}>
+                  {priority === "all" ? (isTr ? "Tüm öncelikler" : "All priorities") : t(`process.priority.${priority}` as TranslationKey)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{isTr ? "Sırala" : "Sort"}</span>
+            <select value={sortBy} onChange={(event) => onSortByChange(event.target.value as NonNullable<TaskListParams["sortBy"]>)}>
+              <option value="dueAt">{isTr ? "En yakın son tarih" : "Nearest deadline"}</option>
+              <option value="priority">{isTr ? "Öncelik" : "Priority"}</option>
+              <option value="newest">{isTr ? "En yeni" : "Newest"}</option>
+              <option value="oldest">{isTr ? "En eski" : "Oldest"}</option>
+            </select>
+          </label>
+          <button
+            aria-label={isTr ? "Sıralama yönünü değiştir" : "Change sort direction"}
+            className="icon-button"
+            onClick={() => onSortDirectionChange(sortDirection === "asc" ? "desc" : "asc")}
+            type="button"
+          >
+            {sortDirection === "asc" ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+          </button>
+        </div>
+
+        {tasks.length > 0 ? (
           <div className="task-list">
-            {openTasks.map((task) => (
-              <div className="task-item" key={task.id}>
-                <div>
-                  <strong>{t("process.approvalTask")}</strong>
-                  <span>
-                    {task.id.slice(0, 8)} - {task.assignedCommunityRoleName || "Topluluk yetkisi"}
-                  </span>
-                  <small className="task-date">
-                    {formatApiDateTime(task.createdAt, language)}
-                  </small>
-                </div>
-                <div className="task-actions">
-                  <button
-                    className="success-button"
-                    disabled={status === "acting"}
-                    onClick={() => setPendingAction({ taskId: task.id, action: "Approve" })}
-                    type="button"
-                  >
-                    <CheckCircle2 size={17} />
-                    {t("process.approve")}
+            {tasks.map((task) => {
+              const isOverdue = Boolean(task.dueAt && Date.parse(task.dueAt) < renderedAt);
+              return (
+                <div
+                  className={`${selectedTaskId === task.id ? "task-item is-selected" : "task-item"}${isOverdue ? " is-overdue" : ""}`}
+                  key={task.id}
+                >
+                  <button className="task-item-select" onClick={() => onSelectTask(task)} type="button">
+                    <div>
+                      <div className="task-title-line">
+                        <strong>{task.title || t("process.approvalTask")}</strong>
+                        {task.priority ? <span className={`task-priority priority-${task.priority.toLowerCase()}`}>{t(`process.priority.${task.priority}` as TranslationKey)}</span> : null}
+                      </div>
+                      <span>{task.workflowName || task.formName || task.id.slice(0, 8)} · {task.communityName || task.assignedCommunityRoleName || (isTr ? "Topluluk yetkisi" : "Community access")}</span>
+                      {task.formName ? <small>{task.formName}</small> : null}
+                      <small className="task-date"><Clock3 size={13} /> {formatApiDateTime(task.createdAt, language)}</small>
+                      {task.dueAt ? (
+                        <small className={isOverdue ? "task-due-date is-overdue" : "task-due-date"}>
+                          <Clock3 size={13} /> {isOverdue ? (isTr ? "Gecikti" : "Overdue") : (isTr ? "Son tarih" : "Due")} · {formatApiDateTime(task.dueAt, language)}
+                        </small>
+                      ) : null}
+                    </div>
                   </button>
-                  <button
-                    className="danger-button"
-                    disabled={status === "acting"}
-                    onClick={() => setPendingAction({ taskId: task.id, action: "Reject" })}
-                    type="button"
-                  >
-                    <XCircle size={17} />
-                    {t("process.reject")}
-                  </button>
-                  {task.availableActions?.includes("Escalate") ? (
-                    <button
-                      className="escalate-button"
+                  <div>
+                    <TaskControls
+                      activeUserId={activeUserId}
                       disabled={status === "acting"}
-                      onClick={() => setPendingAction({ taskId: task.id, action: "Escalate" })}
-                      type="button"
-                    >
-                      <ArrowUpRight size={17} />
-                      {translate(language, "action.Escalate")}
-                    </button>
-                  ) : null}
+                      language={language}
+                      onAction={(action) => setPendingAction({ taskId: task.id, action })}
+                      onClaim={() => onClaimTask(task.id, task.claimVersion)}
+                      onRelease={() => onReleaseTask(task.id, task.claimVersion)}
+                      task={task}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <p className="empty-state">{t("process.noOpenTasks", { role: language === "tr" ? "topluluk rolunuz" : "your community role" })}</p>
+          <p className="empty-state">{t("process.noOpenTasks", { role: isTr ? "topluluk rolünüz" : "your community role" })}</p>
         )}
+
+        {totalPages > 1 ? (
+          <PaginationControls
+            currentPage={result.page}
+            language={language}
+            onNext={onNextPage}
+            onPageChange={onPageChange}
+            onPrevious={onPreviousPage}
+            totalPages={totalPages}
+          />
+        ) : null}
       </article>
 
       {pendingAction ? (
         <TaskActionDialog
           action={pendingAction.action}
-          language={language}
           disabled={status === "acting"}
+          language={language}
           onCancel={() => setPendingAction(null)}
           onConfirm={handleConfirm}
+          taskForm={tasks.find((task) => task.id === pendingAction.taskId)?.taskForm}
         />
       ) : null}
     </>
+  );
+}
+
+function TaskControls({
+  activeUserId,
+  disabled,
+  language,
+  onAction,
+  onClaim,
+  onRelease,
+  task,
+}: {
+  activeUserId: string;
+  disabled: boolean;
+  language: Language;
+  onAction: (action: Exclude<WorkflowAction, "Start">) => void;
+  onClaim: () => void;
+  onRelease: () => void;
+  task: ProcessTask;
+}) {
+  const t = (key: TranslationKey) => translate(language, key);
+  const requiresClaim = task.assignmentType === "Team" || task.assignmentType === "CommunityRole" || task.assignmentType === "TeamAndCommunityRole";
+  const isClaimedByCurrentUser = task.claimedByUserId === activeUserId;
+  const canAct = !requiresClaim || isClaimedByCurrentUser || !task.assignmentType;
+
+  if (requiresClaim && !task.claimedByUserId) {
+    return <div className="task-actions"><button className="primary-button" disabled={disabled} onClick={onClaim} type="button"><Hand size={17} />{t("process.claim")}</button></div>;
+  }
+  if (requiresClaim && !isClaimedByCurrentUser) {
+    return <span className="task-claim-state"><UserRoundCheck size={16} />{t("process.claimedByAnother")}</span>;
+  }
+
+  return (
+    <div className="task-actions">
+      {task.availableActions.filter((action): action is Exclude<WorkflowAction, "Start"> => action !== "Start").map((action) => {
+        const config = {
+          Approve: { className: "success-button", icon: CheckCircle2 },
+          Reject: { className: "danger-button", icon: XCircle },
+          Complete: { className: "success-button", icon: CheckCheck },
+          Escalate: { className: "escalate-button", icon: ArrowUpRight },
+          SendBack: { className: "secondary-button", icon: Undo2 },
+        }[action];
+        const ActionIcon = config.icon;
+        return <button className={config.className} disabled={disabled || !canAct} key={action} onClick={() => onAction(action)} type="button"><ActionIcon size={17} />{translate(language, `action.${action}` as TranslationKey)}</button>;
+      })}
+      {requiresClaim && isClaimedByCurrentUser ? <button className="secondary-button" disabled={disabled} onClick={onRelease} type="button"><Undo2 size={17} />{t("process.release")}</button> : null}
+    </div>
   );
 }

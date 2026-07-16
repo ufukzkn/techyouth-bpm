@@ -34,7 +34,7 @@ internal static class CommunityRoleTemplates
             ProcessStarter,
             "Surec Baslatici",
             "Formlari gorur, surec baslatir ve kendi toplulugundaki surecleri izler.",
-            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart]),
+            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart, PermissionNames.WorkflowsView]),
         new(
             Approver,
             "Onay Sorumlusu",
@@ -44,12 +44,12 @@ internal static class CommunityRoleTemplates
             StandardUser,
             "Standart Kullanici",
             "Formlari gorur, surec baslatir, surecleri ve kendisine acik isleri izler.",
-            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart, PermissionNames.TasksView]),
+            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesStart, PermissionNames.WorkflowsView, PermissionNames.TasksView]),
         new(
             ReadOnly,
             "Gozlemci",
             "Form, surec ve audit kayitlarini izler; degisiklik yapamaz.",
-            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.AuditView]),
+            [PermissionNames.FormsView, PermissionNames.ProcessesView, PermissionNames.ProcessesViewAll, PermissionNames.WorkflowsView, PermissionNames.AuditView]),
         new(
             Unassigned,
             "Atanmadi",

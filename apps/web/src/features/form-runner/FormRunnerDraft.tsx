@@ -1,17 +1,24 @@
 "use client";
 
-import { Play, RotateCcw } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Play, RotateCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { FieldRenderer } from "@/features/forms/fieldRenderer";
 import { buildInitialValues, prepareFormData, type FormValue, type FormValues } from "@/features/forms/formValues";
-import { validateFormValues } from "@/features/forms/formValidation";
+import { validateFormFields, validateFormValues } from "@/features/forms/formValidation";
+import { formatPagingCopy, getFormPagingCopy } from "@/features/forms/formPagingCopy";
+import {
+  resolveFormPages,
+  type FormVersionAdapter,
+  type FormVersionStatus,
+} from "@/features/forms/formVersioning";
 import { JsonViewer } from "@/features/ui/JsonViewer";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
 import { formatApiDateTime } from "@/lib/dateTime";
-import type { FormDefinition, ProcessDetail } from "@/lib/types";
+import type { FormDefinition, ProcessDetail, RunnableProcessDefinition } from "@/lib/types";
 
 type LoadStatus = "loading" | "refreshing" | "idle" | "error";
 type SubmitStatus = "idle" | "submitting" | "success" | "error";
@@ -20,18 +27,27 @@ type FormProcessingStatus = "switching" | "clearing" | null;
 const FORM_PROCESSING_DURATION_MS = 240;
 
 let formRunnerFormsCache: FormDefinition[] | null = null;
+let formRunnerWorkflowsCache: RunnableProcessDefinition[] | null = null;
 
-export function FormRunnerDraft() {
+export type FormRunnerDraftProps = {
+  versionAdapter?: Pick<FormVersionAdapter, "resolveLayout" | "resolveVersion">;
+};
+
+export function FormRunnerDraft({ versionAdapter }: FormRunnerDraftProps = {}) {
+  const router = useRouter();
   const token = useSessionStore((state) => state.token);
   const language = useSessionStore((state) => state.language);
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
+  const pagingCopy = getFormPagingCopy(language);
   const [forms, setForms] = useState<FormDefinition[]>(() => formRunnerFormsCache ?? []);
+  const [workflows, setWorkflows] = useState<RunnableProcessDefinition[]>(() => formRunnerWorkflowsCache ?? []);
   const [selectedFormId, setSelectedFormId] = useState(() => formRunnerFormsCache?.[0]?.id ?? "");
+  const [selectedWorkflowVersionId, setSelectedWorkflowVersionId] = useState("");
   const [values, setValues] = useState<FormValues>(() =>
-    formRunnerFormsCache?.[0] ? buildInitialValues(formRunnerFormsCache[0]) : {},
+    formRunnerFormsCache?.[0] ? buildInitialValues(resolveRunnerForm(formRunnerFormsCache[0], versionAdapter)) : {},
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadStatus, setLoadStatus] = useState<LoadStatus>(formRunnerFormsCache ? "refreshing" : "loading");
@@ -41,17 +57,48 @@ export function FormRunnerDraft() {
     formRunnerFormsCache ? t("form.runner.refreshingForms") : t("form.runner.loadingForms"),
   );
   const [submitResult, setSubmitResult] = useState<ProcessDetail | null>(null);
+  const [activePageIndex, setActivePageIndex] = useState(0);
+  const [furthestPageIndex, setFurthestPageIndex] = useState(0);
   const selectedFormIdRef = useRef(selectedFormId);
   const formProcessingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const submitInFlightRef = useRef(false);
 
   const selectedForm = forms.find((form) => form.id === selectedFormId);
-  const sortedFields = selectedForm?.fields.slice().sort((first, second) => first.sortOrder - second.sortOrder) ?? [];
-  const errorCount = Object.keys(errors).length;
+  const adapterVersion = selectedForm ? versionAdapter?.resolveVersion?.(selectedForm) : null;
+  const selectedFormVersionId = adapterVersion?.layout.versionId ?? selectedForm?.latestPublishedVersionId ?? null;
+  const availableWorkflows = workflows.filter((workflow) => workflow.formDefinitionVersionId === selectedFormVersionId);
+  const selectedWorkflow = availableWorkflows.find(
+    (workflow) => workflow.processDefinitionVersionId === selectedWorkflowVersionId,
+  ) ?? null;
+  const activeFormDefinition = selectedForm
+    ? adapterVersion
+      ? { ...selectedForm, fields: adapterVersion.fields }
+      : selectedForm
+    : undefined;
+  const sortedFields = activeFormDefinition?.fields.slice().sort((first, second) => first.sortOrder - second.sortOrder) ?? [];
+  const resolvedPages = activeFormDefinition
+    ? resolveFormPages(
+        activeFormDefinition,
+        adapterVersion?.layout ?? versionAdapter?.resolveLayout?.(activeFormDefinition),
+        pagingCopy.page,
+      )
+    : null;
+  const pages = resolvedPages?.pages ?? [];
+  const activePage = pages[activePageIndex] ?? pages[0];
+  const activeFields = activePage?.fields ?? sortedFields;
+  const activeFieldKeys = new Set(activeFields.map((field) => field.key));
+  const errorCount = Object.keys(errors).filter((fieldKey) => activeFieldKeys.has(fieldKey)).length;
   const hasForms = forms.length > 0;
   const isRunnerReady = Boolean(token) && loadStatus === "idle";
   const isFormProcessing = formProcessingStatus !== null;
-  const isActionDisabled = !selectedForm || !isRunnerReady || submitStatus === "submitting" || isFormProcessing;
+  const isNavigationDisabled = !selectedForm || !isRunnerReady || submitStatus === "submitting" || isFormProcessing;
+  const versionStatus = resolvedPages?.layout.status;
+  const isUnavailableVersion = Boolean(versionStatus && versionStatus !== "published");
+  const unavailableVersionMessage =
+    versionStatus === "archived" ? pagingCopy.archivedUnavailable : pagingCopy.draftUnavailable;
+  const isSubmitDisabled = isNavigationDisabled || isUnavailableVersion;
+  const isLastPage = activePageIndex >= pages.length - 1;
+  const hasMultiplePages = pages.length > 1;
   const formProcessingLabel =
     formProcessingStatus === "switching"
       ? t("form.runner.switchingForm")
@@ -61,7 +108,8 @@ export function FormRunnerDraft() {
 
   const output = {
     formDefinitionId: selectedFormId,
-    formData: selectedForm ? prepareFormData(selectedForm, values) : values,
+    ...(selectedWorkflow ? { processDefinitionVersionId: selectedWorkflow.processDefinitionVersionId } : {}),
+    formData: activeFormDefinition ? prepareFormData(activeFormDefinition, values) : values,
   };
 
   useEffect(() => {
@@ -70,9 +118,7 @@ export function FormRunnerDraft() {
 
   useEffect(
     () => () => {
-      if (formProcessingTimeoutRef.current !== null) {
-        clearTimeout(formProcessingTimeoutRef.current);
-      }
+      if (formProcessingTimeoutRef.current !== null) clearTimeout(formProcessingTimeoutRef.current);
     },
     [],
   );
@@ -89,23 +135,42 @@ export function FormRunnerDraft() {
 
       try {
         setLoadStatus(formRunnerFormsCache ? "refreshing" : "loading");
-        const result = await api.listForms(token);
+        const [result, runnableWorkflows] = await Promise.all([
+          api.listForms(token),
+          api.listRunnableProcessDefinitions(token).catch(() => []),
+        ]);
         if (ignore) {
           return;
         }
 
         formRunnerFormsCache = result;
+        formRunnerWorkflowsCache = runnableWorkflows;
         const currentSelection = result.find((form) => form.id === selectedFormIdRef.current);
         const nextSelectedForm = currentSelection ?? result[0];
         setForms(result);
+        setWorkflows(runnableWorkflows);
         setSelectedFormId(nextSelectedForm?.id ?? "");
+        const nextFormVersionId = nextSelectedForm
+          ? versionAdapter?.resolveVersion?.(nextSelectedForm)?.layout.versionId
+            ?? nextSelectedForm.latestPublishedVersionId
+          : null;
+        setSelectedWorkflowVersionId(
+          runnableWorkflows.find((workflow) => workflow.formDefinitionVersionId === nextFormVersionId)
+            ?.processDefinitionVersionId ?? "",
+        );
         setValues((current) =>
-          currentSelection && Object.keys(current).length > 0 ? current : nextSelectedForm ? buildInitialValues(nextSelectedForm) : {},
+          currentSelection && Object.keys(current).length > 0
+            ? current
+            : nextSelectedForm
+              ? buildInitialValues(resolveRunnerForm(nextSelectedForm, versionAdapter))
+              : {},
         );
         setErrors({});
         setSubmitResult(null);
+        setActivePageIndex(0);
+        setFurthestPageIndex(0);
         setLoadStatus("idle");
-        setSubmitStatus((current) => (current === "submitting" ? current : "idle"));
+        setSubmitStatus("idle");
         setMessage(result.length > 0 ? t("form.runner.loadedForms") : t("form.runner.designFirst"));
       } catch (error) {
         if (ignore) {
@@ -122,19 +187,68 @@ export function FormRunnerDraft() {
     return () => {
       ignore = true;
     };
-  }, [token, language, t]);
+  }, [token, language, t, versionAdapter]);
 
   function handleChange(fieldKey: string, value: FormValue) {
     setValues((current) => ({ ...current, [fieldKey]: value }));
-    setSubmitStatus((current) => (current === "submitting" ? current : "idle"));
+    setErrors((current) => {
+      if (!(fieldKey in current)) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[fieldKey];
+      return next;
+    });
+    setSubmitStatus("idle");
     setSubmitResult(null);
   }
 
-  function startFormProcessing(status: Exclude<FormProcessingStatus, null>) {
-    if (formProcessingTimeoutRef.current !== null) {
-      clearTimeout(formProcessingTimeoutRef.current);
+  function validateActivePage() {
+    if (!activePage) {
+      return false;
     }
 
+    const nextErrors = validateFormFields(activePage.fields, values, language);
+    setErrors((current) => replacePageErrors(current, activePage.fields.map((field) => field.key), nextErrors));
+    if (Object.keys(nextErrors).length > 0) {
+      setSubmitStatus("idle");
+      setMessage(pagingCopy.pageErrors);
+      return false;
+    }
+
+    return true;
+  }
+
+  function goToPage(pageIndex: number) {
+    if (pageIndex === activePageIndex || pageIndex < 0 || pageIndex >= pages.length) {
+      return;
+    }
+
+    if (pageIndex > activePageIndex && !validateActivePage()) {
+      return;
+    }
+
+    setActivePageIndex(pageIndex);
+    setFurthestPageIndex((current) => Math.max(current, pageIndex));
+    setMessage(
+      formatPagingCopy(pagingCopy.pageProgress, {
+        current: pageIndex + 1,
+        total: pages.length,
+      }),
+    );
+  }
+
+  function showNextPage() {
+    goToPage(activePageIndex + 1);
+  }
+
+  function showPreviousPage() {
+    goToPage(activePageIndex - 1);
+  }
+
+  function startFormProcessing(status: Exclude<FormProcessingStatus, null>) {
+    if (formProcessingTimeoutRef.current !== null) clearTimeout(formProcessingTimeoutRef.current);
     setFormProcessingStatus(status);
     formProcessingTimeoutRef.current = setTimeout(() => {
       setFormProcessingStatus(null);
@@ -143,47 +257,70 @@ export function FormRunnerDraft() {
   }
 
   function handleFormSelection(nextFormId: string) {
-    if (formProcessingTimeoutRef.current !== null || submitInFlightRef.current) {
-      return;
-    }
+    if (formProcessingTimeoutRef.current !== null || submitInFlightRef.current) return;
 
     const nextForm = forms.find((form) => form.id === nextFormId);
     startFormProcessing("switching");
     setSelectedFormId(nextFormId);
-    setValues(nextForm ? buildInitialValues(nextForm) : {});
+    setValues(nextForm ? buildInitialValues(resolveRunnerForm(nextForm, versionAdapter)) : {});
+    const nextVersionId = nextForm
+      ? versionAdapter?.resolveVersion?.(nextForm)?.layout.versionId ?? nextForm.latestPublishedVersionId
+      : null;
+    setSelectedWorkflowVersionId(
+      workflows.find((workflow) => workflow.formDefinitionVersionId === nextVersionId)?.processDefinitionVersionId ?? "",
+    );
     setErrors({});
     setSubmitStatus("idle");
     setSubmitResult(null);
+    setActivePageIndex(0);
+    setFurthestPageIndex(0);
     setMessage(nextForm ? t("form.runner.selectedMessage", { name: nextForm.name }) : t("form.runner.noSavedForm"));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedForm || !token || !isRunnerReady || isFormProcessing || submitInFlightRef.current) {
+    if (!selectedForm || !activeFormDefinition || !token || !isRunnerReady || isFormProcessing || submitInFlightRef.current) {
       return;
     }
 
-    const nextErrors = validateFormValues(selectedForm, values, language);
+    if (!isLastPage) {
+      showNextPage();
+      return;
+    }
+
+    if (isUnavailableVersion) {
+      setMessage(unavailableVersionMessage);
+      return;
+    }
+
+    const nextErrors = validateFormValues(activeFormDefinition, values, language);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
+      const firstInvalidPageIndex = pages.findIndex((page) =>
+        page.fields.some((field) => Object.hasOwn(nextErrors, field.key)),
+      );
+      if (firstInvalidPageIndex >= 0) {
+        setActivePageIndex(firstInvalidPageIndex);
+        setFurthestPageIndex((current) => Math.max(current, firstInvalidPageIndex));
+      }
       setSubmitStatus("idle");
       setMessage(t("form.runner.fixFields"));
       return;
     }
 
     submitInFlightRef.current = true;
-
     try {
       setSubmitStatus("submitting");
       setSubmitResult(null);
-      const process = await api.startProcess(token, {
-        formDefinitionId: selectedForm.id,
-        formData: prepareFormData(selectedForm, values),
-      });
+      const formData = prepareFormData(activeFormDefinition, values);
+      const process = selectedWorkflow
+        ? await api.startProcessVersion(token, selectedWorkflow.processDefinitionVersionId, formData)
+        : await api.startProcess(token, { formDefinitionId: selectedForm.id, formData });
       setSubmitStatus("success");
       setSubmitResult(process);
       setMessage(t("form.runner.started", { id: process.id }));
+      router.push(`/processes?processId=${encodeURIComponent(process.id)}&started=1`);
     } catch (error) {
       setSubmitStatus("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("form.runner.startFailed"));
@@ -193,15 +330,17 @@ export function FormRunnerDraft() {
   }
 
   function resetForm() {
-    if (!selectedForm || !isRunnerReady || submitInFlightRef.current || formProcessingTimeoutRef.current !== null) {
+    if (!activeFormDefinition || !isRunnerReady || submitInFlightRef.current || formProcessingTimeoutRef.current !== null) {
       return;
     }
 
     startFormProcessing("clearing");
-    setValues(buildInitialValues(selectedForm));
+    setValues(buildInitialValues(activeFormDefinition));
     setErrors({});
     setSubmitStatus("idle");
     setSubmitResult(null);
+    setActivePageIndex(0);
+    setFurthestPageIndex(0);
     setMessage(t("form.runner.cleared"));
   }
 
@@ -227,7 +366,6 @@ export function FormRunnerDraft() {
               </span>
             </div>
           ) : null}
-
           {loadStatus === "error" ? (
             <div className="runner-state-panel runner-state-error" role="alert">
               <strong>{token ? t("form.runner.loadFailed") : t("form.runner.sessionRequired")}</strong>
@@ -250,12 +388,7 @@ export function FormRunnerDraft() {
           <label>
             {t("form.runner.savedForm")}
             <select
-              disabled={
-                loadStatus !== "idle" ||
-                !hasForms ||
-                submitStatus === "submitting" ||
-                isFormProcessing
-              }
+              disabled={loadStatus !== "idle" || !hasForms || submitStatus === "submitting" || isFormProcessing}
               value={selectedFormId}
               onChange={(event) => handleFormSelection(event.target.value)}
             >
@@ -269,6 +402,25 @@ export function FormRunnerDraft() {
           </label>
 
           {selectedForm ? (
+            <label>
+              {t("form.runner.workflow")}
+              <select
+                disabled={loadStatus !== "idle" || submitStatus === "submitting"}
+                onChange={(event) => setSelectedWorkflowVersionId(event.target.value)}
+                value={selectedWorkflowVersionId}
+              >
+                <option value="">{t("form.runner.legacyWorkflow")}</option>
+                {availableWorkflows.map((workflow) => (
+                  <option key={workflow.processDefinitionVersionId} value={workflow.processDefinitionVersionId}>
+                    {t("form.runner.workflowVersion", { name: workflow.name, version: workflow.versionNumber })}
+                  </option>
+                ))}
+              </select>
+              {availableWorkflows.length === 0 ? <small>{t("form.runner.noPublishedWorkflow")}</small> : null}
+            </label>
+          ) : null}
+
+          {selectedForm ? (
             <div className="selected-form-summary">
               <span className="eyebrow">{t("form.runner.selectedSummaryEyebrow")}</span>
               <strong>{selectedForm.name}</strong>
@@ -278,22 +430,76 @@ export function FormRunnerDraft() {
                   description: selectedForm.description || t("form.runner.noDescription"),
                 })}
               </span>
+              {resolvedPages ? (
+                <div className="runner-version-summary">
+                  <span>{pagingCopy.version} {resolvedPages.layout.version}</span>
+                  <strong className={`form-version-status form-version-status-${resolvedPages.layout.status}`}>
+                    {getRunnerVersionStatusLabel(pagingCopy, resolvedPages.layout.status)}
+                  </strong>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {isUnavailableVersion ? (
+            <div className="runner-state-panel runner-state-warning" role="status">
+              <strong>{versionStatus === "archived" ? pagingCopy.archived : pagingCopy.draft}</strong>
+              <span>{unavailableVersionMessage}</span>
             </div>
           ) : null}
 
           {loadStatus !== "loading" && !selectedForm ? <p className="empty-state">{t("form.runner.noFormPrompt")}</p> : null}
 
-          {loadStatus !== "loading" &&
-            sortedFields.map((field) => (
-              <FieldRenderer
-                key={field.key}
-                field={field}
-                value={values[field.key]}
-                error={errors[field.key]}
-                language={language}
-                onChange={handleChange}
-              />
-            ))}
+          {hasMultiplePages && activePage ? (
+            <nav className="runner-stepper" aria-label={pagingCopy.stepperLabel}>
+              <ol>
+                {pages.map((page, index) => {
+                  const isActive = index === activePageIndex;
+                  const isComplete = index < activePageIndex || index < furthestPageIndex;
+                  return (
+                    <li key={page.id}>
+                      <button
+                        className={`runner-step${isActive ? " runner-step-active" : ""}${
+                          isComplete ? " runner-step-complete" : ""
+                        }`}
+                        disabled={isNavigationDisabled || index > furthestPageIndex + 1}
+                        type="button"
+                        aria-current={isActive ? "step" : undefined}
+                        aria-label={`${pagingCopy.goToPage}: ${page.title}`}
+                        onClick={() => goToPage(index)}
+                      >
+                        <span className="runner-step-index">{index + 1}</span>
+                        <span className="runner-step-copy">
+                          <small>{pagingCopy.page} {index + 1}</small>
+                          <strong>{page.title}</strong>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+              <div className="runner-current-page-heading">
+                <span>{formatPagingCopy(pagingCopy.pageProgress, { current: activePageIndex + 1, total: pages.length })}</span>
+                <h3>{activePage.title}</h3>
+                {activePage.description ? <p>{activePage.description}</p> : null}
+              </div>
+            </nav>
+          ) : null}
+
+          {loadStatus !== "loading" && activePage ? (
+            <div className="runner-page-fields" key={activePage.id}>
+              {activeFields.map((field) => (
+                <FieldRenderer
+                  key={field.key}
+                  field={field}
+                  value={values[field.key]}
+                  error={errors[field.key]}
+                  language={language}
+                  onChange={handleChange}
+                />
+              ))}
+            </div>
+          ) : null}
 
           {errorCount > 0 ? (
             <div className="runner-state-panel runner-state-error" role="alert">
@@ -320,27 +526,31 @@ export function FormRunnerDraft() {
           </p>
 
           <div className="runner-actions">
-            <button
-              className="primary-button"
-              aria-busy={submitStatus === "submitting"}
-              disabled={isActionDisabled}
-              type="submit"
-            >
-              {submitStatus === "submitting" ? <span className="button-spinner" aria-hidden="true" /> : <Play size={18} />}
-              {submitStatus === "submitting" ? t("form.runner.starting") : t("form.runner.startProcess")}
-            </button>
+            {hasMultiplePages && activePageIndex > 0 ? (
+              <button className="secondary-button" disabled={isNavigationDisabled} type="button" onClick={showPreviousPage}>
+                <ChevronLeft size={18} />
+                {pagingCopy.previous}
+              </button>
+            ) : null}
+            {isLastPage ? (
+              <button className="primary-button" disabled={isSubmitDisabled} type="submit">
+                {submitStatus === "submitting" ? <span className="button-spinner" aria-hidden="true" /> : <Play size={18} />}
+                {submitStatus === "submitting" ? t("form.runner.starting") : t("form.runner.startProcess")}
+              </button>
+            ) : (
+              <button className="primary-button" disabled={isNavigationDisabled} type="button" onClick={showNextPage}>
+                {pagingCopy.next}
+                <ChevronRight size={18} />
+              </button>
+            )}
             <button
               className="secondary-button"
               aria-busy={formProcessingStatus === "clearing"}
-              disabled={isActionDisabled}
+              disabled={isNavigationDisabled}
               type="button"
               onClick={resetForm}
             >
-              {formProcessingStatus === "clearing" ? (
-                <span className="button-spinner" aria-hidden="true" />
-              ) : (
-                <RotateCcw size={18} />
-              )}
+              {formProcessingStatus === "clearing" ? <span className="button-spinner" aria-hidden="true" /> : <RotateCcw size={18} />}
               {formProcessingStatus === "clearing" ? t("form.runner.clearing") : t("form.runner.clear")}
             </button>
           </div>
@@ -356,6 +566,35 @@ export function FormRunnerDraft() {
       </div>
     </section>
   );
+}
+
+function replacePageErrors(
+  currentErrors: Record<string, string>,
+  pageFieldKeys: string[],
+  pageErrors: Record<string, string>,
+) {
+  const nextErrors = { ...currentErrors };
+  for (const fieldKey of pageFieldKeys) {
+    delete nextErrors[fieldKey];
+  }
+
+  return { ...nextErrors, ...pageErrors };
+}
+
+function resolveRunnerForm(
+  form: FormDefinition,
+  versionAdapter: Pick<FormVersionAdapter, "resolveVersion"> | undefined,
+) {
+  const version = versionAdapter?.resolveVersion?.(form);
+  return version ? { ...form, fields: version.fields } : form;
+}
+
+function getRunnerVersionStatusLabel(copy: ReturnType<typeof getFormPagingCopy>, status: FormVersionStatus) {
+  if (status === "published") {
+    return copy.published;
+  }
+
+  return status === "archived" ? copy.archived : copy.draft;
 }
 
 function FormRunnerSkeleton({ language }: { language: "tr" | "en" }) {

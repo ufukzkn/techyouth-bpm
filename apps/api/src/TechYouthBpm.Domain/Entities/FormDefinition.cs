@@ -14,4 +14,5 @@ public class FormDefinition
     public User? UpdatedByUser { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public List<FormFieldDefinition> Fields { get; set; } = [];
+    public List<FormDefinitionVersion> Versions { get; set; } = [];
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ArrowUpRight, CheckCircle2, Play, XCircle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CheckCheck, CheckCircle2, Play, RotateCcw, XCircle } from "lucide-react";
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
 import { formatApiDateTime } from "@/lib/dateTime";
 import type { AuditLog, Language, WorkflowAction } from "@/lib/types";
@@ -15,6 +15,8 @@ const actionConfig: Record<WorkflowAction, { icon: typeof Play; className: strin
   Approve: { icon: CheckCircle2, className: "audit-node-approve" },
   Reject: { icon: XCircle, className: "audit-node-reject" },
   Escalate: { icon: ArrowUpRight, className: "audit-node-escalate" },
+  SendBack: { icon: RotateCcw, className: "audit-node-send-back" },
+  Complete: { icon: CheckCheck, className: "audit-node-approve" },
 };
 
 export function AuditTimeline({ logs, language }: AuditTimelineProps) {

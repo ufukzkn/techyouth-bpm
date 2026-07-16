@@ -221,6 +221,47 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.ToTable("FormDefinitions");
                 });
 
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormDefinitionVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PublishedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("PublishedByUserId");
+
+                    b.HasIndex("FormDefinitionId", "Status");
+
+                    b.HasIndex("FormDefinitionId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("FormDefinitionVersions");
+                });
+
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormFieldDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -256,6 +297,109 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.HasIndex("FormDefinitionId");
 
                     b.ToTable("FormFieldDefinitions");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormPageDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("FormDefinitionVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormDefinitionVersionId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("FormDefinitionVersionId", "SortOrder");
+
+                    b.ToTable("FormPageDefinitions");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormVersionFieldDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FormPageDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("OptionsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("Required")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormPageDefinitionId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("FormVersionFieldDefinitions");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormVersionFieldValidationRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DependsOnFieldKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ExpectedValue")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("FormVersionFieldDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("RuleType")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormVersionFieldDefinitionId");
+
+                    b.ToTable("FormVersionFieldValidationRules");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.Notification", b =>
@@ -302,6 +446,96 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.ToTable("Notifications");
                 });
 
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("CommunityId", "Name");
+
+                    b.ToTable("ProcessDefinitions");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessDefinitionVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("FormDefinitionVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("GraphJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProcessDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PublishedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("FormDefinitionVersionId");
+
+                    b.HasIndex("PublishedByUserId");
+
+                    b.HasIndex("ProcessDefinitionId", "Status");
+
+                    b.HasIndex("ProcessDefinitionId", "VersionNumber")
+                        .IsUnique();
+
+                    b.ToTable("ProcessDefinitionVersions");
+                });
+
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessInstance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -314,11 +548,21 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("CurrentNodeKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("FormDataJson")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<Guid>("FormDefinitionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("FormDefinitionVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProcessDefinitionVersionId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("StartedAt")
@@ -330,15 +574,71 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<string>("VariablesJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CommunityId");
 
                     b.HasIndex("FormDefinitionId");
 
+                    b.HasIndex("FormDefinitionVersionId");
+
+                    b.HasIndex("ProcessDefinitionVersionId");
+
                     b.HasIndex("StartedByUserId");
 
                     b.ToTable("ProcessInstances");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessStepExecution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Action")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CompletedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("EnteredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NodeKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("NodeType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OutputJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProcessInstanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompletedByUserId");
+
+                    b.HasIndex("ProcessInstanceId", "NodeKey", "Attempt")
+                        .IsUnique();
+
+                    b.ToTable("ProcessStepExecutions");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessTask", b =>
@@ -353,9 +653,34 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Property<int>("AssignedRole")
                         .HasColumnType("integer");
 
+                    b.Property<Guid?>("AssignedUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("AssignmentType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Attempt")
+                        .HasColumnType("integer");
+
                     b.Property<string>("AvailableActionsJson")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid?>("CandidateCommunityRoleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CandidateTeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClaimVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ClaimedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ClaimedByUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
@@ -365,6 +690,19 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("DueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("FormDefinitionVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NodeKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("ProcessInstanceId")
                         .HasColumnType("uuid");
@@ -376,13 +714,29 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedCommunityRoleId");
 
+                    b.HasIndex("CandidateCommunityRoleId");
+
+                    b.HasIndex("CandidateTeamId");
+
                     b.HasIndex("CompletedByUserId");
 
+                    b.HasIndex("FormDefinitionVersionId");
+
                     b.HasIndex("ProcessInstanceId");
+
+                    b.HasIndex("AssignedUserId", "Status");
+
+                    b.HasIndex("ClaimedByUserId", "Status");
+
+                    b.HasIndex("Status", "DueAt", "Priority", "CreatedAt");
 
                     b.ToTable("ProcessTasks");
                 });
@@ -465,6 +819,83 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.HasIndex("ActorUserId");
 
                     b.ToTable("SystemAuditLogs");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.Team", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CommunityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("CommunityId", "NormalizedName")
+                        .IsUnique();
+
+                    b.ToTable("Teams");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.TeamMembership", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsLead")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TeamId", "UserId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.ToTable("TeamMemberships");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.User", b =>
@@ -687,6 +1118,32 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Navigation("UpdatedByUser");
                 });
 
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormDefinitionVersion", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.FormDefinition", "FormDefinition")
+                        .WithMany("Versions")
+                        .HasForeignKey("FormDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "PublishedByUser")
+                        .WithMany()
+                        .HasForeignKey("PublishedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("FormDefinition");
+
+                    b.Navigation("PublishedByUser");
+                });
+
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormFieldDefinition", b =>
                 {
                     b.HasOne("TechYouthBpm.Domain.Entities.FormDefinition", "FormDefinition")
@@ -698,6 +1155,39 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Navigation("FormDefinition");
                 });
 
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormPageDefinition", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.FormDefinitionVersion", "FormDefinitionVersion")
+                        .WithMany("Pages")
+                        .HasForeignKey("FormDefinitionVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FormDefinitionVersion");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormVersionFieldDefinition", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.FormPageDefinition", "FormPageDefinition")
+                        .WithMany("Fields")
+                        .HasForeignKey("FormPageDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("FormPageDefinition");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormVersionFieldValidationRule", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.FormVersionFieldDefinition", "Field")
+                        .WithMany("ValidationRules")
+                        .HasForeignKey("FormVersionFieldDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Field");
+                });
+
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.Notification", b =>
                 {
                     b.HasOne("TechYouthBpm.Domain.Entities.User", "User")
@@ -707,6 +1197,66 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessDefinition", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.Community", "Community")
+                        .WithMany()
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Community");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("UpdatedByUser");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessDefinitionVersion", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.FormDefinitionVersion", "FormDefinitionVersion")
+                        .WithMany()
+                        .HasForeignKey("FormDefinitionVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.ProcessDefinition", "ProcessDefinition")
+                        .WithMany("Versions")
+                        .HasForeignKey("ProcessDefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "PublishedByUser")
+                        .WithMany()
+                        .HasForeignKey("PublishedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("FormDefinitionVersion");
+
+                    b.Navigation("ProcessDefinition");
+
+                    b.Navigation("PublishedByUser");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessInstance", b =>
@@ -723,6 +1273,16 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("TechYouthBpm.Domain.Entities.FormDefinitionVersion", "FormDefinitionVersion")
+                        .WithMany()
+                        .HasForeignKey("FormDefinitionVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.ProcessDefinitionVersion", "ProcessDefinitionVersion")
+                        .WithMany()
+                        .HasForeignKey("ProcessDefinitionVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TechYouthBpm.Domain.Entities.User", "StartedByUser")
                         .WithMany()
                         .HasForeignKey("StartedByUserId")
@@ -733,7 +1293,29 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.Navigation("FormDefinition");
 
+                    b.Navigation("FormDefinitionVersion");
+
+                    b.Navigation("ProcessDefinitionVersion");
+
                     b.Navigation("StartedByUser");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessStepExecution", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "CompletedByUser")
+                        .WithMany()
+                        .HasForeignKey("CompletedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.ProcessInstance", "ProcessInstance")
+                        .WithMany("StepExecutions")
+                        .HasForeignKey("ProcessInstanceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CompletedByUser");
+
+                    b.Navigation("ProcessInstance");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessTask", b =>
@@ -743,9 +1325,34 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                         .HasForeignKey("AssignedCommunityRoleId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "AssignedUser")
+                        .WithMany()
+                        .HasForeignKey("AssignedUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.CommunityRole", "CandidateCommunityRole")
+                        .WithMany()
+                        .HasForeignKey("CandidateCommunityRoleId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.Team", "CandidateTeam")
+                        .WithMany()
+                        .HasForeignKey("CandidateTeamId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "ClaimedByUser")
+                        .WithMany()
+                        .HasForeignKey("ClaimedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("TechYouthBpm.Domain.Entities.User", "CompletedByUser")
                         .WithMany()
                         .HasForeignKey("CompletedByUserId");
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.FormDefinitionVersion", "FormDefinitionVersion")
+                        .WithMany()
+                        .HasForeignKey("FormDefinitionVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("TechYouthBpm.Domain.Entities.ProcessInstance", "ProcessInstance")
                         .WithMany("Tasks")
@@ -755,7 +1362,17 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.Navigation("AssignedCommunityRole");
 
+                    b.Navigation("AssignedUser");
+
+                    b.Navigation("CandidateCommunityRole");
+
+                    b.Navigation("CandidateTeam");
+
+                    b.Navigation("ClaimedByUser");
+
                     b.Navigation("CompletedByUser");
+
+                    b.Navigation("FormDefinitionVersion");
 
                     b.Navigation("ProcessInstance");
                 });
@@ -787,6 +1404,43 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("ActorUser");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.Team", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.Community", "Community")
+                        .WithMany("Teams")
+                        .HasForeignKey("CommunityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Community");
+
+                    b.Navigation("CreatedByUser");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.TeamMembership", b =>
+                {
+                    b.HasOne("TechYouthBpm.Domain.Entities.Team", "Team")
+                        .WithMany("Memberships")
+                        .HasForeignKey("TeamId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("TechYouthBpm.Domain.Entities.User", "User")
+                        .WithMany("TeamMemberships")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Team");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.UserCommunityMembership", b =>
@@ -830,6 +1484,8 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.Community", b =>
                 {
                     b.Navigation("Roles");
+
+                    b.Navigation("Teams");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.CommunityRole", b =>
@@ -840,6 +1496,13 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormDefinition", b =>
                 {
                     b.Navigation("Fields");
+
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormDefinitionVersion", b =>
+                {
+                    b.Navigation("Pages");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormFieldDefinition", b =>
@@ -847,16 +1510,40 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Navigation("ValidationRules");
                 });
 
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormPageDefinition", b =>
+                {
+                    b.Navigation("Fields");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.FormVersionFieldDefinition", b =>
+                {
+                    b.Navigation("ValidationRules");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessDefinition", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.ProcessInstance", b =>
                 {
                     b.Navigation("AuditLogs");
 
+                    b.Navigation("StepExecutions");
+
                     b.Navigation("Tasks");
+                });
+
+            modelBuilder.Entity("TechYouthBpm.Domain.Entities.Team", b =>
+                {
+                    b.Navigation("Memberships");
                 });
 
             modelBuilder.Entity("TechYouthBpm.Domain.Entities.User", b =>
                 {
                     b.Navigation("CommunityMemberships");
+
+                    b.Navigation("TeamMemberships");
                 });
 #pragma warning restore 612, 618
         }

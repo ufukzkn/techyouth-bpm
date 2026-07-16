@@ -1,4 +1,5 @@
 using TechYouthBpm.Application.Auth;
+using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
 using TechYouthBpm.Infrastructure.Services;
@@ -76,7 +77,7 @@ public class DashboardServiceTests
         Assert.Equal(1, starterSummary.CompletedProcessCount);
         Assert.Equal(1, approverSummary.OpenTaskCount);
         Assert.Equal(1, approverSummary.InProgressProcessCount);
-        Assert.Equal(1, approverSummary.CompletedProcessCount);
+        Assert.Equal(0, approverSummary.CompletedProcessCount);
         Assert.Empty(starterSummary.RecentOpenTasks!);
         Assert.Single(approverSummary.RecentOpenTasks!);
         Assert.Equal(2, starterSummary.RecentProcesses!.Count);
@@ -139,7 +140,7 @@ public class DashboardServiceTests
     }
 
     [Fact]
-    public async Task GetSummaryAsync_Uses_Community_Scope_While_SuperAdmin_Remains_Global()
+    public async Task GetSummaryAsync_Uses_Explicit_Community_And_Global_Scopes()
     {
         await using var db = TestDbFactory.Create();
         var starter = TestDbFactory.SeedUser(db, Role.User, "scoped-starter");
@@ -175,10 +176,48 @@ public class DashboardServiceTests
         await db.SaveChangesAsync();
         var service = new DashboardService(db);
 
-        var scopedSummary = await service.GetSummaryAsync(TestDbFactory.ToDto(starter));
-        var globalSummary = await service.GetSummaryAsync(TestDbFactory.ToDto(superAdmin));
+        var scopedSummary = await service.GetSummaryAsync(
+            TestDbFactory.CommunityAdminDto(starter),
+            WorkflowVisibilityScope.Community);
+        var personalSuperAdminSummary = await service.GetSummaryAsync(TestDbFactory.ToDto(superAdmin));
+        var globalSummary = await service.GetSummaryAsync(
+            TestDbFactory.ToDto(superAdmin),
+            WorkflowVisibilityScope.Global);
 
         Assert.DoesNotContain(scopedSummary.RecentProcesses!, item => item.FormName == "Other Community Form");
+        Assert.Empty(personalSuperAdminSummary.RecentProcesses!);
         Assert.Contains(globalSummary.RecentProcesses!, item => item.FormName == "Other Community Form");
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_Counts_Escalated_Process_As_Ongoing()
+    {
+        await using var db = TestDbFactory.Create();
+        var starter = TestDbFactory.SeedUser(db, Role.User, "escalated-starter");
+        var form = new FormDefinition
+        {
+            Id = Guid.NewGuid(),
+            Name = "Escalated Form",
+            CommunityId = TestDbFactory.CommunityId,
+            CreatedByUserId = starter.Id,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.AddRange(
+            form,
+            new ProcessInstance
+            {
+                Id = Guid.NewGuid(),
+                FormDefinitionId = form.Id,
+                CommunityId = TestDbFactory.CommunityId,
+                StartedByUserId = starter.Id,
+                Status = ProcessStatus.Escalated,
+                FormDataJson = "{}",
+                StartedAt = DateTime.UtcNow
+            });
+        await db.SaveChangesAsync();
+
+        var summary = await new DashboardService(db).GetSummaryAsync(TestDbFactory.ToDto(starter));
+
+        Assert.Equal(1, summary.InProgressProcessCount);
     }
 }

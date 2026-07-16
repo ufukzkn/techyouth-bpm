@@ -54,6 +54,10 @@ public static class DependencyInjection
             };
         });
         services.AddScoped<IFormService, FormService>();
+        services.AddScoped<IFormVersionService, FormVersionService>();
+        services.AddScoped<IProcessGraphValidator, ProcessGraphValidator>();
+        services.AddScoped<IProcessDefinitionService, ProcessDefinitionService>();
+        services.AddScoped<IWorkflowVisibilityService, WorkflowVisibilityService>();
         services.AddScoped<IProcessService, ProcessService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ITaskService, TaskService>();
@@ -62,6 +66,7 @@ public static class DependencyInjection
         services.AddScoped<ICommunityRoleService>(provider =>
             (ICommunityRoleService)provider.GetRequiredService<ICommunityService>());
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<ITeamService, TeamService>();
         services.AddSingleton<ProcessStateMachine>();
 
         return services;

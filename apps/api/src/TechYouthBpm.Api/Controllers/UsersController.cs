@@ -9,6 +9,7 @@ namespace TechYouthBpm.Api.Controllers;
 public class UsersController(
     IUserAdministrationService userAdministrationService,
     ISessionService sessionService,
+    ITeamService teamService,
     IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
 {
     [HttpGet]
@@ -92,6 +93,19 @@ public class UsersController(
         }
 
         var result = await sessionService.ListUserSessionsAsync(userId, user, CurrentToken(), cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpGet("{userId:guid}/team-memberships")]
+    public async Task<IActionResult> TeamMemberships(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await teamService.ListUserMembershipsAsync(userId, user, cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 

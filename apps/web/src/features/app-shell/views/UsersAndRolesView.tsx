@@ -17,6 +17,7 @@ import { api } from "@/lib/api";
 import type { Community, CommunityRole, CommunitySummary, Language, Role, SystemAuditLog, User, UserAdmin, UserSession, UserStatus } from "@/lib/types";
 import { UserListPanel } from "@/features/management/UserListPanel";
 import { clearUserManagementCache, useUserManagement } from "@/features/management/useUserManagement";
+import { UserTeamMembershipPanel } from "@/features/teams/UserTeamMembershipPanel";
 
 const userCommunitySummaryCache = new Map<string, CommunitySummary>();
 const allCommunitiesUserCountCache = new Map<string, number>();
@@ -884,6 +885,16 @@ export function UsersAndRolesView({
                   </button>
                   <ActionFeedback feedback={passwordResetFeedback} />
                 </div>
+              ) : null}
+              {selectedUser.role !== "SuperAdmin" ? (
+                <UserTeamMembershipPanel
+                  activeUser={activeUser}
+                  key={selectedUser.id}
+                  language={language}
+                  onChanged={refreshUsers}
+                  selectedUser={selectedUser}
+                  token={token}
+                />
               ) : null}
               <section className="identity-section nested-identity-section">
                 <div className="section-toolbar">

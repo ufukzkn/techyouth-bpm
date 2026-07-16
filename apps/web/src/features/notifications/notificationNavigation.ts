@@ -2,7 +2,7 @@ import type { NotificationItem } from "@/lib/types";
 
 export function getNotificationTarget(notification: NotificationItem): string | null {
   if (notification.type.startsWith("Task.")) {
-    return `/tasks${notification.entityId ? `?processId=${encodeURIComponent(notification.entityId)}` : ""}`;
+    return `/tasks${notification.entityId ? `?taskId=${encodeURIComponent(notification.entityId)}` : ""}`;
   }
 
   if (notification.type.startsWith("Process.")) {

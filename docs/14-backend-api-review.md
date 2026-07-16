@@ -13,10 +13,10 @@ The backend satisfies the core PDF expectations well:
 - **Authentication and user/role storage:** users, roles, statuses, password hashes, active sessions, refresh tokens and lockout fields are stored in EF Core entities.
 - **Authorization:** service methods enforce platform role, community scope and operation permission checks for management, forms, process visibility and task execution.
 - **EF Core database layer:** `AppDbContext` supports SQLite by default and PostgreSQL through Npgsql for Neon/shared database testing.
-- **Form persistence:** form definitions, fields, options and validation rules are persisted.
+- **Form persistence:** logical forms plus immutable published versions, pages, fields, options and validation rules are persisted.
 - **Community access model:** communities, custom community roles, role permissions and user memberships are persisted.
-- **Submission and process start:** submitted form data is validated and stored as JSON, then converted into a process instance with the first approver task.
-- **Task and BPM flow:** assigned tasks support approve/reject, and process status transitions are controlled by `ProcessStateMachine`.
+- **Submission and process start:** submitted form data is validated and stored as namespaced JSON variables, then a pinned published workflow version creates the first reachable task.
+- **Task and BPM flow:** typed workflow graphs support start, user task, exclusive gateway, completed/rejected end and team swimlane nodes. Tasks support claim/release plus approve/reject/complete/escalate/send-back.
 - **Audit traceability:** process audit logs and system audit logs record who performed key actions.
 - **Backend validation:** required, type-based and dependent validation are centralized in backend services.
 
@@ -31,7 +31,7 @@ The project uses a clean four-layer split:
 - `TechYouthBpm.Infrastructure`: EF Core, seed data and service implementations.
 - `TechYouthBpm.Api`: controllers, Swagger, CORS, cookies and startup configuration.
 
-This is a good code review story because controllers stay mostly orchestration-only while services own rules. The state machine is isolated, so adding new workflow statuses or actions should not require rewriting controllers. EF Core provider selection is also centralized, which keeps SQLite local development and PostgreSQL/Neon shared testing compatible.
+This is a good code review story because controllers stay mostly orchestration-only while services own rules. `ProcessStateMachine` isolates high-level lifecycle transitions; `DynamicWorkflowEngine`, `IProcessGraphValidator` and `TaskAssignmentResolver` isolate graph execution, validation and candidate resolution. EF Core provider selection is centralized, which keeps SQLite local development and PostgreSQL/Neon shared testing compatible.
 
 The backend now uses EF Core migrations instead of `EnsureCreated`. Startup applies migrations through `Database.MigrateAsync`, then runs deterministic seed data. This gives a stronger production-readiness story while keeping SQLite local demos and PostgreSQL/Neon shared testing on the same EF model.
 
@@ -59,31 +59,21 @@ Remaining hardening opportunities:
 - split rate limit policies per endpoint group instead of one shared `auth` policy
 - add refresh-token family/device identifiers for more precise suspicious-device handling
 - configure allowed CORS origins through environment variables for non-local deployments
-- add optimistic concurrency protection for simultaneous task actions
+- extend concurrency protection from candidate claim to competing task-action submissions
 - move production CORS/cookie policy into environment-specific deployment configuration
 
 ## BPM and Process Flow Review
 
-The BPM model is simple and clear:
+The backend now has two deliberately separated layers:
 
-- process starts at `Pending`
-- `Start` moves it to `InProgress`
-- `Approve` moves it to `Completed`
-- `Reject` moves it to `Rejected`
+- `ProcessStateMachine` protects `Pending`, `InProgress`, `Completed`, `Rejected` and `Escalated` lifecycle changes.
+- `DynamicWorkflowEngine` follows the published node graph, evaluates typed conditions and records each `ProcessStepExecution`.
 
-The allowed transition table lives in `ProcessStateMachine`, and invalid transitions are rejected. This is exactly the right abstraction for presentation because it proves the process is rule-driven, not scattered across button handlers.
+A logical form and process definition can have multiple versions. Draft versions are editable; published versions are immutable. Every process instance pins the exact workflow and form versions it started with, so publishing a new version cannot silently change in-flight work.
 
-Process start creates:
+Dynamic process start creates the process, variables, start-step execution, first task, candidate notification and audit in one transaction. A user task may target the starter, a specific user, a team, a community role or a team-plus-role intersection. Candidate-pool tasks require claim; `ClaimVersion` optimistic concurrency ensures two stale clients cannot both win.
 
-- a `ProcessInstance`
-- JSON form submission data
-- an open approver task
-- a process audit log
-- a system audit log
-
-Task execution checks task status, assigned role/admin override, available actions and state transition. Completed tasks store `CompletedByUserId`, and the parent process receives the final status.
-
-Task execution now also supports permission-based access. The v1 task still keeps legacy assigned-role compatibility, but the target direction is community scope plus required permission such as `Tasks.Act`.
+Task execution validates status, claim ownership, live candidate eligibility, published action and optional task-form data. `Approve`, `Reject`, `Complete`, `Escalate` and `SendBack` follow graph edges; gateways read safe namespaced values such as `start.amount` instead of executing arbitrary code. Conditions cannot read future task outputs and their value/operator types must match the referenced form field. A 100-hop guard stops accidental automatic loops.
 
 Process listing now uses EF Core projection to return only summary fields such as process id, form name, status and dates. Full tasks and audit logs are loaded only by the process detail endpoint, which prevents the board from pulling large related object graphs from PostgreSQL/Neon. Detail loading uses split queries so related collections do not create one oversized joined result set.
 
@@ -97,7 +87,7 @@ Current backend tests are strong for the project scope. The latest run passed:
 dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj
 ```
 
-Result: `101 passed`.
+Result: `166 passed`.
 
 Covered areas include:
 
@@ -113,6 +103,9 @@ Covered areas include:
 - admin user creation/deletion/session management
 - OTP hashing and expiry
 - password reset and public email verification
+- personal/community/global workflow scope authorization
+- Okan, Fatih, Approver and Quaresma candidate-pool HTTP scenarios
+- process/task cache contract inputs and deterministic six-process community seed
 - relational constraints through SQLite instead of EF InMemory
 - real HTTP login, cookies, CSRF, Bearer and logout behavior
 - refresh-token rotation and reuse through the controller pipeline
@@ -121,6 +114,12 @@ Covered areas include:
 - Swagger bearer metadata and form-to-process endpoint smoke flow
 - transaction rollback for form, process and task writes
 - SQLite migration/startup smoke and opt-in PostgreSQL/Neon migration smoke
+- form and workflow version publication/immutability
+- graph reachability, gateway/default edge and form-binding validation
+- dynamic runtime routing, send-back attempts and task-form validation
+- team/role candidate resolution and deterministic stale-snapshot claim competition
+- real HTTP workflow create, publish, runnable-list, start and complete flow
+- deterministic seeded Transfer workflow validation and first-task creation
 
 The remaining test gap is browser-level E2E coverage. The API now has service, relational persistence and `WebApplicationFactory` HTTP coverage; Playwright should next protect the critical login -> form -> process -> task -> audit user journey.
 
@@ -139,7 +138,13 @@ EF Core gives strongly typed entities, LINQ queries, provider switching between 
 SQLite is fast for local demo development and needs no setup. PostgreSQL/Neon supports shared remote testing by the team. The provider is selected by configuration, not by changing code.
 
 **How does the state machine work?**  
-Allowed transitions are defined in one dictionary: `Pending + Start -> InProgress`, `InProgress + Approve -> Completed`, `InProgress + Reject -> Rejected`. Any missing transition is rejected.
+Allowed lifecycle transitions remain in one dictionary. The separate dynamic engine follows a validated published graph for task-to-task routing, gateways, send-back and end nodes. This keeps lifecycle policy independent from process shape.
+
+**Why a custom engine instead of embedding Camunda?**
+The PDF asks for BPM concepts and extensibility, not BPMN deployment. React Flow provides the modeling experience while a small typed .NET runtime keeps the supported nodes, authorization and persistence visible in code review. Camunda and Kissflow are design references rather than runtime dependencies.
+
+**How are running processes protected from later edits?**
+They reference immutable published form and process-definition versions. New edits produce new drafts/versions; existing instances continue with their pinned snapshots.
 
 **How is audit traceability handled?**  
 Workflow actions write process-level audit logs. Identity, form, process and task events also write system audit logs with actor, entity, action, date and description.
@@ -158,7 +163,6 @@ Login returns a bearer token. In Swagger, paste it into Authorize as a bearer to
 ### High
 
 - Move CORS allowed origins and cookie security policy fully into environment-specific config.
-- Add optimistic concurrency or row-version checks for competing task actions.
 - Add Playwright coverage for the critical cross-role BPM journey.
 
 ### Medium
@@ -177,4 +181,4 @@ Login returns a bearer token. In Swagger, paste it into Authorize as a bearer to
 
 ## Reviewer Summary
 
-The backend is presentation-ready for the PDF scope. Its strongest points are layered architecture, role-aware services, state-machine-based BPM, hashed sessions/passwords, refresh-token rotation, transactional audit traceability, migrations and real HTTP security tests. The most valuable next step is browser-level E2E plus task concurrency protection, not another broad feature package.
+The backend is presentation-ready for the PDF scope. Its strongest points are layered architecture, immutable versioned definitions, a validated dynamic workflow runtime, community/team-aware assignment, hashed sessions/passwords, transactional audit traceability, migrations and real HTTP tests. The most valuable next step is browser-level E2E and CI automation, followed by advanced BPM nodes such as parallel gateways and timers.

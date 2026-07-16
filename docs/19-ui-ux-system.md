@@ -59,6 +59,7 @@ Screen migrations to these contracts are incremental. Do not rewrite every featu
 - Motion must explain a state change, not decorate every card.
 - The language toggle is a fixed-width horizontal track: TR exits left when EN enters from the right; the reverse transition mirrors that direction.
 - The dashboard donut keeps its approved stroke-width/opacity focus animation. Do not add SVG scale/translate transforms that move the chart.
+- Workflow canvas has normal, wide and full-screen modes. Expanded modes preserve editor controls, refit the graph after the container changes and return to normal with Escape.
 - Disclosure, dialog and route transitions must remain short and respect `prefers-reduced-motion`.
 - Icon-only controls require labels and keyboard focus. Color must not be the only status signal.
 
@@ -66,12 +67,13 @@ Screen migrations to these contracts are incremental. Do not rewrite every featu
 
 - Desktop navigation remains fixed; tablet/mobile navigation uses the existing drawer.
 - Related routes use reusable sidebar disclosures. `Formlar` owns designer/runner and `Yonetim` owns users/communities; route permissions still decide which children exist.
-- Desktop sidebar width is `232px`; this keeps navigation readable without becoming optically dominant on 1920x1080 displays using 125% system scaling.
+- Desktop sidebar width is `236px`; the `1520px`-`1599px` scaled-desktop band uses `232px` so navigation remains readable without becoming optically dominant on 1920x1080 displays using 125% system scaling.
 - General workspace content stays capped at `1400px` and targets the physical viewport center, not the area remaining beside the sidebar. Its symmetric safe width is calculated as `viewport - 2 x (sidebar + 16px)`, so browser zoom keeps equal space on both sides while the wider cap avoids an undersized center column. Mobile removes the desktop offset entirely.
 - Between `1025px` and `1519px`, including 150%/175% browser zoom levels, strict viewport centering yields to a post-sidebar fit mode. Content keeps 16px workspace gutters and may extend farther right instead of clipping dense grids.
 - Between `1520px` and `1599px`, the dashboard uses a scaled-desktop density preset: outer card gaps grow while card padding, minimum height, list-row height and donut size reduce slightly. Do not shrink the whole content column to compensate for 125% system scaling.
 - In that same `1520px`-`1599px` scaled-desktop band, the sidebar-to-content gutter is `12px`; other desktop widths retain the standard `16px` gutter.
 - Form Designer is the deliberate exception: it uses the post-sidebar workspace width with 16px outer gutters so its palette can occupy the otherwise empty right rail.
+- Form-version actions remain available as labeled controls in the upper information card and as tooltip-backed icon controls in the side rail; both surfaces call the same handlers.
 - At `1440px` and above, the field palette is the sticky third grid column. This includes a 1920x1080 display at 125% browser/OS scaling (1536 CSS pixels). It must not use viewport-fixed positioning or overlap the canvas.
 - Below `1440px`, the normal palette is hidden. A draggable edge-snapping trigger opens the responsive field panel; selecting a type appends the field and returns focus to the trigger when the panel closes.
 - The sheet's full 48px top strip is the dismissal target. Close animation must complete before unmount (`transitionend` plus timeout fallback); reduced-motion may close immediately.

@@ -69,6 +69,13 @@
   min-width: 270px;
 }
 
+.inbox-toolbar-feedback {
+  grid-column: 1 / -1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
 .notification-category-menu {
   position: relative;
   min-width: 190px;

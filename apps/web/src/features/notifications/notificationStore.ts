@@ -133,8 +133,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       });
     }
 
-    const hasItems = get().previewItems.length > 0;
-    set(hasItems ? { isPreviewRefreshing: true } : { isLoading: true });
+    const hasLoadedBaseline = hasPreviewBaseline;
+    set(hasLoadedBaseline
+      ? { isLoading: false, isPreviewRefreshing: true }
+      : { isLoading: true, isPreviewRefreshing: false });
     try {
       const page = await api.listNotifications(token, { page: 1, pageSize: 5 });
       if (get().userId !== userId) {
@@ -179,7 +181,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         return;
       }
     } else {
-      set({ inboxResult: null, inboxStatus: "loading" });
+      const visibleResult = get().inboxResult;
+      set({ inboxResult: visibleResult, inboxStatus: visibleResult ? "refreshing" : "loading" });
     }
 
     try {
@@ -190,7 +193,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       cachePage(key, { data: result, params: { ...params, page: params.page ?? 1, pageSize: params.pageSize ?? 10 }, cachedAt: Date.now() });
       set({ inboxResult: result, inboxStatus: "idle", allCount: result.allCount, unreadCount: result.unreadCount });
     } catch (error) {
-      set({ inboxStatus: cached ? "idle" : "error" });
+      set({ inboxStatus: cached || get().inboxResult ? "idle" : "error" });
       throw error;
     }
   },
@@ -210,8 +213,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       inboxQuery: next.query,
       inboxReadStatus: next.readStatus,
       inboxCategory: next.category,
-      inboxResult: cached?.data ?? null,
-      inboxStatus: cached ? "refreshing" : "loading",
+      // Keep the previous page visible while an uncached filter result is loading.
+      inboxResult: cached?.data ?? state.inboxResult,
+      inboxStatus: cached || state.inboxResult ? "refreshing" : "loading",
     };
   }),
 
