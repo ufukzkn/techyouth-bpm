@@ -87,7 +87,7 @@ Current backend tests are strong for the project scope. The latest run passed:
 dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj
 ```
 
-Result: `147 passed`.
+Result: `166 passed`.
 
 Covered areas include:
 
@@ -103,6 +103,9 @@ Covered areas include:
 - admin user creation/deletion/session management
 - OTP hashing and expiry
 - password reset and public email verification
+- personal/community/global workflow scope authorization
+- Okan, Fatih, Approver and Quaresma candidate-pool HTTP scenarios
+- process/task cache contract inputs and deterministic six-process community seed
 - relational constraints through SQLite instead of EF InMemory
 - real HTTP login, cookies, CSRF, Bearer and logout behavior
 - refresh-token rotation and reuse through the controller pipeline

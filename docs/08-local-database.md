@@ -119,7 +119,7 @@ Current tables:
 - `FormPageDefinitions`, `FormVersionFieldDefinitions`, `FormVersionFieldValidationRules`: ordered multi-page version content.
 - `ProcessDefinitions`, `ProcessDefinitionVersions`: logical workflows and pinned typed JSON graph versions.
 - `ProcessInstances`: started BPM process records.
-- `ProcessTasks`: direct or candidate-pool work items, priority, claim state, node key and optional task form.
+- `ProcessTasks`: direct or candidate-pool work items, priority, nullable SLA deadline, claim state, node key and optional task form.
 - `ProcessStepExecutions`: immutable node attempt, actor, action, timing and output history.
 - `AuditLogs`: traceable process state changes.
 - `SystemAuditLogs`: critical identity, access, form, process and task actions for Admin review.
@@ -151,6 +151,8 @@ The same seed creates 16 operational teams across the five communities. Sportif 
 Session tokens are stored as SHA-256 hashes. Active sessions include created time, last seen time, IP address, user agent and remembered-device state, then can be revoked through logout, the settings screen or `DELETE /api/auth/sessions/{sessionId}`. Remember-me sessions also create hashed rows in `RefreshTokens`; refresh tokens are rotated when used and revoked together with their access session.
 
 The current setup uses formal EF Core migrations. API startup calls `Database.MigrateAsync()` first, then `DatabaseSeeder` adds deterministic demo users, forms, processes, tasks and audit rows. `DatabaseSeeder` should not create or patch tables anymore; schema changes belong in migrations under `apps/api/src/TechYouthBpm.Infrastructure/Data/Migrations`.
+
+Seed upgrades resolve system roles by community and template instead of assuming that every older database used the current deterministic role IDs. This keeps existing users and custom records intact while allowing the current workflow scenarios to reference valid roles.
 
 Local demo still defaults to SQLite. PostgreSQL/Neon uses the same EF model and migration files, so provider-specific changes should be tested against PostgreSQL before the final shared demo. Existing databases created during the earlier `EnsureCreated` phase are disposable; reset/recreate them before relying on migrations:
 
@@ -184,12 +186,13 @@ When mock data is enabled, the seeder also creates:
 - Transfer task forms for Scout, Technical Review, Finance Approval and Transfer Operation.
 - Published `Legacy Basic Approval` compatibility workflow.
 - Published `Transfer Talep Akisi` with four team swimlanes, a typed budget gateway and version-pinned task forms.
-- 12 demo process instances.
-- 6 open approver tasks.
-- completed/rejected examples with audit logs.
+- Published workflow demos for Sportif Faaliyetler, Lojistik, Urun Siparisi, Insan Kaynaklari and Satin Alma.
+- Five graph-consistent scenarios per community: overdue review, upcoming approval, completed, rejected and sent-back/reopened.
+- Open tasks with overdue, upcoming and future `DueAt` values plus version-pinned task forms.
+- Namespaced start/task output, step execution, process audit, system audit and notification records that refer to the same workflow instance.
 - system audit examples for registration, login, role/status updates, form updates, process start and task approval.
 
-The seeded form/process data uses deterministic IDs and is idempotent, so restarting the API does not duplicate records. Resetting the SQLite database with `-ResetDb -Force` recreates the full demo scenario.
+The seeded form/process data uses deterministic IDs and is idempotent, so restarting the API does not duplicate records. Only the fourteen historical fixed mock process IDs are retired; user-created processes, users, memberships and custom communities are preserved. Resetting the SQLite database with `-ResetDb -Force` recreates the full demo scenario.
 
 Mock user, process and log names intentionally use familiar football figures such as Mario Gomez, Ricardo Quaresma, Atiba Hutchinson, Alex de Souza, Ali Koc, Fatih Terim, Senol Gunes, Sergen Yalcin, Tuncay Sanli and Volkan Demirel. These records are only local demo data for making the BPM flow easier to inspect during presentation rehearsal.
 

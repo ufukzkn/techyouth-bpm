@@ -54,14 +54,18 @@ The visual graph editor is implemented under `/workflows` with `@xyflow/react`; 
 - **Drag-and-Drop Process Reordering**: Implemented a drag-and-drop feature to allow users to visually reorder processes in `ProcessListView` using `@dnd-kit`. Extracted `SortableProcessCard`, added ghost overlay during dragging, persisted ordering logic to `localStorage` to save the customized view state per user, and added keyboard accessible move up/down controls.
 - **Escalation Workflow**: Added `Escalate` action and `Escalated` status. Updated `ProcessStateMachine` to handle transitions (`InProgress → Escalated`, `Escalated → Approve/Reject`) and updated `TaskService` to automatically spawn an Admin review task upon escalation.
 
+Escalation is initiated by the explicit user action. Persisted SLA deadlines support overdue display and sorting but do not run a timer-based auto-escalation job.
+
 ## Current Process Flow Capabilities
 
 ### Process List
 
-- All processes are loaded from `GET /api/processes` with role-based visibility (User sees only their own, Admin/Approver see all).
+- Processes are loaded one server page at a time from `GET /api/processes`; visibility follows community, permission, starter and task-assignment scope rather than the retired platform Admin/User/Approver model.
 - The list endpoint returns summary DTOs through EF Core projection, so it does not load every task and audit log while rendering the board.
-- Status filter chips allow narrowing the list by Pending, InProgress, Completed, Rejected or Escalated.
-- Filtered count and total count are shown in the card header.
+- Status, scope, sorting and page are query parameters; the backend sorts before pagination.
+- The default scope is `personal`: processes started by the user or containing a direct, claimed or eligible team-plus-role task. `community` requires `Processes.ViewAll`; `global` is SuperAdmin-only. Unauthorized wider scopes return `403`.
+- Summaries expose workflow name, nearest open-task deadline and highest open-task priority.
+- Drag/drop order is intentionally local to the currently visible page.
 - Clicking a process loads its full detail from `GET /api/processes/{id}`.
 
 ### Process Detail
@@ -74,8 +78,11 @@ The visual graph editor is implemented under `/workflows` with `@xyflow/react`; 
 
 ### My Tasks
 
-- Open tasks are loaded from `GET /api/tasks/my` filtered by the current user's role.
-- Each task shows a process context label, task ID prefix, assigned role and creation date.
+- Open tasks are loaded one server page at a time from `GET /api/tasks/my`, filtered by direct assignment or live team/community-role candidate eligibility.
+- Management permission alone never places work in `Islerim`; the current user must be a direct assignee, claimant or live team/role candidate.
+- Each task shows workflow, form and community context plus priority, creation time and optional GMT+3 deadline.
+- Deadline/priority/created-time ordering happens before pagination; tasks with no deadline appear after dated tasks in nearest-deadline order.
+- A notification task deep link queries the exact task ID and opens its related process instead of selecting the first process in the list.
 - Approve and Reject buttons open a `TaskActionDialog` modal.
 
 ### Task Action Dialog
@@ -167,7 +174,7 @@ Documentation files:
 These capabilities remain intentionally deferred:
 
 - Parallel gateway execution and join semantics.
-- Timer/SLA/escalation scheduling.
+- Automatic timer jobs, SLA breach escalation and reminder scheduling. Static User Task SLA and persisted `DueAt` are implemented; no background scheduler runs yet.
 - Service tasks and external ERP integrations.
 - BPMN XML import/export or Camunda deployment.
 - Cross-community workflow routing.

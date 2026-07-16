@@ -68,7 +68,9 @@ Browser flows send cookies with `credentials: include`. Mutating cookie-authenti
 - `GET /api/dashboard/summary`
   - Returns open-task, in-progress-process and completed-process counts without loading full lists.
   - Also returns at most four recent open tasks and four recent visible processes, ordered newest first.
-  - Applies the same authorization scope as task/process services: SuperAdmin is global, community-scoped roles stay inside their community, and a user without task visibility sees only processes they started.
+  - Accepts `scope=personal|community|global` with the same authorization policy as the process list; the default is `personal` for every role.
+  - Pending task count reuses the exact `/api/tasks/my` candidate predicate in personal scope.
+  - Ongoing count includes `InProgress` and manually `Escalated` processes; SLA expiry alone does not change process state.
   - Keeps the original three count fields for backward compatibility; recent collections are additive.
 
 ## Users And Access
@@ -232,8 +234,12 @@ Graph JSON is data, not executable JavaScript. Gateway conditions use typed fiel
   - Pins the process and form versions, initializes namespaced variables and advances from Start until the first user task or end node.
   - Creates process, step execution, task, notification and audit records atomically.
 - `GET /api/processes`
-  - Lists processes visible to the active user.
+  - Returns `PagedResult<ProcessSummaryDto>` for processes visible to the active user.
   - Process visibility is scoped by community and `Processes.View`.
+  - Accepts `page`, `pageSize` (maximum 50), `status`, `scope`, `sortBy` and `sortDirection`.
+  - `scope=personal` is the default. `community` requires `Processes.ViewAll`; `global` requires SuperAdmin. Legacy `visible`, `startedByMe` and `assignedToMe` values remain compatible.
+  - Sorting supports start time, nearest open-task deadline, highest open-task priority and status.
+  - Summaries include workflow/community context, nearest open deadline and highest open priority.
   - Uses a lightweight EF Core projection for summary fields instead of loading tasks and audit history for every row.
   - This keeps remote PostgreSQL/Neon list screens fast; full task/audit data is loaded only from the detail endpoint.
 - `GET /api/processes/{id}`
@@ -243,9 +249,14 @@ Graph JSON is data, not executable JavaScript. Gateway conditions use typed fiel
 ## Tasks
 
 - `GET /api/tasks/my`
-  - Lists direct assignments and eligible team/role candidate tasks.
+  - Returns `PagedResult<ProcessTaskDto>` for direct assignments and eligible team/role candidate tasks.
   - Visibility uses community scope, `Tasks.View`, live assignment membership and claim state.
+  - Accepts `page`, `pageSize` (maximum 50), `priority`, `taskId`, `sortBy` and `sortDirection`.
+  - Deadline ordering keeps tasks without `DueAt` after dated tasks; exact `taskId` lookup supports deep-link navigation without selecting an unrelated process.
   - When a task is bound to a published form version, the response embeds the immutable `taskForm` page/field/rule snapshot needed by the action dialog.
+  - A User Task may define an SLA between 1 minute and 365 days. The runtime stores `DueAt = CreatedAt + SlaDurationMinutes`; no SLA leaves `DueAt` null.
+  - The endpoint is always personal. Admin/community visibility does not make an unrelated task appear in this candidate pool.
+
 - `POST /api/tasks/{id}/claim`
   - Atomically claims an eligible candidate-pool task. Direct user/process-starter tasks do not need claim.
 - `POST /api/tasks/{id}/release` or `DELETE /api/tasks/{id}/claim`
@@ -290,7 +301,9 @@ Controllers should stay thin. Services own decisions:
 - `NotificationService`: current-user paged search/filter, count, read-state and read-all operations.
 - `ITeamService`: community-scoped team CRUD, paged members/candidates, virtual unassigned users and membership mutations.
 - `ProcessStateMachine`: high-level lifecycle transitions; dynamic node routing remains in `DynamicWorkflowEngine`.
-- `DatabaseSeeder`: local demo users and optional mock workflow data.
+- `DatabaseSeeder`: coordinates community/user/team setup and optional demo data.
+- `DemoFormSeeder`: deterministic published start/task forms and form-version snapshots.
+- `DemoWorkflowSeeder`: versioned workflow graphs plus graph-consistent process/task/step/audit/notification scenarios.
 
 ## Frontend Client Coverage
 
@@ -303,6 +316,7 @@ The frontend API client exposes methods for the implemented endpoint contracts:
 - Teams: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `listTeamMembers`, `listTeamRoster`, `listUserTeamMemberships`, `listTeamCandidates`, `listUnassignedTeamMembers`, `addTeamMember`, `updateTeamMember`, `removeTeamMember`
 - Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`, `listFormVersions`, `getFormVersion`, `createFormVersion`, `updateFormVersion`, `publishFormVersion`
+- Processes/tasks: paged `listProcesses`, exact `getProcess`, paged `listMyTasks`, `claimTask`, `releaseTask`, `executeTaskAction`
 - Process definitions: `listProcessDefinitions`, `listRunnableProcessDefinitions`, `getProcessDefinition`, `createProcessDefinition`, `updateProcessDefinition`, `createProcessDefinitionVersion`, `updateProcessDefinitionVersion`, `publishProcessDefinitionVersion`
 - Processes: `startProcess`, `startProcessVersion`, `listProcesses`, `getProcess`
 - Tasks: `listMyTasks`, `claimTask`, `releaseTask`, `executeTaskAction`

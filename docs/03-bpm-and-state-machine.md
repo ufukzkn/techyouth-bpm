@@ -35,6 +35,8 @@ The legacy compatibility flow still supports:
 
 The dynamic runtime adds node-level actions: `Approve`, `Reject`, `Complete`, `Escalate` and `SendBack`. A published `ProcessDefinitionVersion` contains typed Start, User Task, Exclusive Gateway and End nodes. The runtime follows an action edge, evaluates typed gateway conditions and either creates the next task or closes the process.
 
+`Escalated` is entered only when an authorized user performs the explicit `Escalate` action. A User Task SLA persists `DueAt` for ordering and overdue presentation, but no background timer automatically escalates or reassigns overdue work in the current version.
+
 ## Why Two Layers Exist
 
 - `ProcessStateMachine` protects the high-level process lifecycle.
@@ -52,5 +54,6 @@ This separation keeps status rules small while allowing new workflow shapes with
 - Process, task, notification and audit writes share an EF Core transaction.
 - A missing candidate or downstream failure rolls the entire operation back.
 - Automatic routing has a 100-hop limit to stop accidental infinite loops.
+- Dashboard, process-list and task-list reads do not create audit entries. Start, claim, release, action, publish and team-membership mutations remain auditable.
 
 Invalid lifecycle transitions, unavailable actions, invalid graph edges and unauthorized claims are rejected by the backend. This is the central code-review point for BPM correctness.

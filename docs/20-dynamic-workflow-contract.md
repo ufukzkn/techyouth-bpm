@@ -13,7 +13,7 @@
 - Node types: `Start`, `UserTask`, `ExclusiveGateway`, `CompletedEnd`, `RejectedEnd`, `TeamSwimlane`.
 - Runtime nodes have stable string keys. Swimlanes are visual containers and are not executed.
 - Nodes persist their canvas position and optional width/height together with the parent swimlane key. Saving and reopening a draft must reproduce the same layout.
-- User tasks contain title, optional published form version, priority, action set and assignment.
+- User tasks contain title, optional published form version, priority, action set, assignment and optional SLA duration in minutes.
 - Assignment types: `ProcessStarter`, `SpecificUser`, `Team`, `CommunityRole`, `TeamAndCommunityRole`.
 - Edges may contain an action, a typed condition, a default marker and deterministic order.
 - Conditions reference published form paths such as `start.amount` or `steps.financeApproval.approvedBudget`; arbitrary code is forbidden.
@@ -41,11 +41,15 @@ The runner validates the current page before navigation and the backend validate
 
 Direct assignments (`ProcessStarter`, `SpecificUser`) do not require a separate claim. Team and role assignments are candidate pools and require `Tasks.Act` plus live membership/role eligibility. `TeamAndCommunityRole` uses the intersection. Candidate eligibility is checked again when claiming; `IsLead` grants no implicit permission.
 
-Only one user may claim a task. A provider-independent concurrency token protects simultaneous SQLite and PostgreSQL updates. Task priority values are `Low`, `Normal`, `High` and `Critical`.
+Only one user may claim a task. A provider-independent concurrency token protects simultaneous SQLite and PostgreSQL updates. Task priority values are `Low`, `Normal`, `High` and `Critical`. Optional SLA is validated between 1 minute and 365 days; the runtime calculates a nullable `DueAt` each time a task attempt is created, including a new attempt after `SendBack`.
 
 Process start, task creation, process variables, step execution, notifications and audit entries share a transaction. Task action, next-node routing and completion use a second atomic transaction. Any failure rolls the whole operation back.
 
 Runtime actions are `Approve`, `Reject`, `Complete`, `Escalate` and `SendBack`. A task persists only the actions configured on its published node. Process lifecycle status remains controlled by `ProcessStateMachine`; graph navigation is owned by `DynamicWorkflowEngine`.
+
+`Escalate` is an explicit task action, not a timer side effect. `SlaDurationMinutes` is converted to nullable `ProcessTask.DueAt` when a task is created. The current runtime uses it for display and ordering; automatic reminders, reassignment and SLA escalation remain deferred.
+
+List visibility is independent from graph execution. `personal` means starter/direct assignment/claim/live team-role candidacy, `community` requires `Processes.ViewAll`, and `global` requires SuperAdmin. `GET /api/tasks/my` never broadens beyond the personal candidate pool.
 
 ## HTTP Contract
 
@@ -56,6 +60,8 @@ Runtime actions are `Approve`, `Reject`, `Complete`, `Escalate` and `SendBack`. 
 - `POST /api/process-definitions/{id}/validate`: validate without publishing.
 - `POST /api/process-definitions/{id}/versions/{versionId}/publish`: make a validated version immutable.
 - `POST /api/processes/start/version`: start from an exact process-definition version.
+- `GET /api/processes`: server-paged and scope-aware process summaries with deadline/priority sorting.
+- `GET /api/tasks/my`: server-paged candidate/direct tasks with priority/deadline sorting and exact task deep-link filtering.
 - `POST /api/tasks/{id}/claim` and `POST|DELETE /api/tasks/{id}/release|claim`: candidate-pool ownership.
 - `POST /api/tasks/{id}/actions`: submit action, note and optional task-form data.
 

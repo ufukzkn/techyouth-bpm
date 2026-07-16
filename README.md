@@ -293,7 +293,7 @@ Backend testleri:
 dotnet test apps/api/TechYouthBpm.slnx
 ```
 
-Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, community scope, Swagger, workflow publish, version-pinned process start ve task completion gercek controller pipeline'i uzerinden dogrulanir. Claim concurrency testi iki stale DbContext snapshot'inin ayni gorevi alamadigini kanitlar.
+Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, personal/community/global workflow scope, Swagger, workflow publish, version-pinned process start, task formu, SLA/deadline ve server-side process/task pagination davranislari dogrulanir. Claim concurrency testi iki stale DbContext snapshot'inin ayni gorevi alamadigini kanitlar.
 
 Neon/PostgreSQL migration smoke testi varsayilan kosuda dis servise baglanmaz. Opt-in calistirmak icin baglanti bilgisini yalniz mevcut terminal oturumunda tanimla:
 
@@ -328,7 +328,7 @@ Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `Pending
 
 Admin kullanicisi `Loglar` ekraninda sistem gecmisini arayabilir. Loglar varsayilan olarak toplu dokulmez; kisi, surec, entity veya aksiyon aramasi ile server-side paginated sonuc ve ilgili kronolojik gecmis gorulur. Bu liste register, login/logout, rol/status degisikligi, form create/update, process start ve task approve/reject gibi kritik aksiyonlari kullanici, entity ve zaman bilgisiyle takip eder. Surec detay ekranindaki audit timeline ise ilgili surecin state history bilgisini gosterir; sureci baslatan kullanici kendi surec gecmisini, Admin/Approver ise gorebildigi sureclerin gecmisini inceleyebilir.
 
-Local SQLite demo DB varsayilan olarak sekiz form, versiyonlanmis `Legacy Basic Approval` ve `Transfer Talep Akisi`, ornek surecler, acik tasklar, audit loglari ve bes topluluga dagilmis 16 takimla gelir. Dinamik transfer demosi Scout, Teknik Degerlendirme, kosullu Mali Isler ve Transfer Operasyon adimlarini ayri task formlariyla calistirir. Takim seed'i lider, coklu takim uyesi ve sanal `Takimsiz` sorgusunda gorunecek kullanicilari birlikte icerir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
+Local SQLite demo DB; bes toplulukta yayinlanmis workflow'lar, bagli start/task formlari ve topluluk basina bes graph-uyumlu surec senaryosuyla gelir. Acik tasklarda gecikmis, yaklasan ve ileri tarihli deadline ornekleri; tamamlanan/reddedilen/geri gonderilen akislarda form ciktisi, step execution, audit ve bildirim zinciri bulunur. Eski `Legacy Basic Approval` uyumlulugu ve dort swimlane'li kosullu `Transfer Talep Akisi` korunur. Takim seed'i bes topluluga dagilmis 16 takim, lider, coklu takim uyesi ve sanal `Takimsiz` sorgusunda gorunecek kullanicilari birlikte icerir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
 
 ## Current Demo Flow
 
