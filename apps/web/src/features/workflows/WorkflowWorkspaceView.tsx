@@ -1,0 +1,404 @@
+"use client";
+
+import { CopyPlus, Plus, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  Community,
+  ProcessDefinition,
+  ProcessDefinitionSummary,
+  ProcessDefinitionVersion,
+} from "@/lib/types";
+import { api, ApiError } from "@/lib/api";
+import { useSessionStore } from "@/features/session/sessionStore";
+import { Button } from "@/features/ui/Button";
+import type {
+  SaveWorkflowDraftRequest,
+  WorkflowDefinitionDraft,
+  WorkflowEditorLookups,
+  WorkflowMutationResult,
+} from "@/features/workflows/contracts";
+import { emptyWorkflowLookups } from "@/features/workflows/contracts";
+import { fromApiProcessGraph, resolveLookupLabels } from "@/features/workflows/apiGraphAdapter";
+import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
+import { createStarterWorkflowDraft } from "@/features/workflows/workflowDraft";
+
+type WorkspaceStatus = "loading" | "ready" | "error";
+
+export function WorkflowWorkspaceView() {
+  const token = useSessionStore((state) => state.token);
+  const user = useSessionStore((state) => state.user);
+  const [definitions, setDefinitions] = useState<ProcessDefinitionSummary[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
+  const [selectedDefinition, setSelectedDefinition] = useState<ProcessDefinition | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<ProcessDefinitionVersion | null>(null);
+  const [selectedCommunityId, setSelectedCommunityId] = useState(user?.communityId ?? "");
+  const [draft, setDraft] = useState<WorkflowDefinitionDraft>(() => createStarterWorkflowDraft());
+  const [lookups, setLookups] = useState<WorkflowEditorLookups>(emptyWorkflowLookups);
+  const [status, setStatus] = useState<WorkspaceStatus>("loading");
+  const [workspaceMessage, setWorkspaceMessage] = useState("Akış tanımları yükleniyor...");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const canCreate = Boolean(user?.role === "SuperAdmin" || user?.permissions.includes("Workflows.Create"));
+  const canUpdate = Boolean(user?.role === "SuperAdmin" || user?.permissions.includes("Workflows.Update"));
+  const canPublish = Boolean(user?.role === "SuperAdmin" || user?.permissions.includes("Workflows.Publish"));
+  const isSuperAdmin = user?.role === "SuperAdmin";
+  const canCreateDefinition = canCreate && canUpdate && Boolean(selectedCommunityId);
+  const canEditCurrent = selectedDefinition ? canUpdate : canCreate && canUpdate;
+  const selectedDefinitionId = selectedDefinition?.id ?? "";
+
+  async function loadLookups(communityId: string | null | undefined) {
+    if (!token || !communityId) {
+      setLookups(emptyWorkflowLookups);
+      return emptyWorkflowLookups;
+    }
+
+    const forms = await settle(api.listForms(token), []);
+    const communityForms = forms.filter((form) => form.communityId === communityId);
+    const versionGroups = await Promise.all(communityForms.map((form) => settle(api.listFormVersions(token, form.id), [])));
+    const [teams, people, communityRoles] = await Promise.all([
+      settle(api.listTeams(token, { communityId, isActive: true, pageSize: 100 }), null),
+      settle(api.listUsers(token, { communityId, status: "Active", pageSize: 100 }), null),
+      settle(api.listCommunityRoles(token, communityId), []),
+    ]);
+
+    const nextLookups: WorkflowEditorLookups = {
+      formVersions: versionGroups.flat()
+        .filter((version) => version.status === "Published")
+        .map((version) => ({
+          id: version.id,
+          definitionId: version.formDefinitionId,
+          label: version.formName,
+          description: `v${version.versionNumber}`,
+          version: version.versionNumber,
+          fields: version.pages.flatMap((page) => page.fields.map((field) => ({
+            key: field.key,
+            label: field.label,
+            valueType: conditionValueType(field.type),
+          }))),
+        }))
+        .sort((left, right) => left.label.localeCompare(right.label, "tr") || right.version - left.version),
+      teams: (teams?.items ?? []).map((team) => ({ id: team.id, label: team.name, description: team.description })),
+      people: (people?.items ?? []).map((person) => ({ id: person.id, label: person.displayName, description: person.username })),
+      communityRoles: communityRoles.map((role) => ({ id: role.id, label: role.name, description: role.description })),
+    };
+    setLookups(nextLookups);
+    return nextLookups;
+  }
+
+  async function openDefinition(definitionId: string, options: { quiet?: boolean } = {}) {
+    if (!token) {
+      return;
+    }
+    if (!options.quiet) {
+      setStatus("loading");
+      setWorkspaceMessage("Akış sürümü yükleniyor...");
+    }
+
+    try {
+      const definition = await api.getProcessDefinition(token, definitionId);
+      const version = selectEditableVersion(definition.versions);
+      const nextLookups = await loadLookups(definition.communityId);
+      setSelectedCommunityId(definition.communityId);
+      setSelectedDefinition(definition);
+      setSelectedVersion(version);
+      setDraft(version
+        ? addLookupLabels(versionToDraft(definition, version), nextLookups)
+        : createDefinitionDraft(definition));
+      setStatus("ready");
+      setWorkspaceMessage(version
+        ? `v${version.versionNumber} ${version.status === "Published" ? "yayın sürümü" : "taslağı"} açık.`
+        : "Tanım için ilk taslak hazır.");
+    } catch (error) {
+      setStatus("error");
+      setWorkspaceMessage(toErrorMessage(error, "Akış tanımı yüklenemedi."));
+    }
+  }
+
+  async function loadWorkspace(manual = false) {
+    if (!token) {
+      setStatus("error");
+      setWorkspaceMessage("Akışları görüntülemek için oturum gereklidir.");
+      return;
+    }
+    if (manual) {
+      setIsRefreshing(true);
+    } else {
+      setStatus("loading");
+    }
+
+    try {
+      const [result, availableCommunities] = await Promise.all([
+        api.listProcessDefinitions(token),
+        isSuperAdmin ? api.listCommunities(token) : Promise.resolve([]),
+      ]);
+      setDefinitions(result);
+      setCommunities(availableCommunities);
+      const nextId = selectedDefinitionId && result.some((definition) => definition.id === selectedDefinitionId)
+        ? selectedDefinitionId
+        : result[0]?.id;
+      if (nextId) {
+        await openDefinition(nextId, { quiet: true });
+      } else {
+        const nextCommunityId = user?.communityId ?? availableCommunities[0]?.id ?? "";
+        setSelectedDefinition(null);
+        setSelectedVersion(null);
+        setSelectedCommunityId(nextCommunityId);
+        setDraft(createStarterWorkflowDraft());
+        await loadLookups(nextCommunityId);
+        setStatus("ready");
+        setWorkspaceMessage("Yeni akış taslağı hazır.");
+      }
+    } catch (error) {
+      setStatus("error");
+      setWorkspaceMessage(toErrorMessage(error, "Akış tanımları yüklenemedi."));
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadWorkspace();
+    // The initial request is repeated when the authenticated session changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user?.id]);
+
+  async function persistWorkflow(request: SaveWorkflowDraftRequest, publish: boolean) {
+    if (!token) {
+      throw new Error("Oturum bulunamadı.");
+    }
+    if (!request.formDefinitionVersionId) {
+      throw new Error("Başlangıç form sürümü zorunludur.");
+    }
+
+    let definition = selectedDefinition;
+    if (!definition) {
+      definition = await api.createProcessDefinition(token, {
+        name: request.name,
+        description: request.description,
+        communityId: selectedCommunityId || undefined,
+      });
+    } else if (definition.name !== request.name || definition.description !== request.description) {
+      definition = await api.updateProcessDefinition(token, definition.id, {
+        name: request.name,
+        description: request.description,
+      });
+    }
+
+    const versionPayload = {
+      formDefinitionVersionId: request.formDefinitionVersionId,
+      graph: request.graph,
+    };
+    let version = selectedVersion?.status === "Draft"
+      ? await api.updateProcessDefinitionVersion(token, definition.id, selectedVersion.id, versionPayload)
+      : await api.createProcessDefinitionVersion(token, definition.id, versionPayload);
+
+    if (publish) {
+      version = await api.publishProcessDefinitionVersion(token, definition.id, version.id);
+    }
+
+    const nextDraft = addLookupLabels(versionToDraft(definition, version), lookups);
+    setSelectedDefinition(definition);
+    setSelectedVersion(version);
+    setDraft(nextDraft);
+    setDefinitions(await api.listProcessDefinitions(token));
+    setWorkspaceMessage(publish ? "Yayınlanan sürüm salt okunur açıldı." : `v${version.versionNumber} taslağı kaydedildi.`);
+    return { definition, version, draft: nextDraft };
+  }
+
+  async function saveWorkflow(request: SaveWorkflowDraftRequest): Promise<WorkflowMutationResult> {
+    const result = await persistWorkflow(request, false);
+    return { draft: result.draft, message: "Akış taslağı kaydedildi." };
+  }
+
+  async function publishWorkflow(request: SaveWorkflowDraftRequest): Promise<WorkflowMutationResult> {
+    const result = await persistWorkflow(request, true);
+    return { draft: result.draft, message: "Akış sürümü yayınlandı." };
+  }
+
+  function startNewDefinition() {
+    setSelectedDefinition(null);
+    setSelectedVersion(null);
+    setDraft(createStarterWorkflowDraft());
+    setWorkspaceMessage("Yeni akış taslağı hazır.");
+    void loadLookups(selectedCommunityId);
+  }
+
+  function createDraftFromPublished() {
+    if (!selectedDefinition || !selectedVersion) {
+      return;
+    }
+    const cloned = versionToDraft(selectedDefinition, selectedVersion);
+    setSelectedVersion(null);
+    setDraft({ ...cloned, id: undefined, version: undefined, status: "Draft", publishedAt: null });
+    setWorkspaceMessage("Yayın sürümünden yeni taslak oluşturuldu.");
+  }
+
+  const editorKey = useMemo(
+    () => `${selectedDefinition?.id ?? "new"}:${selectedVersion?.id ?? "draft"}:${draft.status}`,
+    [draft.status, selectedDefinition?.id, selectedVersion?.id],
+  );
+
+  return (
+    <section className="workflow-workspace-view">
+      <div className="section-heading workflow-workspace-heading">
+        <div>
+          <span className="eyebrow">Süreç Tasarımı</span>
+          <h2>Görsel İş Akışları</h2>
+        </div>
+        <p>Versiyonlu süreç grafiklerini, görev atamalarını ve karar yollarını yönetin.</p>
+      </div>
+
+      <div className="workflow-workspace-toolbar">
+        {isSuperAdmin ? (
+          <label className="workflow-definition-select workflow-community-select">
+            <span>Topluluk</span>
+            <select
+              disabled={Boolean(selectedDefinition) || status === "loading"}
+              onChange={(event) => {
+                const communityId = event.target.value;
+                setSelectedCommunityId(communityId);
+                void loadLookups(communityId);
+              }}
+              value={selectedCommunityId}
+            >
+              <option value="">Topluluk seçin</option>
+              {communities.map((community) => (
+                <option key={community.id} value={community.id}>{community.name}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <label className="workflow-definition-select">
+          <span>Akış tanımı</span>
+          <select
+            disabled={status === "loading" || definitions.length === 0}
+            onChange={(event) => void openDefinition(event.target.value)}
+            value={selectedDefinition?.id ?? ""}
+          >
+            {!selectedDefinition ? <option value="">Yeni akış</option> : null}
+            {definitions.map((definition) => (
+              <option key={definition.id} value={definition.id}>
+                {definition.name}{definition.latestVersionNumber ? ` · v${definition.latestVersionNumber}` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="workflow-workspace-toolbar-actions">
+          {selectedVersion?.status === "Published" && canUpdate ? (
+            <Button leadingIcon={<CopyPlus size={16} aria-hidden="true" />} onClick={createDraftFromPublished} size="sm" variant="secondary">
+              Yeni sürüm
+            </Button>
+          ) : null}
+          <Button
+            disabled={!canCreateDefinition}
+            leadingIcon={<Plus size={16} aria-hidden="true" />}
+            onClick={startNewDefinition}
+            size="sm"
+            variant="secondary"
+          >
+            Yeni akış
+          </Button>
+          <Button
+            disabled={isRefreshing || status === "loading"}
+            isLoading={isRefreshing}
+            leadingIcon={<RefreshCw size={16} aria-hidden="true" />}
+            onClick={() => void loadWorkspace(true)}
+            size="sm"
+            variant="secondary"
+          >
+            Yenile
+          </Button>
+        </div>
+        <p className={`workflow-workspace-message workflow-workspace-message-${status}`} aria-live="polite">
+          {workspaceMessage}
+        </p>
+      </div>
+
+      {status === "loading" ? (
+        <WorkflowWorkspaceSkeleton />
+      ) : status === "error" ? (
+        <div className="workflow-workspace-error">
+          <p>{workspaceMessage}</p>
+          <Button onClick={() => void loadWorkspace(true)} size="sm" variant="secondary">Tekrar dene</Button>
+        </div>
+      ) : (
+        <WorkflowEditor
+          canPublish={canPublish}
+          initialDraft={draft}
+          key={editorKey}
+          lookups={lookups}
+          onPublish={publishWorkflow}
+          onSave={saveWorkflow}
+          readOnly={!canEditCurrent}
+        />
+      )}
+    </section>
+  );
+}
+
+function selectEditableVersion(versions: ProcessDefinitionVersion[]) {
+  const byNewest = [...versions].sort((left, right) => right.versionNumber - left.versionNumber);
+  return byNewest.find((version) => version.status === "Draft")
+    ?? byNewest.find((version) => version.status === "Published")
+    ?? null;
+}
+
+function versionToDraft(definition: ProcessDefinition, version: ProcessDefinitionVersion) {
+  return fromApiProcessGraph(version.graph, {
+    id: version.id,
+    version: version.versionNumber,
+    name: definition.name,
+    description: definition.description,
+    status: version.status === "Published" ? "Published" : "Draft",
+    publishedAt: version.publishedAt,
+    formDefinitionVersionId: version.formDefinitionVersionId,
+  });
+}
+
+function createDefinitionDraft(definition: ProcessDefinition) {
+  const draft = createStarterWorkflowDraft();
+  return { ...draft, name: definition.name, description: definition.description };
+}
+
+function addLookupLabels(draft: WorkflowDefinitionDraft, lookups: WorkflowEditorLookups) {
+  return resolveLookupLabels(draft, {
+    people: Object.fromEntries(lookups.people.map((option) => [option.id, option.label])),
+    teams: Object.fromEntries(lookups.teams.map((option) => [option.id, option.label])),
+    communityRoles: Object.fromEntries(lookups.communityRoles.map((option) => [option.id, option.label])),
+    formVersions: Object.fromEntries(lookups.formVersions.map((option) => [option.id, {
+      name: option.label,
+      version: option.version,
+    }])),
+  });
+}
+
+async function settle<T>(request: Promise<T>, fallback: T) {
+  try {
+    return await request;
+  } catch {
+    return fallback;
+  }
+}
+
+function conditionValueType(fieldType: string): "String" | "Number" | "Boolean" {
+  if (fieldType === "Number") return "Number";
+  if (fieldType === "Checkbox") return "Boolean";
+  return "String";
+}
+
+function toErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    return error.errors.join(" ");
+  }
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function WorkflowWorkspaceSkeleton() {
+  return (
+    <div className="workflow-workspace-skeleton" aria-label="Akış editörü yükleniyor">
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
