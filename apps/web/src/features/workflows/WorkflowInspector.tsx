@@ -466,7 +466,8 @@ function FormBindingFields({
 }
 
 function GatewaySummary({ node }: { node: Extract<WorkflowNode, { type: "exclusiveGateway" }> }) {
-  const edges = useWorkflowDraftStore((state) => state.draft.edges.filter((edge) => edge.source === node.id));
+  const allEdges = useWorkflowDraftStore((state) => state.draft.edges);
+  const edges = allEdges.filter((edge) => edge.source === node.id);
   return (
     <InspectorSection title="Çıkışlar">
       <div className="workflow-route-list">

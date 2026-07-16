@@ -6,14 +6,18 @@ import "./workflow-editor.css";
 import {
   AlertCircle,
   CheckCircle2,
+  Expand,
   Eye,
   GitBranch,
+  Maximize2,
+  Minimize2,
   Save,
   Send,
   Trash2,
 } from "lucide-react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import type {
   WorkflowDefinitionDraft,
   WorkflowEditorLookups,
@@ -41,6 +45,7 @@ export type WorkflowEditorProps = {
 };
 
 type SubmissionState = "idle" | "saving" | "publishing" | "success" | "error";
+type EditorMode = "normal" | "wide" | "fullscreen";
 
 export function WorkflowEditor({
   canPublish = true,
@@ -61,6 +66,7 @@ export function WorkflowEditor({
   const markSaved = useWorkflowDraftStore((state) => state.markSaved);
   const markPublished = useWorkflowDraftStore((state) => state.markPublished);
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
+  const [editorMode, setEditorMode] = useState<EditorMode>("normal");
   const [message, setMessage] = useState("Taslak düzenlemeye hazır.");
   const isMobile = useMobileEditorNotice();
   const issues = useMemo(() => validateWorkflow(draft), [draft]);
@@ -82,6 +88,25 @@ export function WorkflowEditor({
       onChange?.(draft);
     }
   }, [draft, isDirty, onChange]);
+
+  useEffect(() => {
+    if (editorMode === "normal") {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setEditorMode("normal");
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [editorMode]);
 
   async function saveDraft() {
     if (effectiveReadOnly || isSubmitting) {
@@ -126,8 +151,11 @@ export function WorkflowEditor({
     return <WorkflowMobileNotice draft={draft} errorCount={errorCount} />;
   }
 
-  return (
-    <section className="workflow-editor-shell">
+  const editor = (
+    <section
+      className={`workflow-editor-shell workflow-editor-shell-mode-${editorMode}`}
+      data-editor-mode={editorMode}
+    >
       <header className="workflow-editor-header">
         <div className="workflow-editor-title">
           <span className="workflow-editor-mark" aria-hidden="true"><GitBranch size={20} /></span>
@@ -143,6 +171,18 @@ export function WorkflowEditor({
           {isDirty ? <span className="workflow-unsaved-indicator">Kaydedilmemiş</span> : null}
         </div>
         <div className="workflow-editor-actions">
+          <IconButton
+            label={editorMode === "wide" ? "Normal görünüme dön" : "Geniş görünüm"}
+            onClick={() => setEditorMode((current) => current === "wide" ? "normal" : "wide")}
+          >
+            {editorMode === "wide" ? <Minimize2 size={16} aria-hidden="true" /> : <Expand size={16} aria-hidden="true" />}
+          </IconButton>
+          <IconButton
+            label={editorMode === "fullscreen" ? "Tam ekrandan çık" : "Tam ekran"}
+            onClick={() => setEditorMode((current) => current === "fullscreen" ? "normal" : "fullscreen")}
+          >
+            {editorMode === "fullscreen" ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
+          </IconButton>
           <IconButton
             disabled={!hasSelection || effectiveReadOnly || isSubmitting}
             label="Seçimi sil"
@@ -186,12 +226,14 @@ export function WorkflowEditor({
       <div className="workflow-editor-grid">
         <WorkflowPalette readOnly={effectiveReadOnly} />
         <ReactFlowProvider>
-          <WorkflowCanvas issues={issues} readOnly={effectiveReadOnly} />
+          <WorkflowCanvas fitViewKey={editorMode} issues={issues} readOnly={effectiveReadOnly} />
         </ReactFlowProvider>
         <WorkflowInspector issues={issues} lookups={lookups} readOnly={effectiveReadOnly} />
       </div>
     </section>
   );
+
+  return editorMode === "normal" ? editor : createPortal(editor, document.body);
 }
 
 function WorkflowMobileNotice({ draft, errorCount }: { draft: WorkflowDefinitionDraft; errorCount: number }) {

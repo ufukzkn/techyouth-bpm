@@ -9,7 +9,7 @@ import {
   type Connection,
 } from "@xyflow/react";
 import type { DragEvent, KeyboardEvent } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type {
   WorkflowNode,
   WorkflowNodeKind,
@@ -22,11 +22,12 @@ import { workflowPaletteMime } from "@/features/workflows/WorkflowPalette";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
 
 type WorkflowCanvasProps = {
+  fitViewKey?: string;
   issues: WorkflowValidationIssue[];
   readOnly: boolean;
 };
 
-export function WorkflowCanvas({ issues, readOnly }: WorkflowCanvasProps) {
+export function WorkflowCanvas({ fitViewKey, issues, readOnly }: WorkflowCanvasProps) {
   const draft = useWorkflowDraftStore((state) => state.draft);
   const applyNodeChanges = useWorkflowDraftStore((state) => state.applyNodeChanges);
   const applyEdgeChanges = useWorkflowDraftStore((state) => state.applyEdgeChanges);
@@ -34,7 +35,7 @@ export function WorkflowCanvas({ issues, readOnly }: WorkflowCanvasProps) {
   const connect = useWorkflowDraftStore((state) => state.connect);
   const syncSelection = useWorkflowDraftStore((state) => state.syncSelection);
   const deleteSelection = useWorkflowDraftStore((state) => state.deleteSelection);
-  const { screenToFlowPosition } = useReactFlow<WorkflowNode, WorkflowTransition>();
+  const { fitView, screenToFlowPosition } = useReactFlow<WorkflowNode, WorkflowTransition>();
   const invalidNodeIds = useMemo(
     () => new Set(issues.filter((issue) => issue.severity === "error" && issue.scope === "node").map((issue) => issue.entityId)),
     [issues],
@@ -56,6 +57,19 @@ export function WorkflowCanvas({ issues, readOnly }: WorkflowCanvasProps) {
     deletable: false,
     label: transitionLabel(edge),
   })), [draft.edges, invalidEdgeIds]);
+
+  useEffect(() => {
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        void fitView({ padding: 0.12, maxZoom: 1.05, duration: 220 });
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
+    };
+  }, [fitView, fitViewKey]);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();

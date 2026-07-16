@@ -130,6 +130,27 @@
   box-shadow: 0 10px 30px rgba(24, 36, 58, 0.08);
 }
 
+.workflow-editor-shell-mode-wide,
+.workflow-editor-shell-mode-fullscreen {
+  position: fixed;
+  z-index: 90;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.workflow-editor-shell-mode-wide {
+  inset: 72px 0 0 var(--sidebar-width);
+}
+
+.workflow-editor-shell-mode-fullscreen {
+  inset: 0;
+}
+
+.workflow-editor-shell-mode-wide .workflow-editor-grid,
+.workflow-editor-shell-mode-fullscreen .workflow-editor-grid {
+  height: auto;
+}
+
 :root[data-theme="dark"] .workflow-editor-shell {
   --workflow-blue: #7eabff;
   --workflow-blue-soft: #1d3152;
