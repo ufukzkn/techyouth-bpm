@@ -180,6 +180,43 @@ Process-specific history is still returned from `GET /api/processes/{id}` as `au
   - Replaces the editable field list and validation rules with the submitted model.
   - Stores `UpdatedByUserId` / `UpdatedAt` and writes a system audit log.
   - Requires an Admin session, like form creation.
+- `GET /api/forms/{id}/versions`
+  - Lists draft, published and archived versions belonging to the logical form definition.
+- `GET /api/forms/{id}/versions/{versionId}`
+  - Returns the immutable page/field snapshot used by a workflow or running process.
+- `POST /api/forms/{id}/versions`
+  - Creates a new editable draft with ordered pages, fields, options and validation rules.
+- `PUT /api/forms/{id}/versions/{versionId}`
+  - Replaces only a draft version. Published versions reject mutation.
+- `POST /api/forms/{id}/versions/{versionId}/publish`
+  - Validates the complete form schema and publishes an immutable version.
+- `POST /api/forms/{id}/versions/{versionId}/archive`
+  - Archives a published version so new processes cannot select it; running processes keep their pinned snapshot.
+
+Legacy create/update remains available for the original PDF flow. Dynamic workflows bind to published `FormDefinitionVersion` records so later edits cannot change a running process.
+
+## Process Definitions
+
+- `GET /api/process-definitions`
+  - Lists process definitions and versions visible in the active community scope.
+- `GET /api/process-definitions/runnable`
+  - Returns only published versions the current user may start, including their start-form contract.
+- `GET /api/process-definitions/{id}`
+  - Returns logical definition metadata and versioned graph data.
+- `POST /api/process-definitions`
+  - Creates logical definition metadata.
+- `PUT /api/process-definitions/{id}`
+  - Updates logical definition metadata without mutating published versions.
+- `POST /api/process-definitions/{id}/versions`
+  - Creates a draft typed graph.
+- `PUT /api/process-definitions/{id}/versions/{versionId}`
+  - Updates only a draft graph.
+- `POST /api/process-definitions/{id}/validate`
+  - Checks start/end count, reachability, action edges, gateways, assignments and published form bindings without publishing.
+- `POST /api/process-definitions/{id}/versions/{versionId}/publish`
+  - Revalidates and publishes an immutable workflow version.
+
+Graph JSON is data, not executable JavaScript. Gateway conditions use typed field paths and operators; the runtime interprets only the supported schema in `docs/20-dynamic-workflow-contract.md`.
 
 ## Processes
 
@@ -189,24 +226,35 @@ Process-specific history is still returned from `GET /api/processes/{id}` as `au
   - Creates a process instance.
   - Creates the first task.
   - Stores `StartedByUserId`, writes process audit and writes system audit.
+  - Preserves compatibility by routing the original form-only request through the legacy approval definition.
+- `POST /api/processes/start/version`
+  - Starts a selected published `ProcessDefinitionVersion` with validated start-form data.
+  - Pins the process and form versions, initializes namespaced variables and advances from Start until the first user task or end node.
+  - Creates process, step execution, task, notification and audit records atomically.
 - `GET /api/processes`
   - Lists processes visible to the active user.
   - Process visibility is scoped by community and `Processes.View`.
   - Uses a lightweight EF Core projection for summary fields instead of loading tasks and audit history for every row.
   - This keeps remote PostgreSQL/Neon list screens fast; full task/audit data is loaded only from the detail endpoint.
 - `GET /api/processes/{id}`
-  - Returns process status, dates, form data, tasks and audit history.
+  - Returns process status, pinned definitions, variables, current node, tasks, step executions and audit history.
   - Uses split loading for related tasks and audit users to avoid one oversized joined result set.
 
 ## Tasks
 
 - `GET /api/tasks/my`
-  - Lists tasks assigned to the current user or role.
-  - V1 task visibility uses community scope plus `Tasks.View`; action execution also requires `Tasks.Act`.
+  - Lists direct assignments and eligible team/role candidate tasks.
+  - Visibility uses community scope, `Tasks.View`, live assignment membership and claim state.
+  - When a task is bound to a published form version, the response embeds the immutable `taskForm` page/field/rule snapshot needed by the action dialog.
+- `POST /api/tasks/{id}/claim`
+  - Atomically claims an eligible candidate-pool task. Direct user/process-starter tasks do not need claim.
+- `POST /api/tasks/{id}/release` or `DELETE /api/tasks/{id}/claim`
+  - Releases a claim back to its candidate pool when the caller owns it.
 - `POST /api/tasks/{id}/actions`
-  - Runs an action such as approve or reject.
-  - Updates process status through the state machine.
-  - Stores `CompletedByUserId`, writes a process audit log entry and writes system audit.
+  - Runs a published action such as approve, reject, complete, escalate or send-back with note and optional task-form data.
+  - Rechecks claim ownership, candidate eligibility, available action and task-form validation.
+  - Advances the graph to the next task/gateway/end and stores step, notification and audit changes in one transaction.
+  - The frontend validates the embedded task form for immediate feedback; the backend validates the submitted `formData` again before persisting it under `steps.<nodeKey>`.
 
 ## Swagger Usage
 
@@ -232,16 +280,21 @@ Controllers should stay thin. Services own decisions:
   - `RoutingEmailSender`: tries the primary live SMTP provider first, then falls back to Mailtrap Sandbox when the recipient or username is outside the live-send allowlist.
 - `SystemAuditService`: critical system-action logging, Admin-only paged/searchable audit list and category count queries.
 - `FormService`: form definition CRUD and field validation.
-- `ProcessService`: process start, detail and listing. List queries return projected summary DTOs; detail queries load the full process graph.
-- `TaskService`: task listing and action execution.
+- `IFormVersionService`: page-based draft creation, update, publication, archive and immutable version reads.
+- `IProcessDefinitionService`: workflow metadata/version CRUD, runnable-version discovery and publication.
+- `IProcessGraphValidator`: typed graph, form binding, assignment, gateway and reachability validation.
+- `DynamicWorkflowEngine`: graph execution, gateway evaluation, task creation, send-back and end-state progression.
+- `TaskAssignmentResolver`: direct and candidate-pool user resolution across team/community-role targets.
+- `ProcessService`: legacy and versioned start, projected lists and full pinned process detail.
+- `TaskService`: task listing, optimistic-concurrency claim/release and transactional action execution.
 - `NotificationService`: current-user paged search/filter, count, read-state and read-all operations.
 - `ITeamService`: community-scoped team CRUD, paged members/candidates, virtual unassigned users and membership mutations.
-- `ProcessStateMachine`: allowed transitions.
+- `ProcessStateMachine`: high-level lifecycle transitions; dynamic node routing remains in `DynamicWorkflowEngine`.
 - `DatabaseSeeder`: local demo users and optional mock workflow data.
 
 ## Frontend Client Coverage
 
-The frontend API client now exposes one method for each planned endpoint:
+The frontend API client exposes methods for the implemented endpoint contracts:
 
 - Auth: `register`, `login`, `me`, `logout`, `updateProfile`, `changePassword`, `listSessions`, `revokeSession`, `startEmailVerification`, `confirmEmailVerification`
 - Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`, `resetUserPasswordByAdmin`
@@ -249,9 +302,10 @@ The frontend API client now exposes one method for each planned endpoint:
 - Notifications: `listNotifications`, `markNotificationRead`, `setNotificationReadState`, `markAllNotificationsRead`
 - Teams: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `listTeamMembers`, `listTeamRoster`, `listUserTeamMemberships`, `listTeamCandidates`, `listUnassignedTeamMembers`, `addTeamMember`, `updateTeamMember`, `removeTeamMember`
 - Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
-- Forms: `listForms`, `createForm`, `updateForm`, `getForm`
-- Processes: `startProcess`, `listProcesses`, `getProcess`
-- Tasks: `listMyTasks`, `executeTaskAction`
+- Forms: `listForms`, `createForm`, `updateForm`, `getForm`, `listFormVersions`, `getFormVersion`, `createFormVersion`, `updateFormVersion`, `publishFormVersion`
+- Process definitions: `listProcessDefinitions`, `listRunnableProcessDefinitions`, `getProcessDefinition`, `createProcessDefinition`, `updateProcessDefinition`, `createProcessDefinitionVersion`, `updateProcessDefinitionVersion`, `publishProcessDefinitionVersion`
+- Processes: `startProcess`, `startProcessVersion`, `listProcesses`, `getProcess`
+- Tasks: `listMyTasks`, `claimTask`, `releaseTask`, `executeTaskAction`
 
 Feature components should call these client methods through feature-level orchestration instead of calling `fetch` directly.
 
@@ -295,7 +349,7 @@ The API accepts the session token as `Authorization: Bearer <token>`.
 
 Enum values are returned as readable strings, for example `Admin`, `InProgress` and `Approve`. This keeps the frontend role checks and status displays explicit.
 
-Task actions load the task and parent process, validate role/action, update process status through `ProcessStateMachine`, and then write a separate `AuditLog` row. The detail response is reloaded from the database after save so UI state reflects persisted data, not a temporary in-memory object graph.
+Dynamic task actions load the task, pinned workflow version and optional published task-form snapshot. Authorization, claim ownership, action availability and backend form validation run before `DynamicWorkflowEngine` advances the graph. Task completion, process variables, step history, notifications and audit records commit atomically; the detail response is then reloaded from persisted data. A `SendBack` keeps historical executions immutable but removes invalidated downstream `steps.*` variables before the new attempt begins.
 
 ## Database Configuration
 

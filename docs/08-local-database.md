@@ -115,8 +115,12 @@ Current tables:
 - `FormDefinitions`: saved dynamic form definitions.
 - `FormFieldDefinitions`: fields belonging to a form definition.
 - `FieldValidationRules`: dependent validation rules such as required-when.
+- `FormDefinitionVersions`: immutable published or editable draft form schemas.
+- `FormPageDefinitions`, `FormVersionFieldDefinitions`, `FormVersionFieldValidationRules`: ordered multi-page version content.
+- `ProcessDefinitions`, `ProcessDefinitionVersions`: logical workflows and pinned typed JSON graph versions.
 - `ProcessInstances`: started BPM process records.
-- `ProcessTasks`: assigned approve/reject work items.
+- `ProcessTasks`: direct or candidate-pool work items, priority, claim state, node key and optional task form.
+- `ProcessStepExecutions`: immutable node attempt, actor, action, timing and output history.
 - `AuditLogs`: traceable process state changes.
 - `SystemAuditLogs`: critical identity, access, form, process and task actions for Admin review.
 
@@ -126,19 +130,19 @@ SQLite stores `Guid` values as lowercase text through an EF Core value converter
 
 `DatabaseSeeder` creates the demo users on startup if they do not already exist. The same deterministic seeder is used by local SQLite, Neon and both Docker stacks:
 
-| Username | Password | Role | Status | Email verified |
-| --- | --- | --- | --- | --- |
-| `admin` | `admin123` | SuperAdmin | Active | true |
-| `user` | `user123` | User | Active | true |
-| `approver` | `approver123` | Approver | Active | true |
-| `mario.gomez` | `mario123` | User | PendingApproval | false |
-| `quaresma` | `trivela123` | Approver | Active | true |
-| `atiba` | `atiba123` | User | Active | true |
-| `alex` | `alex123` | Admin | Active | true |
-| `fatih.terim` | `imparator123` | Admin | Active | true |
-| `sergen.yalcin` | `sergen123` | Approver | Active | true |
-| `tuncay.sanli` | `tuncay123` | User | Active | true |
-| `volkan.demirel` | `volkan123` | User | Rejected | true |
+| Username | Password | Platform role | Community role | Status | Email verified |
+| --- | --- | --- | --- | --- | --- |
+| `admin` | `admin123` | SuperAdmin | Global | Active | true |
+| `user` | `user123` | User | Surec Baslatici | Active | true |
+| `approver` | `approver123` | User | Onay Sorumlusu | Active | true |
+| `mario.gomez` | `mario123` | User | Atanmadi | PendingApproval | false |
+| `quaresma` | `trivela123` | User | Onay Sorumlusu | Active | true |
+| `atiba` | `atiba123` | User | Onay Sorumlusu | Active | true |
+| `alex` | `alex123` | User | Topluluk Admin | Active | true |
+| `fatih.terim` | `imparator123` | User | Topluluk Admin | Active | true |
+| `sergen.yalcin` | `sergen123` | User | Onay Sorumlusu | Active | true |
+| `tuncay.sanli` | `tuncay123` | User | Topluluk Admin | Active | true |
+| `volkan.demirel` | `volkan123` | User | Onay Sorumlusu | Rejected | true |
 
 Passwords are stored as PBKDF2 hashes, not plain text. Existing local SQLite files from the earlier plaintext phase are upgraded on API startup by hashing any user password that is not already in the `pbkdf2:v1` format.
 
@@ -174,10 +178,12 @@ When mock data is enabled, the seeder also creates:
 - Five demo communities: `Sportif Faaliyetler`, `Lojistik`, `Urun Siparisi`, `Insan Kaynaklari` and `Satin Alma`.
 - Registration codes: `SPOR1`, `LOG01`, `URUN1`, `IK001` and `SAT01`.
 - Eight active memberships in each community, distributed across community admin, form designer, process starter, approver, standard user, observer and unassigned roles. Each community includes an unassigned pending user for the approval demo.
-- Built-in community roles such as `Topluluk Admin`, `Form Tasarimcisi`, `Surec Baslatici`, `Onay Sorumlusu`, `Lojistik Gorevlisi` and `Salt Okuyucu`.
+- Built-in community roles such as `Topluluk Admin`, `Form Tasarimcisi`, `Surec Baslatici`, `Onay Sorumlusu`, `Standart Kullanici` and `Gozlemci`.
 - Blank `Atanmadi` roles for pending/new users.
-- `Transfer Talep Formu`
-- `Kamp Hazirlik Onay Formu`
+- Start forms such as `Transfer Talep Formu`, `Kamp Hazirlik Onay Formu`, `Izin ve Uzaktan Calisma Talep Formu` and `Satin Alma Talep Formu`.
+- Transfer task forms for Scout, Technical Review, Finance Approval and Transfer Operation.
+- Published `Legacy Basic Approval` compatibility workflow.
+- Published `Transfer Talep Akisi` with four team swimlanes, a typed budget gateway and version-pinned task forms.
 - 12 demo process instances.
 - 6 open approver tasks.
 - completed/rejected examples with audit logs.

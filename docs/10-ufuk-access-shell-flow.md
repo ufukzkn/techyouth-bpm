@@ -120,7 +120,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - The current token model stays as opaque server-side sessions plus rotating refresh tokens because pending approval, lockout, refresh reuse detection and revoke all need server-side state. JWT can be considered later only if it keeps equivalent refresh-token rotation and explicit session/device management.
 - Theme ownership should stay centralized in `sessionStore`; feature screens should read the active theme only through shared styling tokens.
 - Static shell/login/dashboard/process text should use the shared i18n dictionary instead of inline copy.
-- Team and workflow boundaries must remain distinct: teams describe where work is performed, community roles describe what is allowed, and future task priority/claim behavior remains in Cagdas's workflow scope.
+- Team and workflow boundaries remain distinct: teams describe where work is performed, community roles describe what is allowed, and Cagdas's runtime combines these contracts for assignment, priority and candidate claim.
 
 ## Files Changed
 

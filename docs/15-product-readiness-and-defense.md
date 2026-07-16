@@ -4,30 +4,30 @@
 
 The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, permission-aware access, community/custom role management, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
-The strongest defense is extensibility. Forms are data-driven, workflow transitions are centralized, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional and the real HTTP pipeline is covered for cookie/CSRF, Bearer, refresh, rate limit and authorization behavior. The main remaining production gaps are browser E2E, task concurrency protection, dynamic workflow runtime, CI and final responsive/accessibility QA.
+The strongest defense is extensibility. Forms and workflows are versioned data, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional; the real HTTP pipeline covers cookie/CSRF, Bearer, refresh, rate limit, authorization and dynamic workflow publish/start/complete behavior. Candidate claims use optimistic concurrency. The main remaining production gaps are Playwright E2E, CI, parallel/timer workflow nodes and final responsive/accessibility QA.
 
 ## PDF Compliance Matrix
 
 | Requirement | Current Evidence | Readiness | Gaps / Next Action |
 | --- | --- | --- | --- |
-| Next.js multi-screen frontend | Real routes exist for dashboard, forms, runner, processes, tasks, management, logs and settings. | Strong | Final mobile/tablet QA pass. |
+| Next.js multi-screen frontend | Real routes exist for dashboard, versioned forms, runner, workflow canvas, processes, tasks, teams, inbox, management, logs and settings. | Strong | Final mobile/tablet QA pass. |
 | Login with global user/role state | Zustand session store, role-aware shell, register, password reset, remember-me and forced password change. | Strong | Finish full backend error i18n mapping. |
 | Authenticated layout | Header, fixed/collapsible sidebar, active session popover and role-filtered navigation. | Strong | ARIA checks for icon-only controls. |
 | Dashboard | API-backed metrics and role-aware shortcuts. | Strong | Optional security summary widget. |
-| Form design | Editable fields, types, options, required flags, drag/drop order and JSON preview. | Strong | Decide whether started forms become immutable. |
-| Form runner | Dynamic rendering, frontend validation, payload preview and process start. | Strong | Add UI smoke tests. |
+| Form design | Multi-page draft/publish versions, field types, validations, page/field drag-drop and JSON preview. | Strong | Add browser E2E. |
+| Form runner | Version-pinned rendering, step validation, payload preview and compatible workflow selection. | Strong | Add browser E2E. |
 | Required/type/dependent validation | Frontend helpers plus backend validation for process start. | Strong | Keep backend as final source of truth. |
 | Loading/success/error states | Implemented in auth, forms, dashboard refresh, process/task and management flows. | Good | Normalize every remaining backend error message. |
 | .NET 8 REST API | Layered API with controllers, services, EF Core, Swagger and WebApplicationFactory integration tests. | Strong | Add automated CI execution. |
 | User/role storage and authorization | Users, roles, statuses, sessions, communities, custom roles, permissions and scope checks. | Strong | Add final permission matrix screen/doc for demo. |
 | Form definition persistence | EF entities, migrations and create/update/list/detail endpoints. | Strong | Add migration review to release checklist. |
 | JSON submission data | Process start stores submitted form data as JSON and displays it in detail. | Strong | Consider JSON schema/versioning later. |
-| Process/task workflow | Start process, create task, list tasks, approve/reject and show details with transactional state/audit writes. | Strong | Add optimistic concurrency for simultaneous actions. |
-| BPM state machine | `Pending -> InProgress -> Completed/Rejected` controlled by `ProcessStateMachine`. | Strong | Extend only through state-machine rules. |
+| Process/task workflow | Visual graph publish, process start, candidate claim, task forms, approve/reject/complete/escalate/send-back and step history. | Strong | Parallel/timer nodes are intentionally deferred. |
+| BPM runtime | `ProcessStateMachine` controls lifecycle; `DynamicWorkflowEngine` routes pinned Start/UserTask/Gateway/End graphs. | Strong | Add parallel gateway only through a new schema version. |
 | Audit trail | Process audit and system audit show actor, action, target and timestamp. | Strong | Add export for filtered audit results. |
 | Swagger/OpenAPI | Development Swagger with Bearer token support. | Strong | Add OpenAPI examples for demo requests. |
 | EF Core + database | SQLite default, PostgreSQL/Neon optional via configuration and EF Core migrations. | Strong | Reset/recreate old demo DBs created before migrations. |
-| Bonus: i18n/theme/responsive/drag-drop | TR/EN dictionary, dark/light theme, drawer nav, dnd-kit ordering. | Good | Final localization and accessibility pass. |
+| Bonus: i18n/theme/responsive/drag-drop | TR/EN dictionary, dark/light theme, drawer nav, dnd-kit form ordering and React Flow workflow canvas. | Strong | Final localization and accessibility pass. |
 
 ## User Scenario Review
 
@@ -39,13 +39,13 @@ Demo risk: explain that backend validation still protects the process start even
 
 ### Scenario 2: User Starts A Process
 
-User signs in, opens Form Runner, selects a saved form, fills values, sees JSON payload preview and starts a process. The backend stores form data as JSON, creates a process instance, creates the first approver task and writes audit records.
+User signs in, opens Form Runner, selects a published form plus compatible published workflow, fills values, sees JSON payload preview and starts a version-pinned process. The backend validates the exact form version, stores namespaced variables, creates the first graph task and writes step/audit records atomically.
 
 Demo risk: prepare one dependent-validation failure before showing the successful submit.
 
 ### Scenario 3: Approver Approves Or Rejects
 
-Approver opens My Tasks, selects a task, enters an action note and approves/rejects. The backend validates role, available action and state transition before updating the process. Process detail shows submitted JSON, task status and timeline.
+Approver opens My Tasks, claims a team/role candidate task, fills its optional task form, enters a note and runs one of the node's published actions. The backend rechecks candidate eligibility, claim ownership, form payload and graph route. Process detail shows attempts, actors, outputs and timeline.
 
 Demo risk: mention that invalid transitions are rejected by the state machine, not hidden only by UI buttons.
 
@@ -69,6 +69,10 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 **Why dnd-kit?** It is a focused React drag/drop library used only for form field ordering, with move up/down controls as fallback.
 
+**Why React Flow?** `@xyflow/react` provides proven node/edge canvas interaction, pan/zoom and custom nodes. We keep it in the presentation layer and translate it to our own typed graph DTO, so the backend is not coupled to a UI library.
+
+**Why not install Camunda?** The PDF asks for BPM concepts and a dynamic flow, not an external engine. A typed in-project runtime makes form binding, team permissions, transaction behavior and code review visible. Camunda/Kissflow are UX and modeling references.
+
 **How does Swagger auth work?** Login returns a Bearer token for development. Paste it into Swagger Authorize; browser flows can use HttpOnly cookies instead.
 
 **Why opaque sessions instead of JWT?** This BPM system needs central revoke, pending approval, lockout, session visibility and suspicious refresh reuse detection. Opaque DB-backed sessions make those direct. JWT would still need server-side state for these features.
@@ -81,7 +85,7 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 **How do refresh tokens work?** Remember-me creates a long-lived refresh token hash. Each refresh rotates it, revokes the old token/session and creates a new pair. Reuse of a revoked refresh token is treated as suspicious.
 
-**How does the state machine work?** Allowed transitions are centralized: `Pending + Start`, `InProgress + Approve`, `InProgress + Reject`. Any missing transition fails.
+**How does the state machine work?** `ProcessStateMachine` controls lifecycle status, while `DynamicWorkflowEngine` follows the published node graph. A task action must be both available on the node and connected to a valid edge; otherwise it fails without partial writes.
 
 **How did you optimize process listing?** The process board uses a projected summary query and only loads id, form name, status and dates. Tasks, submitted JSON and audit history are loaded from the detail endpoint when the user opens a specific process. This avoids pulling large related graphs for every row.
 
@@ -95,18 +99,16 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 ### Must
 
-- Commit and merge the current access/security package after final lint/build/test checks.
-- Finish i18n mapping for backend auth/access errors.
-- Run final responsive and accessibility QA on form designer, management and logs.
+- Run Playwright E2E for the seeded Transfer Talep Akisi across at least two task actors.
+- Finish i18n mapping for remaining dynamic workflow/backend validation errors.
+- Run final responsive and accessibility QA on form designer, workflow canvas, management and process detail.
 
 ### Should
 
 - Keep Docker local/cloud startup and secret onboarding notes current as configuration changes.
 - Add Playwright E2E for login, form design, process start, task action and audit review.
-- Add optimistic concurrency protection for competing task actions.
 - Add audit export for filtered logs.
-- Add a compact role/permission matrix for Admin, User and Approver.
-- Extend the compact matrix to include SuperAdmin, Topluluk Admin and custom community roles.
+- Add a compact permission matrix for SuperAdmin, Topluluk Admin and custom community roles.
 - Add health checks for database and SMTP readiness.
 
 ### Could
@@ -121,4 +123,4 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 - Ufuk should present access, session, dashboard, management, audit and security decisions.
 - Ozgun should present form modeling, designer, runner, validation and drag/drop.
 - Cagdas should present process start, tasks, state machine, approve/reject and process audit.
-- The final demo should follow one story: login -> design form -> run form -> approve task -> inspect process detail -> inspect system audit.
+- The final demo should follow one story: login -> publish form -> draw/publish workflow -> start process -> claim/complete task -> inspect pinned process history -> inspect system audit.

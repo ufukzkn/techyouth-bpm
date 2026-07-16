@@ -7,6 +7,8 @@ Bu repo iki ana uygulamadan olusur:
 - `apps/web`: Next.js + TypeScript frontend
 - `apps/api`: .NET 8 Web API backend
 
+Form field/page ordering uses `@dnd-kit`; the visual workflow canvas uses `@xyflow/react`. The API runs a custom typed .NET workflow runtime and persists versioned definitions with EF Core. Camunda/Kissflow are product references, not runtime dependencies.
+
 Dokumantasyon `docs/` altindadir. Proje ilerledikce mimari kararlar, servis isleyisi, code review notlari ve ekip sunum dagilimi buradan takip edilir.
 
 ## Requirements
@@ -233,6 +235,7 @@ Ana workspace route'lari:
 - `http://localhost:3000/dashboard`
 - `http://localhost:3000/forms`
 - `http://localhost:3000/runner`
+- `http://localhost:3000/workflows`
 - `http://localhost:3000/processes`
 - `http://localhost:3000/tasks`
 - `http://localhost:3000/inbox`
@@ -290,7 +293,7 @@ Backend testleri:
 dotnet test apps/api/TechYouthBpm.slnx
 ```
 
-Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, community scope, Swagger ve formdan surec baslatmaya kadar gercek controller pipeline'i dogrulanir.
+Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, community scope, Swagger, workflow publish, version-pinned process start ve task completion gercek controller pipeline'i uzerinden dogrulanir. Claim concurrency testi iki stale DbContext snapshot'inin ayni gorevi alamadigini kanitlar.
 
 Neon/PostgreSQL migration smoke testi varsayilan kosuda dis servise baglanmaz. Opt-in calistirmak icin baglanti bilgisini yalniz mevcut terminal oturumunda tanimla:
 
@@ -313,19 +316,19 @@ npm run build
 
 ## Demo Users
 
-| Username | Password | Role |
-| --- | --- | --- |
-| `admin` | `admin123` | Admin |
-| `user` | `user123` | User |
-| `approver` | `approver123` | Approver |
+| Username | Password | Platform role | Community role |
+| --- | --- | --- | --- |
+| `admin` | `admin123` | SuperAdmin | Global |
+| `user` | `user123` | User | Surec Baslatici |
+| `approver` | `approver123` | User | Onay Sorumlusu |
 
 Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullanicilarla local fallback devreye girer; boylece UI gelistirmesi backend olmadan da devam edebilir.
 
-Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `PendingApproval` durumunda olusur. Admin, `Yonetim` ekranindan kullaniciyi `Active` yapabilir, rol atayabilir, gecici sifreyle yeni kullanici olusturabilir ve kullanici oturumlarini gorebilir/kapatabilir. Admin-created kullanicilar `MustChangePassword=true` baslar; normal workspace'e girmeden once zorunlu sifre degistirme ekranindan gecmek zorundadir. Manuel sifre secilmezse backend guclu bir gecici sifre uretir ve mail provider `Mailtrap`/`Smtp` ise kullaniciya e-posta ile gonderir. Admin, is akisi gecmisi olmayan test kullanicilarini silebilir; process/form/task/audit gecmisi olan kullanicilar icin backend silmeyi reddeder. `Ayarlar` ekraninda profil guncelleme, sifre degistirme, email verification OTP akisi, aktif oturumlar, tek oturum kapatma ve tum cihazlardan cikis akisi denenebilir.
+Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `PendingApproval` durumunda olusur. SuperAdmin veya yetkili Topluluk Admin, `Yonetim` ekranindan kendi kapsamina uygun kullaniciyi `Active` yapabilir, community role atayabilir, gecici sifreyle yeni kullanici olusturabilir ve izinli oturumlari gorebilir/kapatabilir. Admin-created kullanicilar `MustChangePassword=true` baslar; normal workspace'e girmeden once zorunlu sifre degistirme ekranindan gecmek zorundadir. Manuel sifre secilmezse backend guclu bir gecici sifre uretir ve mail provider `Mailtrap`/`Smtp` ise kullaniciya e-posta ile gonderir. SuperAdmin, is akisi gecmisi olmayan test kullanicilarini silebilir; process/form/task/audit gecmisi olan kullanicilar icin backend silmeyi reddeder. `Ayarlar` ekraninda profil guncelleme, sifre degistirme, email verification OTP akisi, aktif oturumlar, tek oturum kapatma ve tum cihazlardan cikis akisi denenebilir.
 
 Admin kullanicisi `Loglar` ekraninda sistem gecmisini arayabilir. Loglar varsayilan olarak toplu dokulmez; kisi, surec, entity veya aksiyon aramasi ile server-side paginated sonuc ve ilgili kronolojik gecmis gorulur. Bu liste register, login/logout, rol/status degisikligi, form create/update, process start ve task approve/reject gibi kritik aksiyonlari kullanici, entity ve zaman bilgisiyle takip eder. Surec detay ekranindaki audit timeline ise ilgili surecin state history bilgisini gosterir; sureci baslatan kullanici kendi surec gecmisini, Admin/Approver ise gorebildigi sureclerin gecmisini inceleyebilir.
 
-Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari, audit log ornekleri ve bes topluluga dagilmis 16 takimla gelir. Takim seed'i lider, coklu takim uyesi ve sanal `Takimsiz` sorgusunda gorunecek kullanicilari birlikte icerir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
+Local SQLite demo DB varsayilan olarak sekiz form, versiyonlanmis `Legacy Basic Approval` ve `Transfer Talep Akisi`, ornek surecler, acik tasklar, audit loglari ve bes topluluga dagilmis 16 takimla gelir. Dinamik transfer demosi Scout, Teknik Degerlendirme, kosullu Mali Isler ve Transfer Operasyon adimlarini ayri task formlariyla calistirir. Takim seed'i lider, coklu takim uyesi ve sanal `Takimsiz` sorgusunda gorunecek kullanicilari birlikte icerir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
 
 ## Current Demo Flow
 
@@ -333,12 +336,14 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 2. Role gore menu ve dashboard'u gor.
 3. Admin kullanicisiyle seeded formlari ve dashboard metriklerini incele.
 4. Form tasarimi ekraninda kayitli bir formu sec, alan modelini duzenle ve guncelle.
-5. Form runner ekraninda seeded veya guncellenmis bir form secip yeni surec baslat.
-6. Approver kullanicisiyla `Islerim` ekranindan task approve/reject akisini dene.
-7. Surec detayinda JSON veri ve audit log mantigini incele.
-8. Bildirim popover'inda son bes kaydi, `Gelen Kutusu` ekraninda arama/filtre/pagination ve okundu durumunu dene.
-9. `Yonetim > Takimlar` ekraninda topluluk takimlarini, uyeleri, adaylari, lider degisimini ve sanal `Takimsiz` listesini dene.
-10. Normal bir takim uyesiyle `/teams` ekranini ac; yalnizca kendi takimlarini ve e-posta icermeyen takim arkadasi listesini gorebildigini dogrula.
+5. Form surumunu taslak olarak kaydet, yayinla, arsivle ve eski surumun degismedigini incele.
+6. `/workflows` ekraninda Start, User Task, Gateway, End ve Team Swimlane dugumleriyle bir akis ciz; form/takim/rol baglayip yayinla.
+7. Form runner'da yayinlanmis formu ve uyumlu workflow'u secip version-pinned surec baslat.
+8. `Islerim` ekraninda aday havuzundaki task'i uzerine al; task formunu doldurup approve/reject/complete/send-back akisini dene.
+9. Surec detayinda node, attempt, tamamlayan kullanici, task form ciktisi ve audit zincirini incele.
+10. Bildirim popover'inda son bes kaydi, `Gelen Kutusu` ekraninda arama/filtre/pagination ve okundu durumunu dene.
+11. `Yonetim > Takimlar` ekraninda topluluk takimlarini, uyeleri, adaylari, lider degisimini ve sanal `Takimsiz` listesini dene.
+12. Normal bir takim uyesiyle `/teams` ekranini ac; yalnizca kendi takimlarini ve e-posta icermeyen takim arkadasi listesini gorebildigini dogrula.
 
 ## Troubleshooting
 
@@ -369,3 +374,4 @@ Local SQLite demo DB varsayilan olarak iki form, sekiz surec, acik onay tasklari
 - `docs/17-docker-and-deployment.md`
 - `docs/18-dynamic-workflow-and-team-architecture.md`
 - `docs/19-ui-ux-system.md`
+- `docs/20-dynamic-workflow-contract.md`

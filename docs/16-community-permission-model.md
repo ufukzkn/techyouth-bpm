@@ -28,12 +28,17 @@ The first permission set is operation-based:
 - `Forms.Create`
 - `Forms.Update`
 - `Processes.View`
+- `Processes.ViewAll`
 - `Processes.Start`
 - `Tasks.View`
 - `Tasks.Act`
 - `Audit.View`
 - `Teams.View`
 - `Teams.Manage`
+- `Workflows.View`
+- `Workflows.Create`
+- `Workflows.Update`
+- `Workflows.Publish`
 
 The frontend receives the active user's community and permissions from `UserDto`. Navigation is filtered by `permissions`, not only by enum role. Direct API calls are still protected by backend service checks.
 
@@ -45,14 +50,19 @@ The frontend receives the active user's community and permissions from `UserDto`
 - A community admin only sees pending registrations, users, sessions, roles and audit records inside their own community.
 - Form definitions belong to a community.
 - Process instances belong to the form's community.
-- Task visibility and task action checks use community scope plus `Tasks.View` / `Tasks.Act`.
+- `Processes.View` covers processes started by or assigned to the user; `Processes.ViewAll` permits community-wide process visibility. SuperAdmin remains global.
+- Task visibility and task action checks use community scope plus `Tasks.View` / `Tasks.Act` and the published node assignment target.
 - Audit search is scoped by community for non-SuperAdmin users.
 - SuperAdmin sees an explicit `Tum topluluklar` user-search scope. Community Admin never gets a cross-community selector; it can only filter users by roles inside its own community.
 - Community management is separate from user management. It owns community metadata, invite code, active status, custom roles and role-distribution counts.
 - A custom role can be updated or removed. Role removal requires a replacement role and moves active memberships in one transaction. System roles, notably `Atanmadi`, are protected.
 - A deactivated community revokes member sessions and blocks member login plus new workflow writes. SuperAdmin retains management access to reactivate it; historical data remains available.
 - Team reads and writes stay inside the active community unless the actor is SuperAdmin. Cross-community membership is rejected, and changing a user's community deactivates old team memberships.
-- `Takimsiz` is a virtual view of active approved users without active team membership. It is not a role, team row or future workflow target.
+- `Takimsiz` is a virtual view of active approved users without active team membership. It is not a role, team row or valid workflow target.
+
+## Workflow Assignment
+
+Published user-task nodes can target the process starter, a specific user, a team, a community role or the intersection of team and community role. Direct targets are assigned immediately. Team/role pools are claimable candidate tasks; the backend recalculates membership, role and `Tasks.Act` eligibility during claim and action. Team lead status remains descriptive and never bypasses permission checks.
 
 ## Demo Templates
 
