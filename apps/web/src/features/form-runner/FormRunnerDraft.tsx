@@ -488,16 +488,24 @@ export function FormRunnerDraft({ versionAdapter }: FormRunnerDraftProps = {}) {
 
           {loadStatus !== "loading" && activePage ? (
             <div className="runner-page-fields" key={activePage.id}>
-              {activeFields.map((field) => (
-                <FieldRenderer
-                  key={field.key}
-                  field={field}
-                  value={values[field.key]}
-                  error={errors[field.key]}
-                  language={language}
-                  onChange={handleChange}
-                />
-              ))}
+              {activeFields.map((field) => {
+                const fieldError = errors[field.key];
+
+                return (
+                  <div
+                    className={`runner-field-control${fieldError ? " runner-field-control-error" : ""}`}
+                    key={field.key}
+                  >
+                    <FieldRenderer
+                      field={field}
+                      value={values[field.key]}
+                      error={fieldError}
+                      language={language}
+                      onChange={handleChange}
+                    />
+                  </div>
+                );
+              })}
             </div>
           ) : null}
 
