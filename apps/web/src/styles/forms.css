@@ -1374,10 +1374,57 @@
 }
 
 .field-editor {
+  --field-editor-control-error-color: color-mix(in srgb, var(--danger) 76%, #7f1d1d);
   transition:
     border-color 180ms ease,
     box-shadow 180ms ease,
     opacity 180ms ease;
+}
+
+.designer-section .field-editor input.field-editor-control-save-error,
+.designer-section .field-editor select.field-editor-control-save-error,
+.designer-section .field-editor textarea.field-editor-control-save-error,
+.designer-section .field-editor-rule-save-error input,
+.designer-section .field-editor-rule-save-error select,
+.designer-section .field-editor-rule-save-error textarea {
+  border: 2px solid var(--field-editor-control-error-color);
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--field-editor-control-error-color) 58%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--field-editor-control-error-color) 18%, transparent);
+}
+
+.designer-section .field-editor input.field-editor-control-save-error:focus,
+.designer-section .field-editor input.field-editor-control-save-error:focus-visible,
+.designer-section .field-editor select.field-editor-control-save-error:focus,
+.designer-section .field-editor select.field-editor-control-save-error:focus-visible,
+.designer-section .field-editor textarea.field-editor-control-save-error:focus,
+.designer-section .field-editor textarea.field-editor-control-save-error:focus-visible,
+.designer-section .field-editor-rule-save-error input:focus,
+.designer-section .field-editor-rule-save-error input:focus-visible,
+.designer-section .field-editor-rule-save-error select:focus,
+.designer-section .field-editor-rule-save-error select:focus-visible,
+.designer-section .field-editor-rule-save-error textarea:focus,
+.designer-section .field-editor-rule-save-error textarea:focus-visible {
+  border-color: var(--field-editor-control-error-color);
+  outline: 3px solid color-mix(in srgb, var(--field-editor-control-error-color) 44%, transparent);
+  outline-offset: 2px;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--field-editor-control-error-color) 72%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--field-editor-control-error-color) 24%, transparent);
+}
+
+.designer-section .field-editor .field-error.field-editor-inline-error {
+  color: var(--field-editor-control-error-color);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.designer-section .option-editor.option-editor-save-error,
+.designer-section .field-editor-rule-save-error {
+  border-color: color-mix(in srgb, var(--danger) 62%, var(--border));
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
 }
 
 .field-editor-grid {
