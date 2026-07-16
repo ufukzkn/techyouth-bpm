@@ -187,4 +187,3 @@ function minimapNodeColor(type: string | undefined) {
       return "#8795a8";
   }
 }
-

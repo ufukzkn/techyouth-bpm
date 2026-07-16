@@ -145,4 +145,3 @@ function assignmentSummary(assignment: WorkflowAssignment) {
       return [assignment.teamName, assignment.communityRoleName].filter(Boolean).join(" · ") || "Takım ve rol seçilmedi";
   }
 }
-

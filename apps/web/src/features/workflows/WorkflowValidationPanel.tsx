@@ -58,4 +58,3 @@ export function WorkflowValidationPanel({ issues }: WorkflowValidationPanelProps
     </section>
   );
 }
-

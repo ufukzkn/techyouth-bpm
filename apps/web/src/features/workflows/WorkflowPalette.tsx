@@ -92,4 +92,3 @@ export function WorkflowPalette({ readOnly }: WorkflowPaletteProps) {
     </aside>
   );
 }
-
