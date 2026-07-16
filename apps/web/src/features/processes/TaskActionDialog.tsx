@@ -11,7 +11,7 @@ import type { FormDefinitionVersion, FormFieldDefinition, Language, WorkflowActi
 type TaskActionDialogProps = {
   action: Exclude<WorkflowAction, "Start">;
   language: Language;
-  onConfirm: (note: string, formData?: Record<string, unknown>) => void;
+  onConfirm: (note: string, formData?: Record<string, unknown>) => Promise<boolean>;
   onCancel: () => void;
   disabled: boolean;
   taskForm?: FormDefinitionVersion | null;
@@ -26,6 +26,7 @@ export function TaskActionDialog({ action, language, onConfirm, onCancel, disabl
   );
   const [formValues, setFormValues] = useState<FormValues>(() => buildTaskFormInitialValues(taskFields));
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const copy = {
     Approve: {
       eyebrow: "dialog.approveAction",
@@ -88,15 +89,20 @@ export function TaskActionDialog({ action, language, onConfirm, onCancel, disabl
     });
   }
 
-  function confirmAction() {
+  async function confirmAction() {
     const nextErrors = validateFormFields(taskFields, formValues, language);
     setFormErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
-    onConfirm(
-      note || t(actionCopy.defaultNote),
-      taskForm ? prepareTaskFormData(taskFields, formValues) : undefined,
-    );
+    setIsSubmitting(true);
+    try {
+      await onConfirm(
+        note || t(actionCopy.defaultNote),
+        taskForm ? prepareTaskFormData(taskFields, formValues) : undefined,
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -156,17 +162,17 @@ export function TaskActionDialog({ action, language, onConfirm, onCancel, disabl
         </label>
 
         <div className="action-dialog-actions">
-          <button className="secondary-button" onClick={onCancel} type="button" disabled={disabled}>
+          <button className="secondary-button" onClick={onCancel} type="button" disabled={disabled || isSubmitting}>
             {t("common.cancel")}
           </button>
           <button
             className={actionCopy.buttonClass}
-            disabled={disabled}
-            onClick={confirmAction}
+            disabled={disabled || isSubmitting}
+            onClick={() => void confirmAction()}
             type="button"
           >
             <ActionIcon size={17} />
-            {disabled ? t("common.saving") : translate(language, `action.${action}` as TranslationKey)}
+            {disabled || isSubmitting ? t("common.saving") : translate(language, `action.${action}` as TranslationKey)}
           </button>
         </div>
       </div>

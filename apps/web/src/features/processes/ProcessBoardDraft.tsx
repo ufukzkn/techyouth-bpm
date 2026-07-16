@@ -19,6 +19,7 @@ const minimumRefreshDelayMs = 500;
 
 export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const token = useSessionStore((state) => state.token);
+  const activeUserId = useSessionStore((state) => state.user?.id ?? "");
   const language = useSessionStore((state) => state.language);
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
@@ -120,22 +121,50 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     }
   }
 
-  async function executeTask(taskId: string, action: Exclude<WorkflowAction, "Start">, note: string) {
+  async function executeTask(
+    taskId: string,
+    action: Exclude<WorkflowAction, "Start">,
+    note: string,
+    formData?: Record<string, unknown>,
+  ) {
+    if (!token) {
+      return false;
+    }
+
+    try {
+      setStatus("acting");
+      const updated = await api.executeTaskAction(token, taskId, { action, note, formData });
+      setDetail(updated);
+      await refreshData(updated.id);
+      setMessage(t("process.actionSaved", { action: actionLabel(language, action) }));
+      setToast({ kind: "success", text: t("process.toastActionSaved") });
+      return true;
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.taskActionFailed"));
+      setToast({ kind: "error", text: t("process.taskActionFailed") });
+      return false;
+    }
+  }
+
+  async function updateTaskClaim(taskId: string, mode: "claim" | "release", claimVersion?: string | null) {
     if (!token) {
       return;
     }
 
     try {
       setStatus("acting");
-      const updated = await api.executeTaskAction(token, taskId, { action, note });
-      setDetail(updated);
-      await refreshData(updated.id);
-      setMessage(t("process.actionSaved", { action: actionLabel(language, action) }));
-      setToast({ kind: "success", text: t("process.toastActionSaved") });
+      if (mode === "claim") {
+        await api.claimTask(token, taskId, { claimVersion });
+      } else {
+        await api.releaseTask(token, taskId, { claimVersion });
+      }
+      await refreshData(selectedProcessId);
+      setToast({ kind: "success", text: t(mode === "claim" ? "process.claimed" : "process.released") });
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.taskActionFailed"));
-      setToast({ kind: "error", text: t("process.taskActionFailed") });
+      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.claimFailed"));
+      setToast({ kind: "error", text: t("process.claimFailed") });
     }
   }
 
@@ -185,8 +214,11 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
             {mode === "tasks" ? (
               <MyTasksView
                 tasks={tasks}
+                activeUserId={activeUserId}
                 language={language}
                 status={status}
+                onClaimTask={(taskId, claimVersion) => updateTaskClaim(taskId, "claim", claimVersion)}
+                onReleaseTask={(taskId, claimVersion) => updateTaskClaim(taskId, "release", claimVersion)}
                 onExecuteTask={executeTask}
               />
             ) : null}
