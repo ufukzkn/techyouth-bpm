@@ -28,6 +28,8 @@ import type {
   RunnableProcessDefinition,
   ProcessSummary,
   ProcessTask,
+  ProcessListParams,
+  TaskListParams,
   RegisterResponse,
   RoleTemplate,
   ResetPasswordRequest,
@@ -622,14 +624,34 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  listProcesses(token: string) {
-    return request<ProcessSummary[]>("/api/processes", { token });
+  listProcesses(token: string, params: ProcessListParams = {}) {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    if (params.status && params.status !== "all") search.set("status", params.status);
+    if (params.scope) search.set("scope", params.scope);
+    if (params.sortBy) search.set("sortBy", params.sortBy);
+    if (params.sortDirection) search.set("sortDirection", params.sortDirection);
+    return request<PagedResult<ProcessSummary> | ProcessSummary[]>(
+      `/api/processes${search.size ? `?${search}` : ""}`,
+      { token },
+    ).then((result) => normalizePagedResult(result, params.page, params.pageSize));
   },
   getProcess(token: string, id: string) {
     return request<ProcessDetail>(`/api/processes/${id}`, { token });
   },
-  listMyTasks(token: string) {
-    return request<ProcessTask[]>("/api/tasks/my", { token });
+  listMyTasks(token: string, params: TaskListParams = {}) {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    if (params.priority && params.priority !== "all") search.set("priority", params.priority);
+    if (params.taskId) search.set("taskId", params.taskId);
+    if (params.sortBy) search.set("sortBy", params.sortBy);
+    if (params.sortDirection) search.set("sortDirection", params.sortDirection);
+    return request<PagedResult<ProcessTask> | ProcessTask[]>(
+      `/api/tasks/my${search.size ? `?${search}` : ""}`,
+      { token },
+    ).then((result) => normalizePagedResult(result, params.page, params.pageSize));
   },
   startProcessVersion(token: string, processDefinitionVersionId: string, formData: Record<string, unknown>) {
     return request<ProcessDetail>("/api/processes/start/version", {

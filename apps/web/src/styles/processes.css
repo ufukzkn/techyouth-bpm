@@ -1053,3 +1053,132 @@
   font-size: 12px;
   color: var(--muted);
 }
+
+/* Server-side process and task query controls */
+.process-list-item small svg,
+.task-date svg,
+.task-due-date svg {
+  display: inline-block;
+  margin-right: 4px;
+  vertical-align: -2px;
+}
+
+.process-card-status-stack {
+  display: grid !important;
+  justify-items: end;
+  gap: 7px;
+  flex: 0 0 auto;
+}
+
+.process-deadline.is-overdue,
+.task-due-date.is-overdue {
+  color: var(--danger);
+  font-weight: 750;
+}
+
+.task-item {
+  transition: border-color var(--motion-fast), background var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.task-item:hover,
+.task-item:focus-within,
+.task-item.is-selected {
+  border-color: color-mix(in srgb, var(--primary) 52%, var(--border));
+  background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+}
+
+.task-item-select {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-item-select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 60%, transparent);
+  outline-offset: 4px;
+}
+
+.task-item.is-selected {
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.task-item.is-overdue {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+}
+
+.task-date,
+.task-due-date {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 2px;
+}
+
+.process-query-toolbar,
+.task-query-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.process-sort-controls,
+.task-query-toolbar {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
+
+.process-sort-controls label,
+.task-query-toolbar label {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.process-sort-controls label > span,
+.task-query-toolbar label > span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.process-sort-controls select,
+.task-query-toolbar select {
+  min-height: 36px;
+  max-width: 190px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 30px 0 9px;
+  color: var(--foreground);
+  background: var(--surface);
+}
+
+@media (max-width: 640px) {
+  .process-query-toolbar,
+  .process-sort-controls,
+  .task-query-toolbar {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .process-sort-controls,
+  .task-query-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .process-sort-controls select,
+  .task-query-toolbar select {
+    width: 100%;
+    max-width: none;
+  }
+}

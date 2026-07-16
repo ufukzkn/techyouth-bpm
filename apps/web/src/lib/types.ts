@@ -362,6 +362,30 @@ export type ProcessTask = {
   claimVersion?: string | null;
   formDefinitionVersionId?: string | null;
   taskForm?: FormDefinitionVersion | null;
+  dueAt?: string | null;
+  workflowName?: string;
+  formName?: string;
+  communityName?: string;
+};
+
+export type ProcessListParams = {
+  page?: number;
+  pageSize?: number;
+  status?: ProcessStatus | "all";
+  scope?: WorkflowVisibilityScope | "visible" | "startedByMe" | "assignedToMe";
+  sortBy?: "startedAt" | "dueAt" | "priority" | "status";
+  sortDirection?: "asc" | "desc";
+};
+
+export type WorkflowVisibilityScope = "personal" | "community" | "global";
+
+export type TaskListParams = {
+  page?: number;
+  pageSize?: number;
+  priority?: TaskPriority | "all";
+  taskId?: string;
+  sortBy?: "dueAt" | "priority" | "newest" | "oldest";
+  sortDirection?: "asc" | "desc";
 };
 
 export type AuditLog = {
@@ -411,6 +435,9 @@ export type ProcessSummary = {
   processDefinitionVersionId?: string | null;
   formDefinitionVersionId?: string | null;
   currentNodeKey?: string;
+  workflowName?: string;
+  nearestOpenTaskDueAt?: string | null;
+  highestOpenTaskPriority?: TaskPriority | null;
 };
 
 export type ProcessStepExecution = {
