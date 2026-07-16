@@ -19,6 +19,23 @@ The scope includes:
 - Audit log creation and timeline display.
 - Backend test coverage for authorization and audit behavior.
 
+## Dynamic Workflow Extension
+
+The original one-step state-machine flow remains as a compatibility path, but the primary process path is now versioned and graph-driven:
+
+- `ProcessDefinitionVersion` stores a published typed graph with Start, User Task, Exclusive Gateway and End nodes.
+- `DynamicWorkflowEngine` routes the exact version pinned to the process instance.
+- User tasks support priority, optional task form, action set and ProcessStarter/SpecificUser/Team/CommunityRole/TeamAndCommunityRole assignment.
+- Task list/detail responses include the pinned published task-form snapshot; the action dialog submits its validated `formData` together with the selected workflow action and note.
+- Candidate-pool tasks must be claimed. `ClaimVersion` optimistic concurrency allows only one stale client to win.
+- `SendBack` creates a new node attempt; completed history is never reopened or rewritten, and invalidated downstream `steps.*` values are cleared before routing resumes.
+- Gateway conditions can reference only fields produced before that gateway and the backend validates field/value/operator type compatibility before publish.
+- `ProcessStepExecution` records node, attempt, actor, action, timestamps and task-form output.
+- Start/action transactions include process state, task, variables, notification and both audit channels.
+- `Complete` supports operational tasks in addition to approval-oriented actions.
+
+The visual graph editor is implemented under `/workflows` with `@xyflow/react`; the backend contract remains independent from that library.
+
 ## Completed Work
 
 - Split the monolithic `ProcessBoardDraft.tsx` (246 lines) into 6 focused components.
@@ -43,7 +60,7 @@ The scope includes:
 
 - All processes are loaded from `GET /api/processes` with role-based visibility (User sees only their own, Admin/Approver see all).
 - The list endpoint returns summary DTOs through EF Core projection, so it does not load every task and audit log while rendering the board.
-- Status filter chips allow narrowing the list by Pending, InProgress, Completed or Rejected.
+- Status filter chips allow narrowing the list by Pending, InProgress, Completed, Rejected or Escalated.
 - Filtered count and total count are shown in the card header.
 - Clicking a process loads its full detail from `GET /api/processes/{id}`.
 
@@ -91,7 +108,7 @@ The `ProcessStateMachine` defines allowed transitions as a simple dictionary:
 | Escalated | Approve | Completed |
 | Escalated | Reject | Rejected |
 
-Any other combination returns a validation error. This is the core BPM correctness guarantee.
+Any other combination returns a validation error. This remains the lifecycle guarantee for legacy and dynamic processes. Dynamic node routing adds a second guarantee: an action must exist on the published task node and have exactly one valid graph edge. Graph navigation never directly replaces lifecycle validation.
 
 ## Test Coverage
 
@@ -147,23 +164,21 @@ Documentation files:
 
 ## Out of Scope
 
-These areas were intentionally not changed:
+These capabilities remain intentionally deferred:
 
-- Core process/task state-transition rules.
-- Backend state machine rules.
-- Form designer or form runner behavior.
-- Login/session flow.
-- Dashboard behavior.
-- App shell navigation structure.
-- Package files such as `package.json` and `package-lock.json`.
+- Parallel gateway execution and join semantics.
+- Timer/SLA/escalation scheduling.
+- Service tasks and external ERP integrations.
+- BPMN XML import/export or Camunda deployment.
+- Cross-community workflow routing.
 
 ## Presentation Talking Points
 
-1. **Why a state machine?** Instead of scattered if/else checks, transitions are defined as a dictionary. Adding a new action means adding one line, not hunting through service code.
+1. **Why a state machine plus runtime?** The state machine owns process lifecycle, while the runtime owns graph navigation. This prevents canvas routing rules from scattering status mutations across controllers.
 
-2. **End-to-end approve flow:** Frontend button → `TaskActionDialog` (note input) → `api.executeTaskAction()` → `TasksController` → `TaskService.ExecuteActionAsync()` → `ProcessStateMachine.Move()` → audit log write → response reload.
+2. **End-to-end action flow:** UI note/task form → API client → `TasksController` → authorization/claim/form validation → `DynamicWorkflowEngine.ContinueAsync()` → next task/end → audit/notification commit → detail reload.
 
-3. **Three layers of authorization:** Role check in `TaskService`, available-actions check from persisted JSON, and state machine validation. All three must pass.
+3. **Authorization layers:** community scope, permission/candidate membership, claim ownership, persisted available action, graph edge and lifecycle validation must all pass.
 
 4. **Why separate audit logs?** They are a separate table, not just a status field. You can trace who did what, when, with which note. This is real BPM traceability.
 
@@ -177,6 +192,9 @@ These areas were intentionally not changed:
 - Why split process audit and system audit?
 - How would a new workflow action (e.g. Escalate) be added?
 - Why collect action notes before approve/reject?
+- Why create a new attempt on SendBack instead of reopening history?
+- How does `ClaimVersion` prevent a double claim?
+- Why keep React Flow objects out of the API DTO?
 
 ## Verification
 
@@ -193,3 +211,5 @@ Backend checks:
 ```bash
 dotnet test apps/api/TechYouthBpm.slnx
 ```
+
+The current suite also covers graph validation, gateway conditions, rollback, candidate resolution, claim competition, HTTP workflow publish/start/complete and provider migrations. The exact baseline is tracked in `docs/01-agent-notes.md`.
