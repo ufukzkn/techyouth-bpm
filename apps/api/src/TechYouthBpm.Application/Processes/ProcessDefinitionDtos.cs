@@ -23,7 +23,8 @@ public record ProcessNodeDto(
     double? Width = null,
     double? Height = null,
     string? Description = null,
-    Guid? TeamId = null);
+    Guid? TeamId = null,
+    int? SlaDurationMinutes = null);
 
 public record ProcessConditionDto(
     string Path,

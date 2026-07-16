@@ -249,6 +249,7 @@ export type ProcessNode = {
   description?: string | null;
   formDefinitionVersionId?: string | null;
   priority: TaskPriority;
+  slaDurationMinutes?: number | null;
   actions?: WorkflowAction[] | null;
   assignment?: TaskAssignment | null;
   parentKey?: string | null;

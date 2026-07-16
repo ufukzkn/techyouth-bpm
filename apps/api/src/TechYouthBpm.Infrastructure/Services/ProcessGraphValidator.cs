@@ -248,6 +248,11 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
             return;
         }
 
+        if (node.SlaDurationMinutes is { } slaMinutes && (slaMinutes < 1 || slaMinutes > 525_600))
+        {
+            errors.Add($"User task '{node.Key}' SLA must be between 1 minute and 365 days.");
+        }
+
         var assignment = node.Assignment;
         switch (assignment.Type)
         {

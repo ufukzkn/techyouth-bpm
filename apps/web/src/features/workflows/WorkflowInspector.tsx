@@ -237,6 +237,13 @@ function UserTaskFields({
     updateTask({ actions });
   }
 
+  const slaUnit = node.data.slaUnit
+    ?? (node.data.slaDurationMinutes && node.data.slaDurationMinutes % 1_440 === 0 ? "days" : "hours");
+  const slaFactor = slaUnit === "days" ? 1_440 : 60;
+  const slaValue = node.data.slaDurationMinutes == null
+    ? ""
+    : Number((node.data.slaDurationMinutes / slaFactor).toFixed(2));
+
   return (
     <>
       <InspectorSection title="Atama">
@@ -267,6 +274,51 @@ function UserTaskFields({
             {priorities.map((priority) => <option key={priority} value={priority}>{workflowPriorityLabels[priority]}</option>)}
           </select>
         </InspectorField>
+        <div className="workflow-sla-fields">
+          <InspectorField label="SLA süresi">
+            <input
+              disabled={readOnly}
+              inputMode="decimal"
+              min="0.02"
+              onChange={(event) => {
+                const rawValue = event.target.value;
+                if (!rawValue) {
+                  updateTask({ slaDurationMinutes: null });
+                  return;
+                }
+                const value = Number(rawValue);
+                if (Number.isFinite(value)) {
+                  updateTask({
+                    slaDurationMinutes: Math.min(525_600, Math.max(1, Math.round(value * slaFactor))),
+                  });
+                }
+              }}
+              placeholder="Sınırsız"
+              step="0.25"
+              type="number"
+              value={slaValue}
+            />
+          </InspectorField>
+          <InspectorField label="Birim">
+            <select
+              disabled={readOnly || node.data.slaDurationMinutes == null}
+              onChange={(event) => {
+                const nextUnit = event.target.value as "hours" | "days";
+                const currentValue = typeof slaValue === "number" ? slaValue : 1;
+                const nextFactor = nextUnit === "days" ? 1_440 : 60;
+                updateTask({
+                  slaUnit: nextUnit,
+                  slaDurationMinutes: Math.min(525_600, Math.max(1, Math.round(currentValue * nextFactor))),
+                });
+              }}
+              value={slaUnit}
+            >
+              <option value="hours">Saat</option>
+              <option value="days">Gün</option>
+            </select>
+          </InspectorField>
+        </div>
+        <p className="workflow-inspector-hint">Boş bırakıldığında görev için son tarih hesaplanmaz.</p>
       </InspectorSection>
 
       <InspectorSection title="İşlemler">

@@ -821,6 +821,19 @@
   padding: 12px;
 }
 
+.workflow-sla-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: 8px;
+}
+
+.workflow-inspector-hint {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .workflow-inspector-field {
   min-width: 0;
   display: grid;

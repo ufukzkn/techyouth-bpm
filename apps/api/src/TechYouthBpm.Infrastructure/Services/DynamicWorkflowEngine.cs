@@ -179,7 +179,8 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             AvailableActionsJson = JsonHelpers.Serialize(node.Actions ?? []),
             FormDefinitionVersionId = node.FormDefinitionVersionId,
             ClaimVersion = Guid.NewGuid(),
-            CreatedAt = now
+            CreatedAt = now,
+            DueAt = node.SlaDurationMinutes is { } slaMinutes ? now.AddMinutes(slaMinutes) : null
         };
         var step = new ProcessStepExecution
         {

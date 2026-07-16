@@ -182,6 +182,19 @@ function validateUserTask(
   if (data.formBinding && !data.formBinding.formVersionId) {
     issues.push(issue("task.form.required", "error", "node", "Form bağlantısı için bir form sürümü seçilmelidir.", nodeId));
   }
+
+  if (data.slaDurationMinutes != null
+    && (!Number.isInteger(data.slaDurationMinutes)
+      || data.slaDurationMinutes < 1
+      || data.slaDurationMinutes > 525_600)) {
+    issues.push(issue(
+      "task.sla.range",
+      "error",
+      "node",
+      "Görev SLA süresi 1 dakika ile 365 gün arasında olmalıdır.",
+      nodeId,
+    ));
+  }
 }
 
 function validateGateway(

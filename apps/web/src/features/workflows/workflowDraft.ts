@@ -106,6 +106,7 @@ export function createStarterWorkflowDraft(): WorkflowDefinitionDraft {
         assignment: createEmptyAssignment("team"),
         actions: ["Approve", "Reject"],
         priority: "High",
+        slaDurationMinutes: null,
         formBinding: null,
       },
     },
@@ -221,6 +222,7 @@ export function createWorkflowNode(
           assignment: createEmptyAssignment("team"),
           actions: ["Approve", "Reject"],
           priority: "Normal",
+          slaDurationMinutes: null,
           formBinding: null,
         },
       };

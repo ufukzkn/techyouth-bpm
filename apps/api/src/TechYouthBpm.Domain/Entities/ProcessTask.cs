@@ -33,6 +33,7 @@ public class ProcessTask
     public ProcessTaskStatus Status { get; set; }
     public string AvailableActionsJson { get; set; } = "[]";
     public DateTime CreatedAt { get; set; }
+    public DateTime? DueAt { get; set; }
     public DateTime? CompletedAt { get; set; }
     public Guid? CompletedByUserId { get; set; }
     public User? CompletedByUser { get; set; }
