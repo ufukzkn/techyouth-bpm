@@ -397,10 +397,10 @@ export function SettingsView({
       ) : null}
       {isPasswordChangeConfirmOpen ? (
         <ConfirmationDialog
-          eyebrow="Sifre degisikligi"
-          title="Sifreniz degistirilsin mi?"
-          description="Yeni sifre kaydedildikten sonra mevcut oturumunuz korunur; dilerseniz ayarlardan diger cihazlari ayrica kapatabilirsiniz."
-          confirmLabel="Sifreyi degistir"
+          eyebrow="Şifre değişikliği"
+          title="Şifreniz değiştirilsin mi?"
+          description="Yeni şifre kaydedildikten sonra mevcut oturumunuz korunur; dilerseniz ayarlardan diğer cihazları ayrıca kapatabilirsiniz."
+          confirmLabel="Şifreyi değiştir"
           tone="primary"
           onCancel={() => setIsPasswordChangeConfirmOpen(false)}
           onConfirm={() => {

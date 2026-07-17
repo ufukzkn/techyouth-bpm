@@ -11,9 +11,13 @@ import { demoUsers, loginWithDemoUser } from "@/features/auth/demoUsers";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
+import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
+
+type AuthMode = "login" | "register" | "forgotPassword" | "verifyEmail";
+type AuthTransitionDirection = "forward" | "backward" | "neutral";
 
 type InitialAuthState = {
-  mode: "login" | "register" | "forgotPassword" | "verifyEmail";
+  mode: AuthMode;
   username: string;
   resetToken: string;
   successMessage: string | null;
@@ -51,7 +55,8 @@ export function LoginView() {
   const [resetToken, setResetToken] = useState(initialAuthState.resetToken);
   const [verificationCode, setVerificationCode] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [mode, setMode] = useState<"login" | "register" | "forgotPassword" | "verifyEmail">(initialAuthState.mode);
+  const [mode, setMode] = useState<AuthMode>(initialAuthState.mode);
+  const [modeDirection, setModeDirection] = useState<AuthTransitionDirection>("neutral");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(initialAuthState.successMessage);
   const [isLoading, setIsLoading] = useState(false);
@@ -85,7 +90,16 @@ export function LoginView() {
     clearSessionNotice();
   }
 
-  function switchMode(nextMode: "login" | "register" | "forgotPassword" | "verifyEmail") {
+  function switchMode(nextMode: AuthMode) {
+    const isPrimaryTransition = (mode === "login" || mode === "register")
+      && (nextMode === "login" || nextMode === "register");
+    setModeDirection(
+      isPrimaryTransition
+        ? nextMode === "register"
+          ? "forward"
+          : "backward"
+        : "neutral",
+    );
     setMode(nextMode);
     setError(null);
     setSuccessMessage(null);
@@ -126,6 +140,7 @@ export function LoginView() {
           submittedCommunityCode,
         );
         setSuccessMessage(t("login.registerPending", { username: registration.username }));
+        setModeDirection("backward");
         setMode("login");
         setPassword("");
       } catch (apiError) {
@@ -241,26 +256,25 @@ export function LoginView() {
           <PrototypeLogo size={34} />
         </div>
         <h1>TechYouth BPM Wizard</h1>
-        <p>{language === "tr" ? "Form tasarimi ve surec yonetimi calisma alani" : "Form design and process management workspace"}</p>
+        <p>{t("login.subtitle")}</p>
 
-        <div className="segmented-control" aria-label={t("login.authMode")}>
-          <button
-            className={mode === "login" ? "active" : undefined}
-            type="button"
-            onClick={() => switchMode("login")}
-          >
-            {t("login.signIn")}
-          </button>
-          <button
-            className={mode === "register" ? "active" : undefined}
-            type="button"
-            onClick={() => switchMode("register")}
-          >
-            {t("login.createAccount")}
-          </button>
-        </div>
+        {mode === "login" || mode === "register" ? (
+          <div className="login-auth-mode">
+            <SlidingSegmentedControl
+              ariaLabel={t("login.authMode")}
+              name="authentication-mode"
+              onChange={switchMode}
+              options={[
+                { value: "login", label: t("login.signIn") },
+                { value: "register", label: t("login.createAccount") },
+              ]}
+              value={mode}
+            />
+          </div>
+        ) : null}
 
-        <form className="login-form" onSubmit={handleSubmit}>
+        <div className={`login-mode-card login-mode-card-${modeDirection}`} key={mode}>
+          <form className="login-form" onSubmit={handleSubmit}>
           <label>
             {mode === "forgotPassword" || mode === "verifyEmail" ? t("login.usernameOrEmail") : t("login.username")}
             <input
@@ -383,15 +397,16 @@ export function LoginView() {
                 : t("login.sendVerification")
               : null}
           </button>
-        </form>
+          </form>
 
-        <div className="login-secondary-actions">
-          <button type="button" onClick={() => switchMode(mode === "forgotPassword" ? "login" : "forgotPassword")}>
-            {mode === "forgotPassword" ? t("login.backToSignIn") : t("login.forgotPassword")}
-          </button>
-          <button type="button" onClick={() => switchMode(mode === "verifyEmail" ? "login" : "verifyEmail")}>
-            {mode === "verifyEmail" ? t("login.backToSignIn") : t("login.verifyEmail")}
-          </button>
+          <div className="login-secondary-actions">
+            <button type="button" onClick={() => switchMode(mode === "forgotPassword" ? "login" : "forgotPassword")}>
+              {mode === "forgotPassword" ? t("login.backToSignIn") : t("login.forgotPassword")}
+            </button>
+            <button type="button" onClick={() => switchMode(mode === "verifyEmail" ? "login" : "verifyEmail")}>
+              {mode === "verifyEmail" ? t("login.backToSignIn") : t("login.verifyEmail")}
+            </button>
+          </div>
         </div>
 
         {sessionNotice ? (

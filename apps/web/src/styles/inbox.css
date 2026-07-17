@@ -1,5 +1,7 @@
 .inbox-view {
+  min-height: max(620px, calc(100dvh - 128px));
   display: grid;
+  align-content: start;
   gap: 18px;
 }
 
@@ -28,6 +30,8 @@
 }
 
 .inbox-toolbar {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: minmax(240px, 1fr) auto minmax(170px, 220px);
   align-items: center;
@@ -140,6 +144,8 @@
 }
 
 .inbox-list-panel {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   display: grid;
   gap: 10px;

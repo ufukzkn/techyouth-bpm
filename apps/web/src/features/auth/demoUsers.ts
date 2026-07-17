@@ -16,7 +16,7 @@ export const demoUsers: Array<{
   { username: "admin", password: "admin123", displayName: "Platform SuperAdmin", role: "SuperAdmin" },
   { username: "fatih.terim", password: "imparator123", displayName: "Fatih Terim", role: "User", community: "sport", communityRoleId: "20202020-0000-0000-0000-000000000001", communityRoleName: "Topluluk Admin", permissions: ["Community.ManageUsers", "Community.ManageRoles", "Community.ManageAdmins", "Forms.View", "Forms.Create", "Forms.Update", "Processes.View", "Processes.Start", "Tasks.View", "Tasks.Act", "Audit.View"] },
   { username: "alex", password: "alex123", displayName: "Alex de Souza", role: "User", community: "product", communityRoleId: "20202020-0000-0000-0000-000000000006", communityRoleName: "Topluluk Admin", permissions: ["Community.ManageUsers", "Community.ManageRoles", "Community.ManageAdmins", "Forms.View", "Forms.Create", "Forms.Update", "Processes.View", "Processes.Start", "Tasks.View", "Tasks.Act", "Audit.View"] },
-  { username: "user", password: "user123", displayName: "Process Starter", role: "User", community: "sport", communityRoleId: "20202020-0000-0000-0000-000000000002", communityRoleName: "Surec Baslatici", permissions: ["Forms.View", "Processes.View", "Processes.Start"] },
+  { username: "user", password: "user123", displayName: "Process Starter", role: "User", community: "sport", communityRoleId: "20202020-0000-0000-0000-000000000002", communityRoleName: "Süreç Başlatici", permissions: ["Forms.View", "Processes.View", "Processes.Start"] },
   { username: "approver", password: "approver123", displayName: "Task Reviewer", role: "User", community: "sport", communityRoleId: "20202020-0000-0000-0000-000000000003", communityRoleName: "Onay Sorumlusu", permissions: ["Processes.View", "Tasks.View", "Tasks.Act"] },
 ];
 
@@ -54,7 +54,7 @@ export function loginWithDemoUser(username: string, password: string, rememberMe
       communityId,
       communityName,
       communityRoleId: isSuperAdmin ? null : user.communityRoleId ?? null,
-      communityRoleName: isSuperAdmin ? "" : user.communityRoleName ?? "Atanmadi",
+      communityRoleName: isSuperAdmin ? "" : user.communityRoleName ?? "Atanmadı",
       permissions: user.role === "SuperAdmin"
         ? ["Community.ManageUsers", "Community.ManageRoles", "Community.ManageAdmins", "Forms.View", "Forms.Create", "Forms.Update", "Processes.View", "Processes.Start", "Tasks.View", "Tasks.Act", "Audit.View"]
         : user.permissions ?? [],

@@ -535,6 +535,12 @@
   border-color: color-mix(in srgb, #2bb673 34%, var(--border));
 }
 
+:root[data-theme="dark"] .community-readonly-status .status-active {
+  color: #6df0b2;
+  background: color-mix(in srgb, #32d583 22%, var(--surface));
+  border-color: color-mix(in srgb, #5ee6a8 58%, var(--border));
+}
+
 .status-pendingapproval {
   color: var(--primary-strong);
   background: color-mix(in srgb, var(--primary) 10%, var(--surface));

@@ -6,7 +6,7 @@ import type { Language, TeamCandidate, TeamCandidatePage, TeamMember, TeamMember
 
 export function TeamListSkeleton() {
   return (
-    <div aria-label="Takimlar yukleniyor" className="team-list team-list-skeleton" role="status">
+    <div aria-label="Takımlar yükleniyor" className="team-list team-list-skeleton" role="status">
       {Array.from({ length: 4 }, (_, index) => (
         <div className="team-list-card" key={index}>
           <SkeletonBlock className="team-skeleton-title" />
@@ -56,8 +56,8 @@ export function TeamListPanel({
           >
             <span className="team-card-icon"><UsersRound size={18} /></span>
             <span className="team-card-copy">
-              <strong>{isTr ? "Takimsiz" : "Unassigned"}</strong>
-              <small>{isTr ? "Aktif bir takim uyeligi bulunmayan kullanicilar" : "Users without an active team membership"}</small>
+              <strong>{isTr ? "Takımsız" : "Unassigned"}</strong>
+              <small>{isTr ? "Aktif bir takım üyeliği bulunmayan kullanıcılar" : "Users without an active team membership"}</small>
             </span>
             <span className="team-card-count">{result?.unassignedCount ?? 0}</span>
           </button>
@@ -74,7 +74,7 @@ export function TeamListPanel({
             <span className="team-card-copy">
               <span className="team-card-title"><strong>{team.name}</strong><i className={team.isActive ? "status-dot is-active" : "status-dot"} /></span>
               <small>{team.communityName}</small>
-              <small>{team.description || (isTr ? "Aciklama eklenmemis" : "No description")}</small>
+              <small>{team.description || (isTr ? "Açıklama eklenmemis" : "No description")}</small>
             </span>
             <span className="team-card-metrics"><span><UsersRound size={14} /> {team.memberCount}</span><span><Crown size={14} /> {team.leadCount}</span></span>
           </button>
@@ -82,9 +82,9 @@ export function TeamListPanel({
 
         {!teams.length && !(showUnassigned && selectedCommunityId) ? (
           <EmptyState
-            description={isTr ? "Arama veya kapsam secimini degistirerek yeniden deneyin." : "Try another search or scope."}
+            description={isTr ? "Arama veya kapsam seçimini değiştirerek yeniden deneyin." : "Try another search or scope."}
             icon={<Network size={20} />}
-            title={isTr ? "Takim bulunamadi" : "No teams found"}
+        title={isTr ? "Takım bulunamadı" : "No teams found"}
           />
         ) : null}
       </div>
@@ -128,17 +128,17 @@ export function TeamMemberList({
         {(result?.items ?? []).map((member) => (
           <article className="team-person-row" key={member.userId}>
             <span className={member.isLead ? "team-person-avatar is-lead" : "team-person-avatar"}>{member.displayName.slice(0, 1).toUpperCase()}</span>
-            <div className="team-person-copy"><strong>{member.displayName}</strong><small>@{member.username} · {member.communityRoleName || (isTr ? "Atanmadi" : "Unassigned")}</small></div>
+            <div className="team-person-copy"><strong>{member.displayName}</strong><small>@{member.username} · {member.communityRoleName || (isTr ? "Atanmadı" : "Unassigned")}</small></div>
             {member.isLead ? <span className="team-lead-pill"><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</span> : null}
             {canManage ? (
               <div className="team-person-actions">
-                <button className="text-button" onClick={() => onToggleLead(member)} type="button">{member.isLead ? (isTr ? "Sorumlulugu kaldir" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}</button>
-                <button className="text-button danger-text-button" onClick={() => onRemove(member)} type="button">{isTr ? "Cikar" : "Remove"}</button>
+              <button className="text-button" onClick={() => onToggleLead(member)} type="button">{member.isLead ? (isTr ? "Sorumluluğu kaldır" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}</button>
+                <button className="text-button danger-text-button" onClick={() => onRemove(member)} type="button">{isTr ? "Çıkar" : "Remove"}</button>
               </div>
             ) : null}
           </article>
         ))}
-        {!result?.items.length ? <EmptyState description={isTr ? "Bu takimda henuz aktif uye yok." : "This team has no active members yet."} icon={<UsersRound size={20} />} title={isTr ? "Uye bulunamadi" : "No members"} /> : null}
+      {!result?.items.length ? <EmptyState description={isTr ? "Bu takımda henüz aktif üye yok." : "This team has no active members yet."} icon={<UsersRound size={20} />} title={isTr ? "Üye bulunamadı" : "No members"} /> : null}
       </div>
       {(result?.totalCount ?? 0) > (result?.pageSize ?? 6) ? <PaginationControls currentPage={result?.page ?? 1} language={language} onNext={() => onPageChange(Math.min(totalPages, (result?.page ?? 1) + 1))} onPageChange={onPageChange} onPrevious={() => onPageChange(Math.max(1, (result?.page ?? 1) - 1))} totalPages={totalPages} /> : null}
     </>
@@ -167,11 +167,11 @@ export function TeamCandidateList({
         {(result?.items ?? []).map((candidate) => (
           <article className="team-person-row" key={candidate.userId}>
             <span className="team-person-avatar">{candidate.displayName.slice(0, 1).toUpperCase()}</span>
-            <div className="team-person-copy"><strong>{candidate.displayName}</strong><small>{candidate.communityRoleName || (isTr ? "Atanmadi" : "Unassigned")} · {candidate.activeTeamCount} {isTr ? "takim" : "teams"}</small></div>
-            <button aria-label={`${candidate.displayName} ${isTr ? "takima ekle" : "add to team"}`} className="icon-button team-add-member-button" onClick={() => onAdd(candidate)} title={isTr ? "Takima ekle" : "Add to team"} type="button"><UserPlus size={16} /></button>
+            <div className="team-person-copy"><strong>{candidate.displayName}</strong><small>{candidate.communityRoleName || (isTr ? "Atanmadı" : "Unassigned")} · {candidate.activeTeamCount} {isTr ? "takım" : "teams"}</small></div>
+            <button aria-label={`${candidate.displayName} ${isTr ? "takıma ekle" : "add to team"}`} className="icon-button team-add-member-button" onClick={() => onAdd(candidate)} title={isTr ? "Takıma ekle" : "Add to team"} type="button"><UserPlus size={16} /></button>
           </article>
         ))}
-        {!result?.items.length ? <EmptyState description={isTr ? "Uygun tum kullanicilar zaten bu takimda olabilir." : "All eligible users may already be in this team."} icon={<UserPlus size={20} />} title={isTr ? "Aday bulunamadi" : "No candidates"} /> : null}
+      {!result?.items.length ? <EmptyState description={isTr ? "Uygun tüm kullanıcılar zaten bu takımda olabilir." : "All eligible users may already be in this team."} icon={<UserPlus size={20} />} title={isTr ? "Aday bulunamadı" : "No candidates"} /> : null}
       </div>
       {(result?.totalCount ?? 0) > (result?.pageSize ?? 6) ? <PaginationControls currentPage={result?.page ?? 1} language={language} onNext={() => onPageChange(Math.min(totalPages, (result?.page ?? 1) + 1))} onPageChange={onPageChange} onPrevious={() => onPageChange(Math.max(1, (result?.page ?? 1) - 1))} totalPages={totalPages} /> : null}
     </>
@@ -186,10 +186,10 @@ export function UnassignedMemberList({ isLoading, language, result }: { isLoadin
       {(result?.items ?? []).map((candidate) => (
         <article className="team-person-row" key={candidate.userId}>
           <span className="team-person-avatar">{candidate.displayName.slice(0, 1).toUpperCase()}</span>
-          <div className="team-person-copy"><strong>{candidate.displayName}</strong><small>@{candidate.username} · {candidate.communityRoleName || (isTr ? "Atanmadi" : "Unassigned")}</small></div>
+          <div className="team-person-copy"><strong>{candidate.displayName}</strong><small>@{candidate.username} · {candidate.communityRoleName || (isTr ? "Atanmadı" : "Unassigned")}</small></div>
         </article>
       ))}
-      {!result?.items.length ? <EmptyState description={isTr ? "Bu topluluktaki tum aktif kullanicilar en az bir takima bagli." : "Every active user in this community belongs to a team."} icon={<UsersRound size={20} />} title={isTr ? "Takimsiz kullanici yok" : "No unassigned users"} /> : null}
+      {!result?.items.length ? <EmptyState description={isTr ? "Bu topluluktaki tüm aktif kullanıcılar en az bir takıma bağlı." : "Every active user in this community belongs to a team."} icon={<UsersRound size={20} />} title={isTr ? "Takımsız kullanıcı yok" : "No unassigned users"} /> : null}
     </div>
   );
 }

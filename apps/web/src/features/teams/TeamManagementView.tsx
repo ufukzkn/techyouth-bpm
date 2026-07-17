@@ -115,7 +115,7 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
         setMemberResult(result);
       }
     } catch (error) {
-      setDetailFeedback({ tone: "error", text: localizeApiError(error, language, isTr ? "Uyeler yuklenemedi." : "Members could not be loaded.") });
+      setDetailFeedback({ tone: "error", text: localizeApiError(error, language, isTr ? "Üyeler yüklenemedi." : "Members could not be loaded.") });
     } finally {
       setIsMembersLoading(false);
     }
@@ -141,7 +141,7 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
       teamCandidatePageCache.set(candidateCacheKey, result);
       setCandidateResult(result);
     } catch (error) {
-      setDetailFeedback({ tone: "error", text: localizeApiError(error, language, isTr ? "Uye adaylari yuklenemedi." : "Candidates could not be loaded.") });
+      setDetailFeedback({ tone: "error", text: localizeApiError(error, language, isTr ? "Üye adaylari yüklenemedi." : "Candidates could not be loaded.") });
     } finally {
       setIsCandidatesLoading(false);
     }
@@ -224,10 +224,10 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
     try {
       if (action.type === "create") {
         if (!management.selectedCommunityId) return;
-        setCreateFeedback({ tone: "loading", text: isTr ? "Takim olusturuluyor..." : "Creating team..." });
+        setCreateFeedback({ tone: "loading", text: isTr ? "Takım oluşturuluyor..." : "Creating team..." });
         const created = await api.createTeam(token, { communityId: management.selectedCommunityId, ...createDraft });
         setCreateDraft({ name: "", description: "" });
-        setCreateFeedback({ tone: "success", text: isTr ? `${created.name} olusturuldu.` : `${created.name} created.` });
+        setCreateFeedback({ tone: "success", text: isTr ? `${created.name} oluşturuldu.` : `${created.name} created.` });
         clearTeamDataCache();
         await management.refresh();
         setSelectedTeam(created);
@@ -237,33 +237,33 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
       }
       if (!selectedTeam || selectedTeamId === "unassigned") return;
       if (action.type === "update") {
-        setDetailFeedback({ tone: "loading", text: isTr ? "Takim kaydediliyor..." : "Saving team..." });
+        setDetailFeedback({ tone: "loading", text: isTr ? "Takım kaydediliyor..." : "Saving team..." });
         const updated = await api.updateTeam(token, selectedTeam.id, teamDraft);
         setSelectedTeam(updated);
-        setDetailFeedback({ tone: "success", text: isTr ? "Takim bilgileri guncellendi." : "Team updated." });
+        setDetailFeedback({ tone: "success", text: isTr ? "Takım bilgileri güncellendi." : "Team updated." });
         await reloadAfterMutation(updated.id);
         return;
       }
       if (action.type === "add") {
-        setDetailFeedback({ tone: "loading", text: isTr ? "Kullanici takima ekleniyor..." : "Adding user..." });
+        setDetailFeedback({ tone: "loading", text: isTr ? "Kullanıcı takıma ekleniyor..." : "Adding user..." });
         await api.addTeamMember(token, selectedTeam.id, action.candidate.userId);
-        setDetailFeedback({ tone: "success", text: isTr ? `${action.candidate.displayName} takima eklendi.` : `${action.candidate.displayName} added.` });
+        setDetailFeedback({ tone: "success", text: isTr ? `${action.candidate.displayName} takıma eklendi.` : `${action.candidate.displayName} added.` });
         await reloadAfterMutation(selectedTeam.id, action.candidate.userId);
         return;
       }
       if (action.type === "toggle-lead") {
-        setDetailFeedback({ tone: "loading", text: isTr ? "Sorumluluk guncelleniyor..." : "Updating lead..." });
+        setDetailFeedback({ tone: "loading", text: isTr ? "Sorumluluk güncelleniyor..." : "Updating lead..." });
         await api.updateTeamMember(token, selectedTeam.id, action.member.userId, !action.member.isLead);
-        setDetailFeedback({ tone: "success", text: isTr ? "Takim sorumlulugu guncellendi." : "Team lead updated." });
+        setDetailFeedback({ tone: "success", text: isTr ? "Takım sorumluluğu güncellendi." : "Team lead updated." });
         await reloadAfterMutation(selectedTeam.id, action.member.userId);
         return;
       }
-      setDetailFeedback({ tone: "loading", text: isTr ? "Uyelik kaldiriliyor..." : "Removing membership..." });
+      setDetailFeedback({ tone: "loading", text: isTr ? "Üyelik kaldiriliyor..." : "Removing membership..." });
       await api.removeTeamMember(token, selectedTeam.id, action.member.userId);
-      setDetailFeedback({ tone: "success", text: isTr ? `${action.member.displayName} takimdan cikarildi.` : `${action.member.displayName} removed.` });
+      setDetailFeedback({ tone: "success", text: isTr ? `${action.member.displayName} takımdan çıkarıldı.` : `${action.member.displayName} removed.` });
       await reloadAfterMutation(selectedTeam.id, action.member.userId);
     } catch (error) {
-      const text = localizeApiError(error, language, isTr ? "Islem tamamlanamadi." : "Action failed.");
+      const text = localizeApiError(error, language, isTr ? "İşlem tamamlanamadı." : "Action failed.");
       if (action.type === "create") setCreateFeedback({ tone: "error", text });
       else setDetailFeedback({ tone: "error", text });
     }
@@ -277,10 +277,10 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
       await management.refresh();
       if (selectedTeamId) await Promise.all([loadMembers(true), candidatesOpen ? loadCandidates(true) : Promise.resolve()]);
       await waitForMinimumDelay(startedAt, 500);
-      setToast({ kind: "success", text: isTr ? "Takim verileri yenilendi." : "Team data refreshed." });
+      setToast({ kind: "success", text: isTr ? "Takım verileri yenilendi." : "Team data refreshed." });
     } catch {
       await waitForMinimumDelay(startedAt, 500);
-      setToast({ kind: "error", text: isTr ? "Takim verileri yenilenemedi." : "Team data could not be refreshed." });
+      setToast({ kind: "error", text: isTr ? "Takım verileri yenilenemedi." : "Team data could not be refreshed." });
     } finally {
       setIsRefreshingDetails(false);
     }
@@ -289,46 +289,46 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
   return (
     <section className="settings-panel team-management-page">
       <div className="section-heading">
-        <div><span className="eyebrow">{isTr ? "Yonetim" : "Management"}</span><h2>{isTr ? "Takim yonetimi" : "Team management"}</h2><p>{isTr ? "Topluluk icindeki operasyon gruplarini, uyeleri ve sorumlulari yonetin." : "Manage operational groups, members and leads inside a community."}</p></div>
+        <div><span className="eyebrow">{isTr ? "Yönetim" : "Management"}</span><h2>{isTr ? "Takım yönetimi" : "Team management"}</h2><p>{isTr ? "Topluluk içindeki operasyon gruplarını, üyeleri ve sorumluları yönetin." : "Manage operational groups, members and leads inside a community."}</p></div>
         <button className="secondary-button refresh-button" disabled={isRefreshingDetails} onClick={() => void refreshAll()} type="button"><RefreshCw className={isRefreshingDetails ? "spin-icon" : undefined} size={16} />{isRefreshingDetails ? (isTr ? "Yenileniyor" : "Refreshing") : (isTr ? "Yenile" : "Refresh")}</button>
       </div>
 
       <section className="identity-section team-filter-card">
         <div className="team-filter-row">
-          <label className="search-field"><Search size={16} /><input aria-label={isTr ? "Takimlarda ara" : "Search teams"} onChange={(event) => management.setQuery(event.target.value)} placeholder={isTr ? "Takim adi veya aciklama ara" : "Search name or description"} value={management.query} /></label>
-          {activeUser.role === "SuperAdmin" ? <label className="filter-select-field"><Building2 size={16} /><select aria-label={isTr ? "Topluluk sec" : "Select community"} disabled={management.isCommunitiesLoading} onChange={(event) => changeCommunity(event.target.value || null)} value={management.selectedCommunityId ?? ""}><option value="">{isTr ? "Tum topluluklar" : "All communities"}</option>{management.communities.map((community) => <option key={community.id} value={community.id}>{community.name}</option>)}</select></label> : <strong className="team-fixed-community"><Building2 size={16} /> {activeUser.communityName}</strong>}
-          <label className="filter-select-field compact-team-status"><select aria-label={isTr ? "Takim durumu" : "Team status"} onChange={(event) => management.setActiveFilter(event.target.value as "all" | "active" | "inactive")} value={management.activeFilter}><option value="all">{isTr ? "Tum durumlar" : "All statuses"}</option><option value="active">{isTr ? "Aktif" : "Active"}</option><option value="inactive">{isTr ? "Pasif" : "Inactive"}</option></select></label>
+          <label className="search-field"><Search size={16} /><input aria-label={isTr ? "Takımlarda ara" : "Search teams"} onChange={(event) => management.setQuery(event.target.value)} placeholder={isTr ? "Takım adi veya açıklama ara" : "Search name or description"} value={management.query} /></label>
+      {activeUser.role === "SuperAdmin" ? <label className="filter-select-field"><Building2 size={16} /><select aria-label={isTr ? "Topluluk seç" : "Select community"} disabled={management.isCommunitiesLoading} onChange={(event) => changeCommunity(event.target.value || null)} value={management.selectedCommunityId ?? ""}><option value="">{isTr ? "Tüm topluluklar" : "All communities"}</option>{management.communities.map((community) => <option key={community.id} value={community.id}>{community.name}</option>)}</select></label> : <strong className="team-fixed-community"><Building2 size={16} /> {activeUser.communityName}</strong>}
+          <label className="filter-select-field compact-team-status"><select aria-label={isTr ? "Takım durumu" : "Team status"} onChange={(event) => management.setActiveFilter(event.target.value as "all" | "active" | "inactive")} value={management.activeFilter}><option value="all">{isTr ? "Tüm durumlar" : "All statuses"}</option><option value="active">{isTr ? "Aktif" : "Active"}</option><option value="inactive">{isTr ? "Pasif" : "Inactive"}</option></select></label>
         </div>
-        <div className="team-scope-summary"><span>{selectedCommunity?.name ?? (isTr ? "Platform geneli" : "Platform-wide")}</span><strong>{management.isLoading && !management.result ? <InlineValueLoader /> : `${management.result?.totalCount ?? 0} ${isTr ? "takim" : "teams"}`}</strong>{management.isRefreshing ? <InlineValueLoader label={isTr ? "Arka planda yenileniyor" : "Refreshing in background"} /> : null}</div>
+        <div className="team-scope-summary"><span>{selectedCommunity?.name ?? (isTr ? "Platform geneli" : "Platform-wide")}</span><strong>{management.isLoading && !management.result ? <InlineValueLoader /> : `${management.result?.totalCount ?? 0} ${isTr ? "takım" : "teams"}`}</strong>{management.isRefreshing ? <InlineValueLoader label={isTr ? "Arka planda yenileniyor" : "Refreshing in background"} /> : null}</div>
         <ActionFeedback feedback={pageFeedback} />
       </section>
 
       <div className="team-management-layout">
         <div className="team-management-left">
-          {canManage ? <DisclosureSection className="team-create-section" description={management.selectedCommunityId ? (isTr ? "Secili topluluga yeni operasyon takimi ekleyin." : "Add an operational team to the selected community.") : (isTr ? "Takim olusturmak icin once bir topluluk secin." : "Select a community before creating a team.")} eyebrow={isTr ? "Yeni kayit" : "New record"} icon={<Plus size={18} />} isOpen={createOpen} onToggle={() => setCreateOpen((value) => !value)} title={isTr ? "Takim olustur" : "Create team"}>
-            <div className="compact-form team-create-form"><label><span>{isTr ? "Takim adi" : "Team name"}</span><input maxLength={80} onChange={(event) => setCreateDraft((draft) => ({ ...draft, name: event.target.value }))} value={createDraft.name} /></label><label><span>{isTr ? "Aciklama" : "Description"}</span><textarea maxLength={400} onChange={(event) => setCreateDraft((draft) => ({ ...draft, description: event.target.value }))} rows={3} value={createDraft.description} /></label><div className="section-actions"><ActionFeedback feedback={createFeedback} /><button className="success-button" disabled={!management.selectedCommunityId || !createDraft.name.trim()} onClick={() => setPendingAction({ type: "create" })} type="button"><Plus size={16} /> {isTr ? "Takim olustur" : "Create team"}</button></div></div>
+          {canManage ? <DisclosureSection className="team-create-section" description={management.selectedCommunityId ? (isTr ? "Seçili topluluğa yeni operasyon takımı ekleyin." : "Add an operational team to the selected community.") : (isTr ? "Takım oluşturmak için once bir topluluk seçin." : "Select a community before creating a team.")} eyebrow={isTr ? "Yeni kayıt" : "New record"} icon={<Plus size={18} />} isOpen={createOpen} onToggle={() => setCreateOpen((value) => !value)} title={isTr ? "Takım oluştur" : "Create team"}>
+            <div className="compact-form team-create-form"><label><span>{isTr ? "Takım adi" : "Team name"}</span><input maxLength={80} onChange={(event) => setCreateDraft((draft) => ({ ...draft, name: event.target.value }))} value={createDraft.name} /></label><label><span>{isTr ? "Açıklama" : "Description"}</span><textarea maxLength={400} onChange={(event) => setCreateDraft((draft) => ({ ...draft, description: event.target.value }))} rows={3} value={createDraft.description} /></label><div className="section-actions"><ActionFeedback feedback={createFeedback} /><button className="success-button" disabled={!management.selectedCommunityId || !createDraft.name.trim()} onClick={() => setPendingAction({ type: "create" })} type="button"><Plus size={16} /> {isTr ? "Takım oluştur" : "Create team"}</button></div></div>
           </DisclosureSection> : null}
 
           <section className="identity-section team-list-panel">
-            <div className="section-toolbar"><div><span className="eyebrow">{isTr ? "Organizasyon" : "Organization"}</span><h3>{isTr ? "Takimlar" : "Teams"}</h3></div><Network size={21} /></div>
+            <div className="section-toolbar"><div><span className="eyebrow">{isTr ? "Organizasyon" : "Organization"}</span><h3>{isTr ? "Takımlar" : "Teams"}</h3></div><Network size={21} /></div>
             <TeamListPanel language={language} isLoading={management.isLoading} onPageChange={management.setPage} onSelectTeam={selectTeam} onSelectUnassigned={selectUnassigned} result={management.result} selectedCommunityId={management.selectedCommunityId} selectedTeamId={selectedTeamId} showUnassigned={Boolean(management.selectedCommunityId)} />
           </section>
         </div>
 
         <section className="identity-section team-detail-panel">
-          {!selectedTeamId ? <EmptyState description={isTr ? "Uyeleri ve takim ayarlarini incelemek icin soldan bir takim secin." : "Select a team to inspect members and settings."} icon={<Network size={20} />} title={isTr ? "Takim detayi" : "Team details"} /> : selectedTeamId === "unassigned" ? (
+          {!selectedTeamId ? <EmptyState description={isTr ? "Üyeleri ve takım ayarlarını incelemek için soldan bir takım seçin." : "Select a team to inspect members and settings."} icon={<Network size={20} />} title={isTr ? "Takım detayı" : "Team details"} /> : selectedTeamId === "unassigned" ? (
             <UnassignedDetail isLoading={isMembersLoading} language={language} memberPage={memberPage} onPageChange={setMemberPage} query={memberQuery} result={memberResult as TeamCandidatePage | null} setQuery={setMemberQuery} />
           ) : selectedTeam ? (
             <>
               <div className="section-toolbar"><div><span className="eyebrow">{selectedTeam.communityName}</span><h3>{selectedTeam.name}</h3></div><span className={selectedTeam.isActive ? "status-pill status-active" : "status-pill status-rejected"}>{selectedTeam.isActive ? (isTr ? "Aktif" : "Active") : (isTr ? "Pasif" : "Inactive")}</span></div>
-              {canManage ? <div className="team-editor-grid"><label><span>{isTr ? "Takim adi" : "Team name"}</span><input maxLength={80} onChange={(event) => setTeamDraft((draft) => ({ ...draft, name: event.target.value }))} value={teamDraft.name} /></label><label><span>{isTr ? "Durum" : "Status"}</span><select onChange={(event) => setTeamDraft((draft) => ({ ...draft, isActive: event.target.value === "active" }))} value={teamDraft.isActive ? "active" : "inactive"}><option value="active">{isTr ? "Aktif" : "Active"}</option><option value="inactive">{isTr ? "Pasif" : "Inactive"}</option></select></label><label className="team-description-field"><span>{isTr ? "Aciklama" : "Description"}</span><textarea maxLength={400} onChange={(event) => setTeamDraft((draft) => ({ ...draft, description: event.target.value }))} rows={3} value={teamDraft.description} /></label><div className="section-actions team-save-actions"><ActionFeedback feedback={detailFeedback} /><button className="primary-button" disabled={!teamDraft.name.trim()} onClick={() => setPendingAction({ type: "update" })} type="button">{isTr ? "Degisikligi uygula" : "Apply changes"}</button></div></div> : <p className="helper-copy">{selectedTeam.description}</p>}
+              {canManage ? <div className="team-editor-grid"><label><span>{isTr ? "Takım adi" : "Team name"}</span><input maxLength={80} onChange={(event) => setTeamDraft((draft) => ({ ...draft, name: event.target.value }))} value={teamDraft.name} /></label><label><span>{isTr ? "Durum" : "Status"}</span><select onChange={(event) => setTeamDraft((draft) => ({ ...draft, isActive: event.target.value === "active" }))} value={teamDraft.isActive ? "active" : "inactive"}><option value="active">{isTr ? "Aktif" : "Active"}</option><option value="inactive">{isTr ? "Pasif" : "Inactive"}</option></select></label><label className="team-description-field"><span>{isTr ? "Açıklama" : "Description"}</span><textarea maxLength={400} onChange={(event) => setTeamDraft((draft) => ({ ...draft, description: event.target.value }))} rows={3} value={teamDraft.description} /></label><div className="section-actions team-save-actions"><ActionFeedback feedback={detailFeedback} /><button className="primary-button" disabled={!teamDraft.name.trim()} onClick={() => setPendingAction({ type: "update" })} type="button">{isTr ? "Değişikliği uygula" : "Apply changes"}</button></div></div> : <p className="helper-copy">{selectedTeam.description}</p>}
               {!canManage ? <ActionFeedback feedback={detailFeedback} /> : null}
-              <div className="team-subsection-heading"><div><span className="eyebrow">{isTr ? "Uyelikler" : "Memberships"}</span><h4>{isTr ? "Takim uyeleri" : "Team members"}</h4></div><span><UsersRound size={15} /> {memberResult?.totalCount ?? selectedTeam.memberCount}</span></div>
-              <label className="search-field team-member-search"><Search size={15} /><input aria-label={isTr ? "Takim uyelerinde ara" : "Search team members"} onChange={(event) => { setMemberQuery(event.target.value); setMemberPage(1); }} placeholder={isTr ? "Kullanici ara" : "Search users"} value={memberQuery} /></label>
+              <div className="team-subsection-heading"><div><span className="eyebrow">{isTr ? "Üyelikler" : "Memberships"}</span><h4>{isTr ? "Takım üyeleri" : "Team members"}</h4></div><span><UsersRound size={15} /> {memberResult?.totalCount ?? selectedTeam.memberCount}</span></div>
+              <label className="search-field team-member-search"><Search size={15} /><input aria-label={isTr ? "Takım üyelerinde ara" : "Search team members"} onChange={(event) => { setMemberQuery(event.target.value); setMemberPage(1); }} placeholder={isTr ? "Kullanıcı ara" : "Search users"} value={memberQuery} /></label>
               <TeamMemberList canManage={canManage} isLoading={isMembersLoading} language={language} onPageChange={setMemberPage} onRemove={(member) => setPendingAction({ type: "remove", member })} onToggleLead={(member) => setPendingAction({ type: "toggle-lead", member })} result={memberResult as TeamMemberPage | null} />
-              {canManage ? <DisclosureSection className="team-candidate-section" description={isTr ? "Ayni topluluktaki aktif ve onayli kullanicilari takima ekleyin." : "Add active approved users from this community."} eyebrow={isTr ? "Uye ekleme" : "Membership"} icon={<UserPlus size={18} />} isOpen={candidatesOpen} onToggle={() => setCandidatesOpen((value) => !value)} title={isTr ? "Takima kullanici ekle" : "Add user to team"}><label className="search-field"><Search size={15} /><input aria-label={isTr ? "Uye adaylarinda ara" : "Search candidates"} onChange={(event) => { setCandidateQuery(event.target.value); setCandidatePage(1); }} placeholder={isTr ? "Kullanici ara" : "Search users"} value={candidateQuery} /></label><TeamCandidateList isLoading={isCandidatesLoading} language={language} onAdd={(candidate) => setPendingAction({ type: "add", candidate })} onPageChange={setCandidatePage} result={candidateResult} /></DisclosureSection> : null}
+              {canManage ? <DisclosureSection className="team-candidate-section" description={isTr ? "Aynı topluluktaki aktif ve onaylı kullanıcıları takıma ekleyin." : "Add active approved users from this community."} eyebrow={isTr ? "Üye ekleme" : "Membership"} icon={<UserPlus size={18} />} isOpen={candidatesOpen} onToggle={() => setCandidatesOpen((value) => !value)} title={isTr ? "Takıma kullanıcı ekle" : "Add user to team"}><label className="search-field"><Search size={15} /><input aria-label={isTr ? "Üye adaylarında ara" : "Search candidates"} onChange={(event) => { setCandidateQuery(event.target.value); setCandidatePage(1); }} placeholder={isTr ? "Kullanıcı ara" : "Search users"} value={candidateQuery} /></label><TeamCandidateList isLoading={isCandidatesLoading} language={language} onAdd={(candidate) => setPendingAction({ type: "add", candidate })} onPageChange={setCandidatePage} result={candidateResult} /></DisclosureSection> : null}
             </>
-          ) : <EmptyState description={isTr ? "Takim bilgisi mevcut sayfada bulunamadi; listeyi yenileyin." : "Team data is not available on this page; refresh the list."} icon={<Network size={20} />} title={isTr ? "Takim yuklenemedi" : "Team unavailable"} />}
+        ) : <EmptyState description={isTr ? "Takım bilgisi mevcut sayfada bulunamadı; listeyi yenileyin." : "Team data is not available on this page; refresh the list."} icon={<Network size={20} />} title={isTr ? "Takım yüklenemedi" : "Team unavailable"} />}
         </section>
       </div>
 
@@ -341,19 +341,19 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
 function UnassignedDetail({ isLoading, language, memberPage, onPageChange, query, result, setQuery }: { isLoading: boolean; language: Language; memberPage: number; onPageChange: (page: number) => void; query: string; result: TeamCandidatePage | null; setQuery: (value: string) => void }) {
   const isTr = language === "tr";
   const totalPages = Math.max(1, Math.ceil((result?.totalCount ?? 0) / Math.max(1, result?.pageSize ?? detailPageSize)));
-  return <><div className="section-toolbar"><div><span className="eyebrow">{isTr ? "Sanal kategori" : "Virtual category"}</span><h3>{isTr ? "Takimsiz kullanicilar" : "Unassigned users"}</h3></div><UsersRound size={21} /></div><p className="helper-copy">{isTr ? "Bu liste veritabaninda ayri bir takim degildir. Aktif takim uyeligi bulunmayan kullanicilardan otomatik hesaplanir." : "This is not a persisted team. It is calculated from users without active team memberships."}</p><label className="search-field team-member-search"><Search size={15} /><input aria-label={isTr ? "Takimsiz kullanicilarda ara" : "Search unassigned users"} onChange={(event) => { setQuery(event.target.value); onPageChange(1); }} placeholder={isTr ? "Kullanici ara" : "Search users"} value={query} /></label><UnassignedMemberList isLoading={isLoading} language={language} result={result} />{(result?.totalCount ?? 0) > (result?.pageSize ?? detailPageSize) ? <PaginationControls currentPage={memberPage} language={language} onNext={() => onPageChange(Math.min(totalPages, memberPage + 1))} onPageChange={onPageChange} onPrevious={() => onPageChange(Math.max(1, memberPage - 1))} totalPages={totalPages} /> : null}</>;
+  return <><div className="section-toolbar"><div><span className="eyebrow">{isTr ? "Sanal kategori" : "Virtual category"}</span><h3>{isTr ? "Takımsız kullanıcılar" : "Unassigned users"}</h3></div><UsersRound size={21} /></div><p className="helper-copy">{isTr ? "Bu liste veritabanında ayrı bir takım değildir. Aktif takım üyeliği bulunmayan kullanıcılardan otomatik hesaplanır." : "This is not a persisted team. It is calculated from users without active team memberships."}</p><label className="search-field team-member-search"><Search size={15} /><input aria-label={isTr ? "Takımsız kullanıcılarda ara" : "Search unassigned users"} onChange={(event) => { setQuery(event.target.value); onPageChange(1); }} placeholder={isTr ? "Kullanıcı ara" : "Search users"} value={query} /></label><UnassignedMemberList isLoading={isLoading} language={language} result={result} />{(result?.totalCount ?? 0) > (result?.pageSize ?? detailPageSize) ? <PaginationControls currentPage={memberPage} language={language} onNext={() => onPageChange(Math.min(totalPages, memberPage + 1))} onPageChange={onPageChange} onPrevious={() => onPageChange(Math.max(1, memberPage - 1))} totalPages={totalPages} /> : null}</>;
 }
 
 function TeamActionConfirmation({ action, isTr, onCancel, onConfirm }: { action: PendingAction; isTr: boolean; onCancel: () => void; onConfirm: () => void }) {
   const copy = action.type === "create"
-    ? [isTr ? "Takim olustur" : "Create team", isTr ? "Yeni takim secili toplulukta kullanilabilir olacak." : "The new team will be available in the selected community.", isTr ? "Olustur" : "Create"]
+    ? [isTr ? "Takım oluştur" : "Create team", isTr ? "Yeni takım seçili toplulukta kullanılabilir olacak." : "The new team will be available in the selected community.", isTr ? "Oluştur" : "Create"]
     : action.type === "update"
-      ? [isTr ? "Takimi guncelle" : "Update team", isTr ? "Takim bilgileri ve aktiflik durumu guncellenecek." : "Team details and status will be updated.", isTr ? "Guncelle" : "Update"]
+      ? [isTr ? "Takımı güncelle" : "Update team", isTr ? "Takım bilgileri ve aktiflik durumu güncellenecek." : "Team details and status will be updated.", isTr ? "Güncelle" : "Update"]
       : action.type === "add"
-        ? [isTr ? "Kullaniciyi ekle" : "Add user", isTr ? `${action.candidate.displayName} bu takimin aktif uyesi olacak.` : `${action.candidate.displayName} will become an active member.`, isTr ? "Takima ekle" : "Add"]
+        ? [isTr ? "Kullanıcıyı ekle" : "Add user", isTr ? `${action.candidate.displayName} bu takımın aktif üyesi olacak.` : `${action.candidate.displayName} will become an active member.`, isTr ? "Takıma ekle" : "Add"]
         : action.type === "toggle-lead"
-          ? [isTr ? "Sorumlulugu guncelle" : "Update lead", action.member.isLead ? (isTr ? "Kullanicinin takim sorumlulugu kaldirilacak; diger yetkileri degismeyecek." : "Team lead status will be removed; permissions stay unchanged.") : (isTr ? "Kullanici takim sorumlusu olarak isaretlenecek; bu isaret ek yetki vermez." : "The user will be marked as team lead; this grants no extra permission."), isTr ? "Uygula" : "Apply"]
-          : [isTr ? "Uyeyi cikar" : "Remove member", isTr ? `${action.member.displayName} bu takimdan cikarilacak.` : `${action.member.displayName} will be removed from this team.`, isTr ? "Takimdan cikar" : "Remove"];
+          ? [isTr ? "Sorumluluğu güncelle" : "Update lead", action.member.isLead ? (isTr ? "Kullanıcının takım sorumluluğu kaldırılacak; diğer yetkileri değişmeyecek." : "Team lead status will be removed; permissions stay unchanged.") : (isTr ? "Kullanıcı takım sorumlusu olarak işaretlenecek; bu işaret ek yetki vermez." : "The user will be marked as team lead; this grants no extra permission."), isTr ? "Uygula" : "Apply"]
+          : [isTr ? "Üyeyi çıkar" : "Remove member", isTr ? `${action.member.displayName} bu takımdan çıkarılacak.` : `${action.member.displayName} will be removed from this team.`, isTr ? "Takımdan çıkar" : "Remove"];
   return <ConfirmationDialog confirmLabel={copy[2]} description={copy[1]} eyebrow={copy[0]} onCancel={onCancel} onConfirm={onConfirm} title={`${copy[0]}?`} tone={action.type === "remove" ? "danger" : "primary"} />;
 }
 

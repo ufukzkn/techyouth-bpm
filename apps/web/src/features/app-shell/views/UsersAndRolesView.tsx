@@ -540,7 +540,7 @@ export function UsersAndRolesView({
     }
 
     setIsResettingPassword(true);
-    setPasswordResetFeedback({ tone: "loading", text: "Gecici sifre hazirlaniyor..." });
+    setPasswordResetFeedback({ tone: "loading", text: "Geçici şifre hazırlaniyor..." });
     try {
       await api.resetUserPasswordByAdmin(token, selectedUser.id, {
         useManualPassword: passwordResetDraft.useManualPassword,
@@ -549,9 +549,9 @@ export function UsersAndRolesView({
       setPasswordResetDraft({ useManualPassword: false, temporaryPassword: "" });
       clearUserManagementCache();
       await loadUsers();
-      setPasswordResetFeedback({ tone: "success", text: "Gecici sifre e-posta ile gonderildi." });
+      setPasswordResetFeedback({ tone: "success", text: "Geçici şifre e-posta ile gönderildi." });
     } catch (error) {
-      setPasswordResetFeedback({ tone: "error", text: localizeApiError(error, language, "Sifre sifirlanamadi.") });
+      setPasswordResetFeedback({ tone: "error", text: localizeApiError(error, language, "Şifre sıfırlanamadı.") });
     } finally {
       setIsResettingPassword(false);
     }
@@ -669,7 +669,7 @@ export function UsersAndRolesView({
                       setSelectedUserId(null);
                     }}
                   >
-                    <option value="">Tum topluluklar</option>
+                    <option value="">Tüm topluluklar</option>
                     {communities.map((community) => (
                       <option key={community.id} value={community.id}>
                         {community.name}
@@ -679,8 +679,8 @@ export function UsersAndRolesView({
                   {!selectedCommunityId ? (
                     <small className="all-communities-summary">
                       {isLoadingCommunities || isLoadingAllCommunitiesUserCount || allCommunitiesUserCount === null
-                        ? <InlineValueLoader label="Toplam kullanici sayisi yukleniyor" />
-                        : `${communities.length} topluluk · ${allCommunitiesUserCount} kullanici`}
+                        ? <InlineValueLoader label="Toplam kullanıcı sayısı yükleniyor" />
+                        : `${communities.length} topluluk · ${allCommunitiesUserCount} kullanıcı`}
                     </small>
                   ) : null}
                 </>
@@ -690,7 +690,7 @@ export function UsersAndRolesView({
             </div>
             {selectedCommunityId ? (
               <span className="community-member-count">
-                {isLoadingCommunitySummary || !selectedCommunitySummary ? <InlineValueLoader label="Uye sayisi yukleniyor" /> : `${selectedCommunitySummary.memberCount} uye`}
+                {isLoadingCommunitySummary || !selectedCommunitySummary ? <InlineValueLoader label="Üye sayısı yükleniyor" /> : `${selectedCommunitySummary.memberCount} üye`}
               </span>
             ) : null}
           </div>
@@ -704,7 +704,7 @@ export function UsersAndRolesView({
                   setPage(1);
                 }}
               >
-                <option value="">Tum roller</option>
+                <option value="">Tüm roller</option>
                 {communityRoles.map((role) => (
                   <option key={role.id} value={role.id}>
                     {role.name}
@@ -716,7 +716,7 @@ export function UsersAndRolesView({
         </div>
         <div className="users-scope-summary">
           <div className="status-line">
-            {selectedCommunity ? `${selectedCommunity.name} toplulugundaki kullanicilar` : activeUser.role === "SuperAdmin" ? "Tum topluluklardaki kullanicilar" : activeUser.communityName}
+            {selectedCommunity ? `${selectedCommunity.name} topluluğundaki kullanıcılar` : activeUser.role === "SuperAdmin" ? "Tüm topluluklardaki kullanıcılar" : activeUser.communityName}
           </div>
           <fieldset className="status-checkbox-filters">
             <legend>Durum</legend>
@@ -778,10 +778,10 @@ export function UsersAndRolesView({
                 <input value={createUserDraft.displayName} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, displayName: event.target.value }))} placeholder={t("login.displayName")} />
                 <input value={createUserDraft.email} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, email: event.target.value }))} placeholder={t("login.email")} type="email" />
                 {usesCustomTemporaryPassword ? <input value={createUserDraft.temporaryPassword} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: event.target.value }))} placeholder={t("users.temporaryPassword")} type="password" /> : <div className="generated-password-placeholder"><Sparkles size={16} /><span>{t("users.autoTemporaryPassword")}</span></div>}
-                {activeUser.role === "SuperAdmin" ? <select value={createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityId: event.target.value, communityRoleId: "" }))}><option value="">Topluluk secin</option>{communities.map((community) => <option key={community.id} value={community.id}>{community.name}</option>)}</select> : null}
-                <select value={createUserDraft.communityRoleId} disabled={!createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityRoleId: event.target.value }))}><option value="">Topluluk rolu secin</option>{createCommunityRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
+                {activeUser.role === "SuperAdmin" ? <select value={createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityId: event.target.value, communityRoleId: "" }))}><option value="">Topluluk seçin</option>{communities.map((community) => <option key={community.id} value={community.id}>{community.name}</option>)}</select> : null}
+                <select value={createUserDraft.communityRoleId} disabled={!createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityRoleId: event.target.value }))}><option value="">Topluluk rolü seçin</option>{createCommunityRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
               </div>
-              {!createUserDraft.communityId ? <p className="helper-copy">Kullanicinin bagli olacagi toplulugu secin; ardindan topluluk rolunu atayin.</p> : null}
+              {!createUserDraft.communityId ? <p className="helper-copy">Kullanıcının bağlı olacağı topluluğu seçin; ardından topluluk rolünü atayın.</p> : null}
               <div className="admin-create-actions">
                 <label className="checkbox-line custom-password-toggle compact-password-toggle"><input checked={usesCustomTemporaryPassword} onChange={(event) => { setUsesCustomTemporaryPassword(event.target.checked); if (!event.target.checked) setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: "" })); }} type="checkbox" /><span>{t("users.useCustomTemporaryPassword")}</span></label>
                 <button className="success-button create-user-submit-button" type="button" disabled={isCreatingUser || !createUserDraft.communityId || !createUserDraft.communityRoleId} onClick={() => setIsCreateUserConfirmOpen(true)}>{isCreatingUser ? t("users.creatingUser") : t("users.createUser")}</button>
@@ -814,9 +814,9 @@ export function UsersAndRolesView({
                   <strong>{selectedUser.username}</strong>
                 </article>
                 <article className="settings-row">
-                  <span>Topluluk rolu</span>
-                  <strong>{selectedUser.communityRoleName || "Atanmadi"}</strong>
-                  <small>{selectedUser.communityName || "Topluluk atanmadi"}</small>
+                  <span>Topluluk rolü</span>
+                  <strong>{selectedUser.communityRoleName || "Atanmadı"}</strong>
+                  <small>{selectedUser.communityName || "Topluluk atanmadı"}</small>
                 </article>
                 <article className="settings-row">
                   <span>Topluluk</span>
@@ -881,7 +881,7 @@ export function UsersAndRolesView({
               {activeUser.role === "SuperAdmin" && selectedUser.role !== "SuperAdmin" ? (
                 <div className="password-reset-inline">
                   <button className="danger-button" disabled={isResettingPassword} onClick={() => setIsPasswordResetConfirmOpen(true)} type="button">
-                    {isResettingPassword ? "Gonderiliyor" : "Sifreyi sifirla"}
+                    {isResettingPassword ? "Gönderiliyor" : "Şifreyi sıfırla"}
                   </button>
                   <ActionFeedback feedback={passwordResetFeedback} />
                 </div>
@@ -996,10 +996,10 @@ export function UsersAndRolesView({
       ) : null}
       {isPasswordResetConfirmOpen && selectedUser ? (
         <ConfirmationDialog
-          eyebrow="Sifre sifirlama"
-          title={`${selectedUser.displayName} icin gecici sifre gonderilsin mi?`}
-          description="Varsayilan akista guclu bir gecici sifre uretilir, e-posta ile gonderilir ve kullanici ilk giriste sifresini degistirmek zorunda kalir."
-          confirmLabel={passwordResetDraft.useManualPassword ? "Manuel sifreyi uygula" : "Gecici sifre gonder"}
+          eyebrow="Şifre sıfırlama"
+          title={`${selectedUser.displayName} için geçici şifre gönderilsin mi?`}
+          description="Varsayılan akışta güçlü bir geçici şifre üretilir, e-posta ile gönderilir ve kullanıcı ilk girişte şifresini değiştirmek zorunda kalır."
+          confirmLabel={passwordResetDraft.useManualPassword ? "Manuel şifreyi uygula" : "Geçici şifre gönder"}
           onCancel={() => {
             setIsPasswordResetConfirmOpen(false);
             setPasswordResetDraft({ useManualPassword: false, temporaryPassword: "" });
@@ -1015,17 +1015,17 @@ export function UsersAndRolesView({
               onChange={(event) => setPasswordResetDraft((draft) => ({ ...draft, useManualPassword: event.target.checked, temporaryPassword: event.target.checked ? draft.temporaryPassword : "" }))}
               type="checkbox"
             />
-            <span>Manuel sifre belirle (tavsiye edilmez)</span>
+            <span>Manuel şifre belirle (tavsiye edilmez)</span>
           </label>
           {passwordResetDraft.useManualPassword ? <input className="inline-password-input" value={passwordResetDraft.temporaryPassword} onChange={(event) => setPasswordResetDraft((draft) => ({ ...draft, temporaryPassword: event.target.value }))} placeholder="En az 8 karakter" type="password" /> : null}
         </ConfirmationDialog>
       ) : null}
       {isCreateUserConfirmOpen ? (
         <ConfirmationDialog
-          eyebrow="Kullanici olusturma"
-          title={`${createUserDraft.username || "Yeni kullanici"} olusturulsun mu?`}
-          description="Kullanici secilen topluluk ve role baglanir. Gecici sifre e-posta ile iletilir ve ilk giriste sifre degisimi zorunlu olur."
-          confirmLabel="Kullaniciyi olustur"
+          eyebrow="Kullanıcı oluşturma"
+          title={`${createUserDraft.username || "Yeni kullanıcı"} oluşturulsun mu?`}
+          description="Kullanıcı seçilen topluluk ve role bağlanır. Geçici şifre e-posta ile iletilir ve ilk girişte şifre değişimi zorunlu olur."
+          confirmLabel="Kullanıcıyı oluştur"
           tone="primary"
           onCancel={() => setIsCreateUserConfirmOpen(false)}
           onConfirm={() => {
@@ -1040,5 +1040,7 @@ export function UsersAndRolesView({
 }
 
 function getUnassignedRoleId(roles: CommunityRole[]) {
-  return roles.find((role) => role.templateKey === "unassigned")?.id ?? roles.find((role) => role.name.toLowerCase() === "atanmadi")?.id ?? "";
+  return roles.find((role) => role.templateKey === "unassigned")?.id
+    ?? roles.find((role) => ["atanmadı", "atanmadi"].includes(role.name.toLocaleLowerCase("tr-TR")))?.id
+    ?? "";
 }

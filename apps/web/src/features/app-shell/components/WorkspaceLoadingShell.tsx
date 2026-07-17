@@ -2,7 +2,7 @@ import { PrototypeLogo } from "@/features/app-shell/PrototypeLogo";
 
 export function WorkspaceLoadingShell() {
   return (
-    <div className="app-shell workspace-loading-shell" aria-live="polite" aria-label="Calisma alani yukleniyor">
+    <div className="app-shell workspace-loading-shell" aria-live="polite" aria-label="Çalışma alanı yükleniyor">
       <aside className="sidebar workspace-loading-sidebar">
         <div className="brand">
           <span className="brand-symbol"><PrototypeLogo size={34} /></span>
@@ -24,7 +24,7 @@ export function LoginRedirectLoading() {
       <section className="login-panel session-loading">
         <PrototypeLogo size={44} />
         <span className="eyebrow">Oturum</span>
-        <h1>Giris ekranina yonlendiriliyor</h1>
+        <h1>Giriş ekranına yonlendiriliyor</h1>
       </section>
     </main>
   );

@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 
-export function InlineValueLoader({ label = "Yukleniyor" }: { label?: string }) {
+export function InlineValueLoader({ label = "Yükleniyor" }: { label?: string }) {
   return (
     <span className="inline-value-loader" aria-label={label} role="status">
       <LoaderCircle className="spin-icon" size={18} aria-hidden="true" />
