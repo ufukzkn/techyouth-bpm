@@ -87,7 +87,7 @@ Current backend tests are strong for the project scope. The latest run passed:
 dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj
 ```
 
-Result: `166 passed`.
+Result: `187 passed` (latest full verification).
 
 Covered areas include:
 
