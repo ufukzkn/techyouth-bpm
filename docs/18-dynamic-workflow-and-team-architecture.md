@@ -40,6 +40,7 @@ The executable DTO and graph decisions are fixed in [20-dynamic-workflow-contrac
 - person, process starter, team, community role and team-plus-role assignment targets;
 - task priority, candidate pools, transactional claim/release and optimistic concurrency;
 - optional User Task SLA values, persisted task deadlines and server-side deadline/priority sorting;
+- optional team-lead-only User Tasks, with candidate visibility separated from claim/action permission;
 - pinned form/workflow versions, namespaced variables and node execution history.
 
 The visual editor uses `@xyflow/react`; form page/field ordering continues to use `@dnd-kit`. An adapter keeps React Flow presentation state out of the API graph contract. Camunda and Kissflow inform the modeling experience, but the application runs its own typed .NET workflow runtime rather than deploying BPMN XML to an external engine.
@@ -63,22 +64,28 @@ Published definitions are immutable. A running instance stays pinned to the vers
 
 Task priority values are `Low`, `Normal`, `High` and `Critical`. Candidate-pool tasks require `Tasks.Act`; team-plus-role assignment resolves the intersection. `ClaimVersion` is an EF Core concurrency token, so two users working from the same snapshot cannot both claim one task.
 
+A Team or Team-and-Community-Role User Task may additionally set `RequiresTeamLead`. Matching members still see the task in their candidate pool, but only an active matching lead may claim or act on it. Publication fails when the selected team has no eligible active lead with `Tasks.Act`. The task snapshot persists this rule so a running process remains pinned to the published definition; `CanCurrentUserAct` and a stable denial-reason code let the UI explain the lock without replacing backend authorization.
+
 User Task nodes may define an SLA between 1 minute and 365 days. The graph stores this value as minutes and each task attempt receives its own nullable `DueAt`; a task recreated after `SendBack` therefore receives a fresh deadline. This is deadline tracking rather than a background timer engine: automatic reminders and escalations remain a later extension.
 
 Process and task boards query one server page at a time. Filtering and sorting run before pagination, and summaries carry workflow context, nearest deadline and highest priority. Deep links use the exact `processId` or `taskId`, so the UI never opens an unrelated first record.
 
 ## Seeded Demo
 
-`Sportif Faaliyetler` includes a published `Transfer Talep Akisi`:
+`Sportif Faaliyetler` includes a published `Transfer Teklif ve Onay Akışı`:
 
-1. Transfer start form is submitted.
+1. A two-page transfer offer form is submitted with all supported field types, conditional validation and file metadata.
 2. `Scout Ekibi` completes a scout report.
 3. `Teknik Degerlendirme` approves, rejects or sends back.
 4. `start.bonservis > 5,000,000` routes to `Mali Isler`; lower values skip that step.
-5. `Transfer Operasyon` completes the contract form.
+5. Team-lead-only Finance and final `Transfer Operasyon` tasks protect the critical decisions.
 6. Every task form, actor, attempt, transition and output remains visible in process history.
 
-Four swimlanes and four task forms are seeded. In addition, all five demo communities receive a published workflow with bound start/task forms and six coherent examples: overdue, upcoming, two completed, rejected and sent-back. Three tasks remain open in each community. The deterministic seed removes only the fourteen retired seed process IDs, preserves user-created process data and resolves old system-role IDs by community/template when upgrading an existing SQLite database. The same seed runs on local SQLite and PostgreSQL/Neon.
+`Lojistik` also includes an `Acil Sevkiyat ve Teslimat Akışı`. Its urgency gateway selects a two-hour or six-hour dispatch SLA, and its warehouse/delivery tasks demonstrate lead-only claim, `Complete`, `Reject`, `SendBack`, deadline ordering and delivery-proof metadata.
+
+Published showcase form and workflow versions are added as new immutable versions rather than rewriting versions used by running processes. Binary files are intentionally outside the current contract: file fields validate and persist name, size, MIME type, extension and modification-time metadata only. The exact manual chain is documented in [22-workflow-end-to-end-test-scenarios.md](22-workflow-end-to-end-test-scenarios.md).
+
+In addition, all five demo communities receive a published workflow with bound start/task forms and coherent process examples: overdue, upcoming, completed, rejected and sent-back. The deterministic seed removes only retired seed process IDs, preserves user-created process data and resolves old system-role IDs by community/template when upgrading an existing SQLite database. The same seed runs on local SQLite and PostgreSQL/Neon.
 
 ## Ownership And Integration Order
 

@@ -69,43 +69,12 @@ export function getAuditCountCacheKey(query: string) {
 }
 
 export function getAuditCategory(log: SystemAuditLog): Exclude<AuditCategory, "all"> {
-  const identityActions = new Set([
-    "Auth.AccountLocked",
-    "Auth.EmailVerificationRequested",
-    "Auth.EmailVerified",
-    "Auth.LoginFailed",
-    "Auth.LoginSucceeded",
-    "Auth.Logout",
-    "Auth.PasswordChanged",
-    "Auth.RegisterRequested",
-    "Auth.SessionRevoked",
-    "Auth.TemporaryPasswordChanged",
-    "User.ProfileAndEmailUpdated",
-    "User.ProfileUpdated",
-  ]);
-  const accessActions = new Set(["Auth.AdminSessionRevoked", "User.AccessUpdated", "User.CreatedByAdmin", "User.DeletedByAdmin"]);
-
-  if (identityActions.has(log.action)) {
-    return "identity";
-  }
-
-  if (accessActions.has(log.action)) {
-    return "access";
-  }
-
-  if (log.action.startsWith("FormDefinition.") || log.entityType === "FormDefinition") {
-    return "forms";
-  }
-
-  if (log.action.startsWith("Task.") || log.entityType === "ProcessTask") {
-    return "tasks";
-  }
-
-  if (log.action.startsWith("Process.") || log.entityType === "ProcessInstance") {
-    return "processes";
-  }
-
-  return "identity";
+  return log.category === "access"
+    || log.category === "forms"
+    || log.category === "processes"
+    || log.category === "tasks"
+    ? log.category
+    : "identity";
 }
 
 export function formatAuditAction(action: string, language: Language) {

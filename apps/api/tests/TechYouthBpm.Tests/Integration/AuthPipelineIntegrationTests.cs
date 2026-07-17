@@ -9,6 +9,40 @@ namespace TechYouthBpm.Tests.Integration;
 public class AuthPipelineIntegrationTests
 {
     [Fact]
+    public async Task Registration_Request_Appears_In_The_Target_Community_Admin_Inbox()
+    {
+        using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateApiClient();
+        var registration = new RegisterRequest(
+            "pending-http-member",
+            "Pending HTTP Member",
+            "pending-http-member@test.local",
+            "password123",
+            "SPOR1");
+
+        using var registerResponse = await client.PostAsJsonAsync("/api/auth/register", registration);
+        Assert.Equal(HttpStatusCode.Created, registerResponse.StatusCode);
+        var registeredUser = await registerResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var registeredUserId = registeredUser.GetProperty("id").GetGuid();
+
+        var (managerSession, _) = await IntegrationTestHttp.LoginAsync(
+            client,
+            username: "fatih.terim",
+            password: "imparator123");
+        using var inboxRequest = IntegrationTestHttp.BearerRequest(
+            HttpMethod.Get,
+            "/api/notifications?category=access&page=1&pageSize=10",
+            managerSession.Token);
+        using var inboxResponse = await client.SendAsync(inboxRequest);
+        Assert.Equal(HttpStatusCode.OK, inboxResponse.StatusCode);
+        var inbox = await inboxResponse.Content.ReadFromJsonAsync<NotificationPageDto>();
+
+        var notification = Assert.Single(inbox!.Items.Where(item => item.Type == "User.PendingApproval"
+            && item.EntityId == registeredUserId.ToString()));
+        Assert.Contains("Pending HTTP Member", notification.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Login_Sets_Secure_Session_Cookies_And_Cookie_Authenticates_Me()
     {
         using var factory = new ApiWebApplicationFactory();

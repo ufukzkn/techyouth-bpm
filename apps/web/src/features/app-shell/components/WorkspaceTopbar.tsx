@@ -144,7 +144,7 @@ export function WorkspaceTopbar({
     router.push(getNotificationTarget(notification) ?? "/inbox");
   }
 
-  const effectiveRole = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
+  const effectiveRole = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadı");
 
   return (
     <header className="topbar">

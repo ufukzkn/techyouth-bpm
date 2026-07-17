@@ -1,4 +1,18 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, History, RefreshCw, Search } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  FileText,
+  Fingerprint,
+  History,
+  ListChecks,
+  RefreshCw,
+  ScrollText,
+  Search,
+  UserCog,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { auditCategories, type AuditCategory, type AuditHistoryMode, type SelectedAuditHistory } from "@/features/app-shell/types";
 import { getAuditCategory, getAuditHistoryTitle, getAuditTargetLabel, getFocusedAuditLogs, formatAuditAction } from "@/features/app-shell/auditUtils";
@@ -14,6 +28,14 @@ import type { Language, SystemAuditLog } from "@/lib/types";
 import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
 
 const minimumRefreshDelayMs = 500;
+const auditCategoryIcons: Record<AuditCategory, LucideIcon> = {
+  all: ScrollText,
+  identity: Fingerprint,
+  access: UserCog,
+  forms: FileText,
+  processes: Workflow,
+  tasks: ListChecks,
+};
 
 export function SystemLogsView({ language, token }: { language: Language; token: string | null }) {
   const t = useCallback(
@@ -239,28 +261,34 @@ export function SystemLogsView({ language, token }: { language: Language; token:
 
       <section className="identity-section">
         <div className="audit-category-grid">
-          {auditCategories.map((category) => (
-            <button
-              className={`audit-category-card ${selectedCategory === category ? "is-active" : ""}`}
-              key={category}
-              type="button"
-              onClick={() => {
-                setSelectedCategory(category);
-                setPage(1);
-                setSelectedHistory(null);
-              }}
-            >
-              <span>{t(`logs.category.${category}` as TranslationKey)}</span>
-              {categoryCounts[category] === null ? (
-                <span className="metric-inline-loader audit-count-loader" aria-label={t("common.loading")}>
-                  <span className="button-spinner" aria-hidden="true" />
+          {auditCategories.map((category) => {
+            const CategoryIcon = auditCategoryIcons[category];
+            return (
+              <button
+                className={`audit-category-card ${selectedCategory === category ? "is-active" : ""}`}
+                key={category}
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(category);
+                  setPage(1);
+                  setSelectedHistory(null);
+                }}
+              >
+                <span className="audit-category-title">
+                  <CategoryIcon aria-hidden="true" size={17} />
+                  <span>{t(`logs.category.${category}` as TranslationKey)}</span>
                 </span>
-              ) : (
-                <strong>{categoryCounts[category]}</strong>
-              )}
-              <small>{t(`logs.categoryHelp.${category}` as TranslationKey)}</small>
-            </button>
-          ))}
+                {categoryCounts[category] === null ? (
+                  <span className="metric-inline-loader audit-count-loader" aria-label={t("common.loading")}>
+                    <span className="button-spinner" aria-hidden="true" />
+                  </span>
+                ) : (
+                  <strong>{categoryCounts[category]}</strong>
+                )}
+                <small>{t(`logs.categoryHelp.${category}` as TranslationKey)}</small>
+              </button>
+            );
+          })}
         </div>
         <label className="search-field">
           <Search size={16} />

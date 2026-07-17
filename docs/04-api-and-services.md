@@ -218,7 +218,7 @@ Legacy create/update remains available for the original PDF flow. Dynamic workfl
 - `POST /api/process-definitions/{id}/versions/{versionId}/publish`
   - Revalidates and publishes an immutable workflow version.
 
-Graph JSON is data, not executable JavaScript. Gateway conditions use typed field paths and operators; the runtime interprets only the supported schema in `docs/20-dynamic-workflow-contract.md`.
+Graph JSON is data, not executable JavaScript. Gateway conditions use typed field paths and operators; the runtime interprets only the supported schema in `docs/20-dynamic-workflow-contract.md`. Team and Team-and-Community-Role tasks may set `RequiresTeamLead`; validation rejects that flag on other assignment kinds and rejects publication when no eligible active lead exists.
 
 ## Processes
 
@@ -256,6 +256,7 @@ Graph JSON is data, not executable JavaScript. Gateway conditions use typed fiel
   - When a task is bound to a published form version, the response embeds the immutable `taskForm` page/field/rule snapshot needed by the action dialog.
   - A User Task may define an SLA between 1 minute and 365 days. The runtime stores `DueAt = CreatedAt + SlaDurationMinutes`; no SLA leaves `DueAt` null.
   - The endpoint is always personal. Admin/community visibility does not make an unrelated task appear in this candidate pool.
+  - Team-lead-only candidate tasks remain visible to matching members. `RequiresTeamLead`, `CanCurrentUserAct` and `ActionDenialReasonCode` explain why claim/action controls are locked without weakening server authorization.
 
 - `POST /api/tasks/{id}/claim`
   - Atomically claims an eligible candidate-pool task. Direct user/process-starter tasks do not need claim.
@@ -364,6 +365,8 @@ The API accepts the session token as `Authorization: Bearer <token>`.
 Enum values are returned as readable strings, for example `Admin`, `InProgress` and `Approve`. This keeps the frontend role checks and status displays explicit.
 
 Dynamic task actions load the task, pinned workflow version and optional published task-form snapshot. Authorization, claim ownership, action availability and backend form validation run before `DynamicWorkflowEngine` advances the graph. Task completion, process variables, step history, notifications and audit records commit atomically; the detail response is then reloaded from persisted data. A `SendBack` keeps historical executions immutable but removes invalidated downstream `steps.*` variables before the new attempt begins.
+
+The deterministic showcase seed publishes immutable versions for `Transfer Teklif ve Onay Akışı` and `Acil Sevkiyat ve Teslimat Akışı`. Together they exercise multi-page forms, every supported field type, conditional validation, typed gateways, team-plus-role assignment, claim/release, team-lead-only actions, SLA/deadline behavior, task forms, notifications and audit. File fields store validated metadata only; binary object storage is not represented as implemented. See `docs/22-workflow-end-to-end-test-scenarios.md` for the manual chain.
 
 ## Database Configuration
 

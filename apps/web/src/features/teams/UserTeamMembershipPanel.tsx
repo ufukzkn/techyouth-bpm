@@ -69,7 +69,7 @@ export function UserTeamMembershipPanel({
     } catch (error) {
       setFeedback({
         tone: "error",
-        text: localizeApiError(error, language, isTr ? "Takim uyelikleri yuklenemedi." : "Team memberships could not be loaded."),
+        text: localizeApiError(error, language, isTr ? "Takım üyelikleri yüklenemedi." : "Team memberships could not be loaded."),
       });
     } finally {
       setIsLoading(false);
@@ -93,7 +93,7 @@ export function UserTeamMembershipPanel({
     const action = pendingAction;
     setPendingAction(null);
     setIsWorking(true);
-    setFeedback({ tone: "loading", text: isTr ? "Takim uyeligi guncelleniyor..." : "Updating team membership..." });
+    setFeedback({ tone: "loading", text: isTr ? "Takım üyeliği güncelleniyor..." : "Updating team membership..." });
     try {
       if (action.type === "add") {
         await api.addTeamMember(token, action.team.id, selectedUser.id);
@@ -103,13 +103,13 @@ export function UserTeamMembershipPanel({
         await api.removeTeamMember(token, action.membership.teamId, selectedUser.id);
       }
       setSelectedTeamId("");
-      setFeedback({ tone: "success", text: isTr ? "Takim uyeligi guncellendi." : "Team membership updated." });
+      setFeedback({ tone: "success", text: isTr ? "Takım üyeliği güncellendi." : "Team membership updated." });
       await load();
       onChanged();
     } catch (error) {
       setFeedback({
         tone: "error",
-        text: localizeApiError(error, language, isTr ? "Takim uyeligi guncellenemedi." : "Team membership could not be updated."),
+        text: localizeApiError(error, language, isTr ? "Takım üyeliği güncellenemedi." : "Team membership could not be updated."),
       });
     } finally {
       setIsWorking(false);
@@ -118,24 +118,24 @@ export function UserTeamMembershipPanel({
 
   const selectedTeam = joinableTeams.find((team) => team.id === selectedTeamId) ?? null;
   const blockedReason = !selectedUser.communityId
-    ? (isTr ? "Kullanicinin aktif bir toplulugu yok." : "The user has no active community.")
+    ? (isTr ? "Kullanıcının aktif bir topluluğu yok." : "The user has no active community.")
     : selectedUser.status !== "Active"
-      ? (isTr ? "Yalniz aktif kullanicilar takima eklenebilir." : "Only active users can join teams.")
+      ? (isTr ? "Yalnız aktif kullanıcılar takıma eklenebilir." : "Only active users can join teams.")
       : null;
 
   return (
     <>
       <DisclosureSection
         className="nested-identity-section user-team-membership-panel"
-        description={isTr ? "Kullanicinin takimlarini goruntuleyin ve yetkiniz varsa yonetin." : "View the user's teams and manage them when authorized."}
+        description={isTr ? "Kullanıcının takımlarını görüntüleyin ve yetkiniz varsa yönetin." : "View the user's teams and manage them when authorized."}
         eyebrow={isTr ? "Organizasyon" : "Organization"}
         icon={<Network size={21} />}
         isOpen={isOpen}
         onToggle={() => setIsOpen((value) => !value)}
-        title={isTr ? "Takim uyelikleri" : "Team memberships"}
+        title={isTr ? "Takım üyelikleri" : "Team memberships"}
       >
         {isLoading ? (
-          <div className="team-membership-skeleton" aria-label={isTr ? "Takim uyelikleri yukleniyor" : "Loading team memberships"}>
+          <div className="team-membership-skeleton" aria-label={isTr ? "Takım üyelikleri yükleniyor" : "Loading team memberships"}>
             <SkeletonBlock className="team-membership-row-skeleton" />
             <SkeletonBlock className="team-membership-row-skeleton" />
           </div>
@@ -144,9 +144,9 @@ export function UserTeamMembershipPanel({
             {memberships.map((membership) => (
               <article className="settings-row user-team-membership-row" key={membership.teamId}>
                 <div className="stacked-summary">
-                  <span>{membership.teamIsActive ? (isTr ? "Aktif takim" : "Active team") : (isTr ? "Pasif takim" : "Inactive team")}</span>
+                  <span>{membership.teamIsActive ? (isTr ? "Aktif takım" : "Active team") : (isTr ? "Pasif takım" : "Inactive team")}</span>
                   <strong><UsersRound size={15} /> {membership.teamName}</strong>
-                  {membership.isLead ? <small className="team-lead-label"><Crown size={13} /> {isTr ? "Takim sorumlusu" : "Team lead"}</small> : null}
+                  {membership.isLead ? <small className="team-lead-label"><Crown size={13} /> {isTr ? "Takım sorumlusu" : "Team lead"}</small> : null}
                 </div>
                 {canManage ? (
                   <div className="compact-icon-actions">
@@ -154,7 +154,7 @@ export function UserTeamMembershipPanel({
                       className="icon-button"
                       disabled={isWorking}
                       onClick={() => setPendingAction({ type: "lead", membership })}
-                      title={membership.isLead ? (isTr ? "Sorumlulugu kaldir" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}
+                    title={membership.isLead ? (isTr ? "Sorumluluğu kaldır" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}
                       type="button"
                     >
                       <Crown size={16} />
@@ -163,7 +163,7 @@ export function UserTeamMembershipPanel({
                       className="icon-button danger-icon-button"
                       disabled={isWorking}
                       onClick={() => setPendingAction({ type: "remove", membership })}
-                      title={isTr ? "Takimdan cikar" : "Remove from team"}
+                      title={isTr ? "Takımdan çıkar" : "Remove from team"}
                       type="button"
                     >
                       <Trash2 size={16} />
@@ -174,17 +174,17 @@ export function UserTeamMembershipPanel({
             ))}
           </div>
         ) : (
-          <p className="status-line">{isTr ? "Kullanici henuz bir takima atanmadi." : "The user has not been assigned to a team yet."}</p>
+          <p className="status-line">{isTr ? "Kullanıcı henüz bir takıma atanmadı." : "The user has not been assigned to a team yet."}</p>
         )}
 
         {canManage && !blockedReason ? (
           <div className="team-membership-add-row">
-            <select aria-label={isTr ? "Eklenecek takimi sec" : "Select team to add"} onChange={(event) => setSelectedTeamId(event.target.value)} value={selectedTeamId}>
-              <option value="">{isTr ? "Takim secin" : "Select a team"}</option>
+            <select aria-label={isTr ? "Eklenecek takımı seç" : "Select team to add"} onChange={(event) => setSelectedTeamId(event.target.value)} value={selectedTeamId}>
+              <option value="">{isTr ? "Takım seçin" : "Select a team"}</option>
               {joinableTeams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
             </select>
             <button className="success-button" disabled={!selectedTeam || isWorking} onClick={() => selectedTeam && setPendingAction({ type: "add", team: selectedTeam })} type="button">
-              {isWorking ? <InlineValueLoader /> : <Plus size={16} />} {isTr ? "Takima ekle" : "Add to team"}
+              {isWorking ? <InlineValueLoader /> : <Plus size={16} />} {isTr ? "Takıma ekle" : "Add to team"}
             </button>
           </div>
         ) : blockedReason ? <p className="helper-copy">{blockedReason}</p> : null}
@@ -193,16 +193,16 @@ export function UserTeamMembershipPanel({
 
       {pendingAction ? (
         <ConfirmationDialog
-          confirmLabel={pendingAction.type === "remove" ? (isTr ? "Takimdan cikar" : "Remove") : (isTr ? "Uygula" : "Apply")}
+          confirmLabel={pendingAction.type === "remove" ? (isTr ? "Takımdan çıkar" : "Remove") : (isTr ? "Uygula" : "Apply")}
           description={pendingAction.type === "add"
-            ? (isTr ? `${selectedUser.displayName}, ${pendingAction.team.name} takimina eklenecek.` : `${selectedUser.displayName} will join ${pendingAction.team.name}.`)
+            ? (isTr ? `${selectedUser.displayName}, ${pendingAction.team.name} takımına eklenecek.` : `${selectedUser.displayName} will join ${pendingAction.team.name}.`)
             : pendingAction.type === "lead"
-              ? (isTr ? "Takim sorumlulugu degisecek; bu islem ek sistem yetkisi vermez." : "Team lead status will change; this grants no system permission.")
-              : (isTr ? `${selectedUser.displayName}, ${pendingAction.membership.teamName} takimindan cikarilacak.` : `${selectedUser.displayName} will leave ${pendingAction.membership.teamName}.`)}
-          eyebrow={isTr ? "Takim uyeligi" : "Team membership"}
+              ? (isTr ? "Takım sorumluluğu değişecek; bu işlem ek sistem yetkisi vermez." : "Team lead status will change; this grants no system permission.")
+              : (isTr ? `${selectedUser.displayName}, ${pendingAction.membership.teamName} takımından çıkarılacak.` : `${selectedUser.displayName} will leave ${pendingAction.membership.teamName}.`)}
+          eyebrow={isTr ? "Takım üyeliği" : "Team membership"}
           onCancel={() => setPendingAction(null)}
           onConfirm={() => void executeAction()}
-          title={isTr ? "Islemi onayliyor musunuz?" : "Confirm this action?"}
+          title={isTr ? "İşlemi onaylıyor musunuz?" : "Confirm this action?"}
           tone={pendingAction.type === "remove" ? "danger" : "primary"}
         />
       ) : null}

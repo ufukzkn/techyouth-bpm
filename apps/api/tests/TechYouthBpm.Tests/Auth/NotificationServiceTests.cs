@@ -114,6 +114,7 @@ public class NotificationServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Null(notification.ReadAt);
+        Assert.Empty(db.SystemAuditLogs);
     }
 
     private static User CreateUser(string username) => new()

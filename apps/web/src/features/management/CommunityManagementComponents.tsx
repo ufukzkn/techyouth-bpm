@@ -14,7 +14,7 @@ export type CommunityPendingAction =
 
 export function CommunityCardSkeleton() {
   return (
-    <div aria-label="Topluluk bilgileri yukleniyor" className="community-card-skeleton">
+    <div aria-label="Topluluk bilgileri yükleniyor" className="community-card-skeleton">
       {Array.from({ length: 4 }, (_, index) => <SkeletonBlock className="skeleton-input" key={index} />)}
     </div>
   );
@@ -22,7 +22,7 @@ export function CommunityCardSkeleton() {
 
 export function CommunityRolePanelSkeleton() {
   return (
-    <div aria-label="Topluluk rolleri yukleniyor" className="community-role-skeleton">
+    <div aria-label="Topluluk rolleri yükleniyor" className="community-role-skeleton">
       <SkeletonBlock className="skeleton-input" />
       <SkeletonBlock className="skeleton-input" />
       <SkeletonBlock className="skeleton-chip-row" />
@@ -71,7 +71,7 @@ export function ManagementConfirmation({
     return (
       <ConfirmationDialog
         confirmLabel="Tasi ve sil"
-        description="Bu roldeki aktif kullanicilar secilen hedef role tasinir; islem geri alinmaz."
+        description="Bu roldeki aktif kullanıcılar seçilen hedef role tasinir; işlem geri alinmaz."
         eyebrow="Rol silme"
         onCancel={onCancel}
         onConfirm={onConfirm}
@@ -89,18 +89,18 @@ export function ManagementConfirmation({
 
   const isDeactivate = action.type === "update-community" && isDeactivating;
   const copy = action.type === "create-community"
-    ? ["Topluluk olustur", "Yeni topluluk ve varsayilan sistem rolleri olusturulacak.", "Olustur"]
+    ? ["Topluluk oluştur", "Yeni topluluk ve varsayılan sistem rolleri oluşturulacak.", "Oluştur"]
     : action.type === "regenerate-code"
-      ? ["Davet kodu", "Eski kayit kodu gecersiz olur; yeni kodla kayit alinabilir.", "Kodu yenile"]
+      ? ["Davet kodu", "Eski kayıt kodu gecersiz olur; yeni kodla kayıt alinabilir.", "Kodu yenile"]
       : action.type === "create-role"
-        ? ["Rol olustur", "Rol izinleri bu topluluk kapsaminda kullanilabilir olacak.", "Rolu olustur"]
+        ? ["Rol oluştur", "Rol izinleri bu topluluk kapsaminda kullanılabilir olacak.", "Rolü oluştur"]
         : action.type === "update-role"
-          ? ["Rol guncelle", "Rol izinleri ve adi guncellenecek.", "Guncelle"]
+          ? ["Rol güncelle", "Rol izinleri ve adi güncellenecek.", "Güncelle"]
           : [
-              isDeactivate ? "Toplulugu pasife al" : "Toplulugu aktif et",
+              isDeactivate ? "Topluluğu pasife al" : "Topluluğu aktif et",
               isDeactivate
-                ? "Normal uyelerin oturumlari kapatilacak; giris ve yeni workflow islemleri engellenecek."
-                : "Topluluk uyeleri yeniden giris yaparak calisma alanina devam edebilecek.",
+                ? "Normal üyelerin oturumlari kapatılacak; giriş ve yeni workflow işlemleri engellenecek."
+                : "Topluluk üyeleri yeniden giriş yaparak çalışma alanına devam edebilecek.",
               isDeactivate ? "Pasife al" : "Aktif et",
             ];
 
@@ -119,23 +119,23 @@ export function ManagementConfirmation({
 
 export function permissionLabel(permission: PermissionName) {
   return {
-    "Community.ManageUsers": "Kullanicilari yonetir",
-    "Community.ManageRoles": "Rolleri yonetir",
-    "Community.ManageAdmins": "Topluluk adminlerini yonetir",
-    "Teams.View": "Takimlari gorur",
-    "Teams.Manage": "Takimlari yonetir",
-    "Forms.View": "Formlari gorur",
-    "Forms.Create": "Form olusturur",
-    "Forms.Update": "Form gunceller",
-    "Workflows.View": "Akis tasarimlarini gorur",
-    "Workflows.Create": "Akis tasarimi olusturur",
-    "Workflows.Update": "Akis tasarimi gunceller",
-    "Workflows.Publish": "Akis tasarimi yayinlar",
-    "Processes.View": "Surecleri gorur",
-    "Processes.ViewAll": "Toplulugun tum sureclerini gorur",
-    "Processes.Start": "Surec baslatir",
-    "Tasks.View": "Isleri gorur",
+    "Community.ManageUsers": "Kullanıcıları yönetir",
+    "Community.ManageRoles": "Rolleri yönetir",
+    "Community.ManageAdmins": "Topluluk adminlerini yönetir",
+    "Teams.View": "Takımlari görür",
+    "Teams.Manage": "Takımlari yönetir",
+    "Forms.View": "Formlari görür",
+    "Forms.Create": "Form oluşturur",
+    "Forms.Update": "Form günceller",
+    "Workflows.View": "Akış tasarimlarini görür",
+    "Workflows.Create": "Akış tasarımı oluşturur",
+    "Workflows.Update": "Akış tasarımı günceller",
+    "Workflows.Publish": "Akış tasarımı yayınlar",
+    "Processes.View": "Süreçleri görür",
+    "Processes.ViewAll": "Topluluğun tüm süreçlerini görür",
+    "Processes.Start": "Süreç başlatır",
+    "Tasks.View": "Isleri görür",
     "Tasks.Act": "Is aksiyonu alir",
-    "Audit.View": "Gecmisi gorur",
+    "Audit.View": "Gecmisi görür",
   }[permission];
 }

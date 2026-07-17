@@ -328,6 +328,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(log => log.ActorUserId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<SystemAuditLog>()
+            .HasOne(log => log.Community)
+            .WithMany()
+            .HasForeignKey(log => log.CommunityId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<SystemAuditLog>()
+            .HasIndex(log => new { log.CommunityId, log.Category, log.CreatedAt });
+
+        modelBuilder.Entity<SystemAuditLog>()
+            .Property(log => log.Category)
+            .HasMaxLength(32);
     }
 
     private void ConfigureSqliteGuidConversion(ModelBuilder modelBuilder)

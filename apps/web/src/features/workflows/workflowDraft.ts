@@ -42,7 +42,7 @@ const defaultTransitions: WorkflowTransition[] = [
   }),
 ];
 
-export function createStarterWorkflowDraft(): WorkflowDefinitionDraft {
+export function createStarterWorkflowDraft(name = "Yeni Akış"): WorkflowDefinitionDraft {
   const nodes: WorkflowNode[] = [
     {
       id: "lane-request",
@@ -107,6 +107,7 @@ export function createStarterWorkflowDraft(): WorkflowDefinitionDraft {
         actions: ["Approve", "Reject"],
         priority: "High",
         slaDurationMinutes: null,
+        requiresTeamLead: false,
         formBinding: null,
       },
     },
@@ -158,7 +159,7 @@ export function createStarterWorkflowDraft(): WorkflowDefinitionDraft {
   ];
 
   return {
-    name: "Satın Alma Onay Akışı",
+    name,
     description: "Talepleri ekip ve tutar kurallarına göre yönlendirir.",
     status: "Draft",
     nodes,
@@ -186,6 +187,15 @@ export function createEmptyAssignment(type: WorkflowAssignmentType): WorkflowAss
   };
 
   return assignments[type];
+}
+
+export function getNextWorkflowName(definitions: ReadonlyArray<{ name: string }>) {
+  const names = new Set(definitions.map((definition) => definition.name.trim().toLocaleLowerCase("tr-TR")));
+  let sequence = 1;
+  while (names.has(`yeni akış ${sequence}`)) {
+    sequence += 1;
+  }
+  return `Yeni Akış ${sequence}`;
 }
 
 export function createWorkflowNode(
@@ -223,6 +233,7 @@ export function createWorkflowNode(
           actions: ["Approve", "Reject"],
           priority: "Normal",
           slaDurationMinutes: null,
+          requiresTeamLead: false,
           formBinding: null,
         },
       };

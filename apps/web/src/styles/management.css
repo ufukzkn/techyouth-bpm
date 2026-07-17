@@ -349,6 +349,23 @@
   text-transform: uppercase;
 }
 
+.audit-category-card .audit-category-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.audit-category-card .audit-category-title > svg {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.audit-category-card .audit-category-title > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .audit-category-card strong {
   font-size: 26px;
 }
@@ -516,6 +533,12 @@
   color: #0f6b43;
   background: color-mix(in srgb, #2bb673 12%, var(--surface));
   border-color: color-mix(in srgb, #2bb673 34%, var(--border));
+}
+
+:root[data-theme="dark"] .community-readonly-status .status-active {
+  color: #6df0b2;
+  background: color-mix(in srgb, #32d583 22%, var(--surface));
+  border-color: color-mix(in srgb, #5ee6a8 58%, var(--border));
 }
 
 .status-pendingapproval {

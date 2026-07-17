@@ -111,6 +111,7 @@ export type UserTaskNodeData = WorkflowNodeDataBase & {
   priority: WorkflowTaskPriority;
   slaDurationMinutes?: number | null;
   slaUnit?: "hours" | "days";
+  requiresTeamLead?: boolean;
   formBinding: WorkflowFormBinding | null;
 };
 
@@ -216,6 +217,7 @@ export type ApiProcessNode = {
   formDefinitionVersionId?: string | null;
   priority: WorkflowTaskPriority;
   slaDurationMinutes?: number | null;
+  requiresTeamLead?: boolean;
   actions?: ApiWorkflowAction[] | null;
   assignment?: ApiTaskAssignment | null;
   parentKey?: string | null;

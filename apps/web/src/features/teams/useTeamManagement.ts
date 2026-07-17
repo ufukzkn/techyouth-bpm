@@ -61,7 +61,7 @@ export function useTeamManagement({
       teamCommunitiesCache.set(activeUser.id, items);
       setCommunities(items);
     } catch {
-      onError("Topluluklar yuklenemedi.");
+      onError("Topluluklar yüklenemedi.");
     } finally {
       setIsCommunitiesLoading(false);
     }
@@ -96,7 +96,7 @@ export function useTeamManagement({
       setLoadState("idle");
     } catch {
       setLoadState("error");
-      onError("Takimlar yuklenemedi.");
+      onError("Takımlar yüklenemedi.");
     }
   }, [activeFilter, cacheKey, debouncedQuery, onError, page, selectedCommunityId, token]);
 

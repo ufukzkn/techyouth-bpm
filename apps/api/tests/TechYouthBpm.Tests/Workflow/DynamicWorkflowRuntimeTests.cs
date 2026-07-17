@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Forms;
 using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Workflow;
@@ -243,6 +244,109 @@ public class DynamicWorkflowRuntimeTests
             step.NodeKey == "approval"
             && step.Attempt == 1
             && step.Status == ProcessStepStatus.Completed);
+    }
+
+    [Fact]
+    public async Task TeamLead_Task_Is_Visible_To_Members_But_Only_Lead_Can_Claim_And_Act()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "team-lead-admin");
+        var lead = TestDbFactory.SeedUser(db, Role.Approver, "team-lead");
+        var member = TestDbFactory.SeedUser(db, Role.Approver, "team-member");
+        var team = DynamicWorkflowTestBuilder.SeedTeam(db, "Lead Restricted Team");
+        db.TeamMemberships.AddRange(
+            TeamMember(team.Id, lead.Id, isLead: true),
+            TeamMember(team.Id, member.Id));
+        await db.SaveChangesAsync();
+        var version = await DynamicWorkflowTestBuilder.CreatePublishedAsync(
+            db,
+            admin,
+            new TaskAssignmentDto(TaskAssignmentType.Team, TeamId: team.Id),
+            requiresTeamLead: true);
+        using var data = JsonDocument.Parse("{\"amount\":100}");
+        var started = await new ProcessService(
+                db,
+                new FormService(db),
+                new ProcessStateMachine(),
+                new SystemAuditService(db))
+            .StartVersionAsync(
+                new StartProcessVersionRequest(version.Id, data.RootElement.Clone()),
+                TestDbFactory.CommunityAdminDto(admin));
+        Assert.True(started.IsSuccess, string.Join(" | ", started.Errors));
+        var task = Assert.Single(started.Value!.Tasks);
+        var leadDto = WithTeam(lead, team, isLead: true);
+        var memberDto = WithTeam(member, team, isLead: false);
+        var taskService = new TaskService(db, new ProcessStateMachine());
+
+        var memberTasks = await taskService.ListMyTasksAsync(memberDto);
+        var memberTask = Assert.Single(memberTasks);
+        Assert.True(memberTask.RequiresTeamLead);
+        Assert.False(memberTask.CanCurrentUserAct);
+        Assert.Equal(TaskActionDenialReasonCodes.TeamLeadRequired, memberTask.ActionDenialReasonCode);
+
+        var memberClaim = await taskService.ClaimAsync(
+            task.Id,
+            new ClaimTaskRequest(task.ClaimVersion),
+            memberDto);
+        Assert.False(memberClaim.IsSuccess);
+        Assert.Contains(memberClaim.Errors, error => error == "This action can only be performed by a team lead. Contact your team lead.");
+
+        var leadClaim = await taskService.ClaimAsync(
+            task.Id,
+            new ClaimTaskRequest(task.ClaimVersion),
+            leadDto);
+        Assert.True(leadClaim.IsSuccess, string.Join(" | ", leadClaim.Errors));
+        Assert.True(leadClaim.Value!.CanCurrentUserAct);
+
+        var memberAction = await taskService.ExecuteActionAsync(
+            task.Id,
+            new TaskActionRequest(WorkflowAction.Approve, "Should be blocked"),
+            memberDto);
+        Assert.False(memberAction.IsSuccess);
+        Assert.Contains(memberAction.Errors, error => error == "This action can only be performed by a team lead. Contact your team lead.");
+
+        var completed = await taskService.ExecuteActionAsync(
+            task.Id,
+            new TaskActionRequest(WorkflowAction.Approve, "Lead approved"),
+            leadDto);
+        Assert.True(completed.IsSuccess, string.Join(" | ", completed.Errors));
+        Assert.Equal(ProcessStatus.Completed, completed.Value!.Status);
+    }
+
+    [Fact]
+    public async Task Start_Rolls_Back_When_Published_TeamLead_Task_Loses_Its_Lead()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "removed-lead-admin");
+        var lead = TestDbFactory.SeedUser(db, Role.Approver, "removed-lead");
+        var team = DynamicWorkflowTestBuilder.SeedTeam(db, "Removed Lead Team");
+        var membership = TeamMember(team.Id, lead.Id, isLead: true);
+        db.TeamMemberships.Add(membership);
+        await db.SaveChangesAsync();
+        var version = await DynamicWorkflowTestBuilder.CreatePublishedAsync(
+            db,
+            admin,
+            new TaskAssignmentDto(TaskAssignmentType.Team, TeamId: team.Id),
+            requiresTeamLead: true);
+        membership.IsLead = false;
+        membership.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        using var data = JsonDocument.Parse("{\"amount\":100}");
+
+        var result = await new ProcessService(
+                db,
+                new FormService(db),
+                new ProcessStateMachine(),
+                new SystemAuditService(db))
+            .StartVersionAsync(
+                new StartProcessVersionRequest(version.Id, data.RootElement.Clone()),
+                TestDbFactory.CommunityAdminDto(admin));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.Contains("no eligible candidate", StringComparison.OrdinalIgnoreCase));
+        db.ChangeTracker.Clear();
+        Assert.False(await db.ProcessInstances.AnyAsync(process => process.ProcessDefinitionVersionId == version.Id));
+        Assert.False(await db.ProcessTasks.AnyAsync(task => task.ProcessInstance!.ProcessDefinitionVersionId == version.Id));
     }
 
     [Fact]
@@ -489,15 +593,22 @@ public class DynamicWorkflowRuntimeTests
             Height: 80,
             SlaDurationMinutes: slaDurationMinutes);
 
-    private static TeamMembership TeamMember(Guid teamId, Guid userId) => new()
+    private static TeamMembership TeamMember(Guid teamId, Guid userId, bool isLead = false) => new()
     {
         Id = Guid.NewGuid(),
         TeamId = teamId,
         UserId = userId,
+        IsLead = isLead,
         IsActive = true,
         CreatedAt = DateTime.UtcNow,
         UpdatedAt = DateTime.UtcNow
     };
+
+    private static UserDto WithTeam(User user, Team team, bool isLead) =>
+        TestDbFactory.ToDto(user) with
+        {
+            Teams = [new UserTeamDto(team.Id, team.Name, isLead)]
+        };
 
     private static Task<ProcessTask> LoadClaimSnapshotAsync(AppDbContext db, Guid taskId) =>
         db.ProcessTasks

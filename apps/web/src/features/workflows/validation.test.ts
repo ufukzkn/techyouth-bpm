@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { TeamSwimlaneNodeData, UserTaskNodeData, WorkflowNode } from "@/features/workflows/contracts";
-import { createStarterWorkflowDraft } from "@/features/workflows/workflowDraft";
+import { createStarterWorkflowDraft, getNextWorkflowName } from "@/features/workflows/workflowDraft";
 import { validateWorkflow } from "@/features/workflows/validation";
 
 describe("validateWorkflow", () => {
+  it("creates the next available starter workflow name", () => {
+    expect(getNextWorkflowName([{ name: "Yeni Akış 1" }, { name: " yeni akış 2 " }])).toBe("Yeni Akış 3");
+  });
+
   it("uses the namespaced start form path in the starter gateway", () => {
     const gatewayEdge = createStarterWorkflowDraft().edges.find((edge) => edge.data?.condition);
 
@@ -123,5 +127,23 @@ describe("validateWorkflow", () => {
     const issues = validateWorkflow(draft);
 
     expect(issues.some((item) => item.code === "task.sla.range")).toBe(true);
+  });
+
+  it("rejects a team-lead restriction on a non-team assignment", () => {
+    const draft = createStarterWorkflowDraft();
+    draft.nodes = draft.nodes.map((node): WorkflowNode => node.type === "userTask"
+      ? {
+          ...node,
+          data: {
+            ...node.data,
+            assignment: { type: "processStarter" },
+            requiresTeamLead: true,
+          } satisfies UserTaskNodeData,
+        }
+      : node);
+
+    const issues = validateWorkflow(draft);
+
+    expect(issues.some((item) => item.code === "task.teamLead.assignment")).toBe(true);
   });
 });

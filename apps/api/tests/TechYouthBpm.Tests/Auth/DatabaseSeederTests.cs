@@ -101,18 +101,11 @@ public class DatabaseSeederTests
 
         var definition = await db.ProcessDefinitions
             .Include(item => item.Versions)
-            .SingleAsync(item => item.Name == "Transfer Talep Akisi");
+            .SingleAsync(item => item.Name == "Transfer Teklif ve Onay Akışı");
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         options.Converters.Add(new JsonStringEnumConverter());
-        var richVersion = definition.Versions
-            .Select(version => new
-            {
-                Version = version,
-                Graph = JsonSerializer.Deserialize<ProcessGraphDto>(version.GraphJson, options)!
-            })
-            .Single(item => item.Graph.Nodes.Count(node => node.Type == ProcessNodeType.TeamSwimlane) == 4);
-        var version = richVersion.Version;
-        var graph = richVersion.Graph;
+        var version = definition.Versions.MaxBy(item => item.VersionNumber)!;
+        var graph = JsonSerializer.Deserialize<ProcessGraphDto>(version.GraphJson, options)!;
         var validation = await new ProcessGraphValidator(db).ValidateForPublishAsync(
             graph,
             definition.CommunityId,
@@ -127,6 +120,24 @@ public class DatabaseSeederTests
         Assert.Contains(graph.Nodes, node =>
             node.Type == ProcessNodeType.UserTask
             && node.Actions?.Contains(WorkflowAction.Complete) == true);
+        Assert.Contains(graph.Nodes, node => node.Key == "financeApproval" && node.RequiresTeamLead);
+        Assert.Contains(graph.Nodes, node => node.Key == "transferOperation" && node.RequiresTeamLead);
+
+        var startForm = await db.FormDefinitionVersions
+            .Include(formVersion => formVersion.Pages)
+            .ThenInclude(page => page.Fields)
+            .SingleAsync(formVersion => formVersion.Id == version.FormDefinitionVersionId);
+        Assert.Equal(2, startForm.Pages.Count);
+        var fieldTypes = startForm.Pages.SelectMany(page => page.Fields).Select(field => field.Type).ToHashSet();
+        Assert.Contains(FieldType.Text, fieldTypes);
+        Assert.Contains(FieldType.TextArea, fieldTypes);
+        Assert.Contains(FieldType.Number, fieldTypes);
+        Assert.Contains(FieldType.Email, fieldTypes);
+        Assert.Contains(FieldType.Select, fieldTypes);
+        Assert.Contains(FieldType.Radio, fieldTypes);
+        Assert.Contains(FieldType.Checkbox, fieldTypes);
+        Assert.Contains(FieldType.Date, fieldTypes);
+        Assert.Contains(FieldType.FileUpload, fieldTypes);
 
         var starter = await db.Users
             .Include(user => user.CommunityMemberships)
@@ -149,7 +160,27 @@ public class DatabaseSeederTests
             membership.CommunityRole!.Name,
             membership.CommunityRole.Permissions.Select(permission => permission.Permission).ToArray());
         using var formData = JsonDocument.Parse(
-            "{\"talepSahibi\":\"Fatih Terim\",\"oyuncuAdi\":\"Mario Gomez\",\"kulup\":\"Besiktas\",\"pozisyon\":\"Forvet\",\"bonservis\":7500000,\"acilMi\":false}");
+            """
+            {
+              "talepSahibi": "Fatih Terim",
+              "iletisimEmail": "fatih.terim@techyouth.local",
+              "oyuncuAdi": "Mario Gomez",
+              "kulup": "Beşiktaş",
+              "pozisyon": "Forvet",
+              "bonservis": 7500000,
+              "paraBirimi": "EUR",
+              "teklifTarihi": "2026-07-17",
+              "acilMi": false,
+              "gerekce": "",
+              "teklifDosyasi": {
+                "name": "transfer-teklifi.pdf",
+                "size": 245760,
+                "type": "application/pdf",
+                "lastModified": 1784246400000
+              },
+              "veriOnayi": true
+            }
+            """);
         var started = await new ProcessService(
                 db,
                 new FormService(db),
@@ -167,6 +198,43 @@ public class DatabaseSeederTests
     }
 
     [Fact]
+    public async Task SeedAsync_Creates_A_Lead_Gated_Urgent_Logistics_Workflow()
+    {
+        await using var db = TestDbFactory.Create();
+
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        var definition = await db.ProcessDefinitions
+            .Include(item => item.Versions)
+            .SingleAsync(item => item.Name == "Acil Sevkiyat ve Teslimat Akışı");
+        var version = definition.Versions.MaxBy(item => item.VersionNumber)!;
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        var graph = JsonSerializer.Deserialize<ProcessGraphDto>(version.GraphJson, options)!;
+        var validation = await new ProcessGraphValidator(db).ValidateForPublishAsync(
+            graph,
+            definition.CommunityId,
+            version.FormDefinitionVersionId);
+
+        Assert.True(validation.IsSuccess, string.Join(" | ", validation.Errors));
+        Assert.Contains(graph.Nodes, node => node.Type == ProcessNodeType.ExclusiveGateway);
+        Assert.Contains(graph.Edges, edge =>
+            edge.Condition?.Path == "start.acilSevkiyat"
+            && edge.Condition.Operator == GraphConditionOperator.Equals);
+        Assert.Contains(graph.Edges, edge => edge.Source == "urgencyGateway" && edge.IsDefault);
+        Assert.All(
+            graph.Nodes.Where(node => node.Type == ProcessNodeType.UserTask),
+            node => Assert.True(node.RequiresTeamLead));
+
+        var startForm = await db.FormDefinitionVersions
+            .Include(formVersion => formVersion.Pages)
+            .ThenInclude(page => page.Fields)
+            .SingleAsync(formVersion => formVersion.Id == version.FormDefinitionVersionId);
+        Assert.Equal(2, startForm.Pages.Count);
+        Assert.Contains(startForm.Pages.SelectMany(page => page.Fields), field => field.Type == FieldType.FileUpload);
+    }
+
+    [Fact]
     public async Task SeedAsync_Creates_Five_Versioned_Workflows_With_Deadline_Scenarios()
     {
         await using var db = TestDbFactory.Create();
@@ -175,8 +243,8 @@ public class DatabaseSeederTests
 
         var workflowNames = new[]
         {
-            "Transfer Talep Akisi",
-            "Sevkiyat Operasyon Akisi",
+            "Transfer Teklif ve Onay Akışı",
+            "Acil Sevkiyat ve Teslimat Akışı",
             "Siparis Karsilama Akisi",
             "Izin ve Uzaktan Calisma Akisi",
             "Talep Tedarikci ve Butce Akisi"

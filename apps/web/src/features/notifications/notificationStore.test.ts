@@ -15,8 +15,8 @@ const unreadPage: NotificationPage = {
   items: [{
     id: "notification-1",
     type: "Team.MembershipAdded",
-    title: "Takim uyeligi",
-    message: "Scout Ekibi takimina eklendiniz.",
+    title: "Takım üyeliği",
+    message: "Scout Ekibi takımına eklendiniz.",
     entityType: "Team",
     entityId: "team-1",
     createdAt: "2026-07-14T12:00:00Z",

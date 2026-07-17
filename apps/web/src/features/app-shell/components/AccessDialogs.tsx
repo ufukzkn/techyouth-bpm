@@ -131,7 +131,7 @@ export function AccessChangeDialog({
           <article className="settings-row">
             <span>Topluluk rolü</span>
             <strong>
-              {change.fromCommunityRoleName || "Atanmadi"} -&gt; {change.toCommunityRoleName || "Atanmadi"}
+              {change.fromCommunityRoleName || "Atanmadı"} -&gt; {change.toCommunityRoleName || "Atanmadı"}
             </strong>
           </article>
           <article className="settings-row">

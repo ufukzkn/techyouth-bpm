@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Domain.Entities;
@@ -22,8 +24,12 @@ internal static class DemoWorkflowSeeder
     private static readonly Guid ProductVersionId = Guid.Parse("abababab-1000-0000-0000-000000000004");
     private static readonly Guid HumanResourcesVersionId = Guid.Parse("abababab-1000-0000-0000-000000000005");
     private static readonly Guid ProcurementVersionId = Guid.Parse("abababab-1000-0000-0000-000000000006");
+    private static readonly Guid SportShowcaseVersionId = Guid.Parse("abababab-3000-0000-0000-000000000002");
+    private static readonly Guid LogisticsShowcaseVersionId = Guid.Parse("abababab-2000-0000-0000-000000000003");
 
+    private static readonly Guid SportScoutTeamId = Guid.Parse("30303030-0000-0000-0000-000000000001");
     private static readonly Guid SportReviewTeamId = Guid.Parse("30303030-0000-0000-0000-000000000002");
+    private static readonly Guid SportFinanceTeamId = Guid.Parse("30303030-0000-0000-0000-000000000003");
     private static readonly Guid SportApprovalTeamId = Guid.Parse("30303030-0000-0000-0000-000000000004");
     private static readonly Guid LogisticsReviewTeamId = Guid.Parse("30303030-0000-0000-0000-000000000007");
     private static readonly Guid LogisticsApprovalTeamId = Guid.Parse("30303030-0000-0000-0000-000000000006");
@@ -69,6 +75,7 @@ internal static class DemoWorkflowSeeder
     {
         var specs = await ResolveRoleReferencesAsync(db, BuildSpecs(), cancellationToken);
         var versions = await EnsureDefinitionsAsync(db, specs, cancellationToken);
+        await EnsureShowcaseWorkflowVersionsAsync(db, specs, cancellationToken);
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await RemoveLegacyProcessesAsync(db, cancellationToken);
@@ -141,6 +148,9 @@ internal static class DemoWorkflowSeeder
                 db.ProcessDefinitions.Add(definition);
             }
 
+            definition.Name = spec.Name;
+            definition.Description = spec.Description;
+
             if (definition.Versions.Any(version => version.Id == spec.VersionId))
             {
                 continue;
@@ -184,6 +194,256 @@ internal static class DemoWorkflowSeeder
             .ToDictionaryAsync(
                 version => specs.Single(spec => spec.VersionId == version.Id).Key,
                 cancellationToken);
+    }
+
+    private static async Task EnsureShowcaseWorkflowVersionsAsync(
+        AppDbContext db,
+        IReadOnlyList<WorkflowSpec> specs,
+        CancellationToken cancellationToken)
+    {
+        var showcaseSpecs = specs.Where(spec => spec.Key is "sport" or "logistics").ToArray();
+        var definitions = await db.ProcessDefinitions
+            .Where(definition => showcaseSpecs.Select(spec => spec.DefinitionId).Contains(definition.Id))
+            .Include(definition => definition.Versions)
+            .ToDictionaryAsync(definition => definition.Id, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        foreach (var spec in showcaseSpecs)
+        {
+            var definition = definitions[spec.DefinitionId];
+            var versionId = spec.Key == "sport" ? SportShowcaseVersionId : LogisticsShowcaseVersionId;
+            if (definition.Versions.Any(version => version.Id == versionId))
+            {
+                continue;
+            }
+
+            var startFormVersionId = await DemoFormSeeder.PublishedVersionIdAsync(db, spec.StartFormId, cancellationToken);
+            ProcessGraphDto graph;
+            if (spec.Key == "sport")
+            {
+                var scoutFormVersionId = await DemoFormSeeder.PublishedVersionIdAsync(
+                    db,
+                    Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002"),
+                    cancellationToken);
+                var technicalFormVersionId = await DemoFormSeeder.PublishedVersionIdAsync(db, spec.ReviewFormId, cancellationToken);
+                var financeFormVersionId = await DemoFormSeeder.PublishedVersionIdAsync(db, DemoFormSeeder.SportFinanceFormId, cancellationToken);
+                var operationFormVersionId = await DemoFormSeeder.PublishedVersionIdAsync(db, spec.ApprovalFormId, cancellationToken);
+                graph = BuildTransferShowcaseGraph(
+                    spec,
+                    startFormVersionId,
+                    scoutFormVersionId,
+                    technicalFormVersionId,
+                    financeFormVersionId,
+                    operationFormVersionId);
+            }
+            else
+            {
+                var warehouseFormVersionId = await DemoFormSeeder.PublishedVersionIdAsync(db, spec.ReviewFormId, cancellationToken);
+                var deliveryFormVersionId = await DemoFormSeeder.PublishedVersionIdAsync(db, spec.ApprovalFormId, cancellationToken);
+                graph = BuildLogisticsShowcaseGraph(
+                    spec,
+                    startFormVersionId,
+                    warehouseFormVersionId,
+                    deliveryFormVersionId);
+            }
+
+            var nextVersionNumber = definition.Versions.Max(version => version.VersionNumber) + 1;
+            db.ProcessDefinitionVersions.Add(new ProcessDefinitionVersion
+            {
+                Id = versionId,
+                ProcessDefinitionId = definition.Id,
+                ProcessDefinition = definition,
+                VersionNumber = nextVersionNumber,
+                Status = DefinitionVersionStatus.Published,
+                FormDefinitionVersionId = startFormVersionId,
+                GraphJson = JsonHelpers.Serialize(graph),
+                CreatedByUserId = spec.OwnerId,
+                CreatedAt = now.AddDays(-1),
+                PublishedByUserId = spec.OwnerId,
+                PublishedAt = now.AddDays(-1)
+            });
+        }
+
+        if (db.ChangeTracker.HasChanges())
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static ProcessGraphDto BuildTransferShowcaseGraph(
+        WorkflowSpec spec,
+        Guid startFormVersionId,
+        Guid scoutFormVersionId,
+        Guid technicalFormVersionId,
+        Guid financeFormVersionId,
+        Guid operationFormVersionId)
+    {
+        using var threshold = JsonDocument.Parse("5000000");
+        return new ProcessGraphDto(
+            "1.0",
+            [
+                new ProcessNodeDto("scout-lane", ProcessNodeType.TeamSwimlane, "Scout Ekibi", PositionX: 40, PositionY: 20, Width: 1120, Height: 220, TeamId: SportScoutTeamId),
+                new ProcessNodeDto("technical-lane", ProcessNodeType.TeamSwimlane, "Teknik Değerlendirme", PositionX: 40, PositionY: 280, Width: 1120, Height: 220, TeamId: SportReviewTeamId),
+                new ProcessNodeDto("finance-lane", ProcessNodeType.TeamSwimlane, "Mali İşler", PositionX: 40, PositionY: 540, Width: 1120, Height: 220, TeamId: SportFinanceTeamId),
+                new ProcessNodeDto("operation-lane", ProcessNodeType.TeamSwimlane, "Transfer Operasyon", PositionX: 40, PositionY: 800, Width: 1120, Height: 220, TeamId: SportApprovalTeamId),
+                new ProcessNodeDto("start", ProcessNodeType.Start, "Transfer Teklifi", startFormVersionId, ParentKey: "scout-lane", PositionX: 50, PositionY: 70, Width: 180, Height: 72),
+                new ProcessNodeDto(
+                    "scoutReview",
+                    ProcessNodeType.UserTask,
+                    "Scout Raporu",
+                    scoutFormVersionId,
+                    TaskPriority.High,
+                    [WorkflowAction.Approve, WorkflowAction.Reject],
+                    new TaskAssignmentDto(TaskAssignmentType.TeamAndCommunityRole, TeamId: SportScoutTeamId, CommunityRoleId: spec.ReviewRoleId),
+                    ParentKey: "scout-lane",
+                    PositionX: 330,
+                    PositionY: 58,
+                    Width: 230,
+                    Height: 104,
+                    Description: "Scout raporunu doldurun ve ilk kararı verin.",
+                    SlaDurationMinutes: 8 * 60),
+                new ProcessNodeDto(
+                    "technicalReview",
+                    ProcessNodeType.UserTask,
+                    "Teknik Değerlendirme",
+                    technicalFormVersionId,
+                    TaskPriority.High,
+                    [WorkflowAction.Approve, WorkflowAction.Reject, WorkflowAction.SendBack],
+                    new TaskAssignmentDto(TaskAssignmentType.TeamAndCommunityRole, TeamId: SportReviewTeamId, CommunityRoleId: spec.ReviewRoleId),
+                    ParentKey: "technical-lane",
+                    PositionX: 300,
+                    PositionY: 58,
+                    Width: 240,
+                    Height: 104,
+                    Description: "Kadro uygunluğunu değerlendirin.",
+                    SlaDurationMinutes: 12 * 60),
+                new ProcessNodeDto("budgetGateway", ProcessNodeType.ExclusiveGateway, "Bütçe Kontrolü", ParentKey: "technical-lane", PositionX: 650, PositionY: 60, Width: 180, Height: 96),
+                new ProcessNodeDto(
+                    "financeApproval",
+                    ProcessNodeType.UserTask,
+                    "Mali Onay",
+                    financeFormVersionId,
+                    TaskPriority.Critical,
+                    [WorkflowAction.Approve, WorkflowAction.Reject, WorkflowAction.SendBack],
+                    new TaskAssignmentDto(TaskAssignmentType.TeamAndCommunityRole, TeamId: SportFinanceTeamId, CommunityRoleId: spec.ApprovalRoleId),
+                    ParentKey: "finance-lane",
+                    PositionX: 330,
+                    PositionY: 58,
+                    Width: 230,
+                    Height: 104,
+                    Description: "Teklif tutarını güncelleyin ve bütçe kararını verin.",
+                    SlaDurationMinutes: 6 * 60,
+                    RequiresTeamLead: true),
+                new ProcessNodeDto(
+                    "transferOperation",
+                    ProcessNodeType.UserTask,
+                    "Transfer Operasyonu",
+                    operationFormVersionId,
+                    TaskPriority.Normal,
+                    [WorkflowAction.Complete, WorkflowAction.SendBack],
+                    new TaskAssignmentDto(TaskAssignmentType.Team, TeamId: SportApprovalTeamId),
+                    ParentKey: "operation-lane",
+                    PositionX: 330,
+                    PositionY: 58,
+                    Width: 240,
+                    Height: 104,
+                    Description: "Sözleşme belgesini ekleyin ve transferi tamamlayın.",
+                    SlaDurationMinutes: 24 * 60,
+                    RequiresTeamLead: true),
+                new ProcessNodeDto("completed", ProcessNodeType.CompletedEnd, "Transfer Tamamlandı", ParentKey: "operation-lane", PositionX: 740, PositionY: 70, Width: 190, Height: 72),
+                new ProcessNodeDto("rejected", ProcessNodeType.RejectedEnd, "Teklif Reddedildi", ParentKey: "technical-lane", PositionX: 900, PositionY: 70, Width: 190, Height: 72)
+            ],
+            [
+                new ProcessEdgeDto("start", "scoutReview", Order: 0, Label: "Teklifi gönder"),
+                new ProcessEdgeDto("scoutReview", "technicalReview", WorkflowAction.Approve, Order: 1, Label: "Scout olumlu"),
+                new ProcessEdgeDto("scoutReview", "rejected", WorkflowAction.Reject, Order: 2, Label: "Scout reddi"),
+                new ProcessEdgeDto("technicalReview", "budgetGateway", WorkflowAction.Approve, Order: 3, Label: "Teknik onay"),
+                new ProcessEdgeDto("technicalReview", "rejected", WorkflowAction.Reject, Order: 4, Label: "Teknik ret"),
+                new ProcessEdgeDto("technicalReview", "scoutReview", WorkflowAction.SendBack, Order: 5, Label: "Scout'a geri gönder"),
+                new ProcessEdgeDto("budgetGateway", "financeApproval", Condition: new ProcessConditionDto("start.bonservis", GraphConditionOperator.GreaterThan, threshold.RootElement.Clone()), Order: 6, Label: "5M üzeri"),
+                new ProcessEdgeDto("budgetGateway", "transferOperation", IsDefault: true, Order: 7, Label: "Standart bütçe"),
+                new ProcessEdgeDto("financeApproval", "transferOperation", WorkflowAction.Approve, Order: 8, Label: "Mali onay"),
+                new ProcessEdgeDto("financeApproval", "rejected", WorkflowAction.Reject, Order: 9, Label: "Mali ret"),
+                new ProcessEdgeDto("financeApproval", "technicalReview", WorkflowAction.SendBack, Order: 10, Label: "Teknik ekibe dön"),
+                new ProcessEdgeDto("transferOperation", "completed", WorkflowAction.Complete, Order: 11, Label: "Transferi tamamla"),
+                new ProcessEdgeDto("transferOperation", "technicalReview", WorkflowAction.SendBack, Order: 12, Label: "Teknik ekibe dön")
+            ]);
+    }
+
+    private static ProcessGraphDto BuildLogisticsShowcaseGraph(
+        WorkflowSpec spec,
+        Guid startFormVersionId,
+        Guid warehouseFormVersionId,
+        Guid deliveryFormVersionId)
+    {
+        using var urgentValue = JsonDocument.Parse("true");
+        return new ProcessGraphDto(
+            "1.0",
+            [
+                new ProcessNodeDto("warehouse-lane", ProcessNodeType.TeamSwimlane, "Depo Operasyon", PositionX: 40, PositionY: 20, Width: 1050, Height: 260, TeamId: spec.ApprovalTeamId),
+                new ProcessNodeDto("delivery-lane", ProcessNodeType.TeamSwimlane, "Teslimat Takibi", PositionX: 40, PositionY: 320, Width: 1050, Height: 240, TeamId: spec.ReviewTeamId),
+                new ProcessNodeDto("start", ProcessNodeType.Start, "Sevkiyat Talebi", startFormVersionId, ParentKey: "warehouse-lane", PositionX: 50, PositionY: 75, Width: 180, Height: 72),
+                new ProcessNodeDto("urgencyGateway", ProcessNodeType.ExclusiveGateway, "Aciliyet", ParentKey: "warehouse-lane", PositionX: 280, PositionY: 62, Width: 160, Height: 96),
+                new ProcessNodeDto(
+                    "urgentDispatch",
+                    ProcessNodeType.UserTask,
+                    "Acil Depo Çıkışı",
+                    warehouseFormVersionId,
+                    TaskPriority.Critical,
+                    [WorkflowAction.Approve, WorkflowAction.Reject],
+                    new TaskAssignmentDto(TaskAssignmentType.TeamAndCommunityRole, TeamId: spec.ApprovalTeamId, CommunityRoleId: spec.ReviewRoleId),
+                    ParentKey: "warehouse-lane",
+                    PositionX: 500,
+                    PositionY: 25,
+                    Width: 220,
+                    Height: 104,
+                    SlaDurationMinutes: 2 * 60,
+                    RequiresTeamLead: true),
+                new ProcessNodeDto(
+                    "standardDispatch",
+                    ProcessNodeType.UserTask,
+                    "Standart Depo Çıkışı",
+                    warehouseFormVersionId,
+                    TaskPriority.High,
+                    [WorkflowAction.Approve, WorkflowAction.Reject],
+                    new TaskAssignmentDto(TaskAssignmentType.TeamAndCommunityRole, TeamId: spec.ApprovalTeamId, CommunityRoleId: spec.ReviewRoleId),
+                    ParentKey: "warehouse-lane",
+                    PositionX: 500,
+                    PositionY: 145,
+                    Width: 220,
+                    Height: 104,
+                    SlaDurationMinutes: 6 * 60,
+                    RequiresTeamLead: true),
+                new ProcessNodeDto(
+                    "deliveryConfirmation",
+                    ProcessNodeType.UserTask,
+                    "Teslimat Onayı",
+                    deliveryFormVersionId,
+                    TaskPriority.Critical,
+                    [WorkflowAction.Complete, WorkflowAction.Reject, WorkflowAction.SendBack],
+                    new TaskAssignmentDto(TaskAssignmentType.TeamAndCommunityRole, TeamId: spec.ReviewTeamId, CommunityRoleId: spec.ReviewRoleId),
+                    ParentKey: "delivery-lane",
+                    PositionX: 500,
+                    PositionY: 65,
+                    Width: 230,
+                    Height: 104,
+                    SlaDurationMinutes: 12 * 60,
+                    RequiresTeamLead: true),
+                new ProcessNodeDto("completed", ProcessNodeType.CompletedEnd, "Teslimat Tamamlandı", ParentKey: "delivery-lane", PositionX: 820, PositionY: 40, Width: 190, Height: 72),
+                new ProcessNodeDto("rejected", ProcessNodeType.RejectedEnd, "Sevkiyat Reddedildi", ParentKey: "delivery-lane", PositionX: 820, PositionY: 155, Width: 190, Height: 72)
+            ],
+            [
+                new ProcessEdgeDto("start", "urgencyGateway", Order: 0, Label: "Talebi gönder"),
+                new ProcessEdgeDto("urgencyGateway", "urgentDispatch", Condition: new ProcessConditionDto("start.acilSevkiyat", GraphConditionOperator.Equals, urgentValue.RootElement.Clone()), Order: 1, Label: "Acil"),
+                new ProcessEdgeDto("urgencyGateway", "standardDispatch", IsDefault: true, Order: 2, Label: "Standart"),
+                new ProcessEdgeDto("urgentDispatch", "deliveryConfirmation", WorkflowAction.Approve, Order: 3, Label: "Depodan çıktı"),
+                new ProcessEdgeDto("urgentDispatch", "rejected", WorkflowAction.Reject, Order: 4, Label: "Çıkış reddi"),
+                new ProcessEdgeDto("standardDispatch", "deliveryConfirmation", WorkflowAction.Approve, Order: 5, Label: "Depodan çıktı"),
+                new ProcessEdgeDto("standardDispatch", "rejected", WorkflowAction.Reject, Order: 6, Label: "Çıkış reddi"),
+                new ProcessEdgeDto("deliveryConfirmation", "completed", WorkflowAction.Complete, Order: 7, Label: "Teslimatı tamamla"),
+                new ProcessEdgeDto("deliveryConfirmation", "rejected", WorkflowAction.Reject, Order: 8, Label: "Teslimat reddi"),
+                new ProcessEdgeDto("deliveryConfirmation", "urgentDispatch", WorkflowAction.SendBack, Order: 9, Label: "Depoya geri gönder")
+            ]);
     }
 
     private static ProcessGraphDto BuildGraph(
@@ -524,6 +784,8 @@ internal static class DemoWorkflowSeeder
             {
                 Id = StableGuid($"demo-system-audit:{processId}"),
                 ActorUserId = spec.StarterId,
+                CommunityId = spec.CommunityId,
+                Category = SystemAuditCategories.Processes,
                 Action = "Process.Seeded",
                 EntityType = "ProcessInstance",
                 EntityId = processId.ToString(),
@@ -789,8 +1051,8 @@ internal static class DemoWorkflowSeeder
             SportVersionId,
             DemoFormSeeder.SportCommunityId,
             SportApproverId,
-            "Transfer Talep Akisi",
-            "Transfer talebini teknik inceleme ve operasyon onayina tasir.",
+            "Transfer Teklif ve Onay Akışı",
+            "Transfer teklifini scout, teknik, mali ve operasyon onayına taşır.",
             DemoFormSeeder.SportStartFormId,
             DemoFormSeeder.SportReviewFormId,
             DemoFormSeeder.SportApprovalFormId,
@@ -815,8 +1077,8 @@ internal static class DemoWorkflowSeeder
             LogisticsVersionId,
             DemoFormSeeder.LogisticsCommunityId,
             LogisticsApproverId,
-            "Sevkiyat Operasyon Akisi",
-            "Planlama, depo ve teslimat adimlarini takip eder.",
+            "Acil Sevkiyat ve Teslimat Akışı",
+            "Acil ve standart sevkiyatları depo çıkışından teslimata kadar izler.",
             DemoFormSeeder.LogisticsStartFormId,
             DemoFormSeeder.LogisticsReviewFormId,
             DemoFormSeeder.LogisticsApprovalFormId,

@@ -161,8 +161,15 @@ internal static class MappingExtensions
                 .Select(version => version.ToDto())
                 .ToArray());
 
-    public static ProcessTaskDto ToDto(this ProcessTask task) =>
-        new(
+    public static ProcessTaskDto ToDto(this ProcessTask task, UserDto? currentUser = null)
+    {
+        var canCurrentUserAct = !task.RequiresTeamLead
+            || currentUser is null
+            || currentUser.IsSuperAdmin()
+            || (task.CandidateTeamId is { } teamId
+                && (currentUser.Teams ?? []).Any(team => team.Id == teamId && team.IsLead));
+
+        return new(
             task.Id,
             task.ProcessInstanceId,
             task.AssignedCommunityRoleId,
@@ -190,7 +197,11 @@ internal static class MappingExtensions
             task.FormDefinitionVersion?.FormDefinition?.Name
                 ?? task.ProcessInstance?.FormDefinition?.Name
                 ?? string.Empty,
-            task.ProcessInstance?.Community?.Name ?? string.Empty);
+            task.ProcessInstance?.Community?.Name ?? string.Empty,
+            task.RequiresTeamLead,
+            canCurrentUserAct,
+            canCurrentUserAct ? null : TaskActionDenialReasonCodes.TeamLeadRequired);
+    }
 
     public static ProcessSummaryDto ToSummaryDto(this ProcessInstance process) =>
         new(
@@ -217,7 +228,7 @@ internal static class MappingExtensions
                 .Select(task => (TaskPriority?)task.Priority)
                 .FirstOrDefault());
 
-    public static ProcessDetailDto ToDetailDto(this ProcessInstance process) =>
+    public static ProcessDetailDto ToDetailDto(this ProcessInstance process, UserDto? currentUser = null) =>
         new(
             process.Id,
             process.FormDefinitionId,
@@ -228,7 +239,7 @@ internal static class MappingExtensions
             JsonHelpers.ToElement(process.FormDataJson),
             process.StartedAt,
             process.CompletedAt,
-            process.Tasks.OrderByDescending(task => task.CreatedAt).Select(task => task.ToDto()).ToArray(),
+            process.Tasks.OrderByDescending(task => task.CreatedAt).Select(task => task.ToDto(currentUser)).ToArray(),
             process.AuditLogs.OrderBy(log => log.CreatedAt).Select(log => new AuditLogDto(
                 log.Id,
                 log.Action,

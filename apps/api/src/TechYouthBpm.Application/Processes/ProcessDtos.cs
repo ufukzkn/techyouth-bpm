@@ -41,7 +41,10 @@ public record ProcessTaskDto(
     DateTime? DueAt = null,
     string WorkflowName = "",
     string FormName = "",
-    string CommunityName = "");
+    string CommunityName = "",
+    bool RequiresTeamLead = false,
+    bool CanCurrentUserAct = true,
+    string? ActionDenialReasonCode = null);
 
 public record ProcessSummaryDto(
     Guid Id,

@@ -26,16 +26,19 @@ import type {
   WorkflowTransition,
   WorkflowValidationIssue,
 } from "@/features/workflows/contracts";
+import { useSessionStore } from "@/features/session/sessionStore";
 import { IconButton } from "@/features/ui/IconButton";
 import { createEmptyAssignment } from "@/features/workflows/workflowDraft";
 import {
-  workflowActionLabels,
-  workflowAssignmentLabels,
   workflowConditionOperatorLabels,
-  workflowConditionValueTypeLabels,
-  workflowNodeLabels,
-  workflowPriorityLabels,
+  getWorkflowActionLabels,
+  getWorkflowAssignmentLabels,
+  getWorkflowConditionOperatorLabels,
+  getWorkflowConditionValueTypeLabels,
+  getWorkflowNodeLabels,
+  getWorkflowPriorityLabels,
 } from "@/features/workflows/workflowLabels";
+import { workflowText } from "@/features/workflows/workflowI18n";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
 import { WorkflowValidationPanel } from "@/features/workflows/WorkflowValidationPanel";
 
@@ -62,6 +65,8 @@ const priorities: WorkflowTaskPriority[] = ["Low", "Normal", "High", "Critical"]
 const conditionOperators = Object.keys(workflowConditionOperatorLabels) as WorkflowConditionOperator[];
 
 export function WorkflowInspector({ issues, lookups, readOnly }: WorkflowInspectorProps) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   const draft = useWorkflowDraftStore((state) => state.draft);
   const selectedNodeId = useWorkflowDraftStore((state) => state.selectedNodeId);
   const selectedEdgeId = useWorkflowDraftStore((state) => state.selectedEdgeId);
@@ -70,7 +75,7 @@ export function WorkflowInspector({ issues, lookups, readOnly }: WorkflowInspect
   const deleteSelection = useWorkflowDraftStore((state) => state.deleteSelection);
 
   return (
-    <aside className="workflow-inspector" aria-label="Özellik denetçisi">
+    <aside className="workflow-inspector" aria-label={text("Özellik denetçisi", "Properties inspector")}>
       <div className="workflow-inspector-scroll">
         {selectedNode ? (
           <SelectedNodeInspector node={selectedNode} lookups={lookups} readOnly={readOnly} />
@@ -83,28 +88,30 @@ export function WorkflowInspector({ issues, lookups, readOnly }: WorkflowInspect
 
       {(selectedNode || selectedEdge) && !readOnly ? (
         <div className="workflow-inspector-delete">
-          <IconButton label="Seçimi sil" onClick={deleteSelection} tone="danger">
+          <IconButton label={text("Seçimi sil", "Delete selection")} onClick={deleteSelection} tone="danger">
             <Trash2 size={16} aria-hidden="true" />
           </IconButton>
-          <span>{selectedNode ? "Düğümü sil" : "Bağlantıyı sil"}</span>
+          <span>{selectedNode ? text("Düğümü sil", "Delete node") : text("Bağlantıyı sil", "Delete connection")}</span>
         </div>
       ) : null}
 
-      <WorkflowValidationPanel issues={issues} />
+      <WorkflowValidationPanel issues={issues} language={language} />
     </aside>
   );
 }
 
 function WorkflowMetadataInspector({ readOnly }: { readOnly: boolean }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   const draft = useWorkflowDraftStore((state) => state.draft);
   const setMetadata = useWorkflowDraftStore((state) => state.setMetadata);
   const flowNodeCount = draft.nodes.filter((node) => node.type !== "teamSwimlane").length;
 
   return (
     <>
-      <InspectorHeading icon={<Settings2 size={17} />} kicker="Akış" title="Genel özellikler" />
+      <InspectorHeading icon={<Settings2 size={17} />} kicker={text("Akış", "Workflow")} title={text("Genel özellikler", "General properties")} />
       <div className="workflow-inspector-fields">
-        <InspectorField label="Akış adı">
+        <InspectorField label={text("Akış adı", "Workflow name")}>
           <input
             disabled={readOnly}
             maxLength={140}
@@ -112,7 +119,7 @@ function WorkflowMetadataInspector({ readOnly }: { readOnly: boolean }) {
             value={draft.name}
           />
         </InspectorField>
-        <InspectorField label="Açıklama">
+        <InspectorField label={text("Açıklama", "Description")}>
           <textarea
             disabled={readOnly}
             maxLength={500}
@@ -122,10 +129,10 @@ function WorkflowMetadataInspector({ readOnly }: { readOnly: boolean }) {
           />
         </InspectorField>
         <dl className="workflow-inspector-facts">
-          <div><dt>Durum</dt><dd>{draft.status === "Published" ? "Yayında" : "Taslak"}</dd></div>
-          <div><dt>Sürüm</dt><dd>{draft.version ?? "Yeni"}</dd></div>
-          <div><dt>Düğüm</dt><dd>{flowNodeCount}</dd></div>
-          <div><dt>Bağlantı</dt><dd>{draft.edges.length}</dd></div>
+          <div><dt>{text("Durum", "Status")}</dt><dd>{draft.status === "Published" ? text("Yayında", "Published") : text("Taslak", "Draft")}</dd></div>
+          <div><dt>{text("Sürüm", "Version")}</dt><dd>{draft.version ?? text("Yeni", "New")}</dd></div>
+          <div><dt>{text("Düğüm", "Nodes")}</dt><dd>{flowNodeCount}</dd></div>
+          <div><dt>{text("Bağlantı", "Connections")}</dt><dd>{draft.edges.length}</dd></div>
         </dl>
       </div>
     </>
@@ -141,6 +148,9 @@ function SelectedNodeInspector({
   lookups: WorkflowEditorLookups;
   readOnly: boolean;
 }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
+  const nodeLabels = getWorkflowNodeLabels(language);
   const draft = useWorkflowDraftStore((state) => state.draft);
   const updateNodeData = useWorkflowDraftStore((state) => state.updateNodeData);
 
@@ -150,9 +160,9 @@ function SelectedNodeInspector({
 
   return (
     <>
-      <InspectorHeading icon={nodeIcon(node.type)} kicker={workflowNodeLabels[node.type]} title={node.data.label || "Adsız düğüm"} />
+      <InspectorHeading icon={nodeIcon(node.type)} kicker={nodeLabels[node.type]} title={node.data.label || text("Adsız düğüm", "Untitled node")} />
       <div className="workflow-inspector-fields">
-        <InspectorField label={node.type === "teamSwimlane" ? "Kulvar adı" : "Başlık"}>
+        <InspectorField label={node.type === "teamSwimlane" ? text("Kulvar adı", "Swimlane name") : text("Başlık", "Title")}>
           <input
             disabled={readOnly}
             maxLength={140}
@@ -160,7 +170,7 @@ function SelectedNodeInspector({
             value={node.data.label}
           />
         </InspectorField>
-        <InspectorField label="Açıklama">
+        <InspectorField label={text("Açıklama", "Description")}>
           <textarea
             disabled={readOnly}
             maxLength={500}
@@ -186,10 +196,10 @@ function SelectedNodeInspector({
         {node.type === "exclusiveGateway" ? <GatewaySummary node={node} /> : null}
 
         {node.type === "teamSwimlane" ? (
-          <InspectorSection title="Takım">
+          <InspectorSection title={text("Takım", "Team")}>
             <LookupSelect
               disabled={readOnly}
-              emptyLabel="Takım seçin"
+              emptyLabel={text("Takım seçin", "Select team")}
               onChange={(teamId, teamName) => {
                 const previousTeamId = node.data.teamId;
                 updateNodeData(
@@ -224,6 +234,11 @@ function UserTaskFields({
   lookups: WorkflowEditorLookups;
   readOnly: boolean;
 }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
+  const actionLabels = getWorkflowActionLabels(language);
+  const assignmentLabels = getWorkflowAssignmentLabels(language);
+  const priorityLabels = getWorkflowPriorityLabels(language);
   const updateNodeData = useWorkflowDraftStore((state) => state.updateNodeData);
 
   function updateTask(patch: Partial<typeof node.data>) {
@@ -246,14 +261,22 @@ function UserTaskFields({
 
   return (
     <>
-      <InspectorSection title="Atama">
-        <InspectorField label="Atama türü">
+      <InspectorSection title={text("Atama", "Assignment")}>
+        <InspectorField label={text("Atama türü", "Assignment type")}>
           <select
             disabled={readOnly}
-            onChange={(event) => updateTask({ assignment: createEmptyAssignment(event.target.value as WorkflowAssignmentType) })}
+            onChange={(event) => {
+              const assignment = createEmptyAssignment(event.target.value as WorkflowAssignmentType);
+              updateTask({
+                assignment,
+                requiresTeamLead: assignment.type === "team" || assignment.type === "teamAndRole"
+                  ? node.data.requiresTeamLead
+                  : false,
+              });
+            }}
             value={node.data.assignment.type}
           >
-            {assignmentTypes.map((type) => <option key={type} value={type}>{workflowAssignmentLabels[type]}</option>)}
+            {assignmentTypes.map((type) => <option key={type} value={type}>{assignmentLabels[type]}</option>)}
           </select>
         </InspectorField>
         <AssignmentTargetFields
@@ -262,20 +285,31 @@ function UserTaskFields({
           onChange={(assignment) => updateTask({ assignment })}
           readOnly={readOnly}
         />
+        {node.data.assignment.type === "team" || node.data.assignment.type === "teamAndRole" ? (
+          <label className="workflow-check-option workflow-team-lead-option">
+            <input
+              checked={Boolean(node.data.requiresTeamLead)}
+              disabled={readOnly}
+              onChange={(event) => updateTask({ requiresTeamLead: event.target.checked })}
+              type="checkbox"
+            />
+            <span>{text("Yalnız takım sorumlusu işlem yapabilir", "Only a team lead can act")}</span>
+          </label>
+        ) : null}
       </InspectorSection>
 
-      <InspectorSection title="Öncelik">
-        <InspectorField label="Görev önceliği">
+      <InspectorSection title={text("Öncelik", "Priority")}>
+        <InspectorField label={text("Görev önceliği", "Task priority")}>
           <select
             disabled={readOnly}
             onChange={(event) => updateTask({ priority: event.target.value as WorkflowTaskPriority })}
             value={node.data.priority}
           >
-            {priorities.map((priority) => <option key={priority} value={priority}>{workflowPriorityLabels[priority]}</option>)}
+            {priorities.map((priority) => <option key={priority} value={priority}>{priorityLabels[priority]}</option>)}
           </select>
         </InspectorField>
         <div className="workflow-sla-fields">
-          <InspectorField label="SLA süresi">
+          <InspectorField label={text("SLA süresi", "SLA duration")}>
             <input
               disabled={readOnly}
               inputMode="decimal"
@@ -293,13 +327,13 @@ function UserTaskFields({
                   });
                 }
               }}
-              placeholder="Sınırsız"
+              placeholder={text("Sınırsız", "No limit")}
               step="0.25"
               type="number"
               value={slaValue}
             />
           </InspectorField>
-          <InspectorField label="Birim">
+          <InspectorField label={text("Birim", "Unit")}>
             <select
               disabled={readOnly || node.data.slaDurationMinutes == null}
               onChange={(event) => {
@@ -313,16 +347,18 @@ function UserTaskFields({
               }}
               value={slaUnit}
             >
-              <option value="hours">Saat</option>
-              <option value="days">Gün</option>
+              <option value="hours">{text("Saat", "Hours")}</option>
+              <option value="days">{text("Gün", "Days")}</option>
             </select>
           </InspectorField>
         </div>
-        <p className="workflow-inspector-hint">Boş bırakıldığında görev için son tarih hesaplanmaz.</p>
+        <p className="workflow-inspector-hint">
+          {text("Boş bırakıldığında görev için son tarih hesaplanmaz.", "No task due date is calculated when left empty.")}
+        </p>
       </InspectorSection>
 
-      <InspectorSection title="İşlemler">
-        <InspectorField label="İşlem şablonu">
+      <InspectorSection title={text("İşlemler", "Actions")}>
+        <InspectorField label={text("İşlem şablonu", "Action preset")}>
           <select
             disabled={readOnly}
             onChange={(event) => {
@@ -331,10 +367,10 @@ function UserTaskFields({
             }}
             value={resolveActionPreset(node.data.actions)}
           >
-            <option value="custom">Özel</option>
-            <option value="approval">Onay</option>
-            <option value="operation">Operasyon</option>
-            <option value="review">İnceleme</option>
+            <option value="custom">{text("Özel", "Custom")}</option>
+            <option value="approval">{text("Onay", "Approval")}</option>
+            <option value="operation">{text("Operasyon", "Operation")}</option>
+            <option value="review">{text("İnceleme", "Review")}</option>
           </select>
         </InspectorField>
         <div className="workflow-check-grid">
@@ -346,7 +382,7 @@ function UserTaskFields({
                 onChange={() => toggleAction(action)}
                 type="checkbox"
               />
-              <span>{workflowActionLabels[action]}</span>
+              <span>{actionLabels[action]}</span>
             </label>
           ))}
         </div>
@@ -378,15 +414,17 @@ function AssignmentTargetFields({
   onChange: (assignment: WorkflowAssignment) => void;
   readOnly: boolean;
 }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   switch (assignment.type) {
     case "processStarter":
       return null;
     case "person":
       return (
-        <InspectorField label="Kullanıcı">
+        <InspectorField label={text("Kullanıcı", "User")}>
           <LookupSelect
             disabled={readOnly}
-            emptyLabel="Kullanıcı seçin"
+            emptyLabel={text("Kullanıcı seçin", "Select user")}
             onChange={(personId, personName) => onChange({ ...assignment, personId, personName })}
             options={lookups.people}
             value={assignment.personId}
@@ -396,10 +434,10 @@ function AssignmentTargetFields({
       );
     case "team":
       return (
-        <InspectorField label="Takım">
+        <InspectorField label={text("Takım", "Team")}>
           <LookupSelect
             disabled={readOnly}
-            emptyLabel="Takım seçin"
+            emptyLabel={text("Takım seçin", "Select team")}
             onChange={(teamId, teamName) => onChange({ ...assignment, teamId, teamName })}
             options={lookups.teams}
             value={assignment.teamId}
@@ -409,10 +447,10 @@ function AssignmentTargetFields({
       );
     case "communityRole":
       return (
-        <InspectorField label="Topluluk rolü">
+        <InspectorField label={text("Topluluk rolü", "Community role")}>
           <LookupSelect
             disabled={readOnly}
-            emptyLabel="Rol seçin"
+            emptyLabel={text("Rol seçin", "Select role")}
             onChange={(communityRoleId, communityRoleName) => onChange({
               ...assignment,
               communityRoleId,
@@ -427,20 +465,20 @@ function AssignmentTargetFields({
     case "teamAndRole":
       return (
         <>
-          <InspectorField label="Takım">
+          <InspectorField label={text("Takım", "Team")}>
             <LookupSelect
               disabled={readOnly}
-              emptyLabel="Takım seçin"
+              emptyLabel={text("Takım seçin", "Select team")}
               onChange={(teamId, teamName) => onChange({ ...assignment, teamId, teamName })}
               options={lookups.teams}
               value={assignment.teamId}
               valueLabel={assignment.teamName}
             />
           </InspectorField>
-          <InspectorField label="Topluluk rolü">
+          <InspectorField label={text("Topluluk rolü", "Community role")}>
             <LookupSelect
               disabled={readOnly}
-              emptyLabel="Rol seçin"
+              emptyLabel={text("Rol seçin", "Select role")}
               onChange={(communityRoleId, communityRoleName) => onChange({
                 ...assignment,
                 communityRoleId,
@@ -467,6 +505,8 @@ function FormBindingFields({
   onChange: (binding: WorkflowFormBinding | null) => void;
   readOnly: boolean;
 }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   function toggle(enabled: boolean) {
     const first = lookups.formVersions[0];
     onChange(enabled ? {
@@ -478,9 +518,9 @@ function FormBindingFields({
   }
 
   return (
-    <InspectorSection title="Form bağlantısı">
+    <InspectorSection title={text("Form bağlantısı", "Form binding")}>
       <label className="workflow-switch-row">
-        <span>Form kullan</span>
+        <span>{text("Form kullan", "Use form")}</span>
         <input
           checked={Boolean(binding)}
           disabled={readOnly}
@@ -489,7 +529,7 @@ function FormBindingFields({
         />
       </label>
       {binding ? (
-        <InspectorField label="Form sürümü">
+        <InspectorField label={text("Form sürümü", "Form version")}>
           <select
             disabled={readOnly}
             onChange={(event) => {
@@ -503,7 +543,7 @@ function FormBindingFields({
             }}
             value={binding.formVersionId}
           >
-            <option value="">Form sürümü seçin</option>
+            <option value="">{text("Form sürümü seçin", "Select form version")}</option>
             {binding.formVersionId && !lookups.formVersions.some((option) => option.id === binding.formVersionId) ? (
               <option value={binding.formVersionId}>{binding.formName || binding.formVersionId}</option>
             ) : null}
@@ -518,18 +558,22 @@ function FormBindingFields({
 }
 
 function GatewaySummary({ node }: { node: Extract<WorkflowNode, { type: "exclusiveGateway" }> }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   const allEdges = useWorkflowDraftStore((state) => state.draft.edges);
   const edges = allEdges.filter((edge) => edge.source === node.id);
   return (
-    <InspectorSection title="Çıkışlar">
+    <InspectorSection title={text("Çıkışlar", "Outgoing paths")}>
       <div className="workflow-route-list">
         {edges.map((edge, index) => (
           <div key={edge.id}>
             <span>{index + 1}</span>
-            <strong>{edge.data?.label || edge.data?.condition?.fieldKey || (edge.data?.isDefault ? "Varsayılan" : "Koşulsuz")}</strong>
+            <strong>{edge.data?.label || edge.data?.condition?.fieldKey || (edge.data?.isDefault
+              ? text("Varsayılan", "Default")
+              : text("Koşulsuz", "Unconditional"))}</strong>
           </div>
         ))}
-        {edges.length === 0 ? <p>Henüz çıkış yok.</p> : null}
+        {edges.length === 0 ? <p>{text("Henüz çıkış yok.", "No outgoing path yet.")}</p> : null}
       </div>
     </InspectorSection>
   );
@@ -544,13 +588,18 @@ function SelectedEdgeInspector({
   lookups: WorkflowEditorLookups;
   readOnly: boolean;
 }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
+  const actionLabels = getWorkflowActionLabels(language);
+  const conditionOperatorLabels = getWorkflowConditionOperatorLabels(language);
+  const conditionValueTypeLabels = getWorkflowConditionValueTypeLabels(language);
   const draft = useWorkflowDraftStore((state) => state.draft);
   const updateEdgeData = useWorkflowDraftStore((state) => state.updateEdgeData);
   const source = draft.nodes.find((node) => node.id === edge.source);
   const target = draft.nodes.find((node) => node.id === edge.target);
   const isGatewayEdge = source?.type === "exclusiveGateway";
   const isTaskEdge = source?.type === "userTask";
-  const conditionFields = buildConditionFieldOptions(draft, lookups, edge.source);
+  const conditionFields = buildConditionFieldOptions(draft, lookups, edge.source, language);
 
   function updateCondition(patch: Partial<WorkflowCondition>) {
     const condition: WorkflowCondition = edge.data?.condition ?? {
@@ -564,14 +613,18 @@ function SelectedEdgeInspector({
 
   return (
     <>
-      <InspectorHeading icon={<ArrowRight size={17} />} kicker="Bağlantı" title={edge.data?.label || "Geçiş"} />
+      <InspectorHeading
+        icon={<ArrowRight size={17} />}
+        kicker={text("Bağlantı", "Connection")}
+        title={edge.data?.label || text("Geçiş", "Transition")}
+      />
       <div className="workflow-inspector-fields">
         <div className="workflow-edge-endpoints">
           <span>{source?.data.label || edge.source}</span>
           <ArrowRight size={14} aria-hidden="true" />
           <span>{target?.data.label || edge.target}</span>
         </div>
-        <InspectorField label="Etiket">
+        <InspectorField label={text("Etiket", "Label")}>
           <input
             disabled={readOnly}
             maxLength={100}
@@ -581,8 +634,8 @@ function SelectedEdgeInspector({
         </InspectorField>
 
         {isTaskEdge ? (
-          <InspectorSection title="Görev işlemi">
-            <InspectorField label="İşlem">
+          <InspectorSection title={text("Görev işlemi", "Task action")}>
+            <InspectorField label={text("İşlem", "Action")}>
               <select
                 disabled={readOnly}
                 onChange={(event) => updateEdgeData(edge.id, {
@@ -590,9 +643,9 @@ function SelectedEdgeInspector({
                 })}
                 value={edge.data?.action ?? ""}
               >
-                <option value="">İşlem seçin</option>
+                <option value="">{text("İşlem seçin", "Select action")}</option>
                 {source.data.actions.map((action) => (
-                  <option key={action} value={action}>{workflowActionLabels[action]}</option>
+                  <option key={action} value={action}>{actionLabels[action]}</option>
                 ))}
               </select>
             </InspectorField>
@@ -600,9 +653,9 @@ function SelectedEdgeInspector({
         ) : null}
 
         {isGatewayEdge ? (
-          <InspectorSection title="Karar koşulu">
+          <InspectorSection title={text("Karar koşulu", "Decision condition")}>
             <label className="workflow-switch-row">
-              <span>Varsayılan çıkış</span>
+              <span>{text("Varsayılan çıkış", "Default path")}</span>
               <input
                 checked={edge.data?.isDefault ?? false}
                 disabled={readOnly}
@@ -615,7 +668,7 @@ function SelectedEdgeInspector({
             </label>
             {!edge.data?.isDefault ? (
               <>
-                <InspectorField label="Form yolu">
+                <InspectorField label={text("Form yolu", "Form path")}>
                   <select
                     disabled={readOnly}
                     onChange={(event) => {
@@ -633,7 +686,7 @@ function SelectedEdgeInspector({
                     }}
                     value={edge.data?.condition?.fieldKey ?? ""}
                   >
-                    <option value="">Form alanı seçin</option>
+                    <option value="">{text("Form alanı seçin", "Select form field")}</option>
                     {edge.data?.condition?.fieldKey
                       && !conditionFields.some((option) => option.path === edge.data?.condition?.fieldKey) ? (
                         <option value={edge.data.condition.fieldKey}>{edge.data.condition.fieldKey}</option>
@@ -643,22 +696,22 @@ function SelectedEdgeInspector({
                     ))}
                   </select>
                 </InspectorField>
-                <InspectorField label="Operatör">
+                <InspectorField label={text("Operatör", "Operator")}>
                   <select
                     disabled={readOnly}
                     onChange={(event) => updateCondition({ operator: event.target.value as WorkflowConditionOperator })}
                     value={edge.data?.condition?.operator ?? "Equals"}
                   >
                     {getConditionOperators(edge.data?.condition?.valueType ?? "String").map((operator) => (
-                      <option key={operator} value={operator}>{workflowConditionOperatorLabels[operator]}</option>
+                      <option key={operator} value={operator}>{conditionOperatorLabels[operator]}</option>
                     ))}
                   </select>
                 </InspectorField>
                 {!isValuelessOperator(edge.data?.condition?.operator) ? (
                   <>
-                    <InspectorField label="Değer türü">
+                    <InspectorField label={text("Değer türü", "Value type")}>
                       <span className="workflow-inspector-readonly-value">
-                        {workflowConditionValueTypeLabels[edge.data?.condition?.valueType ?? "String"]}
+                        {conditionValueTypeLabels[edge.data?.condition?.valueType ?? "String"]}
                       </span>
                     </InspectorField>
                     <ConditionValueField
@@ -681,6 +734,7 @@ function buildConditionFieldOptions(
   draft: WorkflowDefinitionDraft,
   lookups: WorkflowEditorLookups,
   gatewayNodeId: string,
+  language: "tr" | "en",
 ) {
   const versions = new Map(lookups.formVersions.map((version) => [version.id, version]));
   return draft.nodes.flatMap((node) => {
@@ -688,7 +742,7 @@ function buildConditionFieldOptions(
       const version = versions.get(node.data.formBinding.formVersionId);
       return (version?.fields ?? []).map((field) => ({
         path: `start.${field.key}`,
-        label: `Başlangıç / ${field.label}`,
+        label: `${workflowText(language, "Başlangıç", "Start")} / ${field.label}`,
         valueType: field.valueType,
       }));
     }
@@ -745,18 +799,20 @@ function ConditionValueField({
   onChange: (value: string) => void;
   readOnly: boolean;
 }) {
+  const language = useWorkflowLanguage();
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   if (condition?.valueType === "Boolean") {
     return (
-      <InspectorField label="Değer">
+      <InspectorField label={text("Değer", "Value")}>
         <select disabled={readOnly} onChange={(event) => onChange(event.target.value)} value={condition.value || "true"}>
-          <option value="true">Doğru</option>
-          <option value="false">Yanlış</option>
+          <option value="true">{text("Doğru", "True")}</option>
+          <option value="false">{text("Yanlış", "False")}</option>
         </select>
       </InspectorField>
     );
   }
   return (
-    <InspectorField label="Değer">
+    <InspectorField label={text("Değer", "Value")}>
       <input
         disabled={readOnly}
         inputMode={condition?.valueType === "Number" ? "decimal" : undefined}
@@ -847,4 +903,8 @@ function nodeIcon(type: WorkflowNode["type"]) {
 
 function isValuelessOperator(operator: WorkflowConditionOperator | undefined) {
   return operator === "IsEmpty" || operator === "IsNotEmpty";
+}
+
+function useWorkflowLanguage() {
+  return useSessionStore((state) => state.language);
 }

@@ -118,11 +118,11 @@ export function DashboardView({
   const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
   const shouldShowMetricLoader = status === "loading" && !summary;
   const activeChartSegment = chartSegments.find((segment) => segment.key === hoveredChartSegment);
-  const currentAccessLabel = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadi");
+  const currentAccessLabel = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadı");
   const normalizedCommunityRole = user.communityRoleName.trim().toLocaleLowerCase("tr-TR");
   const hasUnassignedCommunityRole = user.role !== "SuperAdmin"
     && Boolean(user.communityId)
-    && (!normalizedCommunityRole || ["atanmadi", "atanmadı", "unassigned"].includes(normalizedCommunityRole));
+    && (!normalizedCommunityRole || ["atanmadı", "atanmadi", "unassigned"].includes(normalizedCommunityRole));
   const showTaskFocus = scope === "personal" && canOpen("tasks");
   const focusEyebrowKey: TranslationKey = showTaskFocus
     ? "dashboard.priorityEyebrow"

@@ -89,7 +89,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         communitySummaryCache.set(communityId, result);
         setSummary(result);
       } catch (error) {
-        setCodeFeedback({ tone: "error", text: localizeApiError(error, language, "Topluluk ozeti yuklenemedi.") });
+        setCodeFeedback({ tone: "error", text: localizeApiError(error, language, "Topluluk özeti yüklenemedi.") });
       } finally {
         setIsSummaryLoading(false);
       }
@@ -112,7 +112,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         })
         .catch((error) => {
           setRoles([]);
-          setRolesError(localizeApiError(error, language, "Topluluk rolleri yuklenemedi."));
+          setRolesError(localizeApiError(error, language, "Topluluk rolleri yüklenemedi."));
         })
         .finally(() => setIsRolesLoading(false));
       await Promise.all([rolesRequest, loadSummary(communityId, forceSummary)]);
@@ -132,7 +132,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
       try {
         setTemplates(await api.listRoleTemplates(token));
       } catch (error) {
-        setRoleFeedback({ tone: "error", text: localizeApiError(error, language, "Rol sablonlari yuklenemedi.") });
+        setRoleFeedback({ tone: "error", text: localizeApiError(error, language, "Rol şablonlari yüklenemedi.") });
       }
       const nextCommunityId = initialCommunityIdRef.current ?? (isSuperAdmin ? communityResult[0]?.id ?? null : activeUser.communityId ?? null);
       initialCommunityIdRef.current = nextCommunityId;
@@ -141,7 +141,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         await loadCommunity(nextCommunityId);
       }
     } catch (error) {
-      setCommunityFeedback({ tone: "error", text: localizeApiError(error, language, "Topluluklar yuklenemedi.") });
+      setCommunityFeedback({ tone: "error", text: localizeApiError(error, language, "Topluluklar yüklenemedi.") });
     } finally {
       setIsLoading(false);
     }
@@ -206,7 +206,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
     try {
       await loadCommunity(communityId);
     } catch (error) {
-      setCommunityFeedback({ tone: "error", text: localizeApiError(error, language, "Topluluk yuklenemedi.") });
+      setCommunityFeedback({ tone: "error", text: localizeApiError(error, language, "Topluluk yüklenemedi.") });
     }
   }
 
@@ -237,7 +237,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
     setPendingAction(null);
     try {
       if (action.type === "create-community") {
-        setCommunityFeedback({ tone: "loading", text: "Topluluk olusturuluyor..." });
+        setCommunityFeedback({ tone: "loading", text: "Topluluk oluşturuluyor..." });
         const created = await api.createCommunity(token, {
           name: createDraft.name,
           description: createDraft.description,
@@ -247,7 +247,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         setCommunities((items) => [...items, created].sort((left, right) => left.name.localeCompare(right.name)));
         setCreateDraft({ name: "", description: "", inviteCode: "" });
         await selectCommunity(created.id);
-        setCommunityFeedback({ tone: "success", text: `${created.name} olusturuldu.` });
+        setCommunityFeedback({ tone: "success", text: `${created.name} oluşturuldu.` });
         return;
       }
 
@@ -256,13 +256,13 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
       }
 
       if (action.type === "update-community") {
-        setCommunityFeedback({ tone: "loading", text: "Topluluk ayarlari kaydediliyor..." });
+        setCommunityFeedback({ tone: "loading", text: "Topluluk ayarları kaydediliyor..." });
         const updated = await api.updateCommunity(token, selectedCommunity.id, communityDraft);
         setCommunities((items) => items.map((item) => (item.id === updated.id ? updated : item)));
         communitySummaryCache.delete(updated.id);
         setCommunityFeedback({
           tone: "success",
-          text: updated.isActive ? "Topluluk ayarlari kaydedildi." : "Topluluk pasife alindi ve oturumlar kapatildi.",
+          text: updated.isActive ? "Topluluk ayarları kaydedildi." : "Topluluk pasife alındı ve oturumlar kapatıldı.",
         });
         return;
       }
@@ -276,21 +276,21 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
       }
 
       if (action.type === "create-role") {
-        setRoleFeedback({ tone: "loading", text: "Rol olusturuluyor..." });
+        setRoleFeedback({ tone: "loading", text: "Rol oluşturuluyor..." });
         const created = await api.createCommunityRole(token, selectedCommunity.id, roleDraft);
         setRoles((items) => [...items, created].sort((left, right) => left.name.localeCompare(right.name)));
         communitySummaryCache.delete(selectedCommunity.id);
         setSelectedRoleId(created.id);
-        setRoleFeedback({ tone: "success", text: `${created.name} rolu olusturuldu.` });
+        setRoleFeedback({ tone: "success", text: `${created.name} rolü oluşturuldu.` });
         return;
       }
 
       if (action.type === "update-role") {
-        setRoleFeedback({ tone: "loading", text: "Rol guncelleniyor..." });
+        setRoleFeedback({ tone: "loading", text: "Rol güncelleniyor..." });
         const updated = await api.updateCommunityRole(token, selectedCommunity.id, action.roleId, roleDraft);
         setRoles((items) => items.map((item) => (item.id === updated.id ? updated : item)));
         communitySummaryCache.delete(selectedCommunity.id);
-        setRoleFeedback({ tone: "success", text: `${updated.name} rolu guncellendi.` });
+        setRoleFeedback({ tone: "success", text: `${updated.name} rolü güncellendi.` });
         return;
       }
 
@@ -304,10 +304,10 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         setIsCustomizingTemplate(false);
         setRoleDraft({ name: "", description: "", templateKey: "custom", permissions: [] });
         await loadSummary(selectedCommunity.id, true);
-        setRoleFeedback({ tone: "success", text: "Rol silindi; kullanicilar hedef role tasindi." });
+      setRoleFeedback({ tone: "success", text: "Rol silindi; kullanıcılar hedef role taşındı." });
       }
     } catch (error) {
-      const message = localizeApiError(error, language, "Islem tamamlanamadi.");
+      const message = localizeApiError(error, language, "İşlem tamamlanamadı.");
       if (action.type === "regenerate-code") {
         setCodeFeedback({ tone: "error", text: message });
       } else if (action.type.includes("role")) {
@@ -368,11 +368,11 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
     <section className="settings-panel">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">Yonetim</span>
+          <span className="eyebrow">Yönetim</span>
           <h2>Topluluklar</h2>
         </div>
         <div className="section-heading-actions">
-          <p>Topluluk davet kodlarini, durumunu ve topluluga ozel rol setlerini yonetin.</p>
+          <p>Topluluk davet kodlarini, durumunu ve topluluğa özel rol setlerini yönetin.</p>
           <button className="secondary-button refresh-button" disabled={isRefreshing} type="button" onClick={refresh}>
             <RefreshCw className={isRefreshing ? "spin-icon" : undefined} size={17} />
             {isRefreshing ? "Yenileniyor" : "Yenile"}
@@ -384,19 +384,19 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         <div className="community-management-left">
           {isSuperAdmin ? (
             <section className="identity-section">
-              <div className="section-toolbar"><div><span className="eyebrow">Platform</span><h3>Topluluk olustur</h3></div><Building2 size={22} /></div>
+              <div className="section-toolbar"><div><span className="eyebrow">Platform</span><h3>Topluluk oluştur</h3></div><Building2 size={22} /></div>
               <div className="compact-form community-create-form">
-                <input value={createDraft.name} onChange={(event) => setCreateDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Topluluk adi" />
-                <input value={createDraft.description} onChange={(event) => setCreateDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Aciklama" />
+                <input value={createDraft.name} onChange={(event) => setCreateDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Topluluk adı" />
+                <input value={createDraft.description} onChange={(event) => setCreateDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Açıklama" />
                 <input value={createDraft.inviteCode} maxLength={5} onChange={(event) => setCreateDraft((draft) => ({ ...draft, inviteCode: event.target.value.toUpperCase() }))} placeholder="Davet kodu (opsiyonel)" />
-                <button className="success-button" disabled={!createDraft.name.trim()} type="button" onClick={() => setPendingAction({ type: "create-community" })}>Topluluk olustur</button>
+                <button className="success-button" disabled={!createDraft.name.trim()} type="button" onClick={() => setPendingAction({ type: "create-community" })}>Topluluk oluştur</button>
               </div>
               <ActionFeedback feedback={communityFeedback} />
             </section>
           ) : null}
 
           <section className="identity-section">
-            <div className="section-toolbar"><div><span className="eyebrow">Topluluk</span><h3>{selectedCommunity?.name ?? "Topluluk yukleniyor"}</h3></div><Landmark size={22} /></div>
+            <div className="section-toolbar"><div><span className="eyebrow">Topluluk</span><h3>{selectedCommunity?.name ?? "Topluluk yükleniyor"}</h3></div><Landmark size={22} /></div>
             {isSuperAdmin ? (
               <label className="filter-select-field compact-filter-field">
                 <Building2 size={16} />
@@ -410,8 +410,8 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
             ) : (
               <div className="community-settings-grid">
                 <label><span>Topluluk adi</span><input value={communityDraft.name} disabled={!isSuperAdmin} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, name: event.target.value }))} /></label>
-                <label><span>Aciklama</span><input value={communityDraft.description} disabled={!isSuperAdmin} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, description: event.target.value }))} /></label>
-                <label><span>Kayit kodu</span><input value={communityDraft.inviteCode} disabled={!isSuperAdmin} maxLength={5} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, inviteCode: event.target.value.toUpperCase() }))} /></label>
+                <label><span>Açıklama</span><input value={communityDraft.description} disabled={!isSuperAdmin} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, description: event.target.value }))} /></label>
+                <label><span>Kayıt kodu</span><input value={communityDraft.inviteCode} disabled={!isSuperAdmin} maxLength={5} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, inviteCode: event.target.value.toUpperCase() }))} /></label>
                 {isSuperAdmin ? (
                   <label><span>Durum</span><select value={communityDraft.isActive ? "active" : "inactive"} onChange={(event) => setCommunityDraft((draft) => ({ ...draft, isActive: event.target.value === "active" }))}><option value="active">Aktif</option><option value="inactive">Pasif</option></select></label>
                 ) : (
@@ -420,14 +420,14 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
               </div>
             )}
             <div className="community-stat-grid">
-              <article className="settings-row community-stat-card"><Users className="community-stat-icon" size={18} /><span>Uyeler</span><strong>{isLoading || isSummaryLoading || !summary ? <InlineValueLoader /> : summary.memberCount}</strong><small>Aktif topluluk uyeligi</small></article>
-              <article className="settings-row community-stat-card"><Tags className="community-stat-icon" size={18} /><span>Rol sayisi</span><strong>{isLoading || isRolesLoading ? <InlineValueLoader /> : roles.length}</strong><small>Tanimli topluluk rolu</small></article>
+              <article className="settings-row community-stat-card"><Users className="community-stat-icon" size={18} /><span>Üyeler</span><strong>{isLoading || isSummaryLoading || !summary ? <InlineValueLoader /> : summary.memberCount}</strong><small>Aktif topluluk üyeliği</small></article>
+              <article className="settings-row community-stat-card"><Tags className="community-stat-icon" size={18} /><span>Rol sayısı</span><strong>{isLoading || isRolesLoading ? <InlineValueLoader /> : roles.length}</strong><small>Tanımlı topluluk rolü</small></article>
             </div>
             {summary ? <RoleCountDisclosure summary={summary} /> : null}
             {isSuperAdmin ? (
               <div className="section-actions">
                 <button className="secondary-button" type="button" onClick={() => setPendingAction({ type: "regenerate-code" })}>Yeni kod uret</button>
-                <button className={communityDraft.isActive ? "primary-button" : "success-button"} type="button" onClick={() => setPendingAction({ type: "update-community" })}>Degisikligi uygula</button>
+                <button className={communityDraft.isActive ? "primary-button" : "success-button"} type="button" onClick={() => setPendingAction({ type: "update-community" })}>Değişikliği uygula</button>
               </div>
             ) : null}
             {canToggleOwnCommunityStatus && selectedCommunity ? (
@@ -440,7 +440,7 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
                     setPendingAction({ type: "update-community" });
                   }}
                 >
-                  {selectedCommunity.isActive ? "Toplulugu pasife al" : "Toplulugu aktif et"}
+                  {selectedCommunity.isActive ? "Topluluğu pasife al" : "Topluluğu aktif et"}
                 </button>
               </div>
             ) : null}
@@ -451,25 +451,25 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
         <section className="identity-section community-role-panel">
           <div className="section-toolbar"><div><span className="eyebrow">Yetkiler</span><h3>{selectedCommunity ? `${selectedCommunity.name} rolleri` : "Topluluk rolleri"}</h3></div><Tags size={22} /></div>
           {isLoading ? <CommunityRolePanelSkeleton /> : <>
-          <label className="filter-select-field compact-filter-field"><BadgeCheck size={16} /><select value={templateSourceKey} onChange={(event) => selectRoleSource(event.target.value)}><option value="custom">Ozel rol olustur</option><optgroup label="Hazir roller">{templates.filter((template) => template.key !== "custom").map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}</optgroup>{customRoles.length ? <optgroup label="Topluluga ozel roller">{customRoles.map((role) => <option key={role.id} value={`role:${role.id}`}>{role.name}</option>)}</optgroup> : null}</select></label>
-          {isRolesLoading ? <div className="role-panel-loading"><InlineValueLoader label="Roller yukleniyor" /></div> : null}
+          <label className="filter-select-field compact-filter-field"><BadgeCheck size={16} /><select value={templateSourceKey} onChange={(event) => selectRoleSource(event.target.value)}><option value="custom">Özel rol oluştur</option><optgroup label="Hazır roller">{templates.filter((template) => template.key !== "custom").map((template) => <option key={template.key} value={template.key}>{template.name}</option>)}</optgroup>{customRoles.length ? <optgroup label="Topluluğa özel roller">{customRoles.map((role) => <option key={role.id} value={`role:${role.id}`}>{role.name}</option>)}</optgroup> : null}</select></label>
+          {isRolesLoading ? <div className="role-panel-loading"><InlineValueLoader label="Roller yükleniyor" /></div> : null}
           {rolesError ? <ActionFeedback feedback={{ tone: "error", text: rolesError }} /> : null}
-          {!isRolesLoading && !rolesError && selectedCommunity && !roles.length ? <p className="status-line">Bu toplulukta rol bulunamadi. Yenile ile tekrar deneyin.</p> : null}
+              {!isRolesLoading && !rolesError && selectedCommunity && !roles.length ? <p className="status-line">Bu toplulukta rol bulunamadı. Yenile ile tekrar deneyin.</p> : null}
           <div className="role-editor-grid">
             <input value={roleDraft.name} onChange={(event) => setRoleDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Rol adi" disabled={!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate} />
-            <input value={roleDraft.description} onChange={(event) => setRoleDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Rol aciklamasi" disabled={!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate} />
+            <input value={roleDraft.description} onChange={(event) => setRoleDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Rol açıklamasi" disabled={!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate} />
           </div>
-          {!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate ? <p className="helper-copy">Hazir rol <strong>{roleDraft.name}</strong> sistemde tanimlidir. Bir izin degistirerek <strong>{roleDraft.name}*</strong> adli ozel kopya olusturabilirsiniz.</p> : null}
-          {!selectedRole && isCustomizingTemplate ? <p className="helper-copy">Bu kopya <strong>{roleDraft.name}</strong> adiyla ozel rol olarak kaydedilecek.</p> : null}
+          {!selectedRole && templateSourceKey !== "custom" && !isCustomizingTemplate ? <p className="helper-copy">Hazır rol <strong>{roleDraft.name}</strong> sistemde tanimlidir. Bir izin değiştirerek <strong>{roleDraft.name}*</strong> adli özel kopya oluşturabilirsiniz.</p> : null}
+          {!selectedRole && isCustomizingTemplate ? <p className="helper-copy">Bu kopya <strong>{roleDraft.name}</strong> adiyla özel rol olarak kaydedilecek.</p> : null}
           <div className="permission-chip-grid">
             {allPermissions.map((permission) => <label className="checkbox-line compact-password-toggle" key={permission}><input type="checkbox" checked={roleDraft.permissions.includes(permission)} onChange={(event) => toggleRolePermission(permission, event.target.checked)} /><span>{permissionLabel(permission)}</span></label>)}
           </div>
           <div className="section-actions role-editor-actions">
-            {!selectedRole && (templateSourceKey === "custom" || isCustomizingTemplate) ? <button className="success-button" disabled={!roleDraft.name.trim()} type="button" onClick={() => setPendingAction({ type: "create-role" })}><Plus size={16} /> Rol olustur</button> : null}
-            {selectedRole && !selectedRole.isSystemRole ? <button className="primary-button" disabled={!roleDraft.name.trim()} type="button" onClick={() => setPendingAction({ type: "update-role", roleId: selectedRole.id })}><Pencil size={16} /> Rolu guncelle</button> : null}
-            {selectedRole && !selectedRole.isSystemRole ? <button className="danger-button" type="button" onClick={() => setPendingAction({ type: "delete-role", roleId: selectedRole.id })}><Trash2 size={16} /> Rolu sil</button> : null}
+            {!selectedRole && (templateSourceKey === "custom" || isCustomizingTemplate) ? <button className="success-button" disabled={!roleDraft.name.trim()} type="button" onClick={() => setPendingAction({ type: "create-role" })}><Plus size={16} /> Rol oluştur</button> : null}
+            {selectedRole && !selectedRole.isSystemRole ? <button className="primary-button" disabled={!roleDraft.name.trim()} type="button" onClick={() => setPendingAction({ type: "update-role", roleId: selectedRole.id })}><Pencil size={16} /> Rolü güncelle</button> : null}
+            {selectedRole && !selectedRole.isSystemRole ? <button className="danger-button" type="button" onClick={() => setPendingAction({ type: "delete-role", roleId: selectedRole.id })}><Trash2 size={16} /> Rolü sil</button> : null}
           </div>
-          {selectedRole ? <p className="helper-copy">Bu rolde {isSummaryLoading ? <InlineValueLoader /> : activeRoleCount} aktif kullanici bulunuyor.</p> : null}
+          {selectedRole ? <p className="helper-copy">Bu rolde {isSummaryLoading ? <InlineValueLoader /> : activeRoleCount} aktif kullanıcı bulunuyor.</p> : null}
           <ActionFeedback feedback={roleFeedback} />
           </>}
         </section>

@@ -128,29 +128,40 @@
   gap: 14px;
 }
 
-.segmented-control {
+.login-mode-card {
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface-muted);
+  gap: 18px;
+  animation: auth-mode-enter-neutral var(--motion-normal) ease-out both;
 }
 
-.segmented-control button {
-  min-height: 38px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--muted);
-  background: transparent;
-  font-weight: 800;
+.login-mode-card-forward {
+  animation-name: auth-mode-enter-forward;
 }
 
-.segmented-control button.active {
-  color: var(--foreground);
-  background: var(--surface);
-  box-shadow: 0 1px 8px rgba(15, 23, 42, 0.08);
+.login-mode-card-backward {
+  animation-name: auth-mode-enter-backward;
+}
+
+@keyframes auth-mode-enter-forward {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes auth-mode-enter-backward {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes auth-mode-enter-neutral {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-mode-card {
+    animation: none;
+  }
 }
 
 .login-form label {

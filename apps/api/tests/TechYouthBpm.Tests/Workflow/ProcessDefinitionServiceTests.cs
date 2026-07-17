@@ -177,6 +177,73 @@ public class ProcessDefinitionServiceTests
     }
 
     [Fact]
+    public void Validation_Rejects_TeamLead_Restriction_For_NonTeam_Assignment()
+    {
+        using var db = TestDbFactory.Create();
+        var graph = new ProcessGraphDto(
+            "1.0",
+            [
+                new ProcessNodeDto("start", ProcessNodeType.Start),
+                new ProcessNodeDto(
+                    "approval",
+                    ProcessNodeType.UserTask,
+                    Actions: [WorkflowAction.Approve],
+                    Assignment: new(TaskAssignmentType.ProcessStarter),
+                    RequiresTeamLead: true),
+                new ProcessNodeDto("end", ProcessNodeType.CompletedEnd)
+            ],
+            [
+                new ProcessEdgeDto("start", "approval"),
+                new ProcessEdgeDto("approval", "end", WorkflowAction.Approve)
+            ]);
+
+        var result = new ProcessGraphValidator(db).ValidateStructure(graph);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.Contains("team lead only", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Publish_Rejects_TeamLead_Task_Without_Eligible_Lead()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "lead-validation-admin");
+        var user = TestDbFactory.CommunityAdminDto(admin);
+        var team = DynamicWorkflowTestBuilder.SeedTeam(db, "No Lead Team");
+        var form = await new FormService(db).CreateAsync(
+            new CreateFormRequest(
+                "Lead validation form",
+                "",
+                [new CreateFormFieldRequest("amount", "Amount", FieldType.Number, true, 0, [], [])]),
+            user);
+        var formVersionId = form.Value!.LatestPublishedVersionId!.Value;
+        var graph = new ProcessGraphDto(
+            "1.0",
+            [
+                new ProcessNodeDto("start", ProcessNodeType.Start, FormDefinitionVersionId: formVersionId),
+                new ProcessNodeDto(
+                    "approval",
+                    ProcessNodeType.UserTask,
+                    Actions: [WorkflowAction.Approve],
+                    Assignment: new(TaskAssignmentType.Team, TeamId: team.Id),
+                    RequiresTeamLead: true),
+                new ProcessNodeDto("end", ProcessNodeType.CompletedEnd)
+            ],
+            [
+                new ProcessEdgeDto("start", "approval"),
+                new ProcessEdgeDto("approval", "end", WorkflowAction.Approve)
+            ]);
+
+        var result = await new ProcessGraphValidator(db).ValidateForPublishAsync(
+            graph,
+            TestDbFactory.CommunityId,
+            formVersionId);
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains(result.Errors, error => error.Contains("active team lead", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void Validation_Rejects_Condition_Path_Outside_Namespaced_Variables()
     {
         using var db = TestDbFactory.Create();

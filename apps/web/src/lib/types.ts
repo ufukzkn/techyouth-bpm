@@ -250,6 +250,7 @@ export type ProcessNode = {
   formDefinitionVersionId?: string | null;
   priority: TaskPriority;
   slaDurationMinutes?: number | null;
+  requiresTeamLead?: boolean;
   actions?: WorkflowAction[] | null;
   assignment?: TaskAssignment | null;
   parentKey?: string | null;
@@ -366,6 +367,9 @@ export type ProcessTask = {
   workflowName?: string;
   formName?: string;
   communityName?: string;
+  requiresTeamLead?: boolean;
+  canCurrentUserAct?: boolean;
+  actionDenialReasonCode?: string | null;
 };
 
 export type ProcessListParams = {
@@ -403,12 +407,15 @@ export type AuditLog = {
 export type SystemAuditLog = {
   id: string;
   actorUserId?: string | null;
+  communityId?: string | null;
   actorDisplayName: string;
   actorUsername: string;
+  category: "identity" | "access" | "forms" | "processes" | "tasks" | "other";
   action: string;
   entityType: string;
   entityId?: string | null;
   description: string;
+  metadataJson?: string | null;
   createdAt: string;
   entityDisplayName?: string | null;
   entityUsername?: string | null;

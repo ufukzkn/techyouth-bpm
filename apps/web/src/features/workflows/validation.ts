@@ -175,6 +175,16 @@ function validateUserTask(
     issues.push(issue("task.assignment.required", "error", "node", "Görev ataması tamamlanmalıdır.", nodeId));
   }
 
+  if (data.requiresTeamLead && data.assignment.type !== "team" && data.assignment.type !== "teamAndRole") {
+    issues.push(issue(
+      "task.teamLead.assignment",
+      "error",
+      "node",
+      "Takım sorumlusu kuralı yalnız takım veya takım + rol atamalarında kullanılabilir.",
+      nodeId,
+    ));
+  }
+
   if (data.actions.length === 0) {
     issues.push(issue("task.actions.required", "error", "node", "Görev için en az bir işlem seçilmelidir.", nodeId));
   }

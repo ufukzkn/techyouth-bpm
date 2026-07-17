@@ -15,11 +15,29 @@ public interface ISystemAuditService
         CancellationToken cancellationToken = default);
 
     Task LogAsync(
+        Guid? actorUserId,
+        string action,
+        string entityType,
+        string? entityId,
+        string description,
+        SystemAuditContext context,
+        CancellationToken cancellationToken = default);
+
+    Task LogAsync(
         UserDto actor,
         string action,
         string entityType,
         string? entityId,
         string description,
+        CancellationToken cancellationToken = default);
+
+    Task LogAsync(
+        UserDto actor,
+        string action,
+        string entityType,
+        string? entityId,
+        string description,
+        SystemAuditContext context,
         CancellationToken cancellationToken = default);
 
     Task<Result<PagedResult<SystemAuditLogDto>>> ListAsync(

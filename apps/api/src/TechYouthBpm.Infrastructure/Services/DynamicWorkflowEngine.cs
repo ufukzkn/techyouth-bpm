@@ -123,6 +123,12 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
         CancellationToken cancellationToken)
     {
         var assignment = node.Assignment!;
+        if (node.RequiresTeamLead
+            && assignment.Type is not (TaskAssignmentType.Team or TaskAssignmentType.TeamAndCommunityRole))
+        {
+            return Result.Failure($"User task '{node.Key}' can require a team lead only for team assignments.");
+        }
+
         var resolver = new TaskAssignmentResolver(db);
         IReadOnlyList<Guid> candidateIds;
         if (assignment.Type == TaskAssignmentType.ProcessStarter)
@@ -144,7 +150,8 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             candidateIds = await resolver.ResolveCandidateUserIdsAsync(
                 process.CommunityId,
                 assignment,
-                cancellationToken);
+                cancellationToken,
+                node.RequiresTeamLead);
         }
 
         if (candidateIds.Count == 0)
@@ -180,7 +187,8 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             FormDefinitionVersionId = node.FormDefinitionVersionId,
             ClaimVersion = Guid.NewGuid(),
             CreatedAt = now,
-            DueAt = node.SlaDurationMinutes is { } slaMinutes ? now.AddMinutes(slaMinutes) : null
+            DueAt = node.SlaDurationMinutes is { } slaMinutes ? now.AddMinutes(slaMinutes) : null,
+            RequiresTeamLead = node.RequiresTeamLead
         };
         var step = new ProcessStepExecution
         {
