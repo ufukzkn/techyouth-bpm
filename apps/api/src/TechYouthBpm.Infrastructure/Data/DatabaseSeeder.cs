@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Domain.Entities;
@@ -254,6 +255,7 @@ public static class DatabaseSeeder
         TeamMember(SportTechnicalTeamId, QuaresmaId),
         TeamMember(SportFinanceTeamId, OkanBurukId, true),
         TeamMember(SportFinanceTeamId, QuaresmaId),
+        TeamMember(SportFinanceTeamId, FatihTerimId, true),
         TeamMember(SportTransferTeamId, FatihTerimId, true),
         TeamMember(SportTransferTeamId, QuaresmaId),
         TeamMember(LogisticsPlanningTeamId, JoseMourinhoId, true),
@@ -2182,6 +2184,7 @@ public static class DatabaseSeeder
         {
             Id = Guid.Parse(id),
             ActorUserId = actorUserId,
+            Category = SystemAuditCategories.Resolve(action, entityType),
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
