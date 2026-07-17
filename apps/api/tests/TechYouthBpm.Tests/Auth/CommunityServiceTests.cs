@@ -172,6 +172,60 @@ public class CommunityServiceTests
     }
 
     [Fact]
+    public async Task UpdateRoleAsync_Diffs_Permissions_Without_Duplicate_Inserts()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-role-editor");
+        var service = new CommunityService(db, new SystemAuditService(db));
+        var created = await service.CreateRoleAsync(
+            TestDbFactory.CommunityId,
+            new CreateCommunityRoleRequest(
+                "Operasyon",
+                "İlk izin seti",
+                "custom",
+                [PermissionNames.FormsView, PermissionNames.ProcessesView]),
+            TestDbFactory.ToDto(admin));
+        Assert.True(created.IsSuccess, string.Join(" | ", created.Errors));
+
+        var updated = await service.UpdateRoleAsync(
+            TestDbFactory.CommunityId,
+            created.Value!.Id,
+            new UpdateCommunityRoleRequest(
+                "Operasyon Güncel",
+                "Güncellenen izin seti",
+                [PermissionNames.ProcessesView, PermissionNames.TasksView]),
+            TestDbFactory.ToDto(admin));
+
+        Assert.True(updated.IsSuccess, string.Join(" | ", updated.Errors));
+        Assert.Equal(
+            [PermissionNames.ProcessesView, PermissionNames.TasksView],
+            updated.Value!.Permissions.Order());
+        Assert.Equal(
+            2,
+            db.CommunityRolePermissions.Count(permission => permission.CommunityRoleId == created.Value.Id));
+        Assert.DoesNotContain(
+            db.CommunityRolePermissions,
+            permission => permission.CommunityRoleId == created.Value.Id && permission.Permission == PermissionNames.FormsView);
+    }
+
+    [Fact]
+    public async Task UpdateRoleAsync_Rejects_All_System_Roles()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "community-system-role-editor");
+        var service = new CommunityService(db, new SystemAuditService(db));
+
+        var result = await service.UpdateRoleAsync(
+            TestDbFactory.CommunityId,
+            TestDbFactory.UserCommunityRoleId,
+            new UpdateCommunityRoleRequest("Changed", "Changed", []),
+            TestDbFactory.ToDto(admin));
+
+        Assert.False(result.IsSuccess);
+        Assert.Contains("system", result.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task DeleteRoleAsync_Moves_Members_To_Replacement_Role()
     {
         await using var db = TestDbFactory.Create();

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Domain.Entities;
@@ -8,6 +10,44 @@ namespace TechYouthBpm.Tests.Auth;
 
 public class SystemAuditServiceTests
 {
+    [Theory]
+    [InlineData("Auth.LoginSucceeded", "User", SystemAuditCategories.Identity)]
+    [InlineData("Team.MemberAdded", "Team", SystemAuditCategories.Access)]
+    [InlineData("FormDefinition.Updated", "FormDefinition", SystemAuditCategories.Forms)]
+    [InlineData("Process.Started", "ProcessInstance", SystemAuditCategories.Processes)]
+    [InlineData("Task.Claimed", "ProcessTask", SystemAuditCategories.Tasks)]
+    public void Resolve_Returns_Stable_Category_For_Audit_Matrix(
+        string action,
+        string entityType,
+        string expectedCategory)
+    {
+        Assert.Equal(expectedCategory, SystemAuditCategories.Resolve(action, entityType));
+    }
+
+    [Fact]
+    public async Task LogAsync_Persists_Category_Community_And_Structured_Metadata()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "admin-structured-audit");
+        var service = new SystemAuditService(db);
+
+        await service.LogAsync(
+            TestDbFactory.ToDto(admin),
+            "Team.MemberAdded",
+            "Team",
+            Guid.NewGuid().ToString(),
+            "Team membership changed.",
+            new SystemAuditContext(Metadata: new { before = "unassigned", after = "operations" }));
+
+        var log = await db.SystemAuditLogs.AsNoTracking().SingleAsync();
+        Assert.Equal(TestDbFactory.CommunityId, log.CommunityId);
+        Assert.Equal(SystemAuditCategories.Access, log.Category);
+        using var metadata = JsonDocument.Parse(log.MetadataJson!);
+        Assert.Equal(1, metadata.RootElement.GetProperty("schemaVersion").GetInt32());
+        Assert.Equal("unassigned", metadata.RootElement.GetProperty("details").GetProperty("before").GetString());
+        Assert.Equal("operations", metadata.RootElement.GetProperty("details").GetProperty("after").GetString());
+    }
+
     [Fact]
     public async Task ListAsync_Returns_System_Audit_Logs_For_Admin()
     {
@@ -96,6 +136,68 @@ public class SystemAuditServiceTests
         Assert.True(result.IsSuccess);
         var log = Assert.Single(result.Value!.Items);
         Assert.Equal(communityAdmin.Id, log.ActorUserId);
+    }
+
+    [Fact]
+    public async Task ListAsync_Scopes_System_Actor_Logs_By_Explicit_Community()
+    {
+        await using var db = TestDbFactory.Create();
+        var communityAdmin = TestDbFactory.SeedUser(db, Role.Admin, "community-system-audit");
+        var otherCommunityId = Guid.NewGuid();
+        db.Communities.Add(new Community
+        {
+            Id = otherCommunityId,
+            Name = "Other System Audit Community",
+            Description = "Other scope",
+            InviteCode = "SYS99",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync();
+        var service = new SystemAuditService(db);
+        await service.LogAsync(
+            (Guid?)null,
+            "Process.Seeded",
+            "ProcessInstance",
+            Guid.NewGuid().ToString(),
+            "Own community system action",
+            new SystemAuditContext(TestDbFactory.CommunityId));
+        await service.LogAsync(
+            (Guid?)null,
+            "Process.Seeded",
+            "ProcessInstance",
+            Guid.NewGuid().ToString(),
+            "Other community system action",
+            new SystemAuditContext(otherCommunityId));
+
+        var result = await service.ListAsync(
+            TestDbFactory.ToDto(communityAdmin),
+            new SystemAuditSearchRequest(Category: SystemAuditCategories.Processes, Page: 1, PageSize: 10));
+
+        Assert.True(result.IsSuccess);
+        var log = Assert.Single(result.Value!.Items);
+        Assert.Equal(TestDbFactory.CommunityId, log.CommunityId);
+        Assert.Equal("Own community system action", log.Description);
+    }
+
+    [Fact]
+    public async Task CountByCategoryAsync_Does_Not_Change_When_Search_Query_Changes()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "admin-count-audit");
+        var service = new SystemAuditService(db);
+        await service.LogAsync(TestDbFactory.ToDto(admin), "Auth.LoginSucceeded", "User", admin.Id.ToString(), "Signed in");
+        await service.LogAsync(TestDbFactory.ToDto(admin), "Team.MemberAdded", "Team", Guid.NewGuid().ToString(), "Member added");
+
+        var unfiltered = await service.CountByCategoryAsync(TestDbFactory.ToDto(admin));
+        var searched = await service.CountByCategoryAsync(TestDbFactory.ToDto(admin), "no-match-at-all");
+
+        Assert.True(unfiltered.IsSuccess);
+        Assert.True(searched.IsSuccess);
+        Assert.Equal(unfiltered.Value, searched.Value);
+        Assert.Equal(2, searched.Value!.All);
+        Assert.Equal(1, searched.Value.Identity);
+        Assert.Equal(1, searched.Value.Access);
     }
 
     [Fact]

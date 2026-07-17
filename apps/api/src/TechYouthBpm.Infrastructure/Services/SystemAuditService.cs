@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
@@ -11,22 +12,49 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 public class SystemAuditService(AppDbContext db) : ISystemAuditService
 {
+    public Task LogAsync(
+        Guid? actorUserId,
+        string action,
+        string entityType,
+        string? entityId,
+        string description,
+        CancellationToken cancellationToken = default) =>
+        LogAsync(actorUserId, action, entityType, entityId, description, new SystemAuditContext(), cancellationToken);
+
     public async Task LogAsync(
         Guid? actorUserId,
         string action,
         string entityType,
         string? entityId,
         string description,
+        SystemAuditContext context,
         CancellationToken cancellationToken = default)
     {
+        var resolvedCommunityId = context.CommunityId
+            ?? await ResolveCommunityIdAsync(actorUserId, entityType, entityId, cancellationToken);
+        var communityId = await KeepExistingCommunityIdAsync(resolvedCommunityId, cancellationToken);
+        var category = SystemAuditCategories.IsKnown(context.Category)
+            ? context.Category!.ToLowerInvariant()
+            : SystemAuditCategories.Resolve(action, entityType);
+
         db.SystemAuditLogs.Add(new SystemAuditLog
         {
             Id = Guid.NewGuid(),
             ActorUserId = actorUserId,
+            CommunityId = communityId,
+            Category = category,
             Action = action,
             EntityType = entityType,
             EntityId = entityId,
             Description = description,
+            MetadataJson = JsonSerializer.Serialize(new
+            {
+                schemaVersion = 1,
+                action,
+                entityType,
+                entityId,
+                details = context.Metadata
+            }),
             CreatedAt = DateTime.UtcNow
         });
 
@@ -40,7 +68,31 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         string? entityId,
         string description,
         CancellationToken cancellationToken = default) =>
-        LogAsync(actor.Id, action, entityType, entityId, description, cancellationToken);
+        LogAsync(
+            actor.Id,
+            action,
+            entityType,
+            entityId,
+            description,
+            new SystemAuditContext(actor.CommunityId),
+            cancellationToken);
+
+    public Task LogAsync(
+        UserDto actor,
+        string action,
+        string entityType,
+        string? entityId,
+        string description,
+        SystemAuditContext context,
+        CancellationToken cancellationToken = default) =>
+        LogAsync(
+            actor.Id,
+            action,
+            entityType,
+            entityId,
+            description,
+            context with { CommunityId = context.CommunityId ?? actor.CommunityId },
+            cancellationToken);
 
     public async Task<Result<PagedResult<SystemAuditLogDto>>> ListAsync(
         UserDto currentUser,
@@ -69,12 +121,15 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
             {
                 log.Id,
                 log.ActorUserId,
+                log.CommunityId,
+                log.Category,
                 ActorDisplayName = log.ActorUser != null ? log.ActorUser.DisplayName : "System",
                 ActorUsername = log.ActorUser != null ? log.ActorUser.Username : "system",
                 log.Action,
                 log.EntityType,
                 log.EntityId,
                 log.Description,
+                log.MetadataJson,
                 log.CreatedAt
             })
             .ToListAsync(cancellationToken);
@@ -107,7 +162,10 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
                 log.Description,
                 log.CreatedAt,
                 entityUser?.DisplayName,
-                entityUser?.Username);
+                entityUser?.Username,
+                log.CommunityId,
+                log.Category,
+                log.MetadataJson);
         }).ToArray();
 
         return Result<PagedResult<SystemAuditLogDto>>.Success(new PagedResult<SystemAuditLogDto>(
@@ -127,7 +185,7 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
             return Result<SystemAuditCategoryCountsDto>.Failure("Community management permission is required to view system audit logs.");
         }
 
-        var baseQuery = ApplySearchFilter(ApplyCommunityScope(db.SystemAuditLogs.Include(log => log.ActorUser), currentUser), query);
+        var baseQuery = ApplyCommunityScope(db.SystemAuditLogs.Include(log => log.ActorUser), currentUser);
         var counts = new SystemAuditCategoryCountsDto(
             await baseQuery.CountAsync(cancellationToken),
             await ApplyCategoryFilter(baseQuery, "identity").CountAsync(cancellationToken),
@@ -156,33 +214,13 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
             || log.Description.ToLower().Contains(search));
     }
 
-    private static IQueryable<SystemAuditLog> ApplyCategoryFilter(IQueryable<SystemAuditLog> query, string? category) =>
-        category?.Trim().ToLowerInvariant() switch
-        {
-            "identity" => query.Where(log =>
-                log.Action == "Auth.AccountLocked"
-                || log.Action == "Auth.EmailVerificationRequested"
-                || log.Action == "Auth.EmailVerified"
-                || log.Action == "Auth.LoginFailed"
-                || log.Action == "Auth.LoginSucceeded"
-                || log.Action == "Auth.Logout"
-                || log.Action == "Auth.PasswordChanged"
-                || log.Action == "Auth.RegisterRequested"
-                || log.Action == "Auth.SessionRevoked"
-                || log.Action == "Auth.TemporaryPasswordChanged"
-                || log.Action == "User.ProfileAndEmailUpdated"
-                || log.Action == "User.ProfileUpdated"),
-            "access" => query.Where(log =>
-                log.Action == "Auth.AdminSessionRevoked"
-                || log.Action == "User.AccessUpdated"
-                || log.Action == "User.CreatedByAdmin"
-                || log.Action == "User.DeletedByAdmin"
-                || log.Action.StartsWith("Team.")),
-            "forms" => query.Where(log => log.Action.StartsWith("FormDefinition.") || log.EntityType == "FormDefinition"),
-            "processes" => query.Where(log => log.Action.StartsWith("Process.") || log.EntityType == "ProcessInstance"),
-            "tasks" => query.Where(log => log.Action.StartsWith("Task.") || log.EntityType == "ProcessTask"),
-            _ => query
-        };
+    private static IQueryable<SystemAuditLog> ApplyCategoryFilter(IQueryable<SystemAuditLog> query, string? category)
+    {
+        var normalized = category?.Trim().ToLowerInvariant();
+        return SystemAuditCategories.IsKnown(normalized) && normalized != SystemAuditCategories.Other
+            ? query.Where(log => log.Category == normalized)
+            : query;
+    }
 
     private static IQueryable<SystemAuditLog> ApplySort(
         IQueryable<SystemAuditLog> query,
@@ -218,12 +256,99 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
 
         var communityId = currentUser.CommunityId.Value;
         return query.Where(log =>
-            (log.ActorUser != null
+            log.CommunityId == communityId
+            || (log.CommunityId == null
+                && log.ActorUser != null
                 && log.ActorUser.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))
-            || (log.EntityType == "User"
+            || (log.CommunityId == null
+                && log.EntityType == "User"
                 && log.EntityId != null
                 && db.Users.Any(user =>
                     user.Id.ToString() == log.EntityId
                     && user.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId))));
+    }
+
+    private async Task<Guid?> ResolveCommunityIdAsync(
+        Guid? actorUserId,
+        string entityType,
+        string? entityId,
+        CancellationToken cancellationToken)
+    {
+        if (Guid.TryParse(entityId, out var entityGuid))
+        {
+            var entityCommunityId = entityType switch
+            {
+                "Community" => entityGuid,
+                "CommunityRole" => await db.CommunityRoles
+                    .Where(role => role.Id == entityGuid)
+                    .Select(role => (Guid?)role.CommunityId)
+                    .SingleOrDefaultAsync(cancellationToken),
+                "Team" => await db.Teams
+                    .Where(team => team.Id == entityGuid)
+                    .Select(team => (Guid?)team.CommunityId)
+                    .SingleOrDefaultAsync(cancellationToken),
+                "FormDefinition" => await db.FormDefinitions
+                    .Where(form => form.Id == entityGuid)
+                    .Select(form => (Guid?)form.CommunityId)
+                    .SingleOrDefaultAsync(cancellationToken),
+                "FormDefinitionVersion" => await db.FormDefinitionVersions
+                    .Where(version => version.Id == entityGuid)
+                    .Select(version => (Guid?)version.FormDefinition!.CommunityId)
+                    .SingleOrDefaultAsync(cancellationToken),
+                "ProcessDefinition" => await db.ProcessDefinitions
+                    .Where(definition => definition.Id == entityGuid)
+                    .Select(definition => (Guid?)definition.CommunityId)
+                    .SingleOrDefaultAsync(cancellationToken),
+                "ProcessInstance" => await db.ProcessInstances
+                    .Where(process => process.Id == entityGuid)
+                    .Select(process => (Guid?)process.CommunityId)
+                    .SingleOrDefaultAsync(cancellationToken),
+                "ProcessTask" => await db.ProcessTasks
+                    .Where(task => task.Id == entityGuid)
+                    .Select(task => (Guid?)task.ProcessInstance!.CommunityId)
+                    .SingleOrDefaultAsync(cancellationToken),
+                "User" => await db.UserCommunityMemberships
+                    .Where(membership => membership.UserId == entityGuid && membership.IsActive)
+                    .Select(membership => (Guid?)membership.CommunityId)
+                    .FirstOrDefaultAsync(cancellationToken),
+                _ => null
+            };
+
+            if (entityCommunityId is not null)
+            {
+                return entityCommunityId;
+            }
+        }
+
+        return actorUserId is null
+            ? null
+            : await db.UserCommunityMemberships
+                .Where(membership => membership.UserId == actorUserId && membership.IsActive)
+                .Select(membership => (Guid?)membership.CommunityId)
+                .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<Guid?> KeepExistingCommunityIdAsync(
+        Guid? communityId,
+        CancellationToken cancellationToken)
+    {
+        if (communityId is null)
+        {
+            return null;
+        }
+
+        var trackedCommunity = db.ChangeTracker
+            .Entries<Community>()
+            .FirstOrDefault(entry => entry.Entity.Id == communityId.Value);
+        if (trackedCommunity is not null)
+        {
+            return trackedCommunity.State == EntityState.Deleted ? null : communityId;
+        }
+
+        return await db.Communities
+            .AsNoTracking()
+            .AnyAsync(community => community.Id == communityId.Value, cancellationToken)
+                ? communityId
+                : null;
     }
 }

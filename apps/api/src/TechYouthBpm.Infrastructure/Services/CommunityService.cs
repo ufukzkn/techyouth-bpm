@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
 using TechYouthBpm.Application.Services;
@@ -283,16 +284,17 @@ public class CommunityService(
             return Result<CommunityRoleDto>.Failure("Community role was not found.");
         }
 
-        if (role.IsSystemRole && role.TemplateKey == CommunityRoleTemplates.CommunityAdmin)
+        if (role.IsSystemRole)
         {
-            return Result<CommunityRoleDto>.Failure("Topluluk Admin system role cannot be edited.");
+            return Result<CommunityRoleDto>.Failure("System community roles cannot be edited.");
         }
 
+        var previousName = role.Name;
+        var previousDescription = role.Description;
+        var previousPermissions = role.Permissions.Select(item => item.Permission).Order().ToArray();
+        var requestedPermissions = NormalizePermissions(request.Permissions);
         role.Name = request.Name.Trim();
         role.Description = request.Description.Trim();
-        role.Permissions.Clear();
-        role.Permissions.AddRange(NormalizePermissions(request.Permissions)
-            .Select(permission => new CommunityRolePermission { Id = Guid.NewGuid(), CommunityRoleId = role.Id, Permission = permission }));
 
         var errors = await ValidateRoleAsync(role, cancellationToken, role.Id);
         if (errors.Count > 0)
@@ -300,8 +302,24 @@ public class CommunityService(
             return Result<CommunityRoleDto>.Failure(errors);
         }
 
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        SynchronizePermissions(role, requestedPermissions);
         await db.SaveChangesAsync(cancellationToken);
-        await auditService.LogAsync(currentUser, "CommunityRole.Updated", "CommunityRole", role.Id.ToString(), $"Community role '{role.Name}' was updated.", cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "CommunityRole.Updated",
+            "CommunityRole",
+            role.Id.ToString(),
+            $"Community role '{role.Name}' was updated.",
+            new SystemAuditContext(
+                CommunityId: communityId,
+                Metadata: new
+                {
+                    before = new { name = previousName, description = previousDescription, permissions = previousPermissions },
+                    after = new { name = role.Name, description = role.Description, permissions = requestedPermissions }
+                }),
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return Result<CommunityRoleDto>.Success(role.ToDto());
     }
@@ -428,6 +446,33 @@ public class CommunityService(
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order()
             .ToList();
+
+    private void SynchronizePermissions(CommunityRole role, IReadOnlyCollection<string> requestedPermissions)
+    {
+        var requested = requestedPermissions.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var removed = role.Permissions
+            .Where(permission => !requested.Contains(permission.Permission))
+            .ToArray();
+        if (removed.Length > 0)
+        {
+            role.Permissions.RemoveAll(permission => removed.Contains(permission));
+        }
+
+        var existing = role.Permissions
+            .Select(permission => permission.Permission)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var permission in requested.Where(permission => !existing.Contains(permission)))
+        {
+            var addedPermission = new CommunityRolePermission
+            {
+                Id = Guid.NewGuid(),
+                CommunityRoleId = role.Id,
+                Permission = permission
+            };
+            role.Permissions.Add(addedPermission);
+            db.CommunityRolePermissions.Add(addedPermission);
+        }
+    }
 
     private async Task<List<string>> ValidateRoleAsync(CommunityRole role, CancellationToken cancellationToken, Guid? existingRoleId = null)
     {

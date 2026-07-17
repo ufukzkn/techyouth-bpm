@@ -18,11 +18,29 @@ internal sealed class FailingSystemAuditService : ISystemAuditService
         CancellationToken cancellationToken = default) => Task.FromException(Failure());
 
     public Task LogAsync(
+        Guid? actorUserId,
+        string action,
+        string entityType,
+        string? entityId,
+        string description,
+        SystemAuditContext context,
+        CancellationToken cancellationToken = default) => Task.FromException(Failure());
+
+    public Task LogAsync(
         UserDto actor,
         string action,
         string entityType,
         string? entityId,
         string description,
+        CancellationToken cancellationToken = default) => Task.FromException(Failure());
+
+    public Task LogAsync(
+        UserDto actor,
+        string action,
+        string entityType,
+        string? entityId,
+        string description,
+        SystemAuditContext context,
         CancellationToken cancellationToken = default) => Task.FromException(Failure());
 
     public Task<Result<PagedResult<SystemAuditLogDto>>> ListAsync(

@@ -349,6 +349,23 @@
   text-transform: uppercase;
 }
 
+.audit-category-card .audit-category-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.audit-category-card .audit-category-title > svg {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+
+.audit-category-card .audit-category-title > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .audit-category-card strong {
   font-size: 26px;
 }
