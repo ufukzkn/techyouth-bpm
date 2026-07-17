@@ -34,6 +34,7 @@ public class ProcessTask
     public string AvailableActionsJson { get; set; } = "[]";
     public DateTime CreatedAt { get; set; }
     public DateTime? DueAt { get; set; }
+    public bool RequiresTeamLead { get; set; }
     public DateTime? CompletedAt { get; set; }
     public Guid? CompletedByUserId { get; set; }
     public User? CompletedByUser { get; set; }

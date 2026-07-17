@@ -18,6 +18,8 @@ import {
 import { ReactFlowProvider } from "@xyflow/react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { localizeApiError } from "@/features/i18n/apiErrorMessages";
+import { useSessionStore } from "@/features/session/sessionStore";
 import type {
   WorkflowDefinitionDraft,
   WorkflowEditorLookups,
@@ -30,6 +32,7 @@ import { IconButton } from "@/features/ui/IconButton";
 import { createWorkflowWriteModel } from "@/features/workflows/apiGraphAdapter";
 import { WorkflowCanvas } from "@/features/workflows/WorkflowCanvas";
 import { WorkflowInspector } from "@/features/workflows/WorkflowInspector";
+import { workflowText } from "@/features/workflows/workflowI18n";
 import { WorkflowPalette } from "@/features/workflows/WorkflowPalette";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
 import { validateWorkflow, workflowHasErrors } from "@/features/workflows/validation";
@@ -56,6 +59,8 @@ export function WorkflowEditor({
   onSave,
   readOnly = false,
 }: WorkflowEditorProps) {
+  const language = useSessionStore((state) => state.language);
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   const draft = useWorkflowDraftStore((state) => state.draft);
   const isDirty = useWorkflowDraftStore((state) => state.isDirty);
   const selectedNodeId = useWorkflowDraftStore((state) => state.selectedNodeId);
@@ -67,7 +72,7 @@ export function WorkflowEditor({
   const markPublished = useWorkflowDraftStore((state) => state.markPublished);
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [editorMode, setEditorMode] = useState<EditorMode>("normal");
-  const [message, setMessage] = useState("Taslak düzenlemeye hazır.");
+  const [message, setMessage] = useState(() => text("Taslak düzenlemeye hazır.", "The draft is ready to edit."));
   const isMobile = useMobileEditorNotice();
   const issues = useMemo(() => validateWorkflow(draft), [draft]);
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
@@ -108,20 +113,29 @@ export function WorkflowEditor({
     };
   }, [editorMode]);
 
+  useEffect(() => {
+    if (submissionState === "idle") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setMessage(text("Taslak düzenlemeye hazır.", "The draft is ready to edit."));
+    }
+    // The language switch should update idle editor feedback immediately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language, submissionState]);
+
   async function saveDraft() {
     if (effectiveReadOnly || isSubmitting) {
       return;
     }
     try {
       setSubmissionState("saving");
-      setMessage("Taslak kaydediliyor...");
+      setMessage(text("Taslak kaydediliyor...", "Saving draft..."));
       const result = await onSave(createWorkflowWriteModel(draft));
       markSaved(result?.draft);
       setSubmissionState("success");
-      setMessage(result?.message || "Taslak kaydedildi.");
+      setMessage(result?.message || text("Taslak kaydedildi.", "Draft saved."));
     } catch (error) {
       setSubmissionState("error");
-      setMessage(errorMessage(error, "Taslak kaydedilemedi."));
+      setMessage(errorMessage(error, text("Taslak kaydedilemedi.", "Draft could not be saved."), language));
     }
   }
 
@@ -131,24 +145,24 @@ export function WorkflowEditor({
     }
     if (workflowHasErrors(issues)) {
       setSubmissionState("error");
-      setMessage("Yayınlamadan önce doğrulama hatalarını giderin.");
+      setMessage(text("Yayınlamadan önce doğrulama hatalarını giderin.", "Resolve validation errors before publishing."));
       return;
     }
     try {
       setSubmissionState("publishing");
-      setMessage("Akış yayınlanıyor...");
+      setMessage(text("Akış yayınlanıyor...", "Publishing workflow..."));
       const result = await onPublish(createWorkflowWriteModel(draft));
       markPublished(result?.draft ? { ...result.draft, status: "Published" } : undefined);
       setSubmissionState("success");
-      setMessage(result?.message || "Akış yayınlandı.");
+      setMessage(result?.message || text("Akış yayınlandı.", "Workflow published."));
     } catch (error) {
       setSubmissionState("error");
-      setMessage(errorMessage(error, "Akış yayınlanamadı."));
+      setMessage(errorMessage(error, text("Akış yayınlanamadı.", "Workflow could not be published."), language));
     }
   }
 
   if (isMobile) {
-    return <WorkflowMobileNotice draft={draft} errorCount={errorCount} />;
+    return <WorkflowMobileNotice draft={draft} errorCount={errorCount} language={language} />;
   }
 
   const editor = (
@@ -161,31 +175,35 @@ export function WorkflowEditor({
           <span className="workflow-editor-mark" aria-hidden="true"><GitBranch size={20} /></span>
           <span>
             <small>Visual Workflow</small>
-            <h2>{draft.name || "Adsız akış"}</h2>
+            <h2>{draft.name || text("Adsız akış", "Untitled workflow")}</h2>
           </span>
         </div>
         <div className="workflow-editor-statuses">
           <span className={`workflow-status-chip workflow-status-chip-${draft.status.toLowerCase()}`}>
-            {draft.status === "Published" ? "Yayında" : "Taslak"}
+            {draft.status === "Published" ? text("Yayında", "Published") : text("Taslak", "Draft")}
           </span>
-          {isDirty ? <span className="workflow-unsaved-indicator">Kaydedilmemiş</span> : null}
+          {isDirty ? <span className="workflow-unsaved-indicator">{text("Kaydedilmemiş", "Unsaved")}</span> : null}
         </div>
         <div className="workflow-editor-actions">
           <IconButton
-            label={editorMode === "wide" ? "Normal görünüme dön" : "Geniş görünüm"}
+            label={editorMode === "wide"
+              ? text("Normal görünüme dön", "Return to normal view")
+              : text("Geniş görünüm", "Wide view")}
             onClick={() => setEditorMode((current) => current === "wide" ? "normal" : "wide")}
           >
             {editorMode === "wide" ? <Minimize2 size={16} aria-hidden="true" /> : <Expand size={16} aria-hidden="true" />}
           </IconButton>
           <IconButton
-            label={editorMode === "fullscreen" ? "Tam ekrandan çık" : "Tam ekran"}
+            label={editorMode === "fullscreen"
+              ? text("Tam ekrandan çık", "Exit full screen")
+              : text("Tam ekran", "Full screen")}
             onClick={() => setEditorMode((current) => current === "fullscreen" ? "normal" : "fullscreen")}
           >
             {editorMode === "fullscreen" ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}
           </IconButton>
           <IconButton
             disabled={!hasSelection || effectiveReadOnly || isSubmitting}
-            label="Seçimi sil"
+            label={text("Seçimi sil", "Delete selection")}
             onClick={deleteSelection}
             tone="danger"
           >
@@ -199,7 +217,7 @@ export function WorkflowEditor({
             size="sm"
             variant="secondary"
           >
-            Kaydet
+            {text("Kaydet", "Save")}
           </Button>
           <Button
             disabled={!canPublish || effectiveReadOnly || isSubmitting || errorCount > 0}
@@ -208,7 +226,7 @@ export function WorkflowEditor({
             onClick={publishDraft}
             size="sm"
           >
-            Yayınla
+            {text("Yayınla", "Publish")}
           </Button>
         </div>
       </header>
@@ -220,13 +238,15 @@ export function WorkflowEditor({
             : <CheckCircle2 size={15} />}
         </span>
         <span>{message}</span>
-        <strong>{errorCount > 0 ? `${errorCount} doğrulama hatası` : "Yerel doğrulama tamam"}</strong>
+        <strong>{errorCount > 0
+          ? text(`${errorCount} doğrulama hatası`, `${errorCount} validation ${errorCount === 1 ? "error" : "errors"}`)
+          : text("Yerel doğrulama tamam", "Local validation complete")}</strong>
       </div>
 
       <div className="workflow-editor-grid">
-        <WorkflowPalette readOnly={effectiveReadOnly} />
+        <WorkflowPalette language={language} readOnly={effectiveReadOnly} />
         <ReactFlowProvider>
-          <WorkflowCanvas fitViewKey={editorMode} issues={issues} readOnly={effectiveReadOnly} />
+          <WorkflowCanvas fitViewKey={editorMode} issues={issues} language={language} readOnly={effectiveReadOnly} />
         </ReactFlowProvider>
         <WorkflowInspector issues={issues} lookups={lookups} readOnly={effectiveReadOnly} />
       </div>
@@ -236,20 +256,32 @@ export function WorkflowEditor({
   return editorMode === "normal" ? editor : createPortal(editor, document.body);
 }
 
-function WorkflowMobileNotice({ draft, errorCount }: { draft: WorkflowDefinitionDraft; errorCount: number }) {
+function WorkflowMobileNotice({
+  draft,
+  errorCount,
+  language,
+}: {
+  draft: WorkflowDefinitionDraft;
+  errorCount: number;
+  language: "tr" | "en";
+}) {
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   const nodeCount = draft.nodes.filter((node) => node.type !== "teamSwimlane").length;
   return (
     <section className="workflow-mobile-notice">
       <span className="workflow-mobile-notice-icon" aria-hidden="true"><Eye size={22} /></span>
       <div>
-        <small>Mobil görünüm</small>
-        <h2>{draft.name || "Adsız akış"}</h2>
-        <p>Akış düzenleme tablet ve masaüstünde kullanılabilir. Bu görünüm salt okunurdur.</p>
+        <small>{text("Mobil görünüm", "Mobile view")}</small>
+        <h2>{draft.name || text("Adsız akış", "Untitled workflow")}</h2>
+        <p>{text(
+          "Akış düzenleme tablet ve masaüstünde kullanılabilir. Bu görünüm salt okunurdur.",
+          "Workflow editing is available on tablets and desktops. This view is read only.",
+        )}</p>
       </div>
       <dl>
-        <div><dt>Düğüm</dt><dd>{nodeCount}</dd></div>
-        <div><dt>Bağlantı</dt><dd>{draft.edges.length}</dd></div>
-        <div><dt>Hata</dt><dd>{errorCount}</dd></div>
+        <div><dt>{text("Düğüm", "Nodes")}</dt><dd>{nodeCount}</dd></div>
+        <div><dt>{text("Bağlantı", "Connections")}</dt><dd>{draft.edges.length}</dd></div>
+        <div><dt>{text("Hata", "Errors")}</dt><dd>{errorCount}</dd></div>
       </dl>
     </section>
   );
@@ -269,6 +301,6 @@ function getMobileSnapshot() {
   return window.matchMedia("(max-width: 767px)").matches;
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error && error.message ? error.message : fallback;
+function errorMessage(error: unknown, fallback: string, language: "tr" | "en") {
+  return localizeApiError(error, language, error instanceof Error && error.message ? error.message : fallback);
 }

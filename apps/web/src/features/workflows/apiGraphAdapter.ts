@@ -124,6 +124,7 @@ function toApiNode(node: WorkflowNode): ApiProcessNode {
       ...base,
       formDefinitionVersionId: node.data.formBinding?.formVersionId || null,
       slaDurationMinutes: node.data.slaDurationMinutes,
+      requiresTeamLead: node.data.requiresTeamLead,
       actions: node.data.actions,
       assignment: toApiAssignment(node.data.assignment),
     };
@@ -196,6 +197,7 @@ function fromApiNodeData(node: ApiProcessNode, type: WorkflowNodeKind): Workflow
         actions: (node.actions ?? []).filter((action) => action !== "Start"),
         priority: node.priority,
         slaDurationMinutes: node.slaDurationMinutes ?? null,
+        requiresTeamLead: node.requiresTeamLead ?? false,
         formBinding: node.formDefinitionVersionId ? {
           formVersionId: node.formDefinitionVersionId,
           formName: "",

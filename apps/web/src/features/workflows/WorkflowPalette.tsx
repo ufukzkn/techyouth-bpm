@@ -10,11 +10,15 @@ import {
 } from "lucide-react";
 import type { DragEvent } from "react";
 import type { WorkflowNodeKind } from "@/features/workflows/contracts";
+import { getWorkflowNodeLabels } from "@/features/workflows/workflowLabels";
+import { workflowText } from "@/features/workflows/workflowI18n";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
+import type { Language } from "@/lib/types";
 
 export const workflowPaletteMime = "application/x-techyouth-workflow-node";
 
 type WorkflowPaletteProps = {
+  language: Language;
   readOnly: boolean;
 };
 
@@ -24,29 +28,30 @@ type PaletteItem = {
   icon: LucideIcon;
 };
 
-const paletteGroups: Array<{ label: string; items: PaletteItem[] }> = [{
-  label: "Akış",
-  items: [
-    { kind: "start", label: "Başlangıç", icon: Play },
-    { kind: "userTask", label: "Kullanıcı görevi", icon: ClipboardCheck },
-    { kind: "exclusiveGateway", label: "Karar", icon: GitFork },
-  ],
-}, {
-  label: "Sonuç",
-  items: [
-    { kind: "completedEnd", label: "Tamamlandı", icon: CircleCheck },
-    { kind: "rejectedEnd", label: "Reddedildi", icon: CircleX },
-  ],
-}, {
-  label: "Yerleşim",
-  items: [
-    { kind: "teamSwimlane", label: "Takım kulvarı", icon: Rows3 },
-  ],
-}];
-
-export function WorkflowPalette({ readOnly }: WorkflowPaletteProps) {
+export function WorkflowPalette({ language, readOnly }: WorkflowPaletteProps) {
   const addNode = useWorkflowDraftStore((state) => state.addNode);
   const hasStart = useWorkflowDraftStore((state) => state.draft.nodes.some((node) => node.type === "start"));
+  const labels = getWorkflowNodeLabels(language);
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
+  const paletteGroups: Array<{ label: string; items: PaletteItem[] }> = [{
+    label: text("Akış", "Flow"),
+    items: [
+      { kind: "start", label: labels.start, icon: Play },
+      { kind: "userTask", label: labels.userTask, icon: ClipboardCheck },
+      { kind: "exclusiveGateway", label: labels.exclusiveGateway, icon: GitFork },
+    ],
+  }, {
+    label: text("Sonuç", "Result"),
+    items: [
+      { kind: "completedEnd", label: text("Tamamlandı", "Completed"), icon: CircleCheck },
+      { kind: "rejectedEnd", label: text("Reddedildi", "Rejected"), icon: CircleX },
+    ],
+  }, {
+    label: text("Yerleşim", "Layout"),
+    items: [
+      { kind: "teamSwimlane", label: labels.teamSwimlane, icon: Rows3 },
+    ],
+  }];
 
   function startDrag(event: DragEvent<HTMLButtonElement>, kind: WorkflowNodeKind) {
     event.dataTransfer.setData(workflowPaletteMime, kind);
@@ -54,10 +59,10 @@ export function WorkflowPalette({ readOnly }: WorkflowPaletteProps) {
   }
 
   return (
-    <aside className="workflow-palette" aria-label="Düğüm paleti">
+    <aside className="workflow-palette" aria-label={text("Düğüm paleti", "Node palette")}>
       <div className="workflow-panel-heading">
-        <span>Palet</span>
-        <strong>Düğümler</strong>
+        <span>{text("Palet", "Palette")}</span>
+        <strong>{text("Düğümler", "Nodes")}</strong>
       </div>
       <div className="workflow-palette-groups">
         {paletteGroups.map((group) => (
@@ -74,7 +79,9 @@ export function WorkflowPalette({ readOnly }: WorkflowPaletteProps) {
                     key={item.kind}
                     onClick={() => addNode(item.kind)}
                     onDragStart={(event) => startDrag(event, item.kind)}
-                    title={item.kind === "start" && hasStart ? "Başlangıç düğümü zaten var" : item.label}
+                    title={item.kind === "start" && hasStart
+                      ? text("Başlangıç düğümü zaten var", "A start node already exists")
+                      : item.label}
                     type="button"
                   >
                     <span className={`workflow-palette-icon workflow-palette-icon-${item.kind}`}>

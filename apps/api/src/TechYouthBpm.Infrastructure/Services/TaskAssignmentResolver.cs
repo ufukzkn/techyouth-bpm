@@ -9,6 +9,8 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 internal sealed class TaskAssignmentResolver(AppDbContext db)
 {
+    public const string TeamLeadRequiredError = "This action can only be performed by a team lead. Contact your team lead.";
+
     public static bool IsCandidatePool(TaskAssignmentType? assignmentType) =>
         assignmentType is TaskAssignmentType.Team
             or TaskAssignmentType.CommunityRole
@@ -33,7 +35,7 @@ internal sealed class TaskAssignmentResolver(AppDbContext db)
                 && await IsActiveInCommunityAsync(user.Id, task.ProcessInstance!.CommunityId, cancellationToken);
         }
 
-        return await IsEligibleCandidateAsync(task, user.Id, cancellationToken);
+        return await IsEligibleCandidateAsync(task, user.Id, cancellationToken, enforceTeamLead: false);
     }
 
     public async Task<bool> CanExecuteAsync(ProcessTask task, UserDto user, CancellationToken cancellationToken)
@@ -59,7 +61,11 @@ internal sealed class TaskAssignmentResolver(AppDbContext db)
             && await IsEligibleCandidateAsync(task, user.Id, cancellationToken);
     }
 
-    public Task<bool> IsEligibleCandidateAsync(ProcessTask task, Guid userId, CancellationToken cancellationToken)
+    public Task<bool> IsEligibleCandidateAsync(
+        ProcessTask task,
+        Guid userId,
+        CancellationToken cancellationToken,
+        bool enforceTeamLead = true)
     {
         if (!IsCandidatePool(task.AssignmentType) || task.ProcessInstance is null)
         {
@@ -70,14 +76,16 @@ internal sealed class TaskAssignmentResolver(AppDbContext db)
                 task.ProcessInstance.CommunityId,
                 task.AssignmentType!.Value,
                 task.CandidateTeamId,
-                task.CandidateCommunityRoleId)
+                task.CandidateCommunityRoleId,
+                enforceTeamLead && task.RequiresTeamLead)
             .AnyAsync(user => user.Id == userId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Guid>> ResolveCandidateUserIdsAsync(
         Guid communityId,
         TaskAssignmentDto assignment,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool requireTeamLead = false)
     {
         if (assignment.Type == TaskAssignmentType.ProcessStarter)
         {
@@ -96,7 +104,8 @@ internal sealed class TaskAssignmentResolver(AppDbContext db)
                 communityId,
                 assignment.Type,
                 assignment.TeamId,
-                assignment.CommunityRoleId)
+                assignment.CommunityRoleId,
+                requireTeamLead)
             .Select(user => user.Id)
             .Distinct()
             .ToListAsync(cancellationToken);
@@ -106,7 +115,8 @@ internal sealed class TaskAssignmentResolver(AppDbContext db)
         Guid communityId,
         TaskAssignmentType assignmentType,
         Guid? teamId,
-        Guid? communityRoleId)
+        Guid? communityRoleId,
+        bool requireTeamLead = false)
     {
         var query = db.Users.Where(user =>
             user.Status == UserStatus.Active
@@ -123,6 +133,7 @@ internal sealed class TaskAssignmentResolver(AppDbContext db)
             query = query.Where(user => user.TeamMemberships.Any(membership =>
                 membership.IsActive
                 && membership.TeamId == teamId
+                && (!requireTeamLead || membership.IsLead)
                 && membership.Team != null
                 && membership.Team.IsActive
                 && membership.Team.CommunityId == communityId));

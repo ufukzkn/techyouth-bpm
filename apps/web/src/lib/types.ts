@@ -250,6 +250,7 @@ export type ProcessNode = {
   formDefinitionVersionId?: string | null;
   priority: TaskPriority;
   slaDurationMinutes?: number | null;
+  requiresTeamLead?: boolean;
   actions?: WorkflowAction[] | null;
   assignment?: TaskAssignment | null;
   parentKey?: string | null;
@@ -366,6 +367,9 @@ export type ProcessTask = {
   workflowName?: string;
   formName?: string;
   communityName?: string;
+  requiresTeamLead?: boolean;
+  canCurrentUserAct?: boolean;
+  actionDenialReasonCode?: string | null;
 };
 
 export type ProcessListParams = {

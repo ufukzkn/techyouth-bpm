@@ -16,18 +16,21 @@ import type {
   WorkflowTransition,
   WorkflowValidationIssue,
 } from "@/features/workflows/contracts";
-import { workflowActionLabels } from "@/features/workflows/workflowLabels";
+import { getWorkflowActionLabels } from "@/features/workflows/workflowLabels";
+import { workflowText } from "@/features/workflows/workflowI18n";
 import { workflowNodeTypes } from "@/features/workflows/nodes/WorkflowNodes";
 import { workflowPaletteMime } from "@/features/workflows/WorkflowPalette";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
+import type { Language } from "@/lib/types";
 
 type WorkflowCanvasProps = {
   fitViewKey?: string;
   issues: WorkflowValidationIssue[];
+  language: Language;
   readOnly: boolean;
 };
 
-export function WorkflowCanvas({ fitViewKey, issues, readOnly }: WorkflowCanvasProps) {
+export function WorkflowCanvas({ fitViewKey, issues, language, readOnly }: WorkflowCanvasProps) {
   const draft = useWorkflowDraftStore((state) => state.draft);
   const applyNodeChanges = useWorkflowDraftStore((state) => state.applyNodeChanges);
   const applyEdgeChanges = useWorkflowDraftStore((state) => state.applyEdgeChanges);
@@ -55,8 +58,8 @@ export function WorkflowCanvas({ fitViewKey, issues, readOnly }: WorkflowCanvasP
     ...edge,
     className: [edge.className, invalidEdgeIds.has(edge.id) ? "workflow-flow-edge-invalid" : ""].filter(Boolean).join(" "),
     deletable: false,
-    label: transitionLabel(edge),
-  })), [draft.edges, invalidEdgeIds]);
+    label: transitionLabel(edge, language),
+  })), [draft.edges, invalidEdgeIds, language]);
 
   useEffect(() => {
     let secondFrame = 0;
@@ -152,7 +155,7 @@ export function WorkflowCanvas({ fitViewKey, issues, readOnly }: WorkflowCanvasP
         <Background color="var(--workflow-canvas-dot)" gap={20} size={1.2} variant={BackgroundVariant.Dots} />
         <Controls position="bottom-left" showInteractive={false} />
         <MiniMap
-          ariaLabel="Akış mini haritası"
+          ariaLabel={workflowText(language, "Akış mini haritası", "Workflow mini map")}
           maskColor="var(--workflow-minimap-mask)"
           nodeColor={(node) => minimapNodeColor(node.type)}
           pannable
@@ -164,12 +167,12 @@ export function WorkflowCanvas({ fitViewKey, issues, readOnly }: WorkflowCanvasP
   );
 }
 
-function transitionLabel(edge: WorkflowTransition) {
+function transitionLabel(edge: WorkflowTransition, language: Language) {
   if (edge.data?.action) {
-    return workflowActionLabels[edge.data.action];
+    return getWorkflowActionLabels(language)[edge.data.action];
   }
   if (edge.data?.isDefault) {
-    return "Varsayılan";
+    return workflowText(language, "Varsayılan", "Default");
   }
   if (edge.data?.condition?.fieldKey) {
     return edge.data.condition.fieldKey;

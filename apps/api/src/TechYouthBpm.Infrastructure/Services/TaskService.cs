@@ -75,7 +75,7 @@ public class TaskService(
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<ProcessTaskDto>(tasks.Select(task => task.ToDto()).ToArray(), page, pageSize, totalCount);
+        return new PagedResult<ProcessTaskDto>(tasks.Select(task => task.ToDto(user)).ToArray(), page, pageSize, totalCount);
     }
 
     private static IOrderedQueryable<ProcessTask> ApplyTaskOrdering(
@@ -126,7 +126,16 @@ public class TaskService(
             return Result<ProcessTaskDto>.Failure("Task claim changed. Refresh and try again.");
         }
 
-        if (!await new TaskAssignmentResolver(db).IsEligibleCandidateAsync(task, user.Id, cancellationToken)
+        var assignmentResolver = new TaskAssignmentResolver(db);
+        if (task.RequiresTeamLead
+            && !user.IsSuperAdmin()
+            && await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken, enforceTeamLead: false)
+            && !await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken))
+        {
+            return Result<ProcessTaskDto>.Failure(TaskAssignmentResolver.TeamLeadRequiredError);
+        }
+
+        if (!await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken)
             && !user.IsSuperAdmin())
         {
             return Result<ProcessTaskDto>.Failure("Current user is not an eligible task candidate.");
@@ -154,7 +163,7 @@ public class TaskService(
             return Result<ProcessTaskDto>.Failure("Task was claimed by another user. Refresh and try again.");
         }
 
-        return Result<ProcessTaskDto>.Success(task.ToDto());
+        return Result<ProcessTaskDto>.Success(task.ToDto(user));
     }
 
     public async Task<Result<ProcessTaskDto>> ReleaseAsync(
@@ -211,7 +220,7 @@ public class TaskService(
             return Result<ProcessTaskDto>.Failure("Task claim changed. Refresh and try again.");
         }
 
-        return Result<ProcessTaskDto>.Success(task.ToDto());
+        return Result<ProcessTaskDto>.Success(task.ToDto(user));
     }
 
     public async Task<Result<ProcessDetailDto>> ExecuteActionAsync(
@@ -238,7 +247,16 @@ public class TaskService(
             return Result<ProcessDetailDto>.Failure("The task community is not active.");
         }
 
-        if (!await new TaskAssignmentResolver(db).CanExecuteAsync(task, user, cancellationToken))
+        var assignmentResolver = new TaskAssignmentResolver(db);
+        if (task.RequiresTeamLead
+            && !user.IsSuperAdmin()
+            && await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken, enforceTeamLead: false)
+            && !await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken))
+        {
+            return Result<ProcessDetailDto>.Failure(TaskAssignmentResolver.TeamLeadRequiredError);
+        }
+
+        if (!await assignmentResolver.CanExecuteAsync(task, user, cancellationToken))
         {
             return Result<ProcessDetailDto>.Failure("Current user cannot execute this task.");
         }
@@ -360,7 +378,7 @@ public class TaskService(
             return Result<ProcessDetailDto>.Failure("Task changed while the action was being applied. Refresh and try again.");
         }
 
-        return Result<ProcessDetailDto>.Success(await LoadProcessDetailAsync(process.Id, cancellationToken));
+        return Result<ProcessDetailDto>.Success(await LoadProcessDetailAsync(process.Id, user, cancellationToken));
     }
 
     private async Task<Result<ProcessDetailDto>> ExecuteLegacyActionAsync(
@@ -442,7 +460,7 @@ public class TaskService(
             return Result<ProcessDetailDto>.Failure("Task changed while the action was being applied. Refresh and try again.");
         }
 
-        return Result<ProcessDetailDto>.Success(await LoadProcessDetailAsync(process.Id, cancellationToken));
+        return Result<ProcessDetailDto>.Success(await LoadProcessDetailAsync(process.Id, user, cancellationToken));
     }
 
     private IQueryable<ProcessTask> TaskQuery() =>
@@ -484,7 +502,7 @@ public class TaskService(
             .ThenInclude(field => field.ValidationRules)
             .AsSplitQuery();
 
-    private async Task<ProcessDetailDto> LoadProcessDetailAsync(Guid processId, CancellationToken cancellationToken)
+    private async Task<ProcessDetailDto> LoadProcessDetailAsync(Guid processId, UserDto user, CancellationToken cancellationToken)
     {
         var process = await db.ProcessInstances
             .AsNoTracking()
@@ -508,7 +526,7 @@ public class TaskService(
             .ThenInclude(log => log.User)
             .AsSplitQuery()
             .SingleAsync(item => item.Id == processId, cancellationToken);
-        return process.ToDetailDto();
+        return process.ToDetailDto(user);
     }
 
     private void AddOutcomeNotification(ProcessInstance process, Guid actorUserId)

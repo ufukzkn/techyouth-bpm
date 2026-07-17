@@ -1,16 +1,20 @@
 import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { WorkflowValidationIssue } from "@/features/workflows/contracts";
+import { localizeWorkflowValidationIssue, workflowText } from "@/features/workflows/workflowI18n";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
+import type { Language } from "@/lib/types";
 
 type WorkflowValidationPanelProps = {
   issues: WorkflowValidationIssue[];
+  language: Language;
 };
 
-export function WorkflowValidationPanel({ issues }: WorkflowValidationPanelProps) {
+export function WorkflowValidationPanel({ issues, language }: WorkflowValidationPanelProps) {
   const selectNode = useWorkflowDraftStore((state) => state.selectNode);
   const selectEdge = useWorkflowDraftStore((state) => state.selectEdge);
   const errors = issues.filter((issue) => issue.severity === "error").length;
   const warnings = issues.length - errors;
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
 
   function reveal(issue: WorkflowValidationIssue) {
     if (issue.scope === "node" && issue.entityId) {
@@ -23,11 +27,15 @@ export function WorkflowValidationPanel({ issues }: WorkflowValidationPanelProps
   }
 
   return (
-    <section className="workflow-validation" aria-label="Akış doğrulaması">
+    <section className="workflow-validation" aria-label={text("Akış doğrulaması", "Workflow validation")}>
       <div className="workflow-validation-heading">
         <span>
-          <strong>Doğrulama</strong>
-          <small>{errors > 0 ? `${errors} hata` : warnings > 0 ? `${warnings} uyarı` : "Yayına hazır"}</small>
+          <strong>{text("Doğrulama", "Validation")}</strong>
+          <small>{errors > 0
+            ? text(`${errors} hata`, `${errors} ${errors === 1 ? "error" : "errors"}`)
+            : warnings > 0
+              ? text(`${warnings} uyarı`, `${warnings} ${warnings === 1 ? "warning" : "warnings"}`)
+              : text("Yayına hazır", "Ready to publish")}</small>
         </span>
         {errors > 0
           ? <AlertCircle className="workflow-validation-status-error" size={18} aria-hidden="true" />
@@ -48,12 +56,12 @@ export function WorkflowValidationPanel({ issues }: WorkflowValidationPanelProps
               {issue.severity === "error"
                 ? <AlertCircle size={14} aria-hidden="true" />
                 : <AlertTriangle size={14} aria-hidden="true" />}
-              <span>{issue.message}</span>
+              <span>{localizeWorkflowValidationIssue(issue, language)}</span>
             </button>
           ))}
         </div>
       ) : (
-        <p className="workflow-validation-empty">Yerel kontroller tamamlandı.</p>
+        <p className="workflow-validation-empty">{text("Yerel kontroller tamamlandı.", "Local checks completed.")}</p>
       )}
     </section>
   );

@@ -9,6 +9,7 @@ import {
   CircleDot,
   Clock3,
   Hand,
+  Crown,
   Undo2,
   UserRoundCheck,
   XCircle,
@@ -147,6 +148,7 @@ export function MyTasksView({
                       <div className="task-title-line">
                         <strong>{task.title || t("process.approvalTask")}</strong>
                         {task.priority ? <span className={`task-priority priority-${task.priority.toLowerCase()}`}>{t(`process.priority.${task.priority}` as TranslationKey)}</span> : null}
+                        {task.requiresTeamLead ? <span className="task-lead-badge"><Crown size={13} />{t("process.teamLeadOnly")}</span> : null}
                       </div>
                       <span>{task.workflowName || task.formName || task.id.slice(0, 8)} · {task.communityName || task.assignedCommunityRoleName || (isTr ? "Topluluk yetkisi" : "Community access")}</span>
                       {task.formName ? <small>{task.formName}</small> : null}
@@ -223,7 +225,21 @@ function TaskControls({
   const t = (key: TranslationKey) => translate(language, key);
   const requiresClaim = task.assignmentType === "Team" || task.assignmentType === "CommunityRole" || task.assignmentType === "TeamAndCommunityRole";
   const isClaimedByCurrentUser = task.claimedByUserId === activeUserId;
-  const canAct = !requiresClaim || isClaimedByCurrentUser || !task.assignmentType;
+  const isTeamLeadBlocked = task.requiresTeamLead && task.canCurrentUserAct === false;
+  const canAct = (!requiresClaim || isClaimedByCurrentUser || !task.assignmentType) && !isTeamLeadBlocked;
+
+  if (isTeamLeadBlocked) {
+    return (
+      <div className="task-lead-restriction">
+        <span><Crown size={16} />{t("process.teamLeadRequired")}</span>
+        {requiresClaim && isClaimedByCurrentUser ? (
+          <button className="secondary-button" disabled={disabled} onClick={onRelease} type="button">
+            <Undo2 size={17} />{t("process.release")}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   if (requiresClaim && !task.claimedByUserId) {
     return <div className="task-actions"><button className="primary-button" disabled={disabled} onClick={onClaim} type="button"><Hand size={17} />{t("process.claim")}</button></div>;

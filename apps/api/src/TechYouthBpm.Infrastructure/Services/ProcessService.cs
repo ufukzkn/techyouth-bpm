@@ -155,7 +155,7 @@ public class ProcessService(
             return null;
         }
 
-        return process.ToDetailDto();
+        return process.ToDetailDto(user);
     }
 
     public async Task<Result<ProcessDetailDto>> StartAsync(

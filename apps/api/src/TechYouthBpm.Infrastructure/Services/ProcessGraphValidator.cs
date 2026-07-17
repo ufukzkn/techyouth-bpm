@@ -254,6 +254,12 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
         }
 
         var assignment = node.Assignment;
+        if (node.RequiresTeamLead
+            && assignment.Type is not (TaskAssignmentType.Team or TaskAssignmentType.TeamAndCommunityRole))
+        {
+            errors.Add($"User task '{node.Key}' can require a team lead only for Team or TeamAndCommunityRole assignments.");
+        }
+
         switch (assignment.Type)
         {
             case TaskAssignmentType.ProcessStarter:
@@ -482,6 +488,29 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
             && !await db.Teams.AnyAsync(team => team.Id == teamId && team.CommunityId == communityId && team.IsActive, cancellationToken))
         {
             errors.Add($"Assignment team '{teamId}' for task '{node.Key}' is not active in the process community.");
+        }
+
+        if (node.RequiresTeamLead
+            && assignment.TeamId is { } requiredLeadTeamId
+            && !await db.Users.AnyAsync(user =>
+                user.Status == UserStatus.Active
+                && user.TeamMemberships.Any(membership =>
+                    membership.TeamId == requiredLeadTeamId
+                    && membership.IsActive
+                    && membership.IsLead
+                    && membership.Team != null
+                    && membership.Team.IsActive
+                    && membership.Team.CommunityId == communityId)
+                && user.CommunityMemberships.Any(membership =>
+                    membership.IsActive
+                    && membership.CommunityId == communityId
+                    && (assignment.Type != TaskAssignmentType.TeamAndCommunityRole
+                        || membership.CommunityRoleId == assignment.CommunityRoleId)
+                    && membership.CommunityRole != null
+                    && membership.CommunityRole.Permissions.Any(permission => permission.Permission == PermissionNames.TasksAct)),
+                cancellationToken))
+        {
+            errors.Add($"Assignment team '{requiredLeadTeamId}' for task '{node.Key}' needs an active team lead with Tasks.Act permission.");
         }
 
         if (assignment.CommunityRoleId is { } roleId)

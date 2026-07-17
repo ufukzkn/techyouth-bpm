@@ -9,6 +9,7 @@ import type {
   ProcessDefinitionVersion,
 } from "@/lib/types";
 import { api, ApiError } from "@/lib/api";
+import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { Button } from "@/features/ui/Button";
 import type {
@@ -20,13 +21,16 @@ import type {
 import { emptyWorkflowLookups } from "@/features/workflows/contracts";
 import { fromApiProcessGraph, resolveLookupLabels } from "@/features/workflows/apiGraphAdapter";
 import { WorkflowEditor } from "@/features/workflows/WorkflowEditor";
-import { createStarterWorkflowDraft } from "@/features/workflows/workflowDraft";
+import { workflowText } from "@/features/workflows/workflowI18n";
+import { createStarterWorkflowDraft, getNextWorkflowName } from "@/features/workflows/workflowDraft";
 
 type WorkspaceStatus = "loading" | "ready" | "error";
 
 export function WorkflowWorkspaceView() {
   const token = useSessionStore((state) => state.token);
   const user = useSessionStore((state) => state.user);
+  const language = useSessionStore((state) => state.language);
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
   const [definitions, setDefinitions] = useState<ProcessDefinitionSummary[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [selectedDefinition, setSelectedDefinition] = useState<ProcessDefinition | null>(null);
@@ -35,7 +39,7 @@ export function WorkflowWorkspaceView() {
   const [draft, setDraft] = useState<WorkflowDefinitionDraft>(() => createStarterWorkflowDraft());
   const [lookups, setLookups] = useState<WorkflowEditorLookups>(emptyWorkflowLookups);
   const [status, setStatus] = useState<WorkspaceStatus>("loading");
-  const [workspaceMessage, setWorkspaceMessage] = useState("Akış tanımları yükleniyor...");
+  const [workspaceMessage, setWorkspaceMessage] = useState(() => text("Akış tanımları yükleniyor...", "Loading workflow definitions..."));
   const [isRefreshing, setIsRefreshing] = useState(false);
   const canCreate = Boolean(user?.role === "SuperAdmin" || user?.permissions.includes("Workflows.Create"));
   const canUpdate = Boolean(user?.role === "SuperAdmin" || user?.permissions.includes("Workflows.Update"));
@@ -75,7 +79,7 @@ export function WorkflowWorkspaceView() {
             valueType: conditionValueType(field.type),
           }))),
         }))
-        .sort((left, right) => left.label.localeCompare(right.label, "tr") || right.version - left.version),
+        .sort((left, right) => left.label.localeCompare(right.label, language === "tr" ? "tr-TR" : "en-US") || right.version - left.version),
       teams: (teams?.items ?? []).map((team) => ({ id: team.id, label: team.name, description: team.description })),
       people: (people?.items ?? []).map((person) => ({ id: person.id, label: person.displayName, description: person.username })),
       communityRoles: communityRoles.map((role) => ({ id: role.id, label: role.name, description: role.description })),
@@ -90,7 +94,7 @@ export function WorkflowWorkspaceView() {
     }
     if (!options.quiet) {
       setStatus("loading");
-      setWorkspaceMessage("Akış sürümü yükleniyor...");
+      setWorkspaceMessage(text("Akış sürümü yükleniyor...", "Loading workflow version..."));
     }
 
     try {
@@ -105,18 +109,21 @@ export function WorkflowWorkspaceView() {
         : createDefinitionDraft(definition));
       setStatus("ready");
       setWorkspaceMessage(version
-        ? `v${version.versionNumber} ${version.status === "Published" ? "yayın sürümü" : "taslağı"} açık.`
-        : "Tanım için ilk taslak hazır.");
+        ? text(
+          `v${version.versionNumber} ${version.status === "Published" ? "yayın sürümü" : "taslağı"} açık.`,
+          `v${version.versionNumber} ${version.status === "Published" ? "published version" : "draft"} is open.`,
+        )
+        : text("Tanım için ilk taslak hazır.", "The first draft is ready for this definition."));
     } catch (error) {
       setStatus("error");
-      setWorkspaceMessage(toErrorMessage(error, "Akış tanımı yüklenemedi."));
+      setWorkspaceMessage(toErrorMessage(error, language, text("Akış tanımı yüklenemedi.", "Workflow definition could not be loaded.")));
     }
   }
 
   async function loadWorkspace(manual = false) {
     if (!token) {
       setStatus("error");
-      setWorkspaceMessage("Akışları görüntülemek için oturum gereklidir.");
+      setWorkspaceMessage(text("Akışları görüntülemek için oturum gereklidir.", "A session is required to view workflows."));
       return;
     }
     if (manual) {
@@ -142,14 +149,14 @@ export function WorkflowWorkspaceView() {
         setSelectedDefinition(null);
         setSelectedVersion(null);
         setSelectedCommunityId(nextCommunityId);
-        setDraft(createStarterWorkflowDraft());
+        setDraft(createStarterWorkflowDraft(getNextWorkflowName(result)));
         await loadLookups(nextCommunityId);
         setStatus("ready");
-        setWorkspaceMessage("Yeni akış taslağı hazır.");
+        setWorkspaceMessage(text("Yeni akış taslağı hazır.", "The new workflow draft is ready."));
       }
     } catch (error) {
       setStatus("error");
-      setWorkspaceMessage(toErrorMessage(error, "Akış tanımları yüklenemedi."));
+      setWorkspaceMessage(toErrorMessage(error, language, text("Akış tanımları yüklenemedi.", "Workflow definitions could not be loaded.")));
     } finally {
       setIsRefreshing(false);
     }
@@ -162,12 +169,33 @@ export function WorkflowWorkspaceView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, user?.id]);
 
+  useEffect(() => {
+    if (status === "loading") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setWorkspaceMessage(text("Akış tanımları yükleniyor...", "Loading workflow definitions..."));
+      return;
+    }
+    if (status !== "ready") {
+      return;
+    }
+    // Keep passive status text in sync when the language changes in place.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWorkspaceMessage(selectedVersion
+      ? text(
+        `v${selectedVersion.versionNumber} ${selectedVersion.status === "Published" ? "yayın sürümü" : "taslağı"} açık.`,
+        `v${selectedVersion.versionNumber} ${selectedVersion.status === "Published" ? "published version" : "draft"} is open.`,
+      )
+      : text("Yeni akış taslağı hazır.", "The new workflow draft is ready."));
+    // Only language and the active version define this passive copy.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language, selectedVersion?.id, selectedVersion?.status, selectedVersion?.versionNumber, status]);
+
   async function persistWorkflow(request: SaveWorkflowDraftRequest, publish: boolean) {
     if (!token) {
-      throw new Error("Oturum bulunamadı.");
+      throw new Error(text("Oturum bulunamadı.", "Session not found."));
     }
     if (!request.formDefinitionVersionId) {
-      throw new Error("Başlangıç form sürümü zorunludur.");
+      throw new Error(text("Başlangıç form sürümü zorunludur.", "A start form version is required."));
     }
 
     let definition = selectedDefinition;
@@ -177,11 +205,16 @@ export function WorkflowWorkspaceView() {
         description: request.description,
         communityId: selectedCommunityId || undefined,
       });
+      setSelectedDefinition(definition);
+      setDefinitions((current) => current.some((item) => item.id === definition!.id)
+        ? current
+        : [definition!, ...current]);
     } else if (definition.name !== request.name || definition.description !== request.description) {
       definition = await api.updateProcessDefinition(token, definition.id, {
         name: request.name,
         description: request.description,
       });
+      setSelectedDefinition(definition);
     }
 
     const versionPayload = {
@@ -191,9 +224,11 @@ export function WorkflowWorkspaceView() {
     let version = selectedVersion?.status === "Draft"
       ? await api.updateProcessDefinitionVersion(token, definition.id, selectedVersion.id, versionPayload)
       : await api.createProcessDefinitionVersion(token, definition.id, versionPayload);
+    setSelectedVersion(version);
 
     if (publish) {
       version = await api.publishProcessDefinitionVersion(token, definition.id, version.id);
+      setSelectedVersion(version);
     }
 
     const nextDraft = addLookupLabels(versionToDraft(definition, version), lookups);
@@ -201,25 +236,27 @@ export function WorkflowWorkspaceView() {
     setSelectedVersion(version);
     setDraft(nextDraft);
     setDefinitions(await api.listProcessDefinitions(token));
-    setWorkspaceMessage(publish ? "Yayınlanan sürüm salt okunur açıldı." : `v${version.versionNumber} taslağı kaydedildi.`);
+    setWorkspaceMessage(publish
+      ? text("Yayınlanan sürüm salt okunur açıldı.", "The published version was opened as read only.")
+      : text(`v${version.versionNumber} taslağı kaydedildi.`, `Draft v${version.versionNumber} was saved.`));
     return { definition, version, draft: nextDraft };
   }
 
   async function saveWorkflow(request: SaveWorkflowDraftRequest): Promise<WorkflowMutationResult> {
     const result = await persistWorkflow(request, false);
-    return { draft: result.draft, message: "Akış taslağı kaydedildi." };
+    return { draft: result.draft, message: text("Akış taslağı kaydedildi.", "Workflow draft was saved.") };
   }
 
   async function publishWorkflow(request: SaveWorkflowDraftRequest): Promise<WorkflowMutationResult> {
     const result = await persistWorkflow(request, true);
-    return { draft: result.draft, message: "Akış sürümü yayınlandı." };
+    return { draft: result.draft, message: text("Akış sürümü yayınlandı.", "Workflow version was published.") };
   }
 
   function startNewDefinition() {
     setSelectedDefinition(null);
     setSelectedVersion(null);
-    setDraft(createStarterWorkflowDraft());
-    setWorkspaceMessage("Yeni akış taslağı hazır.");
+    setDraft(createStarterWorkflowDraft(getNextWorkflowName(definitions)));
+    setWorkspaceMessage(text("Yeni akış taslağı hazır.", "The new workflow draft is ready."));
     void loadLookups(selectedCommunityId);
   }
 
@@ -230,7 +267,7 @@ export function WorkflowWorkspaceView() {
     const cloned = versionToDraft(selectedDefinition, selectedVersion);
     setSelectedVersion(null);
     setDraft({ ...cloned, id: undefined, version: undefined, status: "Draft", publishedAt: null });
-    setWorkspaceMessage("Yayın sürümünden yeni taslak oluşturuldu.");
+    setWorkspaceMessage(text("Yayın sürümünden yeni taslak oluşturuldu.", "A new draft was created from the published version."));
   }
 
   const editorKey = useMemo(
@@ -242,16 +279,19 @@ export function WorkflowWorkspaceView() {
     <section className="workflow-workspace-view">
       <div className="section-heading workflow-workspace-heading">
         <div>
-          <span className="eyebrow">Süreç Tasarımı</span>
-          <h2>Görsel İş Akışları</h2>
+          <span className="eyebrow">{text("Süreç Tasarımı", "Process Design")}</span>
+          <h2>{text("Görsel İş Akışları", "Visual Workflows")}</h2>
         </div>
-        <p>Versiyonlu süreç grafiklerini, görev atamalarını ve karar yollarını yönetin.</p>
+        <p>{text(
+          "Versiyonlu süreç grafiklerini, görev atamalarını ve karar yollarını yönetin.",
+          "Manage versioned process graphs, task assignments, and decision paths.",
+        )}</p>
       </div>
 
       <div className="workflow-workspace-toolbar">
         {isSuperAdmin ? (
           <label className="workflow-definition-select workflow-community-select">
-            <span>Topluluk</span>
+            <span>{text("Topluluk", "Community")}</span>
             <select
               disabled={Boolean(selectedDefinition) || status === "loading"}
               onChange={(event) => {
@@ -261,7 +301,7 @@ export function WorkflowWorkspaceView() {
               }}
               value={selectedCommunityId}
             >
-              <option value="">Topluluk seçin</option>
+              <option value="">{text("Topluluk seçin", "Select community")}</option>
               {communities.map((community) => (
                 <option key={community.id} value={community.id}>{community.name}</option>
               ))}
@@ -269,13 +309,13 @@ export function WorkflowWorkspaceView() {
           </label>
         ) : null}
         <label className="workflow-definition-select">
-          <span>Akış tanımı</span>
+          <span>{text("Akış tanımı", "Workflow definition")}</span>
           <select
             disabled={status === "loading" || definitions.length === 0}
             onChange={(event) => void openDefinition(event.target.value)}
             value={selectedDefinition?.id ?? ""}
           >
-            {!selectedDefinition ? <option value="">Yeni akış</option> : null}
+            {!selectedDefinition ? <option value="">{text("Yeni akış", "New workflow")}</option> : null}
             {definitions.map((definition) => (
               <option key={definition.id} value={definition.id}>
                 {definition.name}{definition.latestVersionNumber ? ` · v${definition.latestVersionNumber}` : ""}
@@ -286,7 +326,7 @@ export function WorkflowWorkspaceView() {
         <div className="workflow-workspace-toolbar-actions">
           {selectedVersion?.status === "Published" && canUpdate ? (
             <Button leadingIcon={<CopyPlus size={16} aria-hidden="true" />} onClick={createDraftFromPublished} size="sm" variant="secondary">
-              Yeni sürüm
+              {text("Yeni sürüm", "New version")}
             </Button>
           ) : null}
           <Button
@@ -296,7 +336,7 @@ export function WorkflowWorkspaceView() {
             size="sm"
             variant="secondary"
           >
-            Yeni akış
+            {text("Yeni akış", "New workflow")}
           </Button>
           <Button
             disabled={isRefreshing || status === "loading"}
@@ -306,7 +346,7 @@ export function WorkflowWorkspaceView() {
             size="sm"
             variant="secondary"
           >
-            Yenile
+            {text("Yenile", "Refresh")}
           </Button>
         </div>
         <p className={`workflow-workspace-message workflow-workspace-message-${status}`} aria-live="polite">
@@ -319,7 +359,9 @@ export function WorkflowWorkspaceView() {
       ) : status === "error" ? (
         <div className="workflow-workspace-error">
           <p>{workspaceMessage}</p>
-          <Button onClick={() => void loadWorkspace(true)} size="sm" variant="secondary">Tekrar dene</Button>
+          <Button onClick={() => void loadWorkspace(true)} size="sm" variant="secondary">
+            {text("Tekrar dene", "Try again")}
+          </Button>
         </div>
       ) : (
         <WorkflowEditor
@@ -386,16 +428,20 @@ function conditionValueType(fieldType: string): "String" | "Number" | "Boolean" 
   return "String";
 }
 
-function toErrorMessage(error: unknown, fallback: string) {
+function toErrorMessage(error: unknown, language: "tr" | "en", fallback: string) {
   if (error instanceof ApiError) {
-    return error.errors.join(" ");
+    return localizeApiError(error, language, fallback);
   }
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
 function WorkflowWorkspaceSkeleton() {
+  const language = useSessionStore((state) => state.language);
   return (
-    <div className="workflow-workspace-skeleton" aria-label="Akış editörü yükleniyor">
+    <div
+      className="workflow-workspace-skeleton"
+      aria-label={workflowText(language, "Akış editörü yükleniyor", "Loading workflow editor")}
+    >
       <span />
       <span />
       <span />
