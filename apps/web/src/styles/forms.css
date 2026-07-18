@@ -25,6 +25,21 @@ main:has(> .workspace-route-content > .runner-section) {
   container: form-runner / inline-size;
 }
 
+.rendered-form-field-label {
+  min-width: 0;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.rendered-form-required-indicator {
+  color: color-mix(in srgb, var(--orange) 72%, var(--muted));
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
 .designer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(280px, 1fr));

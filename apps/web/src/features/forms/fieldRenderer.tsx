@@ -18,7 +18,7 @@ export function FieldRenderer({ field, value, error, language, onChange }: Field
   if (field.type === "Radio") {
     return (
       <fieldset className="runner-radio-group">
-        <legend>{field.label}</legend>
+        <legend><FieldLabel field={field} language={language} /></legend>
         <FieldInput field={field} value={value} language={language} onChange={onChange} />
         {error ? <span className="field-error">{error}</span> : null}
       </fieldset>
@@ -36,16 +36,31 @@ export function FieldRenderer({ field, value, error, language, onChange }: Field
             onChange={(event) => onChange(field.key, event.target.checked)}
             type="checkbox"
           />
-          {field.label}
+          <FieldLabel field={field} language={language} />
         </>
       ) : (
         <>
-          {field.label}
+          <FieldLabel field={field} language={language} />
           <FieldInput field={field} value={value} language={language} onChange={onChange} />
         </>
       )}
       {error ? <span className="field-error">{error}</span> : null}
     </label>
+  );
+}
+
+function FieldLabel({ field, language }: { field: FormFieldDefinition; language: Language }) {
+  const requiredLabel = translate(language, "form.designer.required");
+
+  return (
+    <span className="rendered-form-field-label">
+      <span>{field.label}</span>
+      {field.required ? (
+        <span aria-label={requiredLabel} className="rendered-form-required-indicator" title={requiredLabel}>
+          *
+        </span>
+      ) : null}
+    </span>
   );
 }
 
