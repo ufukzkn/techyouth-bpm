@@ -16,6 +16,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "TechYouth BPM Wizard",
   description: "Multi-step form and process management application",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
