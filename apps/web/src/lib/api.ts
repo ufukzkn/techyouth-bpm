@@ -8,6 +8,7 @@ import type {
   CreateUserAdminRequest,
   AdminPasswordResetRequest,
   AdminPasswordResetResponse,
+  BrowserSessionResponse,
   EmailVerificationStartResponse,
   ForgotPasswordRequest,
   ForgotPasswordResponse,
@@ -17,7 +18,6 @@ import type {
   CommunityRole,
   CommunitySummary,
   DashboardSummary,
-  LoginResponse,
   NotificationListParams,
   NotificationPage,
   PagedResult,
@@ -55,6 +55,7 @@ import type {
   UserTeamMembership,
   UpdateTeamRequest,
 } from "@/lib/types";
+import { COOKIE_SESSION_MARKER } from "@/features/session/sessionPersistence";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5291";
 
@@ -65,9 +66,9 @@ type ApiErrorPayload = {
   detail?: unknown;
 };
 
-let unauthorizedHandler: (() => void) | null = null;
+let unauthorizedHandler: (() => Promise<boolean>) | null = null;
 
-export function setUnauthorizedHandler(handler: (() => void) | null) {
+export function setUnauthorizedHandler(handler: (() => Promise<boolean>) | null) {
   unauthorizedHandler = handler;
 }
 
@@ -138,11 +139,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function request<T>(path: string, init?: RequestInit & { token?: string }): Promise<T> {
+async function request<T>(
+  path: string,
+  init?: RequestInit & { token?: string },
+  hasRetriedAfterRefresh = false,
+): Promise<T> {
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
 
-  if (init?.token) {
+  if (init?.token && init.token !== COOKIE_SESSION_MARKER && !init.token.startsWith("demo-")) {
     headers.set("Authorization", `Bearer ${init.token}`);
   }
 
@@ -158,10 +163,14 @@ async function request<T>(path: string, init?: RequestInit & { token?: string })
   });
 
   if (!response.ok) {
-    const payload: ApiErrorPayload = await response.json().catch(() => ({}));
-    if (response.status === 401 && init?.token) {
-      unauthorizedHandler?.();
+    if (response.status === 401 && init?.token && unauthorizedHandler && !hasRetriedAfterRefresh) {
+      const recovered = await unauthorizedHandler();
+      if (recovered) {
+        return request<T>(path, init, true);
+      }
     }
+
+    const payload: ApiErrorPayload = await response.json().catch(() => ({}));
     throw new ApiError(normalizeApiErrors(payload), response.status);
   }
 
@@ -204,13 +213,13 @@ export const api = {
     });
   },
   login(username: string, password: string, rememberMe = false) {
-    return request<LoginResponse>("/api/auth/login", {
+    return request<BrowserSessionResponse>("/api/auth/browser-login", {
       method: "POST",
       body: JSON.stringify({ username, password, rememberMe }),
     });
   },
   refreshSession() {
-    return request<LoginResponse>("/api/auth/refresh", { method: "POST" });
+    return request<BrowserSessionResponse>("/api/auth/refresh", { method: "POST" });
   },
   me(token: string) {
     return request<User>("/api/auth/me", { token });

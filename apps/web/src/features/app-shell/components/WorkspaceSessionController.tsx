@@ -16,7 +16,10 @@ export function WorkspaceSessionController() {
     expiresAt,
     language,
     hasHydrated,
+    hasCheckedSession,
     expireSession,
+    completeSessionCheck,
+    restoreCookieSession,
     setSession,
   } = useSessionStore();
   const t = useCallback(
@@ -25,19 +28,69 @@ export function WorkspaceSessionController() {
   );
 
   useEffect(() => {
-    let hasHandledUnauthorized = false;
+    let recoveryPromise: Promise<boolean> | null = null;
     setUnauthorizedHandler(() => {
-      if (hasHandledUnauthorized) {
-        return;
+      if (recoveryPromise) {
+        return recoveryPromise;
       }
 
-      hasHandledUnauthorized = true;
-      expireSession(t("session.unverified"));
-      router.replace("/login");
+      recoveryPromise = api.refreshSession()
+        .then((session) => {
+          setSession(session);
+          return true;
+        })
+        .catch(() => {
+          expireSession(t("session.unverified"));
+          router.replace("/login");
+          return false;
+        })
+        .finally(() => {
+          recoveryPromise = null;
+        });
+
+      return recoveryPromise;
     });
 
     return () => setUnauthorizedHandler(null);
-  }, [expireSession, router, t]);
+  }, [expireSession, router, setSession, t]);
+
+  useEffect(() => {
+    if (!hasHydrated || hasCheckedSession) {
+      return;
+    }
+
+    let ignore = false;
+
+    async function restoreSession() {
+      try {
+        const currentUser = await api.meFromCookie();
+        if (!ignore) {
+          restoreCookieSession(currentUser);
+        }
+      } catch (error) {
+        if (error instanceof ApiError && error.statusCode === 401) {
+          try {
+            const refreshedSession = await api.refreshSession();
+            if (!ignore) {
+              setSession(refreshedSession);
+            }
+            return;
+          } catch {
+            // The refresh endpoint clears stale auth cookies before login is shown.
+          }
+        }
+
+        if (!ignore) {
+          completeSessionCheck();
+        }
+      }
+    }
+
+    void restoreSession();
+    return () => {
+      ignore = true;
+    };
+  }, [completeSessionCheck, hasCheckedSession, hasHydrated, restoreCookieSession, setSession]);
 
   useEffect(() => {
     if (!hasHydrated || !token || !user) {
@@ -95,10 +148,8 @@ export function WorkspaceSessionController() {
 
       try {
         await api.me(sessionToken);
-      } catch (error) {
-        if (!ignore && error instanceof ApiError && error.statusCode === 401) {
-          await refreshOrExpire(t("session.unverified"));
-        }
+      } catch {
+        // Authenticated 401 responses are recovered or expired by the shared handler.
       }
     }
 

@@ -86,6 +86,7 @@ app.Use(async (context, next) =>
             || HttpMethods.IsPatch(context.Request.Method)
             || HttpMethods.IsDelete(context.Request.Method));
     var isPublicAuthEndpoint = context.Request.Path.StartsWithSegments("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+        || context.Request.Path.StartsWithSegments("/api/auth/browser-login", StringComparison.OrdinalIgnoreCase)
         || context.Request.Path.StartsWithSegments("/api/auth/register", StringComparison.OrdinalIgnoreCase)
         || context.Request.Path.StartsWithSegments("/api/auth/refresh", StringComparison.OrdinalIgnoreCase)
         || context.Request.Path.StartsWithSegments("/api/auth/forgot-password", StringComparison.OrdinalIgnoreCase)

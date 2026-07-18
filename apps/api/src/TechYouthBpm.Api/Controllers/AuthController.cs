@@ -40,6 +40,25 @@ public class AuthController(
     }
 
     [EnableRateLimiting("auth")]
+    [HttpPost("browser-login")]
+    public async Task<IActionResult> BrowserLogin(LoginRequest request, CancellationToken cancellationToken)
+    {
+        var result = await AuthenticationService.LoginAsync(
+            request,
+            ResolveClientIpAddress(),
+            Request.Headers.UserAgent.ToString(),
+            cancellationToken);
+        if (result.IsSuccess)
+        {
+            AppendAuthCookies(result.Value!);
+        }
+
+        return result.IsSuccess
+            ? Ok(new { result.Value!.User, result.Value.ExpiresAt })
+            : ValidationProblem(result.Errors);
+    }
+
+    [EnableRateLimiting("auth")]
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
     {
@@ -60,7 +79,9 @@ public class AuthController(
             ClearAuthCookies();
         }
 
-        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+        return result.IsSuccess
+            ? Ok(new { result.Value!.User, result.Value.ExpiresAt })
+            : ValidationProblem(result.Errors);
     }
 
     [HttpGet("me")]

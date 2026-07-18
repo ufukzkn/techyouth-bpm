@@ -47,10 +47,13 @@ export type PermissionName =
   | "Tasks.Act"
   | "Audit.View";
 
-export type LoginResponse = {
-  token: string;
+export type BrowserSessionResponse = {
   user: User;
   expiresAt: string;
+};
+
+export type LoginResponse = BrowserSessionResponse & {
+  token: string;
   csrfToken: string;
 };
 

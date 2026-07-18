@@ -3,11 +3,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { clearProcessBoardCaches } from "@/features/processes/processBoardCache";
-import type { Language, LoginResponse, ThemeMode, User } from "@/lib/types";
+import {
+  migratePersistedPreferences,
+  resolveClientSessionToken,
+  selectPersistedPreferences,
+  type PersistedPreferences,
+} from "@/features/session/sessionPersistence";
+import type { BrowserSessionResponse, Language, LoginResponse, ThemeMode, User } from "@/lib/types";
 
 type SessionState = {
   token: string | null;
-  csrfToken: string | null;
   user: User | null;
   expiresAt: string | null;
   theme: ThemeMode;
@@ -15,7 +20,10 @@ type SessionState = {
   language: Language;
   sessionNotice: string | null;
   hasHydrated: boolean;
-  setSession: (session: LoginResponse) => void;
+  hasCheckedSession: boolean;
+  setSession: (session: BrowserSessionResponse | LoginResponse) => void;
+  restoreCookieSession: (user: User) => void;
+  completeSessionCheck: () => void;
   setUser: (user: User) => void;
   expireSession: (message: string) => void;
   clearSessionNotice: () => void;
@@ -35,10 +43,9 @@ function getSystemTheme(): ThemeMode {
 }
 
 export const useSessionStore = create<SessionState>()(
-  persist(
+  persist<SessionState, [], [], PersistedPreferences>(
     (set, get) => ({
       token: null,
-      csrfToken: null,
       user: null,
       expiresAt: null,
       theme: getSystemTheme(),
@@ -46,22 +53,36 @@ export const useSessionStore = create<SessionState>()(
       language: "tr",
       sessionNotice: null,
       hasHydrated: false,
+      hasCheckedSession: false,
       setSession: (session) => {
         if (get().user?.id && get().user?.id !== session.user.id) {
           clearProcessBoardCaches();
         }
         set({
-          token: session.token,
-          csrfToken: session.csrfToken,
+          token: resolveClientSessionToken("token" in session ? session.token : null),
           user: session.user,
           expiresAt: session.expiresAt,
           sessionNotice: null,
+          hasCheckedSession: true,
         });
       },
+      restoreCookieSession: (user) => {
+        if (get().user?.id && get().user?.id !== user.id) {
+          clearProcessBoardCaches();
+        }
+        set({
+          token: resolveClientSessionToken(),
+          user,
+          expiresAt: null,
+          sessionNotice: null,
+          hasCheckedSession: true,
+        });
+      },
+      completeSessionCheck: () => set({ hasCheckedSession: true }),
       setUser: (user) => set({ user }),
       expireSession: (message) => {
         clearProcessBoardCaches();
-        set({ token: null, csrfToken: null, user: null, expiresAt: null, sessionNotice: message });
+        set({ token: null, user: null, expiresAt: null, sessionNotice: message, hasCheckedSession: true });
       },
       clearSessionNotice: () => set({ sessionNotice: null }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
@@ -73,7 +94,7 @@ export const useSessionStore = create<SessionState>()(
       toggleLanguage: () => set({ language: get().language === "tr" ? "en" : "tr" }),
       logout: () => {
         clearProcessBoardCaches();
-        set({ token: null, csrfToken: null, user: null, expiresAt: null, sessionNotice: null });
+        set({ token: null, user: null, expiresAt: null, sessionNotice: null, hasCheckedSession: true });
       },
       toggleTheme: () => {
         const nextTheme = get().theme === "light" ? "dark" : "light";
@@ -82,29 +103,9 @@ export const useSessionStore = create<SessionState>()(
     }),
     {
       name: "techyouth-session",
-      version: 1,
-      partialize: (state) => ({
-        token: state.token,
-        csrfToken: state.csrfToken,
-        user: state.user,
-        expiresAt: state.expiresAt,
-        theme: state.theme,
-        themePreference: state.themePreference,
-        language: state.language,
-      }),
-      migrate: (persistedState) => {
-        if (!persistedState || typeof persistedState !== "object") {
-          return persistedState;
-        }
-
-        const state = persistedState as Partial<SessionState>;
-        return {
-          ...state,
-          theme: state.themePreference ?? getSystemTheme(),
-          themePreference: state.themePreference ?? null,
-          language: state.language ?? "tr",
-        };
-      },
+      version: 2,
+      partialize: selectPersistedPreferences,
+      migrate: (persistedState) => migratePersistedPreferences(persistedState, getSystemTheme()),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

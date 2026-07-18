@@ -18,13 +18,13 @@ export function WorkspaceLoadingShell() {
   );
 }
 
-export function LoginRedirectLoading() {
+export function LoginRedirectLoading({ title = "Giriş ekranına yönlendiriliyor" }: { title?: string }) {
   return (
     <main className="login-page" aria-live="polite">
       <section className="login-panel session-loading">
         <PrototypeLogo size={44} />
         <span className="eyebrow">Oturum</span>
-        <h1>Giriş ekranına yonlendiriliyor</h1>
+        <h1>{title}</h1>
       </section>
     </main>
   );

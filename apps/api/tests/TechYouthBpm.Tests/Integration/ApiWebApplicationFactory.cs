@@ -12,7 +12,8 @@ namespace TechYouthBpm.Tests.Integration;
 internal sealed class ApiWebApplicationFactory(
     int rateLimitPermitLimit = 100,
     string databaseProvider = "Sqlite",
-    string? connectionString = null) : WebApplicationFactory<Program>
+    string? connectionString = null,
+    int sessionDurationMinutes = 120) : WebApplicationFactory<Program>
 {
     private readonly string databasePath = Path.Combine(
         Path.GetTempPath(),
@@ -32,7 +33,8 @@ internal sealed class ApiWebApplicationFactory(
                 ["Seed:MockData"] = "true",
                 ["Email:Provider"] = "Demo",
                 ["Auth:RateLimitPermitLimit"] = rateLimitPermitLimit.ToString(),
-                ["Auth:RateLimitWindowMinutes"] = "1"
+                ["Auth:RateLimitWindowMinutes"] = "1",
+                ["Auth:SessionDurationMinutes"] = sessionDurationMinutes.ToString()
             });
         });
         builder.ConfigureServices(services =>

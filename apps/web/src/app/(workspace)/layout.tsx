@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LoginRedirectLoading, WorkspaceLoadingShell } from "@/features/app-shell/components/WorkspaceLoadingShell";
-import { WorkspaceSessionController } from "@/features/app-shell/components/WorkspaceSessionController";
 import { WorkspaceSidebar } from "@/features/app-shell/components/WorkspaceSidebar";
 import { WorkspaceTopbar } from "@/features/app-shell/components/WorkspaceTopbar";
 import { navItems, type NavGroupId } from "@/features/app-shell/navigation";
@@ -29,6 +28,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
     theme,
     language,
     hasHydrated,
+    hasCheckedSession,
     logout,
     setUser,
     toggleLanguage,
@@ -87,25 +87,24 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   }, [isMobileNavOpen]);
 
   useEffect(() => {
-    if (!hasHydrated || !user || user.mustChangePassword || canAccessCurrentRoute) {
+    if (!hasHydrated || !hasCheckedSession || !user || user.mustChangePassword || canAccessCurrentRoute) {
       return;
     }
 
     router.replace(visibleNavItems[0]?.path ?? "/dashboard");
-  }, [canAccessCurrentRoute, hasHydrated, router, user, visibleNavItems]);
+  }, [canAccessCurrentRoute, hasCheckedSession, hasHydrated, router, user, visibleNavItems]);
 
   useEffect(() => {
-    if (hasHydrated && !user) {
+    if (hasHydrated && hasCheckedSession && !user) {
       router.replace("/login");
     }
-  }, [hasHydrated, router, user]);
+  }, [hasCheckedSession, hasHydrated, router, user]);
 
   return (
     <>
-      <WorkspaceSessionController />
-      {!hasHydrated ? <WorkspaceLoadingShell /> : null}
-      {hasHydrated && !user ? <LoginRedirectLoading /> : null}
-      {hasHydrated && user?.mustChangePassword ? (
+      {!hasHydrated || !hasCheckedSession ? <WorkspaceLoadingShell /> : null}
+      {hasHydrated && hasCheckedSession && !user ? <LoginRedirectLoading /> : null}
+      {hasHydrated && hasCheckedSession && user?.mustChangePassword ? (
         <ForcedPasswordChangeView
           language={language}
           token={token}
@@ -117,7 +116,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
           theme={theme}
         />
       ) : null}
-      {hasHydrated && user && !user.mustChangePassword && canAccessCurrentRoute ? (
+      {hasHydrated && hasCheckedSession && user && !user.mustChangePassword && canAccessCurrentRoute ? (
         <div className="app-shell">
           <WorkspaceSidebar
             isMobileOpen={isMobileNavOpen}

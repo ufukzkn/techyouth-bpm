@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { WorkspaceSessionController } from "@/features/app-shell/components/WorkspaceSessionController";
 import { AppPreferenceController } from "@/features/session/AppPreferenceController";
 import "./globals.css";
 
@@ -31,6 +32,7 @@ export default function RootLayout({
     <html lang="tr" className={`${geistSans.variable} ${geistMono.variable}`} suppressHydrationWarning>
       <body>
         <AppPreferenceController />
+        <WorkspaceSessionController />
         {children}
       </body>
     </html>

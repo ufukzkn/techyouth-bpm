@@ -64,6 +64,159 @@ public class AuthPipelineIntegrationTests
     }
 
     [Fact]
+    public async Task Browser_Cookie_Transport_Does_Not_Expose_Auth_Tokens_In_Response_Bodies()
+    {
+        using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateApiClient();
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, "/api/auth/browser-login")
+        {
+            Content = JsonContent.Create(new LoginRequest("admin", "admin123", RememberMe: true))
+        };
+
+        using var loginResponse = await client.SendAsync(loginRequest);
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        var loginPayload = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(loginPayload.TryGetProperty("user", out var user));
+        Assert.Equal("admin", user.GetProperty("username").GetString());
+        Assert.True(loginPayload.TryGetProperty("expiresAt", out _));
+        Assert.False(loginPayload.TryGetProperty("token", out _));
+        Assert.False(loginPayload.TryGetProperty("csrfToken", out _));
+
+        var cookies = IntegrationTestHttp.ReadCookies(loginResponse);
+        Assert.Contains("techyouth_access", cookies.Keys);
+        Assert.Contains("techyouth_refresh", cookies.Keys);
+        Assert.Contains("techyouth_csrf", cookies.Keys);
+        var setCookieHeaders = loginResponse.Headers.GetValues("Set-Cookie").ToArray();
+        Assert.Contains(setCookieHeaders, value =>
+            value.StartsWith("techyouth_access=", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("httponly", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(setCookieHeaders, value =>
+            value.StartsWith("techyouth_refresh=", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("httponly", StringComparison.OrdinalIgnoreCase));
+
+        using var refreshRequest = IntegrationTestHttp.CookieRequest(HttpMethod.Post, "/api/auth/refresh", cookies);
+        using var refreshResponse = await client.SendAsync(refreshRequest);
+        Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
+        var refreshPayload = await refreshResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(refreshPayload.TryGetProperty("user", out _));
+        Assert.False(refreshPayload.TryGetProperty("token", out _));
+        Assert.False(refreshPayload.TryGetProperty("csrfToken", out _));
+    }
+
+    [Fact]
+    public async Task Browser_One_Minute_Session_Expires_And_Remembered_Device_Refreshes()
+    {
+        using var factory = new ApiWebApplicationFactory(sessionDurationMinutes: 1);
+        using var client = factory.CreateApiClient();
+        var loginStartedAt = DateTime.UtcNow;
+        using var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/browser-login",
+            new LoginRequest("admin", "admin123", RememberMe: true));
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+
+        var loginPayload = await loginResponse.Content.ReadFromJsonAsync<JsonElement>();
+        var expiresAt = loginPayload.GetProperty("expiresAt").GetDateTime();
+        Assert.InRange(expiresAt, loginStartedAt.AddSeconds(45), DateTime.UtcNow.AddSeconds(75));
+        var loginCookies = IntegrationTestHttp.ReadCookies(loginResponse);
+
+        using var activeMeRequest = IntegrationTestHttp.CookieRequest(HttpMethod.Get, "/api/auth/me", loginCookies);
+        using var activeMeResponse = await client.SendAsync(activeMeRequest);
+        Assert.Equal(HttpStatusCode.OK, activeMeResponse.StatusCode);
+
+        await factory.ExecuteDbAsync(async db =>
+        {
+            var session = await db.UserSessions
+                .Where(item => item.User!.Username == "admin" && item.RevokedAt == null)
+                .OrderByDescending(item => item.CreatedAt)
+                .FirstAsync();
+            session.ExpiresAt = DateTime.UtcNow.AddSeconds(-1);
+            await db.SaveChangesAsync();
+        });
+
+        using var expiredMeRequest = IntegrationTestHttp.CookieRequest(HttpMethod.Get, "/api/auth/me", loginCookies);
+        using var expiredMeResponse = await client.SendAsync(expiredMeRequest);
+        Assert.Equal(HttpStatusCode.Unauthorized, expiredMeResponse.StatusCode);
+
+        using var refreshRequest = IntegrationTestHttp.CookieRequest(
+            HttpMethod.Post,
+            "/api/auth/refresh",
+            new Dictionary<string, string> { ["techyouth_refresh"] = loginCookies["techyouth_refresh"] });
+        using var refreshResponse = await client.SendAsync(refreshRequest);
+        Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
+        var refreshPayload = await refreshResponse.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.False(refreshPayload.TryGetProperty("token", out _));
+        Assert.False(refreshPayload.TryGetProperty("csrfToken", out _));
+
+        var rotatedCookies = IntegrationTestHttp.ReadCookies(refreshResponse);
+        Assert.NotEqual(loginCookies["techyouth_access"], rotatedCookies["techyouth_access"]);
+        Assert.NotEqual(loginCookies["techyouth_refresh"], rotatedCookies["techyouth_refresh"]);
+        using var recoveredMeRequest = IntegrationTestHttp.CookieRequest(HttpMethod.Get, "/api/auth/me", rotatedCookies);
+        using var recoveredMeResponse = await client.SendAsync(recoveredMeRequest);
+        Assert.Equal(HttpStatusCode.OK, recoveredMeResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Browser_One_Minute_Session_Without_RememberMe_Cannot_Refresh()
+    {
+        using var factory = new ApiWebApplicationFactory(sessionDurationMinutes: 1);
+        using var client = factory.CreateApiClient();
+        using var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/browser-login",
+            new LoginRequest("admin", "admin123", RememberMe: false));
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        var cookies = IntegrationTestHttp.ReadCookies(loginResponse);
+        Assert.DoesNotContain("techyouth_refresh", cookies.Keys);
+
+        await factory.ExecuteDbAsync(async db =>
+        {
+            var session = await db.UserSessions
+                .Where(item => item.User!.Username == "admin" && item.RevokedAt == null)
+                .OrderByDescending(item => item.CreatedAt)
+                .FirstAsync();
+            session.ExpiresAt = DateTime.UtcNow.AddSeconds(-1);
+            await db.SaveChangesAsync();
+        });
+
+        using var expiredMeRequest = IntegrationTestHttp.CookieRequest(HttpMethod.Get, "/api/auth/me", cookies);
+        using var expiredMeResponse = await client.SendAsync(expiredMeRequest);
+        Assert.Equal(HttpStatusCode.Unauthorized, expiredMeResponse.StatusCode);
+
+        using var refreshResponse = await client.PostAsync("/api/auth/refresh", content: null);
+        Assert.Equal(HttpStatusCode.BadRequest, refreshResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task Browser_Logout_With_Csrf_Revokes_Access_And_Refresh_Sessions()
+    {
+        using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateApiClient();
+        using var loginResponse = await client.PostAsJsonAsync(
+            "/api/auth/browser-login",
+            new LoginRequest("admin", "admin123", RememberMe: true));
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+        var cookies = IntegrationTestHttp.ReadCookies(loginResponse);
+
+        using var logoutRequest = IntegrationTestHttp.CookieRequest(
+            HttpMethod.Post,
+            "/api/auth/logout",
+            cookies,
+            cookies["techyouth_csrf"]);
+        using var logoutResponse = await client.SendAsync(logoutRequest);
+        Assert.Equal(HttpStatusCode.NoContent, logoutResponse.StatusCode);
+
+        using var meRequest = IntegrationTestHttp.CookieRequest(HttpMethod.Get, "/api/auth/me", cookies);
+        using var meResponse = await client.SendAsync(meRequest);
+        Assert.Equal(HttpStatusCode.Unauthorized, meResponse.StatusCode);
+
+        using var refreshRequest = IntegrationTestHttp.CookieRequest(
+            HttpMethod.Post,
+            "/api/auth/refresh",
+            new Dictionary<string, string> { ["techyouth_refresh"] = cookies["techyouth_refresh"] });
+        using var refreshResponse = await client.SendAsync(refreshRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, refreshResponse.StatusCode);
+    }
+
+    [Fact]
     public async Task Protected_Endpoint_Rejects_Anonymous_And_Invalid_Sessions()
     {
         using var factory = new ApiWebApplicationFactory();
@@ -121,8 +274,9 @@ public class AuthPipelineIntegrationTests
         using var refreshResponse = await client.SendAsync(refreshRequest);
         Assert.Equal(HttpStatusCode.OK, refreshResponse.StatusCode);
         var refreshedPayload = await refreshResponse.Content.ReadFromJsonAsync<JsonElement>();
-        var refreshedAccessToken = refreshedPayload.GetProperty("token").GetString();
+        Assert.False(refreshedPayload.TryGetProperty("token", out _));
         var rotatedCookies = IntegrationTestHttp.ReadCookies(refreshResponse);
+        var refreshedAccessToken = rotatedCookies["techyouth_access"];
         Assert.NotEqual(originalRefreshToken, rotatedCookies["techyouth_refresh"]);
 
         using var reuseRequest = IntegrationTestHttp.CookieRequest(
