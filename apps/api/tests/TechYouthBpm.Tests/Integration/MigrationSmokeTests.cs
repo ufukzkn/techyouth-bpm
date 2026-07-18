@@ -54,10 +54,20 @@ public class MigrationSmokeTests
             var (session, _) = await IntegrationTestHttp.LoginAsync(client);
             using var formsRequest = IntegrationTestHttp.BearerRequest(HttpMethod.Get, "/api/forms", session.Token);
             using var formsResponse = await client.SendAsync(formsRequest);
+            var lifecycle = await FormLifecycleHttpScenario.RunAsync(
+                client,
+                session.Token,
+                "PostgreSQL migration lifecycle");
             var pendingMigrations = await factory.ExecuteDbAsync(async db =>
                 (await db.Database.GetPendingMigrationsAsync()).ToArray());
 
             Assert.Equal(HttpStatusCode.OK, formsResponse.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, lifecycle.FormUpdateStatus);
+            Assert.Equal(HttpStatusCode.OK, lifecycle.UpdateStatus);
+            Assert.Equal(HttpStatusCode.OK, lifecycle.PublishDraftUpdateStatus);
+            Assert.Equal("Published", lifecycle.PublishedStatus);
+            Assert.Equal("InProgress", lifecycle.ProcessStatus);
+            Assert.Equal("Archived", lifecycle.ArchivedStatus);
             Assert.Empty(pendingMigrations);
         }
         finally

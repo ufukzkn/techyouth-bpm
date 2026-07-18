@@ -146,6 +146,29 @@ public class AuthorizationAndWorkflowIntegrationTests
     }
 
     [Fact]
+    public async Task SuperAdmin_Can_Save_Publish_Start_And_Archive_Form_Version_Through_Http_Api()
+    {
+        using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateApiClient();
+        var (session, _) = await IntegrationTestHttp.LoginAsync(client);
+
+        var result = await FormLifecycleHttpScenario.RunAsync(client, session.Token);
+
+        Assert.Equal(HttpStatusCode.Created, result.FormStatus);
+        Assert.Equal(HttpStatusCode.Created, result.DraftStatus);
+        Assert.Equal(HttpStatusCode.OK, result.FormUpdateStatus);
+        Assert.Equal(HttpStatusCode.OK, result.UpdateStatus);
+        Assert.Equal(HttpStatusCode.OK, result.PublishDraftUpdateStatus);
+        Assert.Equal(HttpStatusCode.OK, result.PublishStatus);
+        Assert.Equal(HttpStatusCode.OK, result.StartStatus);
+        Assert.Equal(HttpStatusCode.OK, result.ArchiveStatus);
+        Assert.Equal("Updated lifecycle page", result.UpdatedPageTitle);
+        Assert.Equal("Published", result.PublishedStatus);
+        Assert.Equal("InProgress", result.ProcessStatus);
+        Assert.Equal("Archived", result.ArchivedStatus);
+    }
+
+    [Fact]
     public async Task Published_Dynamic_Workflow_Runs_Through_The_Http_Api()
     {
         using var factory = new ApiWebApplicationFactory();

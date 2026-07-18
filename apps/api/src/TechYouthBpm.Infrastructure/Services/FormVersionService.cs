@@ -147,8 +147,18 @@ public class FormVersionService(AppDbContext db, ISystemAuditService auditServic
         }
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-        db.FormPageDefinitions.RemoveRange(version.Pages);
-        version.Pages = FormVersionModel.BuildPages(pages);
+        var previousPages = version.Pages.ToArray();
+        var replacementPages = FormVersionModel.BuildPages(pages);
+
+        version.Pages.Clear();
+        db.FormPageDefinitions.RemoveRange(previousPages);
+        foreach (var page in replacementPages)
+        {
+            page.FormDefinitionVersionId = version.Id;
+            version.Pages.Add(page);
+        }
+
+        db.FormPageDefinitions.AddRange(replacementPages);
         await db.SaveChangesAsync(cancellationToken);
         await auditService.LogAsync(
             user,
