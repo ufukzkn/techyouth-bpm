@@ -52,7 +52,7 @@ Sürüm numaralarının güncel kaynağı [package.json](../apps/web/package.jso
 
 ## 4. Frontend Nasıl Ayrıldı?
 
-Next.js route'ları `apps/web/src/app` altındadır. Authenticated sayfalar [(workspace) layout](../apps/web/src/app/(workspace)/layout.tsx) altında ortak sidebar ve topbar kullanır. Route değişirken shell korunur, yalnız `children` değişir; bu hem flashing'i azaltır hem Next.js code splitting avantajını sürdürür.
+Next.js route'ları `apps/web/src/app` altındadır. Authenticated sayfalar [(workspace) layout](<../apps/web/src/app/(workspace)/layout.tsx>) altında ortak sidebar ve topbar kullanır. Route değişirken shell korunur, yalnız `children` değişir; bu hem flashing'i azaltır hem Next.js code splitting avantajını sürdürür.
 
 Ana feature sınırları:
 
@@ -197,15 +197,15 @@ Controller, DTO ve workflow kuralları provider değişince değişmez. Tasarım
 
 ## 12. Test Stratejisi
 
-Test piramidi tek tür teste dayanmaz:
+Test piramidi saf kurallar, relational SQLite servisleri,
+`WebApplicationFactory` HTTP güvenlik/yetki akışları, opt-in PostgreSQL migration
+smoke, frontend Vitest ve gerçekçi cross-role kabul zincirinden oluşur.
 
-- **Saf/unit:** state machine, graph adapter, store/cache ve form sıralama.
-- **Relational service:** SQLite ile foreign key, unique index ve transaction davranışı.
-- **HTTP integration:** `WebApplicationFactory<Program>` ile cookie, CSRF, Bearer, role/scope, refresh rotation, rate limit ve endpoint sözleşmeleri.
-- **PostgreSQL opt-in smoke:** Geçici schema üzerinde migrations + temel HTTP akışı; Neon demo verisine dokunmaz.
-- **Gerçekçi zincir:** Transfer formu, koşullu validasyon, metadata dosyası, takım+rol adaylığı, claim/release, task formu, approve/reject, bildirim ve audit birlikte doğrulanır.
-
-18 Temmuz 2026 doğrulama anındaki baseline: **194/194 backend testi** ve **49/49 frontend testi** geçti; frontend production build başarılı oldu. Lintte hata yok, workflow ekranında davranışı etkilemeyen bir adet eski `unused eslint-disable` uyarısı bulunuyor. Ana komutlar [QUICKSTART.md](../QUICKSTART.md) içindedir. Sayılar yeni testlerle artabileceği için sunumdan hemen önce çıktıyı yeniden alın.
+Güncel sayılar, kapsam kataloğu, komutlar ve kalan Playwright boşluğu tek yerde
+tutulur: [Testing And Quality Gates](24-testing-and-quality-gates.md). Sunumdan
+önce oradaki komutları yeniden çalıştırın; manuel Transfer zinciri için
+[Workflow Uçtan Uca Test Senaryoları](22-workflow-end-to-end-test-scenarios.md)
+belgesini izleyin.
 
 ## 13. Uçtan Uca Örnek Anlatım
 
@@ -294,7 +294,7 @@ Projeyi hızlı öğrenmek için şu sırayı izleyin:
 3. [PermissionNames.cs](../apps/api/src/TechYouthBpm.Application/Auth/PermissionNames.cs)
 4. [AuthService](../apps/api/src/TechYouthBpm.Infrastructure/Services/AuthService.cs) ve [WorkflowVisibilityService](../apps/api/src/TechYouthBpm.Infrastructure/Services/WorkflowVisibilityService.cs)
 5. [ProcessGraphValidator](../apps/api/src/TechYouthBpm.Infrastructure/Services/ProcessGraphValidator.cs) ve [DynamicWorkflowEngine](../apps/api/src/TechYouthBpm.Infrastructure/Services/DynamicWorkflowEngine.cs)
-6. [(workspace) layout](../apps/web/src/app/(workspace)/layout.tsx), [navigation.ts](../apps/web/src/features/app-shell/navigation.ts) ve [sessionStore](../apps/web/src/features/session/sessionStore.ts)
+6. [(workspace) layout](<../apps/web/src/app/(workspace)/layout.tsx>), [navigation.ts](../apps/web/src/features/app-shell/navigation.ts) ve [sessionStore](../apps/web/src/features/session/sessionStore.ts)
 7. [workflowDraftStore](../apps/web/src/features/workflows/workflowDraftStore.ts) ve [apiGraphAdapter](../apps/web/src/features/workflows/apiGraphAdapter.ts)
 8. [Uçtan uca workflow senaryoları](22-workflow-end-to-end-test-scenarios.md)
 

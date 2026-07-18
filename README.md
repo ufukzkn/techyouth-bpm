@@ -9,7 +9,7 @@ Bu repo iki ana uygulamadan olusur:
 
 Form field/page ordering uses `@dnd-kit`; the visual workflow canvas uses `@xyflow/react`. The API runs a custom typed .NET workflow runtime and persists versioned definitions with EF Core. Camunda/Kissflow are product references, not runtime dependencies.
 
-Dokumantasyon `docs/` altindadir. Proje ilerledikce mimari kararlar, servis isleyisi, code review notlari ve ekip sunum dagilimi buradan takip edilir.
+Dokumantasyon `docs/` altindadir. Tekrarsiz konu sahipligi ve onerilen okuma sirasi [docs/README.md](docs/README.md) dosyasinda tanimlidir.
 
 Hizli kurulum icin [QUICKSTART.md](QUICKSTART.md), sunuma hazirlanmak icin [docs/23-presentation-study-guide.md](docs/23-presentation-study-guide.md) dosyasini kullanin.
 
@@ -358,27 +358,9 @@ Local SQLite demo DB; bes toplulukta yayinlanmis workflow'lar, bagli start/task 
 
 ## Documentation
 
-- `docs/00-requirements-from-pdf.md`
-- `docs/01-agent-notes.md`
-- `docs/02-architecture.md`
-- `docs/03-bpm-and-state-machine.md`
-- `docs/04-api-and-services.md`
-- `docs/05-code-review-guide.md`
-- `docs/06-team-presentation-split.md`
-- `docs/07-product-todo.md`
-- `docs/08-local-database.md`
-- `docs/09-ozgun-form-flow.md`
-- `docs/10-ufuk-access-shell-flow.md`
-- `docs/11-i18n-language-support.md`
-- `docs/12-cagdas-process-flow.md`
-- `docs/13-frontend-ui-review.md`
-- `docs/14-backend-api-review.md`
-- `docs/15-product-readiness-and-defense.md`
-- `docs/16-community-permission-model.md`
-- `docs/17-docker-and-deployment.md`
-- `docs/18-dynamic-workflow-and-team-architecture.md`
-- `docs/19-ui-ux-system.md`
-- `docs/20-dynamic-workflow-contract.md`
-- `docs/21-dynamic-workflow-rebase-notes.md`
-- `docs/22-workflow-end-to-end-test-scenarios.md`
-- `docs/23-presentation-study-guide.md`
+- [Dokumantasyon rehberi](docs/README.md): konu sahipligi ve okuma sirasi.
+- [PDF gereksinim matrisi](docs/00-requirements-from-pdf.md): zorunlu ve bonus kapsam.
+- [Mimari](docs/02-architecture.md): katmanlar ve genisleme sinirlari.
+- [API ve servisler](docs/04-api-and-services.md): HTTP ve servis sozlesmeleri.
+- [Test ve kalite kapilari](docs/24-testing-and-quality-gates.md): kapsam, komutlar ve guncel kanit.
+- [Sunum calisma rehberi](docs/23-presentation-study-guide.md): teknoloji, karar ve savunma Q&A.

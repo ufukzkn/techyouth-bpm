@@ -99,4 +99,4 @@ The shared contract was implemented in that order: team API, form versions, grap
 
 The PDF-required form components, validation, JSON submission, first task, assigned work, approve/reject, status dates, Swagger, EF Core and audit behavior remain intact. Multi-page form drag/drop and the React Flow canvas directly strengthen the PDF bonus expectations for field ordering, role/user assignment and dynamic process design.
 
-Verification covers graph validation, version immutability, gateway routing, task-form validation, rollback, team/role candidate resolution, stale-snapshot claim competition, HTTP publish/start/complete and SQLite/PostgreSQL migrations. Exact current counts are recorded in `docs/01-agent-notes.md` after each full verification run.
+Verification covers graph validation, version immutability, gateway routing, task-form validation, rollback, team/role candidate resolution, stale-snapshot claim competition, HTTP publish/start/complete and SQLite/PostgreSQL migrations. Exact current counts and commands are recorded only in [Testing And Quality Gates](24-testing-and-quality-gates.md).

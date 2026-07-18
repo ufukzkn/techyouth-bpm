@@ -81,86 +81,26 @@ Form update, process start and task action now use explicit EF Core transactions
 
 ## Test Coverage
 
-Current backend tests are strong for the project scope. The latest run passed:
+Backend coverage is strong for the project scope: it spans pure lifecycle rules,
+relational persistence, real HTTP authentication/authorization, workflow runtime,
+transactions, provider migrations and deterministic demonstration chains. The
+single canonical catalog, latest verified result and commands are maintained in
+[Testing And Quality Gates](24-testing-and-quality-gates.md).
 
-```bash
-dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj
-```
-
-Result: `194 passed` (latest full verification).
-
-Covered areas include:
-
-- state machine valid/invalid transitions
-- task authorization and closed task behavior
-- audit log creation for approve/reject
-- form update and validation rule replacement
-- password hashing and legacy password upgrade
-- hashed access and refresh tokens
-- refresh token rotation and reuse detection
-- pending approval login rejection
-- account lockout
-- admin user creation/deletion/session management
-- OTP hashing and expiry
-- password reset and public email verification
-- personal/community/global workflow scope authorization
-- Okan, Fatih, Approver and Quaresma candidate-pool HTTP scenarios
-- process/task cache contract inputs and deterministic six-process community seed
-- relational constraints through SQLite instead of EF InMemory
-- real HTTP login, cookies, CSRF, Bearer and logout behavior
-- refresh-token rotation and reuse through the controller pipeline
-- rate limiting with standard `429` responses
-- SuperAdmin and community-admin authorization boundaries
-- Swagger bearer metadata and form-to-process endpoint smoke flow
-- transaction rollback for form, process and task writes
-- SQLite migration/startup smoke and opt-in PostgreSQL/Neon migration smoke
-- form and workflow version publication/immutability
-- graph reachability, gateway/default edge and form-binding validation
-- dynamic runtime routing, send-back attempts and task-form validation
-- team/role candidate resolution and deterministic stale-snapshot claim competition
-- real HTTP workflow create, publish, runnable-list, start and complete flow
-- deterministic seeded Transfer workflow validation and first-task creation
-- real HTTP transfer chain with dependent/file validation, team-role candidate checks, claim/release, task-form rejection, approve/reject, notifications and both audit layers
-- live role and team membership reevaluation with the same already-issued opaque session token
-
-The remaining test gap is browser-level E2E coverage. The API now has service, relational persistence and `WebApplicationFactory` HTTP coverage; Playwright should next protect the critical login -> form -> process -> task -> audit user journey.
+The remaining material gap is browser-level E2E coverage. Service, relational
+and `WebApplicationFactory` tests cannot prove focus behavior, drag/drop geometry
+or the complete login -> form -> process -> task -> audit experience in a real
+browser. That risk is recorded in the same quality document and the manual chain
+is specified in [Workflow End-to-End Test Scenarios](22-workflow-end-to-end-test-scenarios.md).
 
 ## Presentation Defense Notes
 
-**Why opaque sessions instead of JWT?**  
-The project needs central revoke, account approval, lockout, active session view, logout and refresh-token reuse detection. Opaque DB-backed sessions make these behaviors direct. JWT would still need server-side state for these requirements.
-
-The token contains no role/team claims. Protected requests reload active permissions and memberships from the database, so access changes apply on the next request. The normal browser uses `/api/auth/browser-login` and never persists the raw token; HttpOnly cookies carry access/refresh secrets, while `/api/auth/login` preserves Bearer compatibility for Swagger and explicit API clients.
-
-**Why custom community roles?**
-Fixed enum roles are too rigid for BPM teams. Community roles let a team create `Lojistik Gorevlisi` or `Form Tasarimcisi` by selecting permissions instead of changing code.
-
-**Why EF Core?**  
-EF Core gives strongly typed entities, LINQ queries, provider switching between SQLite/PostgreSQL and a migration path for production. It keeps persistence logic readable for code review.
-
-**Why SQLite and Neon/PostgreSQL?**  
-SQLite is fast for local demo development and needs no setup. PostgreSQL/Neon supports shared remote testing by the team. The provider is selected by configuration, not by changing code.
-
-**How does the state machine work?**  
-Allowed lifecycle transitions remain in one dictionary. The separate dynamic engine follows a validated published graph for task-to-task routing, gateways, send-back and end nodes. This keeps lifecycle policy independent from process shape.
-
-**Why a custom engine instead of embedding Camunda?**
-The PDF asks for BPM concepts and extensibility, not BPMN deployment. React Flow provides the modeling experience while a small typed .NET runtime keeps the supported nodes, authorization and persistence visible in code review. Camunda and Kissflow are design references rather than runtime dependencies.
-
-**How are running processes protected from later edits?**
-They reference immutable published form and process-definition versions. New edits produce new drafts/versions; existing instances continue with their pinned snapshots.
-
-**How is audit traceability handled?**  
-Workflow actions write process-level audit logs. Identity, form, process and task events also write system audit logs with actor, entity, action, date and description.
-
-**How does refresh-token rotation work?**  
-Remember-me creates a long-lived refresh token hash. Each refresh revokes the previous refresh token and access session, then creates new ones. Reuse of a revoked refresh token is treated as suspicious.
-
-**How are passwords protected?**  
-Passwords are stored with PBKDF2 hashes. Raw passwords are only used for verification or temporary email delivery during admin-created account setup.
-
-**How does Swagger work with auth?**  
-Login returns a bearer token. In Swagger, paste it into Authorize as a bearer token; protected endpoints then receive `Authorization: Bearer <token>`.
+This review owns backend findings, not a duplicate defense script. Canonical
+answers for opaque sessions versus JWT, live permission reevaluation, community
+roles, EF Core/providers, state machine versus graph runtime, Camunda, immutable
+versions, audit, refresh rotation, password storage and Swagger Bearer usage are
+in [Presentation Study Guide](23-presentation-study-guide.md). Endpoint behavior
+itself remains canonical in [API And Services](04-api-and-services.md).
 
 ## Recommended Next Improvements
 

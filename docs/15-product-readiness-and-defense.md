@@ -4,9 +4,29 @@
 
 The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, permission-aware access, community/custom role management, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
-The strongest defense is extensibility. Forms and workflows are versioned data, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional; 194 backend tests cover cookie/CSRF, Bearer, cookie-only browser transport, one-minute session expiry, refresh, logout, rate limit, live role/team reevaluation and a realistic transfer workflow across start, claim, release, approve and reject. Candidate claims use optimistic concurrency. The main remaining production gaps are Playwright E2E, CI, parallel/timer workflow nodes and final responsive/accessibility QA.
+The strongest defense is extensibility. Forms and workflows are versioned data, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional, HTTP/security/runtime behavior is covered across multiple test layers, and candidate claims use optimistic concurrency. Current counts and exact evidence live in [Testing And Quality Gates](24-testing-and-quality-gates.md). The main remaining production gaps are Playwright E2E, CI, parallel/timer workflow nodes and final responsive/accessibility QA.
 
 The dependency direction is healthy: Domain is independent, Application references Domain, Infrastructure implements Application contracts, and API composes the layers. Next.js routes share one persistent workspace layout while feature folders own their views. Physical modularity is not finished everywhere: `AuthService`, `DatabaseSeeder`, `DemoWorkflowSeeder`, `FormDesignerDraft` and `UsersAndRolesView` are still large files. They are maintainable behind focused interfaces/components today, but splitting their implementations is the clearest next readability improvement.
+
+## Readability And Extensibility Verdict
+
+The project **meets the PDF's readability and extensibility expectation at the
+architecture and behavior-contract level**, and exceeds the baseline in several
+areas. It should not be described as perfectly modular at file level.
+
+| Area | Evidence | Verdict |
+| --- | --- | --- |
+| Dependency direction | Domain has no project dependency; Application references Domain; Infrastructure implements Application; API is the composition root. | Strong |
+| HTTP boundary | Controllers depend on focused service interfaces and do not query `AppDbContext` directly. | Strong |
+| Frontend routing | App Router pages are small composition files; the shared workspace layout persists shell state while feature folders own behavior. | Strong |
+| Change tolerance | Data-driven permissions, typed workflow graphs, immutable versions and provider-neutral EF contracts avoid hardcoded business paths. | Strong |
+| Verification | Unit, relational, HTTP integration, frontend and provider-smoke layers protect extension points. | Strong, with browser E2E remaining |
+| Physical file size | `AuthService`, seed orchestration, Form Designer and user-management view still combine many subflows. | Acceptable technical debt, next refactor target |
+
+The practical conclusion is: a new field, permission, provider, route or workflow
+node has an identified extension boundary and does not require a whole-system
+rewrite. The next quality step is splitting the largest implementations without
+changing their existing contracts, not redesigning the architecture.
 
 ## PDF Compliance Matrix
 
@@ -59,43 +79,16 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 ## Likely Reviewer Questions And Answers
 
-**Why Next.js?** It gives TypeScript, route-based screens, production build tooling and a clean App Router model for the authenticated workspace.
+Reviewer answers are maintained once in
+[Presentation Study Guide](23-presentation-study-guide.md). That guide covers
+Next.js, .NET, EF Core, SQLite/PostgreSQL, Zustand, drag/drop, React Flow,
+Camunda/Kissflow, Swagger/browser auth, opaque sessions, roles/teams, password
+and refresh security, workflow runtime, projected lists, audit, i18n and Docker.
 
-**Why .NET 8?** The PDF asks for .NET 8 or newer. It gives a strong REST API stack, dependency injection, middleware, Swagger and EF Core integration.
-
-**Why EF Core?** EF Core keeps persistence typed and testable, supports SQLite/PostgreSQL provider switching and gives a migration path.
-
-**Why SQLite and Neon?** SQLite is frictionless for local demos. Neon/PostgreSQL allows shared remote testing without changing application code.
-
-**Why Zustand?** Session, theme and language are lightweight global states. Zustand avoids heavier Redux-style boilerplate.
-
-**Why dnd-kit?** It is a focused React drag/drop library used only for form field ordering, with move up/down controls as fallback.
-
-**Why React Flow?** `@xyflow/react` provides proven node/edge canvas interaction, pan/zoom and custom nodes. We keep it in the presentation layer and translate it to our own typed graph DTO, so the backend is not coupled to a UI library.
-
-**Why not install Camunda?** The PDF asks for BPM concepts and a dynamic flow, not an external engine. A typed in-project runtime makes form binding, team permissions, transaction behavior and code review visible. Camunda/Kissflow are UX and modeling references.
-
-**How does Swagger auth work?** Swagger calls `/api/auth/login`, receives a Bearer token and lets the operator paste it into Authorize. The web application instead calls `/api/auth/browser-login`; that endpoint and `/api/auth/refresh` omit token fields and use HttpOnly cookies plus CSRF-protected mutations. The separate contracts preserve Swagger support without exposing browser auth secrets to localStorage.
-
-**Why opaque sessions instead of JWT?** This BPM system needs central revoke, pending approval, lockout, session visibility and suspicious refresh reuse detection. Opaque DB-backed sessions make those direct. JWT would still need server-side state for these features.
-
-**Why community/custom roles?** Real BPM systems usually need team-specific permissions. `SuperAdmin` manages the platform, while `CommunityRolePermission` records let each community define roles such as form designer, process starter or logistics operator without new code.
-
-**Why are teams separate from roles?** A team answers where work is performed, while a role answers what a user may do. Keeping them separate allows one user to work in multiple operational teams without duplicating permissions or inventing a second authorization system.
-
-**How are passwords protected?** Passwords are stored as PBKDF2 hashes. Raw passwords are only used at verification time or as temporary admin-created credentials before forced change.
-
-**How do refresh tokens work?** Remember-me creates a long-lived refresh token hash. Each refresh rotates it, revokes the old token/session and creates a new pair. Reuse of a revoked refresh token is treated as suspicious.
-
-**How does the state machine work?** `ProcessStateMachine` controls lifecycle status, while `DynamicWorkflowEngine` follows the published node graph. A task action must be both available on the node and connected to a valid edge; otherwise it fails without partial writes.
-
-**How did you optimize process listing?** The process board uses a projected summary query and only loads id, form name, status and dates. Tasks, submitted JSON and audit history are loaded from the detail endpoint when the user opens a specific process. This avoids pulling large related graphs for every row.
-
-**Why audit logs?** Process audit explains BPM decisions. System audit explains identity/access/form/process/task actions. Together they satisfy traceability.
-
-**How is i18n handled?** The frontend uses a shared TR/EN dictionary and maps known API errors to localized messages. Remaining raw backend messages should be mapped before final demo.
-
-**Is Docker ready?** Yes. Separate Compose stacks run the SQLite local demo or the Neon-backed cloud flow with the same API/web images, migrations and deterministic seed. They share host ports and are intentionally started one at a time.
+This file remains the readiness assessment: its matrices, scenario risks and
+recommended work should be read together with the canonical
+[PDF requirement matrix](00-requirements-from-pdf.md) and
+[quality gates](24-testing-and-quality-gates.md).
 
 ## Recommended Next Work
 

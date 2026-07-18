@@ -36,19 +36,12 @@ This report reviews the frontend implementation against the TechYouth BPM projec
 
 ## Presentation Defense Notes
 
-**Why Next.js?** It gives a structured App Router, route-based screens, TypeScript support and a production build path while keeping the prototype fast to develop.
-
-**Why Zustand?** The app needs lightweight global state for session, theme and language. Zustand avoids boilerplate and keeps domain data in local feature components.
-
-**Why a service/API layer?** `src/lib/api.ts` centralizes API base URL, bearer token support, cookie credentials, CSRF header handling and response normalization.
-
-**How does route-based navigation work?** `navigation.ts` defines each view, path, icon and required permissions. The shared layout reads the active pathname, renders semantic Next.js links and keeps sidebar/topbar mounted while route pages such as `/dashboard`, `/management` and `/logs` replace only the content.
-
-**Which UI libraries are used?** Lucide React is used for icons. `@dnd-kit` is used for drag/drop field ordering. Most visual styling is custom CSS in `globals.css`.
-
-**How are loading states handled?** Feature screens keep explicit status values such as `loading`, `refreshing`, `idle`, `error` or `submitting`, then render loaders, disabled buttons, inline messages or toasts.
-
-**Why not store all UI data globally?** Session and preferences are global; form drafts, filters, selected process and dialog state are local because they belong to one flow.
+This review records findings rather than maintaining a second technology Q&A.
+The canonical answers for Next.js, Zustand, API client boundaries, Lucide,
+`@dnd-kit`, React Flow and local-versus-global state are in
+[Presentation Study Guide](23-presentation-study-guide.md). Current loading,
+motion and responsive contracts are in [UI And UX System](19-ui-ux-system.md),
+while route ownership is defined in [Architecture](02-architecture.md).
 
 ## Recommended Next Improvements
 

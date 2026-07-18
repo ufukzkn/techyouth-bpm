@@ -28,43 +28,25 @@ Use this file for the final code review presentation.
 
 ## Current Test Story
 
-- `ProcessStateMachineTests` proves the allowed BPM transitions:
-  - `Pending -> Start -> InProgress`
-  - `InProgress -> Approve -> Completed`
-  - `InProgress -> Reject -> Rejected`
-- Invalid transitions are rejected with an explicit error.
-- Available actions are derived from the current process status instead of being hardcoded in the UI.
-- `TaskAuthorizationTests` covers who can execute assigned tasks:
-  - normal users cannot execute approver tasks.
-  - approvers can execute approver tasks.
-  - admins can execute any task.
-  - closed or missing tasks return explicit errors.
-- `AuditLogTests` proves approve/reject actions create audit entries with correct status transitions, user ids and notes.
-- `SystemAuditServiceTests` proves only Admin users can read the system-wide audit trail.
-- `FormServiceTests` covers form definition updates:
-  - admin users can update a saved form.
-  - non-admin users cannot update form definitions.
-  - update replaces the editable field and validation-rule model.
-- `AuthServiceTests` covers the hardened login path:
-  - raw session tokens are returned only once to the client.
-  - only hashed session tokens are stored in the database.
-  - plaintext legacy passwords are upgraded to PBKDF2 hashes on successful login.
-  - invalid passwords do not create sessions.
-  - remember-me logins use the longer configured session duration.
-  - registration creates pending/unverified accounts.
-  - repeated failed login attempts lock the account.
-  - logout revokes the stored session.
-- The latest verified backend suite passes 166 tests across auth, community/team access, form/workflow versioning, graph validation, SLA/deadline calculation, server-side process/task paging, runtime rollback, claim concurrency, HTTP security, notifications, shared workflow visibility, deterministic demo scenarios and audit behavior. Frontend Vitest passes 40 tests across notification cache, process cache isolation, scope options, form versioning/validation, designer page movement and workflow graph/store/SLA behavior.
-- `ProcessDefinitionServiceTests` proves publish validation, geometry round-trip, namespace-safe conditions, cycle rejection and permission separation.
-- `DynamicWorkflowRuntimeTests` proves conditional routing, send-back attempts, task forms, no-candidate rollback, `Complete` and stale-snapshot claim competition.
-- `AuthorizationAndWorkflowIntegrationTests` publishes and runs a dynamic workflow through real HTTP controllers, not direct service calls.
+Review test evidence in four passes:
+
+1. Pure lifecycle, validation and graph tests.
+2. Relational SQLite service and transaction tests.
+3. `WebApplicationFactory` HTTP security/authorization/workflow tests.
+4. Frontend Vitest plus the manual cross-role browser chain.
+
+The complete suite catalog, current verified counts, commands, provider matrix and
+remaining browser gap are maintained in
+[Testing And Quality Gates](24-testing-and-quality-gates.md). The exact manual
+form -> workflow -> process -> claim -> task -> audit path is in
+[Workflow End-to-End Test Scenarios](22-workflow-end-to-end-test-scenarios.md).
 
 ## Current Frontend Story
 
 - `LoginView` starts empty and uses demo-account buttons only to fill credentials for testing.
 - `LoginView` supports both sign-in and register mode. Register creates a pending account and explains that admin approval is required.
-- `sessionStore` keeps the active user, token, expiry and theme in Zustand so refresh does not reset the demo flow.
-- `AuthService` verifies PBKDF2 password hashes and stores only hashed session tokens, while the frontend receives the raw opaque token once at login.
+- `sessionStore` keeps the active user, expiry and preferences needed across routes; browser access/refresh secrets never enter Zustand or localStorage.
+- `AuthService` verifies PBKDF2 password hashes and stores only hashed session tokens. The normal browser receives HttpOnly cookies through `/api/auth/browser-login`; only explicit Swagger/API clients receive a raw Bearer token from `/api/auth/login`.
 - `AuthService` keeps the current opaque-session model instead of JWT because logout, revoke, lockout and pending approval need server-side state anyway.
 - The shared `(workspace)` layout keeps navigation chrome mounted across route changes. `WorkspaceSessionController` verifies restored API sessions, schedules expiry and sends expired/unauthorized sessions to login.
 - The layout filters navigation by effective permissions while each route imports only its feature view. Sidebar links remain semantic App Router links and backend services still enforce authorization.
