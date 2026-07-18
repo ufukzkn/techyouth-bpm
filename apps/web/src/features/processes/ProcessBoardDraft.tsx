@@ -3,6 +3,7 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
 import { MyTasksView } from "@/features/processes/MyTasksView";
 import { ProcessDetailPanel } from "@/features/processes/ProcessDetailPanel";
@@ -89,14 +90,43 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const requestedProcessId = searchParams.get("processId") ?? "";
   const requestedTaskId = searchParams.get("taskId") ?? "";
 
+  function prepareProcessQueryTransition(overrides: Partial<ProcessListParams>) {
+    const nextParams = { ...processParams, ...overrides };
+    const cached = processPageCache.get(createProcessCacheKey(activeUserId, nextParams));
+    setProcessResult(cached ?? null);
+    setStatus(cached ? "refreshing" : "loading");
+    setMessage(t(cached ? "process.refreshing" : "process.loading"));
+  }
+
+  function prepareTaskQueryTransition(overrides: Partial<TaskListParams>) {
+    const nextParams = { ...taskParams, ...overrides };
+    const cached = taskPageCache.get(createProcessCacheKey(activeUserId, nextParams));
+    setTaskResult(cached ?? null);
+    setStatus(cached ? "refreshing" : "loading");
+    setMessage(t(cached ? "process.refreshing" : "process.loading"));
+  }
+
   function changeProcessScope(nextScope: WorkflowVisibilityScope) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("scope", nextScope);
     params.delete("processId");
+    prepareProcessQueryTransition({ page: 1, scope: nextScope });
     setProcessPage(1);
     setSelectedProcessId("");
     setDetail(null);
     router.replace(`/processes?${params.toString()}`);
+  }
+
+  function changeProcessPage(nextPage: number) {
+    const boundedPage = Math.max(1, Math.min(totalPages, nextPage));
+    prepareProcessQueryTransition({ page: boundedPage });
+    setProcessPage(boundedPage);
+  }
+
+  function changeTaskPage(nextPage: number) {
+    const boundedPage = Math.max(1, Math.min(totalPages, nextPage));
+    prepareTaskQueryTransition({ page: boundedPage });
+    setTaskPage(boundedPage);
   }
 
   useEffect(() => {
@@ -138,6 +168,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
       else setTaskResult(activeCache as PagedResult<ProcessTask>);
     }
     setStatus(activeCache ? "refreshing" : "loading");
+    setMessage(t(activeCache ? "process.refreshing" : "process.loading"));
     if (isManual) setIsManualRefreshing(true);
 
     try {
@@ -278,6 +309,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
 
   const activeResult = mode === "processes" ? processResult : taskResult;
   const isInitialLoading = status === "loading" && !activeResult;
+  const isListLoading = status === "loading" || status === "refreshing";
   const totalPages = Math.max(1, Math.ceil((activeResult?.totalCount ?? 0) / pageSize));
 
   return (
@@ -308,7 +340,14 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
       ) : null}
 
       <div className="section-toolbar">
-        <p className={`status-line status-line-${status}`} aria-live="polite">{message}</p>
+        <p className={`status-line status-line-${status}`} aria-live="polite">
+          {isListLoading ? (
+            <>
+              <InlineValueLoader label={t(status === "refreshing" ? "process.refreshing" : "process.loading")} />
+              <span>{t(status === "refreshing" ? "process.refreshing" : "process.loading")}</span>
+            </>
+          ) : message}
+        </p>
         <button
           className="secondary-button refresh-button"
           disabled={isInitialLoading || isManualRefreshing || status === "acting"}
@@ -327,13 +366,13 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
               <ProcessListView
                 cacheScope={`${activeUserId}:${processScope}:${processPage}:${processStatus}:${processSortBy}:${processSortDirection}`}
                 language={language}
-                onNextPage={() => setProcessPage((value) => Math.min(totalPages, value + 1))}
-                onPageChange={setProcessPage}
-                onPreviousPage={() => setProcessPage((value) => Math.max(1, value - 1))}
+                onNextPage={() => changeProcessPage(processPage + 1)}
+                onPageChange={changeProcessPage}
+                onPreviousPage={() => changeProcessPage(processPage - 1)}
                 onSelectProcess={(id) => void selectProcess(id)}
-                onSortByChange={(value) => { setProcessSortBy(value); setProcessPage(1); }}
-                onSortDirectionChange={(value) => { setProcessSortDirection(value); setProcessPage(1); }}
-                onStatusChange={(value) => { setProcessStatus(value); setProcessPage(1); }}
+                onSortByChange={(value) => { prepareProcessQueryTransition({ page: 1, sortBy: value }); setProcessSortBy(value); setProcessPage(1); }}
+                onSortDirectionChange={(value) => { prepareProcessQueryTransition({ page: 1, sortDirection: value }); setProcessSortDirection(value); setProcessPage(1); }}
+                onStatusChange={(value) => { prepareProcessQueryTransition({ page: 1, status: value }); setProcessStatus(value); setProcessPage(1); }}
                 result={processResult}
                 selectedProcessId={selectedProcessId}
                 sortBy={processSortBy}
@@ -348,14 +387,14 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 language={language}
                 onClaimTask={(taskId, claimVersion) => void updateTaskClaim(taskId, "claim", claimVersion)}
                 onExecuteTask={executeTask}
-                onNextPage={() => setTaskPage((value) => Math.min(totalPages, value + 1))}
-                onPageChange={setTaskPage}
-                onPreviousPage={() => setTaskPage((value) => Math.max(1, value - 1))}
-                onPriorityChange={(value) => { setTaskPriority(value); setTaskPage(1); }}
+                onNextPage={() => changeTaskPage(taskPage + 1)}
+                onPageChange={changeTaskPage}
+                onPreviousPage={() => changeTaskPage(taskPage - 1)}
+                onPriorityChange={(value) => { prepareTaskQueryTransition({ page: 1, priority: value }); setTaskPriority(value); setTaskPage(1); }}
                 onReleaseTask={(taskId, claimVersion) => void updateTaskClaim(taskId, "release", claimVersion)}
                 onSelectTask={(task) => void selectTask(task)}
-                onSortByChange={(value) => { setTaskSortBy(value); setTaskPage(1); }}
-                onSortDirectionChange={(value) => { setTaskSortDirection(value); setTaskPage(1); }}
+                onSortByChange={(value) => { prepareTaskQueryTransition({ page: 1, sortBy: value }); setTaskSortBy(value); setTaskPage(1); }}
+                onSortDirectionChange={(value) => { prepareTaskQueryTransition({ page: 1, sortDirection: value }); setTaskSortDirection(value); setTaskPage(1); }}
                 priorityFilter={taskPriority}
                 result={taskResult}
                 selectedTaskId={selectedTaskId}

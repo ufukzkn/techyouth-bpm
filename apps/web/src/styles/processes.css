@@ -6,6 +6,13 @@
   gap: 14px;
 }
 
+.process-section .section-toolbar .status-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
 .process-card {
   display: grid;
   gap: 14px;

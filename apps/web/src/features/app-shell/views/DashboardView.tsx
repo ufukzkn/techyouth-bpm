@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, ListTodo, Network, Workflow } from "lucide-react";
+import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, GitBranch, ListTodo, Network, Workflow } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
@@ -181,6 +181,11 @@ export function DashboardView({
             {canOpen("runner") ? (
               <button className="primary-button" onClick={() => onNavigate("runner")} type="button">
                 <FilePlay size={17} /> {t("dashboard.quick.start")}
+              </button>
+            ) : null}
+            {canOpen("workflows") ? (
+              <button className="secondary-button" onClick={() => onNavigate("workflows")} type="button">
+                <GitBranch size={17} /> {t("dashboard.quick.workflow")}
               </button>
             ) : null}
             {canOpen("forms") ? (
