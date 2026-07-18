@@ -89,6 +89,8 @@ Backend varsayilan olarak SQLite kullanir:
 
 Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Browser akisi access token'i HttpOnly cookie olarak da alir, mutating cookie isteklerinde CSRF header kullanir. `Beni hatirla` secilirse hashed rotating refresh token uretilir; refresh reuse tespitinde aktif oturumlar revoke edilir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
 
+Mevcut demo web istemcisi Swagger/dev uyumlulugu icin login response'taki bearer token'i Zustand persist ile tarayici depolamasinda da tutar. Production browser hardening adiminda normal web akisi cookie-only yapilmali, oturum `/api/auth/me` ile toparlanmali ve raw bearer token yalniz Swagger veya ayri API istemcilerine acilmalidir. Bu, opaque session modelini degil token'in browser'da tasinma seklini sertlestiren ayri bir teslimat adimidir.
+
 Sifre sifirlama e-postalarindaki link `Frontend:BaseUrl` ayarindan uretilir. Local varsayilan `http://localhost:3000` degeridir; farkli web portu kullanilirsa scriptlerde `-FrontendBaseUrl` verilebilir.
 
 Email verification varsayilan olarak `Demo` provider ile calisir. Bu modda OTP hashlenerek veritabanina yazilir ve demo kod UI'da gorunur. Kodlar varsayilan olarak 24 saat gecerlidir ve yeniden kod gonderme icin 5 dakikalik cooldown uygulanir. `Routing` provider kullanildiginda once guvenli allowlist'e bagli canli SMTP denenir; allowlist disindaki kullanicilar Mailtrap Sandbox'a yonlendirilir. Sandbox mail gercek Gmail/Outlook inbox'ina degil, Mailtrap Sandbox inbox'ina gider.
@@ -293,7 +295,7 @@ Backend testleri:
 dotnet test apps/api/TechYouthBpm.slnx
 ```
 
-Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, personal/community/global workflow scope, Swagger, workflow publish, version-pinned process start, task formu, SLA/deadline ve server-side process/task pagination davranislari dogrulanir. Claim concurrency testi iki stale DbContext snapshot'inin ayni gorevi alamadigini kanitlar.
+Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, personal/community/global workflow scope, Swagger, workflow publish, version-pinned process start, task formu, SLA/deadline ve server-side process/task pagination davranislari dogrulanir. Claim concurrency testi iki stale DbContext snapshot'inin ayni gorevi alamadigini kanitlar. Gercek transfer demo zinciri; bagimli form validasyonu, dosya metadata'si, takim+rol adayligi, claim/release, eksik task formu reddi, approve/reject, step output, bildirim ve iki seviyeli audit kaydini ayni HTTP senaryosunda kontrol eder. Mevcut bir session ile rol veya takim uyeligi degistiginde sonraki istegin yeni yetkiyi DB'den yeniden hesapladigi da entegrasyon testiyle guvence altindadir.
 
 Neon/PostgreSQL migration smoke testi varsayilan kosuda dis servise baglanmaz. Opt-in calistirmak icin baglanti bilgisini yalniz mevcut terminal oturumunda tanimla:
 

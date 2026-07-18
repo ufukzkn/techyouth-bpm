@@ -78,6 +78,20 @@ Bildirim okundu/okunmadı değişikliği audit üretmez. Kaynak iş olayı audit
 
 ## Otomatik Doğrulama
 
+`WorkflowRoleAndActionIntegrationTests.Transfer_Workflow_Enforces_Form_Team_Role_Claim_Approve_And_Reject_Through_Http` gerçek controller hattında şu zinciri tek veritabanı üzerinde doğrular:
+
+- koşullu başlangıç formu ve dosya metadata validasyonu
+- takım + community role kesişimi ve yanlış aday reddi
+- claim, eksik task formu reddi, release ve yeniden claim
+- Scout onayıyla Teknik Değerlendirme adımına geçiş
+- başka kullanıcının claim ettiği task'a müdahale reddi
+- teknik ret ile süreç kapanışı
+- `start`/`steps.<nodeKey>` çıktıları, process audit, system audit ve bildirimler
+
+`Existing_Session_Reevaluates_Role_And_Team_Membership_On_Every_Request` aynı access token açıkken community role değişiminin görevi görünür yaptığını, takım üyeliği kapatılınca aynı token ile görevin yeniden gizlendiğini kanıtlar. Token yetki snapshot'ı taşımaz; backend aktif rol ve takımları her protected istekte veritabanından çözer.
+
+Toplam otomatik kapsam şu anda 190 backend ve 46 frontend testidir. Servis/unit testleri ayrıca gateway, SendBack, Complete, Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transaction rollback, pagination ve scope davranışlarını kapsar. Tam cross-role tarayıcı zinciri hâlâ manuel kabul senaryosudur; bunun Playwright ile otomasyonu teslimat borcu olarak kalır.
+
 ```powershell
 dotnet test apps/api/TechYouthBpm.slnx
 cd apps/web

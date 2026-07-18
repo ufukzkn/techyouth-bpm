@@ -87,7 +87,7 @@ Current backend tests are strong for the project scope. The latest run passed:
 dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj
 ```
 
-Result: `187 passed` (latest full verification).
+Result: `190 passed` (latest full verification).
 
 Covered areas include:
 
@@ -120,6 +120,8 @@ Covered areas include:
 - team/role candidate resolution and deterministic stale-snapshot claim competition
 - real HTTP workflow create, publish, runnable-list, start and complete flow
 - deterministic seeded Transfer workflow validation and first-task creation
+- real HTTP transfer chain with dependent/file validation, team-role candidate checks, claim/release, task-form rejection, approve/reject, notifications and both audit layers
+- live role and team membership reevaluation with the same already-issued opaque session token
 
 The remaining test gap is browser-level E2E coverage. The API now has service, relational persistence and `WebApplicationFactory` HTTP coverage; Playwright should next protect the critical login -> form -> process -> task -> audit user journey.
 
@@ -127,6 +129,8 @@ The remaining test gap is browser-level E2E coverage. The API now has service, r
 
 **Why opaque sessions instead of JWT?**  
 The project needs central revoke, account approval, lockout, active session view, logout and refresh-token reuse detection. Opaque DB-backed sessions make these behaviors direct. JWT would still need server-side state for these requirements.
+
+The token contains no role/team claims. Protected requests reload active permissions and memberships from the database, so access changes apply on the next request. The current demo browser still persists the raw bearer token for development convenience; production hardening should use the already-supported HttpOnly cookie path and reserve bearer tokens for Swagger or explicit API clients.
 
 **Why custom community roles?**
 Fixed enum roles are too rigid for BPM teams. Community roles let a team create `Lojistik Gorevlisi` or `Form Tasarimcisi` by selecting permissions instead of changing code.
@@ -163,12 +167,11 @@ Login returns a bearer token. In Swagger, paste it into Authorize as a bearer to
 ### High
 
 - Move CORS allowed origins and cookie security policy fully into environment-specific config.
+- Remove raw bearer-token persistence from the normal browser flow and recover sessions through HttpOnly cookies.
 - Add Playwright coverage for the critical cross-role BPM journey.
 
 ### Medium
 
-- Add paged process/task endpoints for large datasets.
-- Add endpoint-specific rate limits for login, register, verification, reset password and admin mutations.
 - Add structured audit action enums/constants instead of free-form action strings.
 - Extend HTTP integration coverage when new community-scoped mutations are added.
 

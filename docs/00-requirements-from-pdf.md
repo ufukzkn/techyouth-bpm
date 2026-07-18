@@ -77,7 +77,7 @@ These items are not required by the PDF, but they strengthen the final review st
 - Separate local SQLite and cloud Neon Docker Compose stacks.
 - Production deployment hardening for HTTPS cookie settings, SMTP domain verification and environment-specific secrets.
 
-Remaining delivery work is CI automation and browser-level end-to-end coverage for the complete cross-role demo.
+Remaining delivery work is CI automation, browser-level Playwright coverage for the complete cross-role demo and cookie-only production browser auth that removes the persisted raw bearer token from frontend storage.
 
 ## Important Evaluation Point
 
