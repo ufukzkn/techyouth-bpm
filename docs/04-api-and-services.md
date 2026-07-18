@@ -63,7 +63,7 @@ The project does not currently use JWT. It uses opaque bearer session tokens bac
 
 Browser flows send cookies with `credentials: include`. Mutating cookie-authenticated requests include `X-CSRF-Token`; Swagger and local API debugging can still use the `Authorization: Bearer` header.
 
-The backend authorization decision is not embedded in the opaque token. `/api/auth/me` and every protected request resolve the hashed server session, then reload active community role permissions and team memberships from the database. Role, status, community and team changes therefore affect an already-open session on its next request. The current demo frontend also persists the returned raw bearer token in its Zustand session snapshot and normally sends it as an authorization header. A production browser deployment should remove that persisted bearer path, recover the session from the HttpOnly cookie and retain bearer responses only for Swagger/dev or non-browser clients.
+The backend authorization decision is not embedded in the opaque token. `/api/auth/me` and every protected request resolve the hashed server session, then reload active community role permissions and team memberships from the database. Role, status, community and team changes therefore affect an already-open session on its next request. The normal web client uses the dedicated `/api/auth/browser-login` endpoint; browser login and refresh responses omit token fields, auth secrets remain in HttpOnly cookies and Zustand persists preferences only. Swagger/dev clients use `/api/auth/login` and may still receive and use Bearer tokens.
 
 ## Dashboard
 

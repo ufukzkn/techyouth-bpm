@@ -11,6 +11,8 @@ Form field/page ordering uses `@dnd-kit`; the visual workflow canvas uses `@xyfl
 
 Dokumantasyon `docs/` altindadir. Proje ilerledikce mimari kararlar, servis isleyisi, code review notlari ve ekip sunum dagilimi buradan takip edilir.
 
+Hizli kurulum icin [QUICKSTART.md](QUICKSTART.md), sunuma hazirlanmak icin [docs/23-presentation-study-guide.md](docs/23-presentation-study-guide.md) dosyasini kullanin.
+
 ## Requirements
 
 - Git
@@ -87,9 +89,9 @@ Backend varsayilan olarak SQLite kullanir:
 
 `Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` ve `Auth:RefreshTokenDurationMinutes` beni-hatirla/refresh-token akisi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:PasswordResetMinutes` sifre sifirlama token gecerliligini belirler. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:EmailVerificationMinutes` e-posta dogrulama kodu gecerliligini, `Auth:EmailVerificationResendCooldownMinutes` yeniden kod gonderme bekleme suresini belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register/verification/reset endpointlerini sinirlar.
 
-Auth modeli JWT degildir; backend opaque bearer session token uretir. Token'in sadece hash'i veritabaninda saklanir. Browser akisi access token'i HttpOnly cookie olarak da alir, mutating cookie isteklerinde CSRF header kullanir. `Beni hatirla` secilirse hashed rotating refresh token uretilir; refresh reuse tespitinde aktif oturumlar revoke edilir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
+Auth modeli JWT degildir; backend opaque session token uretir ve yalniz hash'ini veritabaninda saklar. Normal web istemcisi token dondurmeyen `/api/auth/browser-login` endpointini kullanir: access/refresh token JSON body'ye veya Zustand/localStorage'a girmez, HttpOnly cookie'de kalir. Mutation istekleri okunabilir ancak kimlik dogrulama yetkisi tasimayan CSRF cookie'sini `X-CSRF-Token` header'i olarak geri yollar. Sayfa yenilenince oturum `/api/auth/me` ile toparlanir; access suresi dolmus ve beni-hatirla aktifse `/api/auth/refresh` cookie'leri sessizce rotate eder ve response body'de sir dondurmez. Swagger ve acik API istemcileri `/api/auth/login` ile Bearer token response'u almaya devam eder.
 
-Mevcut demo web istemcisi Swagger/dev uyumlulugu icin login response'taki bearer token'i Zustand persist ile tarayici depolamasinda da tutar. Production browser hardening adiminda normal web akisi cookie-only yapilmali, oturum `/api/auth/me` ile toparlanmali ve raw bearer token yalniz Swagger veya ayri API istemcilerine acilmalidir. Bu, opaque session modelini degil token'in browser'da tasinma seklini sertlestiren ayri bir teslimat adimidir.
+`Beni hatirla` secilirse hashed rotating refresh token uretilir; refresh reuse tespitinde aktif oturumlar revoke edilir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
 
 Sifre sifirlama e-postalarindaki link `Frontend:BaseUrl` ayarindan uretilir. Local varsayilan `http://localhost:3000` degeridir; farkli web portu kullanilirsa scriptlerde `-FrontendBaseUrl` verilebilir.
 
@@ -377,3 +379,6 @@ Local SQLite demo DB; bes toplulukta yayinlanmis workflow'lar, bagli start/task 
 - `docs/18-dynamic-workflow-and-team-architecture.md`
 - `docs/19-ui-ux-system.md`
 - `docs/20-dynamic-workflow-contract.md`
+- `docs/21-dynamic-workflow-rebase-notes.md`
+- `docs/22-workflow-end-to-end-test-scenarios.md`
+- `docs/23-presentation-study-guide.md`

@@ -4,7 +4,7 @@
 
 The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, permission-aware access, community/custom role management, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
-The strongest defense is extensibility. Forms and workflows are versioned data, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional; 190 backend tests cover cookie/CSRF, Bearer, refresh, rate limit, live role/team reevaluation and a realistic transfer workflow across start, claim, release, approve and reject. Candidate claims use optimistic concurrency. The main remaining production gaps are Playwright E2E, CI, cookie-only browser token transport, parallel/timer workflow nodes and final responsive/accessibility QA.
+The strongest defense is extensibility. Forms and workflows are versioned data, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional; 194 backend tests cover cookie/CSRF, Bearer, cookie-only browser transport, one-minute session expiry, refresh, logout, rate limit, live role/team reevaluation and a realistic transfer workflow across start, claim, release, approve and reject. Candidate claims use optimistic concurrency. The main remaining production gaps are Playwright E2E, CI, parallel/timer workflow nodes and final responsive/accessibility QA.
 
 The dependency direction is healthy: Domain is independent, Application references Domain, Infrastructure implements Application contracts, and API composes the layers. Next.js routes share one persistent workspace layout while feature folders own their views. Physical modularity is not finished everywhere: `AuthService`, `DatabaseSeeder`, `DemoWorkflowSeeder`, `FormDesignerDraft` and `UsersAndRolesView` are still large files. They are maintainable behind focused interfaces/components today, but splitting their implementations is the clearest next readability improvement.
 
@@ -75,7 +75,7 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 
 **Why not install Camunda?** The PDF asks for BPM concepts and a dynamic flow, not an external engine. A typed in-project runtime makes form binding, team permissions, transaction behavior and code review visible. Camunda/Kissflow are UX and modeling references.
 
-**How does Swagger auth work?** Login returns a Bearer token for development. Paste it into Swagger Authorize. The API also issues HttpOnly cookies and supports CSRF-protected cookie mutations. The current demo frontend still persists and sends the bearer token for compatibility; production browser hardening will remove that storage path and use the cookie session only.
+**How does Swagger auth work?** Swagger calls `/api/auth/login`, receives a Bearer token and lets the operator paste it into Authorize. The web application instead calls `/api/auth/browser-login`; that endpoint and `/api/auth/refresh` omit token fields and use HttpOnly cookies plus CSRF-protected mutations. The separate contracts preserve Swagger support without exposing browser auth secrets to localStorage.
 
 **Why opaque sessions instead of JWT?** This BPM system needs central revoke, pending approval, lockout, session visibility and suspicious refresh reuse detection. Opaque DB-backed sessions make those direct. JWT would still need server-side state for these features.
 
@@ -102,7 +102,7 @@ Demo risk: avoid dumping every log; use search/filter to show production-aware p
 ### Must
 
 - Run Playwright E2E for the seeded Transfer Talep Akisi across at least two task actors.
-- Remove the raw bearer token from frontend persistence and make normal browser requests cookie-only; keep Bearer for Swagger/dev and explicit API clients.
+- Add Playwright coverage for cookie bootstrap, silent refresh and forced logout behavior.
 - Finish i18n mapping for remaining dynamic workflow/backend validation errors.
 - Run final responsive and accessibility QA on form designer, workflow canvas, management and process detail.
 

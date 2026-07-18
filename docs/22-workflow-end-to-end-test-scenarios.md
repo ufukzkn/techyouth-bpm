@@ -90,7 +90,7 @@ Bildirim okundu/okunmadı değişikliği audit üretmez. Kaynak iş olayı audit
 
 `Existing_Session_Reevaluates_Role_And_Team_Membership_On_Every_Request` aynı access token açıkken community role değişiminin görevi görünür yaptığını, takım üyeliği kapatılınca aynı token ile görevin yeniden gizlendiğini kanıtlar. Token yetki snapshot'ı taşımaz; backend aktif rol ve takımları her protected istekte veritabanından çözer.
 
-Toplam otomatik kapsam şu anda 190 backend ve 46 frontend testidir. Servis/unit testleri ayrıca gateway, SendBack, Complete, Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transaction rollback, pagination ve scope davranışlarını kapsar. Tam cross-role tarayıcı zinciri hâlâ manuel kabul senaryosudur; bunun Playwright ile otomasyonu teslimat borcu olarak kalır.
+Toplam otomatik kapsam şu anda 194 backend ve 49 frontend testidir. Servis/unit testleri ayrıca cookie-only browser transport, bir dakikalık access-session expiry, remembered refresh recovery, cookie logout, gateway, SendBack, Complete, Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transaction rollback, pagination ve scope davranışlarını kapsar. Tam cross-role tarayıcı zinciri hâlâ manuel kabul senaryosudur; bunun Playwright ile otomasyonu teslimat borcu olarak kalır.
 
 ```powershell
 dotnet test apps/api/TechYouthBpm.slnx

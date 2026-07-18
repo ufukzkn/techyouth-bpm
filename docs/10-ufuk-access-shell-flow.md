@@ -12,17 +12,17 @@ This work coordinates the user entry and navigation experience. It does not own 
 
 - Login starts empty and supports demo-account fill buttons for local testing.
 - Login view now also supports registration. New accounts must provide a community code, are created as `PendingApproval` in that community and cannot sign in until a community admin activates them.
-- Session state stores user, role, token, expiry and theme through Zustand.
+- Runtime session state keeps the resolved user and expiry in memory through Zustand; persisted Zustand storage contains only theme and language preferences. Browser auth secrets remain in HttpOnly cookies.
 - Theme starts from the operating system preference when the user has no saved manual choice; after the user toggles theme, that explicit choice is persisted.
 - Theme toggle uses a CSS moon/sun transition inspired by the referenced CodePen interaction, implemented locally as `ThemeToggleButton` without adding a package.
 - Language preference is persisted in the same session store and can be switched from both login and authenticated top bar.
 - Language toggle uses a small CSS globe/orbit microinteraction with the active `TR/EN` code, implemented locally as `LanguageToggleButton`.
 - Restored API sessions are verified once through `/api/auth/me`; the app does not poll the user every second.
-- The shell schedules one timeout from the stored `expiresAt` value. Expired or unauthorized sessions return to login and show a confirmable alert dialog.
+- The shell schedules one timeout from the in-memory `expiresAt` value. On a hard refresh it rebuilds identity through `/api/auth/me`; expired or unauthorized sessions attempt one refresh rotation and otherwise return to login.
 - API session duration is read from `Auth:SessionDurationMinutes`; the normal local duration is currently 120 minutes.
 - `Beni hatirla` sends `rememberMe=true` during login and creates a longer-lived refresh token while the access session stays short.
 - Remember-me now creates a hashed, rotating refresh token tied to a remembered device. Access sessions remain opaque server-side sessions; refresh rotation replaces the old session/token pair and flags revoked-token reuse as a suspicious audit event.
-- Login responses still return a bearer token for Swagger/dev usage, but browser flows also receive an HttpOnly access cookie and a CSRF token for cookie-authenticated mutations.
+- `/api/auth/login` still returns a Bearer token for Swagger/dev usage. The web application uses `/api/auth/browser-login`, whose response omits auth secrets and establishes HttpOnly access/refresh cookies plus a readable CSRF cookie for protected mutations.
 - If an access session expires and a valid refresh cookie exists, the shell attempts a silent refresh before showing the timeout dialog.
 - Long remember-me sessions are checked with capped browser timers so the timeout scheduler does not overflow for durations longer than the browser's maximum `setTimeout` delay.
 - Demo fallback sessions also respect the local expiry timer, but skip `/api/auth/me` because they do not exist in the API session table.
@@ -118,7 +118,7 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Session-expiry behavior stays centralized in `WorkspaceSessionController`/`sessionStore` instead of being duplicated in feature screens.
 - User-action traceability has two levels: `AuditLogs` for process state history and `SystemAuditLogs` for broader identity/access/form/process/task events.
 - The current token model stays as opaque server-side sessions plus rotating refresh tokens because pending approval, lockout, refresh reuse detection and revoke all need server-side state. JWT can be considered later only if it keeps equivalent refresh-token rotation and explicit session/device management.
-- Role and team permissions are not copied into the opaque token. Each protected request resolves the server-side session and rebuilds the user DTO from active database memberships, so role/team changes apply to an already-open session immediately. The demo browser currently persists the raw bearer token for its Swagger-friendly development flow; production browser hardening should switch normal web calls to HttpOnly cookie-only auth and keep bearer tokens out of `localStorage`.
+- Role and team permissions are not copied into the opaque token. Each protected request resolves the server-side session and rebuilds the user DTO from active database memberships, so role/team changes apply to an already-open session immediately. The web client now uses cookie-only transport: auth secrets stay in HttpOnly cookies, session identity is rebuilt through `/api/auth/me`, refresh recovery rotates the cookie, and Zustand/localStorage contains only theme and language preferences. Swagger Bearer support remains independent.
 - Theme ownership should stay centralized in `sessionStore`; feature screens should read the active theme only through shared styling tokens.
 - Static shell/login/dashboard/process text should use the shared i18n dictionary instead of inline copy.
 - Team and workflow boundaries remain distinct: teams describe where work is performed, community roles describe what is allowed, and Cagdas's runtime combines these contracts for assignment, priority and candidate claim.

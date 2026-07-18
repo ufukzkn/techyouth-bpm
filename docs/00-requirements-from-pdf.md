@@ -69,6 +69,31 @@ The PDF marks some items as bonus or optional. For this project, these are treat
 - Person, team, community-role and team-plus-role task assignment with candidate claim.
 - Task forms, conditional routing, send-back and step-level execution history.
 
+## Bonus And Optional Status
+
+`Core scope is largely exceeded` means the required baseline is implemented and several optional items were extended beyond their minimum form. It does not mean a known PDF bonus was silently skipped.
+
+| PDF bonus / optional item | Status | Implementation |
+| --- | --- | --- |
+| Drag/drop field addition and ordering | Completed | Desktop palette drag/drop, mobile palette addition and page/field ordering use `@dnd-kit`. |
+| BPM process modeling | Completed and extended | Versioned workflow definitions model start, user task, gateway, completed/rejected end and swimlane nodes. |
+| Drag/drop process design | Completed | `/workflows` uses `@xyflow/react` for a persisted visual graph editor. |
+| Bind a form to a process step | Completed | Published form versions can be pinned to the Start node and individual User Task nodes. |
+| Multiple workflow actions | Completed | Approve, Reject, Complete, SendBack and Escalate are validated against node action edges. |
+| Role/user assignment | Completed and extended | Specific user, team, community role and team-plus-role candidate pools are supported. |
+| Dynamic flow stored and executed by backend | Completed | Published graph JSON is validated, version-pinned and interpreted by the custom .NET workflow runtime. |
+| Workflow-engine execution | Completed | Candidate resolution, claim/release, gateway routing, task forms and process advancement are backend-owned. |
+| Role-based UI and actions | Completed | Navigation, routes and actions are permission-aware; backend repeats every security decision. |
+| Role-based dashboard | Completed and extended | Personal/community/global scopes expose pending tasks and active/completed processes according to permission. |
+| State transition audit | Completed | Process audit, step execution and categorized system audit are stored separately. |
+| Transaction handling | Completed | Form update, process start and task action commit business state, notification and audit atomically. |
+| State-machine unit tests | Completed | Transition, graph, runtime, rollback, claim and HTTP action tests are present. |
+| Layered architecture | Completed | API, Application, Domain and Infrastructure layers are used; EF Core DbContext supplies repository/unit-of-work behavior. |
+| Clean commit history | Ongoing repository discipline | Feature ownership and scoped commits are used; this is a Git-history quality criterion rather than an application feature. |
+| i18n, theme and responsive UX | Completed for current scope | TR/EN dictionaries, light/dark themes and desktop/mobile layouts are implemented. |
+
+Playwright browser automation, CI, binary file storage, parallel gateways and timer jobs are valuable next steps, but they are product/production extensions rather than missing core PDF requirements.
+
 ## Production-Readiness Work Included
 
 These items are not required by the PDF, but they strengthen the final review story:
@@ -77,7 +102,7 @@ These items are not required by the PDF, but they strengthen the final review st
 - Separate local SQLite and cloud Neon Docker Compose stacks.
 - Production deployment hardening for HTTPS cookie settings, SMTP domain verification and environment-specific secrets.
 
-Remaining delivery work is CI automation, browser-level Playwright coverage for the complete cross-role demo and cookie-only production browser auth that removes the persisted raw bearer token from frontend storage.
+Remaining delivery work is CI automation and browser-level Playwright coverage for the complete cross-role demo. Cookie-only browser auth is implemented: raw access/refresh tokens are no longer returned to or persisted by the normal web client.
 
 ## Important Evaluation Point
 
