@@ -1,0 +1,70 @@
+name: Full Validation
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgresql:
+    name: PostgreSQL migration smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: techyouth_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d techyouth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TECHYOUTH_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=techyouth_test;Username=postgres;Password=postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run migration smoke tests
+        run: dotnet test apps/api/TechYouthBpm.slnx --configuration Release --nologo --filter FullyQualifiedName~MigrationSmokeTests
+
+  docker:
+    name: Docker configuration and builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare non-secret cloud configuration
+        shell: bash
+        run: |
+          cat > .env.neon.local <<'EOF'
+          Database__Provider=PostgreSql
+          ConnectionStrings__DefaultConnection=Host=postgres.invalid;Database=techyouth;Username=test;Password=test;SSL Mode=Require
+          Seed__MockData=true
+          EOF
+
+      - name: Validate Compose files
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.cloud.yaml config --quiet
+
+      - name: Build API and web images
+        run: docker compose build
