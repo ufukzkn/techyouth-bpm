@@ -11,6 +11,9 @@ TestResults/
 *.db
 *.db-shm
 *.db-wal
+.e2e/
+playwright-report/
+test-results/
 
 # local env
 .env
