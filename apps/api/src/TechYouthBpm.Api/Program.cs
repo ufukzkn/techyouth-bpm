@@ -1,8 +1,10 @@
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using TechYouthBpm.Api;
+using TechYouthBpm.Api.Health;
 using TechYouthBpm.Infrastructure;
 using TechYouthBpm.Infrastructure.Data;
 
@@ -13,6 +15,9 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<SystemReadinessHealthCheck>("system", tags: ["ready"]);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -116,6 +121,16 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live"),
+    ResponseWriter = HealthResponseWriter.WriteAsync,
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = HealthResponseWriter.WriteAsync,
+});
 
 using (var scope = app.Services.CreateScope())
 {

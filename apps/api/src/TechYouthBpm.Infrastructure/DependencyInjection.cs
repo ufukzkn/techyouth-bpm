@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TechYouthBpm.Application.Health;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Application.Workflow;
 using TechYouthBpm.Infrastructure.Data;
+using TechYouthBpm.Infrastructure.Health;
 using TechYouthBpm.Infrastructure.Services;
 
 namespace TechYouthBpm.Infrastructure;
@@ -34,6 +36,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<AuthService>();
+        services.AddScoped<ISystemReadinessService, SystemReadinessService>();
         services.AddScoped<IAuthService>(provider => provider.GetRequiredService<AuthService>());
         services.AddScoped<IAuthenticationService>(provider => provider.GetRequiredService<AuthService>());
         services.AddScoped<IRegistrationService>(provider => provider.GetRequiredService<AuthService>());
