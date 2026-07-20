@@ -2,6 +2,7 @@ import type {
   UserTaskNodeData,
   WorkflowAssignment,
   WorkflowDefinitionDraft,
+  WorkflowEditorLookups,
   WorkflowNode,
   WorkflowTransition,
   WorkflowValidationIssue,
@@ -10,7 +11,10 @@ import type {
 const flowNodeTypes = new Set(["start", "userTask", "exclusiveGateway", "completedEnd", "rejectedEnd"]);
 const terminalNodeTypes = new Set(["completedEnd", "rejectedEnd"]);
 
-export function validateWorkflow(draft: WorkflowDefinitionDraft): WorkflowValidationIssue[] {
+export function validateWorkflow(
+  draft: WorkflowDefinitionDraft,
+  lookups?: WorkflowEditorLookups,
+): WorkflowValidationIssue[] {
   const issues: WorkflowValidationIssue[] = [];
   const flowNodes = draft.nodes.filter(isFlowNode);
   const nodeIds = new Set(draft.nodes.map((node) => node.id));
@@ -123,7 +127,7 @@ export function validateWorkflow(draft: WorkflowDefinitionDraft): WorkflowValida
   validEdges.forEach((edge) => validateTransition(edge, draft.nodes, issues));
   validateReachability(starts[0], flowNodes, validEdges, issues);
   validateCyclesAndSendBack(flowNodes, validEdges, issues);
-  validateGatewayConditionSources(validEdges, issues);
+  validateGatewayConditionSources(draft, validEdges, issues, lookups);
 
   return issues;
 }
@@ -394,8 +398,10 @@ function validateCyclesAndSendBack(
 }
 
 function validateGatewayConditionSources(
+  draft: WorkflowDefinitionDraft,
   edges: WorkflowTransition[],
   issues: WorkflowValidationIssue[],
+  lookups?: WorkflowEditorLookups,
 ) {
   const forwardEdges = edges.filter((edge) => edge.data?.action !== "SendBack");
   edges.forEach((edge) => {
@@ -410,7 +416,65 @@ function validateGatewayConditionSources(
         edge.id,
       ));
     }
+
+    if (!lookups || !edge.data?.condition) {
+      return;
+    }
+
+    const source = resolveConditionSource(draft, path);
+    if (!source?.formVersionId) {
+      return;
+    }
+
+    const formVersion = lookups.formVersions.find((version) => version.id === source.formVersionId);
+    if (!formVersion) {
+      return;
+    }
+
+    const field = formVersion.fields.find((candidate) => candidate.key === source.fieldKey);
+    if (!field) {
+      issues.push(issue(
+        "gateway.condition.field.missing",
+        "error",
+        "transition",
+        `“${path}” koşulu bağlı formda bulunmayan bir alanı kullanıyor. Gerçek bir form alanı seçin.`,
+        edge.id,
+      ));
+      return;
+    }
+
+    if (field.valueType !== edge.data.condition.valueType) {
+      issues.push(issue(
+        "gateway.condition.type.mismatch",
+        "error",
+        "transition",
+        `“${path}” koşulunun veri tipi bağlı form alanıyla uyuşmuyor. Alanı yeniden seçin.`,
+        edge.id,
+      ));
+    }
   });
+}
+
+function resolveConditionSource(draft: WorkflowDefinitionDraft, path: string) {
+  const startMatch = /^start\.([^.]+)$/.exec(path);
+  if (startMatch) {
+    const start = draft.nodes.find((node) => node.type === "start");
+    return {
+      fieldKey: startMatch[1],
+      formVersionId: start?.type === "start" ? start.data.formBinding?.formVersionId : undefined,
+    };
+  }
+
+  const stepMatch = /^steps\.([^.]+)\.([^.]+)$/.exec(path);
+  if (!stepMatch) {
+    return null;
+  }
+
+  const task = draft.nodes.find((node) => node.id === stepMatch[1] && node.type === "userTask");
+  return {
+    fieldKey: stepMatch[2],
+    formVersionId: task?.type === "userTask" ? task.data.formBinding?.formVersionId : undefined,
+  };
 }
 
 function hasForwardPath(source: string, target: string, edges: WorkflowTransition[]) {

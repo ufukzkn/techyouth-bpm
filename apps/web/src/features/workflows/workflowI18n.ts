@@ -40,6 +40,8 @@ const validationMessagesEn: Record<string, string> = {
   "workflow.forward.cycle": "Automatic workflow connections cannot form a cycle; use Send back to return to an earlier task.",
   "transition.sendback.order": "Send back can only target a user task that appears earlier in the forward workflow.",
   "gateway.condition.future-step": "A decision condition can only use task forms completed before this step.",
+  "gateway.condition.field.missing": "The condition uses a field that does not exist in the bound form. Select an available form field.",
+  "gateway.condition.type.mismatch": "The condition type does not match the bound form field. Select the field again.",
 };
 
 export function localizeWorkflowValidationIssue(issue: WorkflowValidationIssue, language: Language) {

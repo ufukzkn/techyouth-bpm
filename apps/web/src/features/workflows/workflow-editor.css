@@ -116,9 +116,9 @@
   --workflow-red-soft: #fff0ef;
   --workflow-amber: #b25f05;
   --workflow-amber-soft: #fff6df;
-  --workflow-canvas: #f8fafc;
-  --workflow-canvas-dot: #bcc6d4;
-  --workflow-minimap-mask: rgba(230, 235, 243, 0.7);
+  --workflow-canvas: #f2f1ed;
+  --workflow-canvas-dot: #c3c2bc;
+  --workflow-minimap-mask: rgba(242, 241, 237, 0.76);
   min-width: 0;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
@@ -160,9 +160,9 @@
   --workflow-red-soft: #402426;
   --workflow-amber: #ffc164;
   --workflow-amber-soft: #3d3020;
-  --workflow-canvas: #111a2a;
-  --workflow-canvas-dot: #40506a;
-  --workflow-minimap-mask: rgba(17, 26, 42, 0.76);
+  --workflow-canvas: #080b10;
+  --workflow-canvas-dot: #2d3745;
+  --workflow-minimap-mask: rgba(8, 11, 16, 0.82);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
 }
 

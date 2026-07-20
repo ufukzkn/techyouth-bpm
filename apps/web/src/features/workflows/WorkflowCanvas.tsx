@@ -21,6 +21,7 @@ import { workflowText } from "@/features/workflows/workflowI18n";
 import { workflowNodeTypes } from "@/features/workflows/nodes/WorkflowNodes";
 import { workflowPaletteMime } from "@/features/workflows/WorkflowPalette";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
+import { useSessionStore } from "@/features/session/sessionStore";
 import type { Language } from "@/lib/types";
 
 type WorkflowCanvasProps = {
@@ -31,6 +32,7 @@ type WorkflowCanvasProps = {
 };
 
 export function WorkflowCanvas({ fitViewKey, issues, language, readOnly }: WorkflowCanvasProps) {
+  const theme = useSessionStore((state) => state.theme);
   const draft = useWorkflowDraftStore((state) => state.draft);
   const applyNodeChanges = useWorkflowDraftStore((state) => state.applyNodeChanges);
   const applyEdgeChanges = useWorkflowDraftStore((state) => state.applyEdgeChanges);
@@ -122,7 +124,7 @@ export function WorkflowCanvas({ fitViewKey, issues, language, readOnly }: Workf
       onKeyDown={handleKeyDown}
     >
       <ReactFlow<WorkflowNode, WorkflowTransition>
-        colorMode="system"
+        colorMode={theme}
         defaultEdgeOptions={{
           type: "smoothstep",
           markerEnd: { type: MarkerType.ArrowClosed },

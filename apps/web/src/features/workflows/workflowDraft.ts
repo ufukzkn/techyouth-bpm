@@ -28,12 +28,12 @@ const defaultTransitions: WorkflowTransition[] = [
   createTransition("transition-review-gateway", "node-review", "node-decision", { action: "Approve" }),
   createTransition("transition-review-reject", "node-review", "node-rejected", { action: "Reject" }),
   createTransition("transition-gateway-complete", "node-decision", "node-completed", {
-    label: "Limit dahilinde",
+    label: "Koşulu belirleyin",
     condition: {
-      fieldKey: "start.amount",
-      operator: "LessThanOrEquals",
-      valueType: "Number",
-      value: "50000",
+      fieldKey: "",
+      operator: "Equals",
+      valueType: "String",
+      value: "",
     },
   }),
   createTransition("transition-gateway-reject", "node-decision", "node-rejected", {

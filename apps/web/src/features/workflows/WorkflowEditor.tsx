@@ -30,6 +30,7 @@ import { emptyWorkflowLookups } from "@/features/workflows/contracts";
 import { Button } from "@/features/ui/Button";
 import { IconButton } from "@/features/ui/IconButton";
 import { createWorkflowWriteModel } from "@/features/workflows/apiGraphAdapter";
+import { workflowApiValidationIssues } from "@/features/workflows/apiValidation";
 import { WorkflowCanvas } from "@/features/workflows/WorkflowCanvas";
 import { WorkflowInspector } from "@/features/workflows/WorkflowInspector";
 import { workflowText } from "@/features/workflows/workflowI18n";
@@ -49,6 +50,10 @@ export type WorkflowEditorProps = {
 
 type SubmissionState = "idle" | "saving" | "publishing" | "success" | "error";
 type EditorMode = "normal" | "wide" | "fullscreen";
+type ServerValidationState = {
+  fingerprint: string;
+  issues: ReturnType<typeof workflowApiValidationIssues>;
+};
 
 export function WorkflowEditor({
   canPublish = true,
@@ -73,8 +78,16 @@ export function WorkflowEditor({
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [editorMode, setEditorMode] = useState<EditorMode>("normal");
   const [message, setMessage] = useState(() => text("Taslak düzenlemeye hazır.", "The draft is ready to edit."));
+  const [serverValidation, setServerValidation] = useState<ServerValidationState | null>(null);
   const isMobile = useMobileEditorNotice();
-  const issues = useMemo(() => validateWorkflow(draft), [draft]);
+  const draftFingerprint = useMemo(() => JSON.stringify(createWorkflowWriteModel(draft)), [draft]);
+  const localIssues = useMemo(() => validateWorkflow(draft, lookups), [draft, lookups]);
+  const issues = useMemo(
+    () => serverValidation?.fingerprint === draftFingerprint
+      ? [...localIssues, ...serverValidation.issues]
+      : localIssues,
+    [draftFingerprint, localIssues, serverValidation],
+  );
   const errorCount = issues.filter((issue) => issue.severity === "error").length;
   const effectiveReadOnly = readOnly || draft.status === "Published";
   const isSubmitting = submissionState === "saving" || submissionState === "publishing";
@@ -127,6 +140,7 @@ export function WorkflowEditor({
       return;
     }
     try {
+      setServerValidation(null);
       setSubmissionState("saving");
       setMessage(text("Taslak kaydediliyor...", "Saving draft..."));
       const result = await onSave(createWorkflowWriteModel(draft));
@@ -134,8 +148,13 @@ export function WorkflowEditor({
       setSubmissionState("success");
       setMessage(result?.message || text("Taslak kaydedildi.", "Draft saved."));
     } catch (error) {
+      const apiIssues = workflowApiValidationIssues(error, draft, language);
+      if (apiIssues.length > 0) {
+        setServerValidation({ fingerprint: draftFingerprint, issues: apiIssues });
+      }
       setSubmissionState("error");
-      setMessage(errorMessage(error, text("Taslak kaydedilemedi.", "Draft could not be saved."), language));
+      setMessage(apiIssues[0]?.message
+        ?? errorMessage(error, text("Taslak kaydedilemedi.", "Draft could not be saved."), language));
     }
   }
 
@@ -145,10 +164,14 @@ export function WorkflowEditor({
     }
     if (workflowHasErrors(issues)) {
       setSubmissionState("error");
-      setMessage(text("Yayınlamadan önce doğrulama hatalarını giderin.", "Resolve validation errors before publishing."));
+      setMessage(text(
+        `Yayınlama engellendi: ${errorCount} hata var. Doğrulama listesinden bir hatayı seçerek ilgili alanı açın.`,
+        `Publishing is blocked by ${errorCount} ${errorCount === 1 ? "error" : "errors"}. Select an item in the validation list to open it.`,
+      ));
       return;
     }
     try {
+      setServerValidation(null);
       setSubmissionState("publishing");
       setMessage(text("Akış yayınlanıyor...", "Publishing workflow..."));
       const result = await onPublish(createWorkflowWriteModel(draft));
@@ -156,8 +179,17 @@ export function WorkflowEditor({
       setSubmissionState("success");
       setMessage(result?.message || text("Akış yayınlandı.", "Workflow published."));
     } catch (error) {
+      const apiIssues = workflowApiValidationIssues(error, draft, language);
+      if (apiIssues.length > 0) {
+        setServerValidation({ fingerprint: draftFingerprint, issues: apiIssues });
+      }
       setSubmissionState("error");
-      setMessage(errorMessage(error, text("Akış yayınlanamadı.", "Workflow could not be published."), language));
+      setMessage(apiIssues.length > 0
+        ? text(
+          `Yayınlama engellendi: ${apiIssues.length} sunucu doğrulama hatası bulundu. Hata listesinden ilgili öğeyi açın.`,
+          `Publishing is blocked by ${apiIssues.length} server validation ${apiIssues.length === 1 ? "error" : "errors"}. Open the related item from the validation list.`,
+        )
+        : errorMessage(error, text("Akış yayınlanamadı.", "Workflow could not be published."), language));
     }
   }
 
@@ -220,7 +252,7 @@ export function WorkflowEditor({
             {text("Kaydet", "Save")}
           </Button>
           <Button
-            disabled={!canPublish || effectiveReadOnly || isSubmitting || errorCount > 0}
+            disabled={!canPublish || effectiveReadOnly || isSubmitting}
             isLoading={submissionState === "publishing"}
             leadingIcon={<Send size={16} aria-hidden="true" />}
             onClick={publishDraft}

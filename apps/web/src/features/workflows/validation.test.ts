@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { TeamSwimlaneNodeData, UserTaskNodeData, WorkflowNode } from "@/features/workflows/contracts";
+import type {
+  TeamSwimlaneNodeData,
+  UserTaskNodeData,
+  WorkflowEditorLookups,
+  WorkflowNode,
+} from "@/features/workflows/contracts";
 import { createStarterWorkflowDraft, getNextWorkflowName } from "@/features/workflows/workflowDraft";
 import { validateWorkflow } from "@/features/workflows/validation";
 
@@ -8,10 +13,10 @@ describe("validateWorkflow", () => {
     expect(getNextWorkflowName([{ name: "Yeni Akış 1" }, { name: " yeni akış 2 " }])).toBe("Yeni Akış 3");
   });
 
-  it("uses the namespaced start form path in the starter gateway", () => {
+  it("keeps the starter gateway condition empty until a form field is selected", () => {
     const gatewayEdge = createStarterWorkflowDraft().edges.find((edge) => edge.data?.condition);
 
-    expect(gatewayEdge?.data?.condition?.fieldKey).toBe("start.amount");
+    expect(gatewayEdge?.data?.condition?.fieldKey).toBe("");
   });
 
   it("reports missing team and task assignment references in the starter draft", () => {
@@ -22,8 +27,60 @@ describe("validateWorkflow", () => {
     expect(issues.some((item) => item.code === "start.form.required")).toBe(true);
   });
 
+  it("points to a gateway edge when its condition field is missing from the bound start form", () => {
+    const draft = createStarterWorkflowDraft();
+    const gatewayEdge = draft.edges.find((edge) => edge.id === "transition-gateway-complete")!;
+    gatewayEdge.data.condition = {
+      fieldKey: "start.amount",
+      operator: "LessThanOrEquals",
+      valueType: "Number",
+      value: "50000",
+    };
+    draft.nodes = draft.nodes.map((node): WorkflowNode => node.type === "start"
+      ? {
+          ...node,
+          data: {
+            ...node.data,
+            formBinding: {
+              formVersionId: "form-version-1",
+              formName: "Özlük Kayıt Formu",
+              version: 1,
+              mode: "Required",
+            },
+          },
+        }
+      : node);
+    const lookups: WorkflowEditorLookups = {
+      people: [],
+      teams: [],
+      communityRoles: [],
+      formVersions: [{
+        id: "form-version-1",
+        definitionId: "form-1",
+        label: "Özlük Kayıt Formu",
+        version: 1,
+        fields: [{ key: "ozlukNotu", label: "Özlük notu", valueType: "String" }],
+      }],
+    };
+
+    const issues = validateWorkflow(draft, lookups);
+
+    expect(issues).toContainEqual(expect.objectContaining({
+      code: "gateway.condition.field.missing",
+      entityId: "transition-gateway-complete",
+      scope: "transition",
+    }));
+  });
+
   it("accepts the starter graph after required assignment references are supplied", () => {
     const draft = createStarterWorkflowDraft();
+    const gatewayEdge = draft.edges.find((edge) => edge.id === "transition-gateway-complete")!;
+    gatewayEdge.data.condition = {
+      fieldKey: "start.amount",
+      operator: "LessThanOrEquals",
+      valueType: "Number",
+      value: "50000",
+    };
     draft.nodes = draft.nodes.map((node): WorkflowNode => {
       if (node.type === "teamSwimlane") {
         return {
