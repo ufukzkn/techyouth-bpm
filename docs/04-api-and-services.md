@@ -65,6 +65,36 @@ Browser flows send cookies with `credentials: include`. Mutating cookie-authenti
 
 The backend authorization decision is not embedded in the opaque token. `/api/auth/me` and every protected request resolve the hashed server session, then reload active community role permissions and team memberships from the database. Role, status, community and team changes therefore affect an already-open session on its next request. The normal web client uses the dedicated `/api/auth/browser-login` endpoint; browser login and refresh responses omit token fields, auth secrets remain in HttpOnly cookies and Zustand persists preferences only. Swagger/dev clients use `/api/auth/login` and may still receive and use Bearer tokens.
 
+Production identity composition is physically separated:
+
+- `AuthenticationService`: login, refresh and current-user resolution.
+- `RegistrationService`: registration and public verification.
+- `AccountService`: profile, password and recovery.
+- `SessionService`: logout, device/session listing and revoke.
+- `UserAdministrationService`: paged user management and admin mutations.
+- `AuthenticatedUserLoader`: shared live session, permission, community and team resolution.
+
+Controllers depend on those focused Application interfaces. `AuthService` remains
+an unregistered compatibility façade for legacy service tests only; it is not
+the production DI implementation.
+
+## Operational Endpoints And Error Contract
+
+- `GET /health/live`
+  - Verifies only that the API process can answer.
+- `GET /health/ready`
+  - Uses the Application `ISystemReadinessService` contract.
+  - Infrastructure checks database connectivity, pending migrations and exactly
+    one active SuperAdmin.
+  - Returns only named healthy/unhealthy checks, never connection strings or
+    exception details.
+
+Unexpected failures are returned as RFC 7807 `ProblemDetails` with safe
+`traceId` and `correlationId` extensions. A valid incoming
+`X-Correlation-ID` is echoed; invalid or oversized values are replaced. Production
+uses the built-in .NET JSON console formatter. Technical request logs never
+record token, cookie, password, e-mail or form payloads.
+
 ## Dashboard
 
 - `GET /api/dashboard/summary`
@@ -304,7 +334,10 @@ Controllers should stay thin. Services own decisions:
 - `NotificationService`: current-user paged search/filter, count, read-state and read-all operations.
 - `ITeamService`: community-scoped team CRUD, paged members/candidates, virtual unassigned users and membership mutations.
 - `ProcessStateMachine`: high-level lifecycle transitions; dynamic node routing remains in `DynamicWorkflowEngine`.
-- `DatabaseSeeder`: coordinates community/user/team setup and optional demo data.
+- `DatabaseSeeder`: thin orchestration only.
+- `IdentityDataSeeder`: deterministic users, roles and identity fixtures.
+- `CommunityTeamDataSeeder`: community, role and team fixtures.
+- `ProcessInstanceDataSeeder`: graph-consistent process/task/step/audit/notification fixtures.
 - `DemoFormSeeder`: deterministic published start/task forms and form-version snapshots.
 - `DemoWorkflowSeeder`: versioned workflow graphs plus graph-consistent process/task/step/audit/notification scenarios.
 

@@ -4,9 +4,27 @@
 
 The project is presentation-ready for the TechYouth BPM scope. It is no longer a static UI prototype: it has a Next.js route-based workspace, a .NET 8 REST API, EF Core persistence, permission-aware access, community/custom role management, dynamic form definitions, process/task execution, state-machine transitions, audit trails and security-focused identity flows.
 
-The strongest defense is extensibility. Forms and workflows are versioned data, API calls are isolated in a client layer, focused Application contracts keep controllers thin, EF Core migrations own schema evolution, and documentation tracks feature ownership. Critical writes are transactional, HTTP/security/runtime behavior is covered across multiple test layers, and candidate claims use optimistic concurrency. Current counts and exact evidence live in [Testing And Quality Gates](24-testing-and-quality-gates.md). The main remaining production gaps are Playwright E2E, CI, parallel/timer workflow nodes and final responsive/accessibility QA.
+The strongest defense is extensibility. Forms and workflows are versioned data,
+API calls are isolated in a client layer, focused Application contracts keep
+controllers thin, EF Core migrations own schema evolution, and documentation
+tracks feature ownership. Critical writes are transactional, HTTP/security/runtime
+behavior is covered across multiple test layers, and candidate claims use
+optimistic concurrency. Playwright and GitHub Actions now automate the critical
+browser and build gates. Current counts and exact evidence live in
+[Testing And Quality Gates](24-testing-and-quality-gates.md). The main remaining
+production gaps are deployment-specific observability/secret management,
+parallel/timer workflow nodes, binary object storage and final
+responsive/accessibility QA.
 
-The dependency direction is healthy: Domain is independent, Application references Domain, Infrastructure implements Application contracts, and API composes the layers. Next.js routes share one persistent workspace layout while feature folders own their views. Physical modularity is not finished everywhere: `AuthService`, `DatabaseSeeder`, `DemoWorkflowSeeder`, `FormDesignerDraft` and `UsersAndRolesView` are still large files. They are maintainable behind focused interfaces/components today, but splitting their implementations is the clearest next readability improvement.
+The dependency direction is healthy: Domain is independent, Application
+references Domain, Infrastructure implements Application contracts, and API
+composes the layers. Next.js routes share one persistent workspace layout while
+feature folders own their views. Identity is split into five focused services,
+`DatabaseSeeder` is a thin orchestrator over dedicated idempotent seeders, and
+Form Designer/User Management delegate their major visual responsibilities to
+focused modules. Controller views still coordinate substantial state, but no
+longer duplicate their field editor, version actions, filters, create/detail or
+session/audit panels.
 
 ## Readability And Extensibility Verdict
 
@@ -20,8 +38,8 @@ areas. It should not be described as perfectly modular at file level.
 | HTTP boundary | Controllers depend on focused service interfaces and do not query `AppDbContext` directly. | Strong |
 | Frontend routing | App Router pages are small composition files; the shared workspace layout persists shell state while feature folders own behavior. | Strong |
 | Change tolerance | Data-driven permissions, typed workflow graphs, immutable versions and provider-neutral EF contracts avoid hardcoded business paths. | Strong |
-| Verification | Unit, relational, HTTP integration, frontend and provider-smoke layers protect extension points. | Strong, with browser E2E remaining |
-| Physical file size | `AuthService`, seed orchestration, Form Designer and user-management view still combine many subflows. | Acceptable technical debt, next refactor target |
+| Verification | Unit, relational, HTTP integration, frontend, Playwright, OpenAPI, provider-smoke and CI layers protect extension points. | Strong |
+| Physical modularity | Focused identity/seed implementations and extracted Form Designer/User Management modules preserve controller-level orchestration. | Strong, with measured incremental extraction preferred |
 
 The practical conclusion is: a new field, permission, provider, route or workflow
 node has an identified extension boundary and does not require a whole-system
@@ -36,11 +54,11 @@ changing their existing contracts, not redesigning the architecture.
 | Login with global user/role state | Zustand session store, role-aware shell, register, password reset, remember-me and forced password change. | Strong | Finish full backend error i18n mapping. |
 | Authenticated layout | Header, fixed/collapsible sidebar, active session popover and role-filtered navigation. | Strong | ARIA checks for icon-only controls. |
 | Dashboard | API-backed metrics and role-aware shortcuts. | Strong | Optional security summary widget. |
-| Form design | Multi-page draft/publish versions, field types, validations, page/field drag-drop and JSON preview. | Strong | Add browser E2E. |
-| Form runner | Version-pinned rendering, step validation, payload preview and compatible workflow selection. | Strong | Add browser E2E. |
+| Form design | Multi-page draft/publish versions, field types, validations, page/field drag-drop and JSON preview. | Strong | Real-device drag/zoom acceptance. |
+| Form runner | Version-pinned rendering, step validation, payload preview and compatible workflow selection. | Strong | Accessibility/keyboard acceptance. |
 | Required/type/dependent validation | Frontend helpers plus backend validation for process start. | Strong | Keep backend as final source of truth. |
 | Loading/success/error states | Implemented in auth, forms, dashboard refresh, process/task and management flows. | Good | Normalize every remaining backend error message. |
-| .NET 8 REST API | Layered API with controllers, services, EF Core, Swagger and WebApplicationFactory integration tests. | Strong | Add automated CI execution. |
+| .NET 8 REST API | Layered API with controllers, services, EF Core, Swagger, health endpoints, WebApplicationFactory and CI execution. | Strong | Add deployment alerts after hosting is selected. |
 | User/role storage and authorization | Users, roles, statuses, sessions, communities, custom roles, permissions and scope checks. | Strong | Add final permission matrix screen/doc for demo. |
 | Form definition persistence | EF entities, migrations and create/update/list/detail endpoints. | Strong | Add migration review to release checklist. |
 | JSON submission data | Process start stores submitted form data as JSON and displays it in detail. | Strong | Consider JSON schema/versioning later. |
@@ -94,25 +112,22 @@ recommended work should be read together with the canonical
 
 ### Must
 
-- Run Playwright E2E for the seeded Transfer Talep Akisi across at least two task actors.
-- Add Playwright coverage for cookie bootstrap, silent refresh and forced logout behavior.
 - Finish i18n mapping for remaining dynamic workflow/backend validation errors.
 - Run final responsive and accessibility QA on form designer, workflow canvas, management and process detail.
+- Define production backup/restore, secret manager and error-monitoring ownership.
 
 ### Should
 
 - Keep Docker local/cloud startup and secret onboarding notes current as configuration changes.
-- Add Playwright E2E for login, form design, process start, task action and audit review.
 - Add audit export for filtered logs.
 - Add a compact permission matrix for SuperAdmin, Topluluk Admin and custom community roles.
-- Add health checks for database and SMTP readiness.
+- Add explicit readiness/alert dashboards at the selected hosting platform.
 
 ### Could
 
-- Add CI for frontend lint/build and backend tests.
 - Add OpenAPI request examples for the demo endpoints.
-- Add UI smoke tests for route access, form validation and login/session flows.
 - Add a small security dashboard for locked accounts, pending approvals and active sessions.
+- Add timer or parallel-gateway support through a backward-compatible graph schema version.
 
 ## Team Presentation Fit
 

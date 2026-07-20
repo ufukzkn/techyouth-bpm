@@ -1,0 +1,79 @@
+name: Quality Gate
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore apps/api/TechYouthBpm.slnx
+
+      - name: Test
+        run: dotnet test apps/api/TechYouthBpm.slnx --configuration Release --no-restore --nologo
+
+  frontend:
+    name: Frontend test, lint and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Unit tests
+        working-directory: apps/web
+        run: npm run test
+
+      - name: Lint
+        working-directory: apps/web
+        run: npm run lint
+
+      - name: Production build
+        working-directory: apps/web
+        run: npm run build
+
+  whitespace:
+    name: Diff whitespace check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check changed lines
+        shell: bash
+        run: |
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD
+          else
+            git diff --check HEAD
+          fi

@@ -54,8 +54,22 @@ Database__Provider=PostgreSql
 ConnectionStrings__DefaultConnection=Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true
 ```
 
+Varsayilan `public` semasi disinda ozel bir PostgreSQL semasi kullaniliyorsa
+connection string icindeki `Search Path=your_schema` degerine ek olarak
+`Database__Schema=your_schema` verilmelidir. Bu ayar EF migration history
+tablosunu da ayni semaya sabitler. Normal Neon/public kurulumunda bu ayar
+gerekmez.
+
 Migration ve smoke test tamamlandiginda Neon, ortak ekip testi / production-ready veritabani anlatisi icin kullanilabilir. Local SQLite ise hizli resetlenebilir demo ortami olarak korunur.
 
 ## Guvenlik Notu
 
 SMTP, Mailtrap, Neon ve benzeri secret'lar `.env.*`, user-secrets veya CI secret store icinde tutulur; git'e eklenmez. Cloud Compose dosyasi secret degerini degil, yalnizca `.env.neon.local` dosyasinin yolunu tasir.
+
+API runtime image'i root olarak çalışmaz. .NET image'indeki `app` kullanıcısı
+uygulamayı çalıştırır; yalnız SQLite için gereken `/data` dizini bu kullanıcıya
+yazılabilir bırakılır. Web runtime da ayrı `nextjs` kullanıcısıyla çalışır.
+Production ortamında CORS origin'leri `Cors__AllowedOrigins__0` benzeri
+konfigürasyonla açıkça verilmelidir; credentials kullanılırken wildcard kabul
+edilmez. HTTPS terminasyonu arkasında HSTS ve `Secure` cookie davranışı
+korunmalıdır.

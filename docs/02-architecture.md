@@ -14,8 +14,9 @@ docs/      Requirements, architecture, BPM, API, code review and team notes
 The API follows a lightweight layered architecture:
 
 - Controllers expose HTTP endpoints and translate requests/responses.
-- Services contain business rules such as login, form validation and process transitions.
-- Repositories/EF Core DbContext handle persistence.
+- Application contracts describe use cases without depending on EF Core or HTTP.
+- Infrastructure services implement login, validation, authorization and process transitions.
+- EF Core `DbContext`/`DbSet` provide repository and unit-of-work behavior inside Infrastructure.
 - Domain models represent users, roles, forms, processes, tasks and audit logs.
 
 This keeps process logic independent from HTTP so it can be tested and extended.
@@ -50,7 +51,9 @@ Implemented frontend folders:
 - `src/features/app-shell`: role-aware navigation, authenticated layout, dashboard/settings/access/log views and shared shell components.
 - `src/features/forms`: shared field metadata, field renderer, form value helpers and frontend validation.
 - `src/features/form-designer`: admin-facing dynamic form editor plus a separately tested pure page/field ordering and validation model.
+- `src/features/form-designer/FormFieldEditor.tsx` and `FormVersionActions.tsx`: field/property editing and draft/publish/archive actions extracted from the controller view.
 - `src/features/form-runner`: saved-form runner that starts process instances.
+- `src/features/management`: user filters, create/detail panels and the `useUserManagement` orchestration hook.
 - `src/features/processes`: process list, task list, task action dialog, process detail, audit timeline and status badge components.
 - `src/features/workflows`: React Flow canvas, typed graph adapter, Zustand draft store, node inspector and publish validation.
 
@@ -80,17 +83,46 @@ Detailed permission notes are tracked in `docs/16-community-permission-model.md`
 
 ## Focused Application Boundaries
 
-The identity implementation may share one Infrastructure class while controllers depend on focused Application contracts:
+Identity is physically split as well as contractually separated:
 
-- `IAuthenticationService`: login, refresh and current-user resolution.
-- `IRegistrationService`: registration and public email verification.
-- `IAccountService`: profile, password and recovery operations.
-- `ISessionService`: logout, session listing and revoke.
-- `IUserAdministrationService`: paged user management and admin operations.
+- `AuthenticationService`: login, refresh and current-user resolution.
+- `RegistrationService`: registration and public email verification.
+- `AccountService`: profile, password and recovery operations.
+- `SessionService`: logout, session listing and revoke.
+- `UserAdministrationService`: paged user management and admin operations.
 - `ICommunityService`: community metadata, lifecycle, invite code and summary.
 - `ICommunityRoleService`: role templates and community-role CRUD.
 
+Controllers resolve the focused Application interfaces directly. The aggregate
+`AuthService`/`IAuthService` façade is not registered in production DI; it remains
+only as compatibility for older service tests.
+
+`AuthenticatedUserLoader` is the shared live authorization boundary. It resolves
+the hashed opaque session plus current role permissions, community state and team
+memberships from the database on every protected request. Those mutable values are
+deliberately not cached.
+
 This is a pragmatic layered architecture, influenced by Clean Architecture dependency direction: Domain is independent, Application defines contracts, Infrastructure implements them and API exposes HTTP. A generic repository is intentionally avoided because EF Core `DbContext` already supplies repository/unit-of-work behavior.
+
+## Operations And Quality Boundaries
+
+Operational health follows the same dependency direction:
+
+- Application owns the neutral `ISystemReadinessService` report contract.
+- Infrastructure implements database connectivity, pending migration and
+  exactly-one-active-SuperAdmin checks.
+- API maps `/health/live` and `/health/ready` without exposing connection details.
+
+Unexpected HTTP failures use RFC 7807 `ProblemDetails` with a safe trace and
+validated `X-Correlation-ID`. Development keeps readable console logs; production
+uses the built-in JSON console formatter. Request logs contain method, path,
+status and duration, never token, cookie, password, e-mail or form payloads.
+`SystemAuditLog` remains the durable business trail; `ILogger` is the technical
+operational trail.
+
+GitHub Actions protects these boundaries. Every push runs backend/frontend
+tests, lint, build and whitespace checks; `master` pushes and manual runs add
+Playwright, PostgreSQL migration smoke and Docker build/config validation.
 
 ## Team Extension Boundary
 

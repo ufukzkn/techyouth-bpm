@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +15,11 @@ internal sealed class ApiWebApplicationFactory(
     int rateLimitPermitLimit = 100,
     string databaseProvider = "Sqlite",
     string? connectionString = null,
-    int sessionDurationMinutes = 120) : WebApplicationFactory<Program>
+    string? databaseSchema = null,
+    int sessionDurationMinutes = 120,
+    Action<IServiceCollection>? configureServices = null,
+    IReadOnlyDictionary<string, string?>? configurationOverrides = null,
+    string environment = "Development") : WebApplicationFactory<Program>
 {
     private readonly string databasePath = Path.Combine(
         Path.GetTempPath(),
@@ -23,19 +29,26 @@ internal sealed class ApiWebApplicationFactory(
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment(environment);
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            var values = new Dictionary<string, string?>
             {
                 ["Database:Provider"] = databaseProvider,
                 ["ConnectionStrings:DefaultConnection"] = DatabaseConnectionString,
+                ["Database:Schema"] = databaseSchema,
                 ["Seed:MockData"] = "true",
                 ["Email:Provider"] = "Demo",
                 ["Auth:RateLimitPermitLimit"] = rateLimitPermitLimit.ToString(),
                 ["Auth:RateLimitWindowMinutes"] = "1",
                 ["Auth:SessionDurationMinutes"] = sessionDurationMinutes.ToString()
-            });
+            };
+            foreach (var item in configurationOverrides ?? new Dictionary<string, string?>())
+            {
+                values[item.Key] = item.Value;
+            }
+
+            configuration.AddInMemoryCollection(values);
         });
         builder.ConfigureServices(services =>
         {
@@ -43,16 +56,27 @@ internal sealed class ApiWebApplicationFactory(
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.AddDbContext<AppDbContext>(options =>
             {
+                options.ConfigureWarnings(warnings =>
+                    warnings.Throw(RelationalEventId.MultipleCollectionIncludeWarning));
                 if (databaseProvider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase)
                     || databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
                 {
-                    options.UseNpgsql(DatabaseConnectionString);
+                    options.UseNpgsql(DatabaseConnectionString, providerOptions =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(databaseSchema))
+                        {
+                            providerOptions.MigrationsHistoryTable(
+                                HistoryRepository.DefaultTableName,
+                                databaseSchema);
+                        }
+                    });
                 }
                 else
                 {
                     options.UseSqlite(DatabaseConnectionString);
                 }
             });
+            configureServices?.Invoke(services);
         });
     }
 

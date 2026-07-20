@@ -1,18 +1,57 @@
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using TechYouthBpm.Api;
+using TechYouthBpm.Api.Configuration;
+using TechYouthBpm.Api.Health;
+using TechYouthBpm.Api.Observability;
 using TechYouthBpm.Infrastructure;
 using TechYouthBpm.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+        options.UseUtcTimestamp = true;
+    });
+}
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(180);
+});
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        var traceId = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+        context.ProblemDetails.Extensions["traceId"] = traceId;
+        context.ProblemDetails.Extensions["correlationId"] =
+            CorrelationIdMiddleware.GetCorrelationId(context.HttpContext);
+
+        if (context.ProblemDetails.Status >= StatusCodes.Status500InternalServerError)
+        {
+            context.ProblemDetails.Title = "An unexpected error occurred.";
+            context.ProblemDetails.Detail = "The request could not be completed.";
+        }
+    };
+});
+builder.Services.AddHealthChecks()
+    .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["live"])
+    .AddCheck<SystemReadinessHealthCheck>("system", tags: ["ready"]);
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -54,17 +93,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("Web", policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
+builder.Services.AddConfiguredWebCors(builder.Configuration);
 
 var app = builder.Build();
 
@@ -73,10 +102,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHsts();
+}
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<SafeRequestLoggingMiddleware>();
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
-app.UseCors("Web");
+app.UseCors(WebCorsConfiguration.PolicyName);
 app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
@@ -116,6 +152,16 @@ app.Use(async (context, next) =>
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("live"),
+    ResponseWriter = HealthResponseWriter.WriteAsync,
+});
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = registration => registration.Tags.Contains("ready"),
+    ResponseWriter = HealthResponseWriter.WriteAsync,
+});
 
 using (var scope = app.Services.CreateScope())
 {

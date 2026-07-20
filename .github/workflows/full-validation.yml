@@ -1,0 +1,117 @@
+name: Full Validation
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright browser workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_API_BASE_URL: http://localhost:5291
+        run: npm run build
+
+      - name: Run end-to-end tests
+        working-directory: apps/web
+        run: npm run test:e2e
+
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/.e2e/runs
+          if-no-files-found: ignore
+          retention-days: 7
+
+  postgresql:
+    name: PostgreSQL migration smoke
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: techyouth_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d techyouth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TECHYOUTH_TEST_POSTGRES_CONNECTION: Host=localhost;Port=5432;Database=techyouth_test;Username=postgres;Password=postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Run migration smoke tests
+        run: dotnet test apps/api/TechYouthBpm.slnx --configuration Release --nologo --filter FullyQualifiedName~MigrationSmokeTests
+
+  docker:
+    name: Docker configuration and builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare non-secret cloud configuration
+        shell: bash
+        run: |
+          cat > .env.neon.local <<'EOF'
+          Database__Provider=PostgreSql
+          ConnectionStrings__DefaultConnection=Host=postgres.invalid;Database=techyouth;Username=test;Password=test;SSL Mode=Require
+          Seed__MockData=true
+          EOF
+
+      - name: Validate Compose files
+        run: |
+          docker compose config --quiet
+          docker compose -f compose.cloud.yaml config --quiet
+
+      - name: Build API and web images
+        run: docker compose build

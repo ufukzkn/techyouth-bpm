@@ -48,7 +48,8 @@ public class MigrationSmokeTests
             };
             using var factory = new ApiWebApplicationFactory(
                 databaseProvider: "PostgreSql",
-                connectionString: builder.ConnectionString);
+                connectionString: builder.ConnectionString,
+                databaseSchema: schemaName);
             using var client = factory.CreateApiClient();
 
             var (session, _) = await IntegrationTestHttp.LoginAsync(client);
@@ -58,8 +59,27 @@ public class MigrationSmokeTests
                 client,
                 session.Token,
                 "PostgreSQL migration lifecycle");
-            var pendingMigrations = await factory.ExecuteDbAsync(async db =>
-                (await db.Database.GetPendingMigrationsAsync()).ToArray());
+            var migrationState = await factory.ExecuteDbAsync(async db =>
+            {
+                await db.Database.OpenConnectionAsync();
+                try
+                {
+                    await using var command = db.Database.GetDbConnection().CreateCommand();
+                    command.CommandText = "SELECT current_schema()";
+                    var currentSchema = (string?)await command.ExecuteScalarAsync();
+                    return new
+                    {
+                        Provider = db.Database.ProviderName,
+                        CurrentSchema = currentSchema,
+                        Applied = (await db.Database.GetAppliedMigrationsAsync()).ToArray(),
+                        Pending = (await db.Database.GetPendingMigrationsAsync()).ToArray()
+                    };
+                }
+                finally
+                {
+                    await db.Database.CloseConnectionAsync();
+                }
+            });
 
             Assert.Equal(HttpStatusCode.OK, formsResponse.StatusCode);
             Assert.Equal(HttpStatusCode.OK, lifecycle.FormUpdateStatus);
@@ -68,7 +88,10 @@ public class MigrationSmokeTests
             Assert.Equal("Published", lifecycle.PublishedStatus);
             Assert.Equal("InProgress", lifecycle.ProcessStatus);
             Assert.Equal("Archived", lifecycle.ArchivedStatus);
-            Assert.Empty(pendingMigrations);
+            Assert.Equal("Npgsql.EntityFrameworkCore.PostgreSQL", migrationState.Provider);
+            Assert.Equal(schemaName, migrationState.CurrentSchema);
+            Assert.NotEmpty(migrationState.Applied);
+            Assert.Empty(migrationState.Pending);
         }
         finally
         {

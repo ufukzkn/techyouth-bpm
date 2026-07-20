@@ -182,6 +182,7 @@ public class FormService(AppDbContext db, ISystemAuditService auditService) : IF
 
     private IQueryable<FormDefinition> FormQuery() =>
         db.FormDefinitions
+            .AsSplitQuery()
             .Include(form => form.Community)
             .Include(form => form.Versions)
             .Include(form => form.Fields)

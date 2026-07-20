@@ -316,7 +316,23 @@ cd apps/web
 npm run test
 npm run lint
 npm run build
+npm run test:e2e
 ```
+
+Playwright komutu izole SQLite veritabanı hazırlayıp API ve web sunucularını
+kendisi başlatır. Cookie session, route koruması, form/workflow yayınlama, süreç
+başlatma ve takım+rol claim sınırını gerçek tarayıcıda doğrular.
+
+API çalışırken operasyon kontrolleri:
+
+- `http://localhost:5291/health/live`
+- `http://localhost:5291/health/ready`
+
+Her push için temel; `master`/manuel koşu için Playwright, PostgreSQL ve Docker
+kalite kapıları GitHub Actions altında tanımlıdır. CI deployment yapmaz. Güncel
+test sayıları ve kapsamın tek kaynağı
+[docs/24-testing-and-quality-gates.md](docs/24-testing-and-quality-gates.md)
+dosyasıdır.
 
 ## Demo Users
 

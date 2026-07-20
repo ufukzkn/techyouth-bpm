@@ -175,6 +175,7 @@ public class WorkflowRoleAndActionIntegrationTests
         var persisted = await factory.ExecuteDbAsync(async db =>
         {
             var process = await db.ProcessInstances
+                .AsSplitQuery()
                 .Include(item => item.AuditLogs)
                 .Include(item => item.StepExecutions)
                 .SingleAsync(item => item.Id == processId);

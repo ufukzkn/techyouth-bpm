@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Domain.Entities;
 using TechYouthBpm.Domain.Enums;
@@ -14,13 +15,18 @@ internal static class TestDbFactory
     public static readonly Guid ApproverCommunityRoleId = Guid.Parse("dddddddd-dddd-dddd-dddd-dddddddddddd");
     public static readonly Guid UnassignedCommunityRoleId = Guid.Parse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
 
-    public static AppDbContext Create(string? dbName = null)
+    public static AppDbContext Create(params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
+        var builder = new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlite("Data Source=:memory:")
-            .Options;
+            .ConfigureWarnings(warnings =>
+                warnings.Throw(RelationalEventId.MultipleCollectionIncludeWarning));
+        if (interceptors.Length > 0)
+        {
+            builder.AddInterceptors(interceptors);
+        }
 
-        var context = new AppDbContext(options);
+        var context = new AppDbContext(builder.Options);
         context.Database.OpenConnection();
         context.Database.EnsureCreated();
         return context;

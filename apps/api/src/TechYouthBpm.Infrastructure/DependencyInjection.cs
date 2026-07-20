@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TechYouthBpm.Application.Health;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Application.Workflow;
 using TechYouthBpm.Infrastructure.Data;
+using TechYouthBpm.Infrastructure.Health;
 using TechYouthBpm.Infrastructure.Services;
 
 namespace TechYouthBpm.Infrastructure;
@@ -15,6 +18,7 @@ public static class DependencyInjection
         var provider = configuration["Database:Provider"] ?? "Sqlite";
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=techyouth-bpm.db";
+        var databaseSchema = configuration["Database:Schema"];
 
         services.AddDbContext<AppDbContext>(options =>
         {
@@ -22,7 +26,15 @@ public static class DependencyInjection
             {
                 case "postgresql":
                 case "postgres":
-                    options.UseNpgsql(connectionString);
+                    options.UseNpgsql(connectionString, providerOptions =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(databaseSchema))
+                        {
+                            providerOptions.MigrationsHistoryTable(
+                                HistoryRepository.DefaultTableName,
+                                databaseSchema);
+                        }
+                    });
                     break;
                 case "sqlite":
                     options.UseSqlite(connectionString);
@@ -33,13 +45,13 @@ public static class DependencyInjection
             }
         });
 
-        services.AddScoped<AuthService>();
-        services.AddScoped<IAuthService>(provider => provider.GetRequiredService<AuthService>());
-        services.AddScoped<IAuthenticationService>(provider => provider.GetRequiredService<AuthService>());
-        services.AddScoped<IRegistrationService>(provider => provider.GetRequiredService<AuthService>());
-        services.AddScoped<IAccountService>(provider => provider.GetRequiredService<AuthService>());
-        services.AddScoped<ISessionService>(provider => provider.GetRequiredService<AuthService>());
-        services.AddScoped<IUserAdministrationService>(provider => provider.GetRequiredService<AuthService>());
+        services.AddScoped<ISystemReadinessService, SystemReadinessService>();
+        services.AddScoped<AuthenticatedUserLoader>();
+        services.AddScoped<IAuthenticationService, AuthenticationService>();
+        services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddScoped<IAccountService, AccountService>();
+        services.AddScoped<ISessionService, SessionService>();
+        services.AddScoped<IUserAdministrationService, UserAdministrationService>();
         services.AddScoped<IOtpService, OtpService>();
         services.AddScoped<IEmailSender>(_ =>
         {

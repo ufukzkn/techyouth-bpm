@@ -47,6 +47,8 @@ Bağımlılık yönü `API -> Application/Infrastructure`, `Infrastructure -> Ap
 | Swashbuckle | Swagger/OpenAPI | Endpoint keşfi ve Bearer tabanlı debug akışı sağlar. |
 | xUnit + WebApplicationFactory | Backend testleri | Servis kurallarını ve gerçek HTTP/cookie/CSRF davranışını test eder. |
 | Vitest | Frontend saf mantık/store testleri | Zustand cache, graph adapter, form modeli ve çeviri parity kontrollerini hızlı çalıştırır. |
+| Playwright | Uçtan uca doğrulama | Gerçek API/web sunucusunda cookie session, route guard ve workflow zincirini çalıştırır. |
+| GitHub Actions | Otomatik kalite kapısı | Her push'ta test/lint/build; master/manual koşuda E2E, PostgreSQL ve Docker doğrular. |
 
 Sürüm numaralarının güncel kaynağı [package.json](../apps/web/package.json) ve `.csproj` dosyalarıdır.
 
@@ -92,7 +94,15 @@ Başlıca sınırlar:
 
 Kontratlar [Application/Services](../apps/api/src/TechYouthBpm.Application/Services), implementasyonlar [Infrastructure/Services](../apps/api/src/TechYouthBpm.Infrastructure/Services) altındadır. Kayıtlar [DependencyInjection.cs](../apps/api/src/TechYouthBpm.Infrastructure/DependencyInjection.cs) içinde yapılır.
 
-Identity tarafında controller'lar küçük kontratlara bağımlıdır, fakat bugün bu kontratların çoğunu tek [AuthService](../apps/api/src/TechYouthBpm.Infrastructure/Services/AuthService.cs) uygular. [IAuthService](../apps/api/src/TechYouthBpm.Application/Services/IAuthService.cs) eski servis testleri/istemciler için compatibility aggregate'tır. Bu, davranışsal sınırları ayıran pragmatik bir ara adımdır; sonraki fiziksel modülerlik adımı AuthService implementasyonunu da ayrı sınıflara bölmektir.
+Identity implementasyonları
+[Services/Auth](../apps/api/src/TechYouthBpm.Infrastructure/Services/Auth)
+altında fiziksel olarak ayrılmıştır: `AuthenticationService`,
+`RegistrationService`, `AccountService`, `SessionService` ve
+`UserAdministrationService`. Controller'lar ilgili küçük kontratı doğrudan alır.
+[AuthService](../apps/api/src/TechYouthBpm.Infrastructure/Services/AuthService.cs)
+ile [IAuthService](../apps/api/src/TechYouthBpm.Application/Services/IAuthService.cs)
+production DI'a kayıtlı değildir; eski servis testlerinin davranış uyumluluğunu
+koruyan aggregate façade olarak kalır.
 
 ### Neden Generic Repository Yok?
 
@@ -109,7 +119,13 @@ Bu model dört kavramı ayırır:
 
 Permission adlarının merkezi kaynağı [PermissionNames.cs](../apps/api/src/TechYouthBpm.Application/Auth/PermissionNames.cs) dosyasıdır. Örnekler: `Forms.Create`, `Processes.Start`, `Tasks.Act`, `Teams.Manage`, `Audit.View`.
 
-Aktif session her protected istekte DB'den kullanıcı, community role permission'ları ve takım üyelikleriyle yüklenir; [AuthService.GetUserByTokenAsync](../apps/api/src/TechYouthBpm.Infrastructure/Services/AuthService.cs) bunu yapar. [MappingExtensions](../apps/api/src/TechYouthBpm.Infrastructure/Services/MappingExtensions.cs) SuperAdmin için tüm izinleri, diğer kullanıcılar için aktif community role izinlerini DTO'ya taşır. Bu sayede bir rol veya takım üyeliği değiştirilince eski token'a statik yetki gömülü kalmaz; sonraki istek güncel yetkiyi görür.
+Aktif session her protected istekte DB'den kullanıcı, community role
+permission'ları ve takım üyelikleriyle yüklenir;
+[AuthenticatedUserLoader](../apps/api/src/TechYouthBpm.Infrastructure/Services/Auth/AuthenticatedUserLoader.cs)
+bu tek canlı çözümleme sınırıdır. [MappingExtensions](../apps/api/src/TechYouthBpm.Infrastructure/Services/MappingExtensions.cs)
+SuperAdmin için tüm izinleri, diğer kullanıcılar için aktif community role
+izinlerini DTO'ya taşır. Bu sayede bir rol veya takım üyeliği değiştirilince eski
+token'a statik yetki gömülü kalmaz; sonraki istek güncel yetkiyi görür.
 
 Süreç/task görünürlüğü [WorkflowVisibilityService](../apps/api/src/TechYouthBpm.Infrastructure/Services/WorkflowVisibilityService.cs) içinde merkezileştirilmiştir:
 
@@ -129,7 +145,10 @@ Proje JWT kullanmaz; merkezi, opaque session modeli kullanır:
 4. Kullanıcı durumu, topluluk durumu, permission ve takım üyelikleri DB'den yeniden değerlendirilir.
 5. Logout, admin revoke veya password reset session'ı merkezi olarak kapatabilir.
 
-İlgili kod: [SessionTokenHasher](../apps/api/src/TechYouthBpm.Infrastructure/Security/SessionTokenHasher.cs), [PasswordHasher](../apps/api/src/TechYouthBpm.Infrastructure/Security/PasswordHasher.cs), [AuthService](../apps/api/src/TechYouthBpm.Infrastructure/Services/AuthService.cs).
+İlgili kod: [SessionTokenHasher](../apps/api/src/TechYouthBpm.Infrastructure/Security/SessionTokenHasher.cs),
+[PasswordHasher](../apps/api/src/TechYouthBpm.Infrastructure/Security/PasswordHasher.cs),
+[AuthenticationService](../apps/api/src/TechYouthBpm.Infrastructure/Services/Auth/AuthenticationService.cs)
+ve [AuthenticatedUserLoader](../apps/api/src/TechYouthBpm.Infrastructure/Services/Auth/AuthenticatedUserLoader.cs).
 
 Şifreler PBKDF2-SHA256 + kullanıcıya özel salt ile saklanır. Browser cookie akışında `HttpOnly`, `SameSite` ve production'da `Secure` cookie; mutation'larda `X-CSRF-Token` kullanılır. Swagger/dev için Bearer desteği korunur. “Beni hatırla” rotating refresh token üretir; eski refresh token tekrar kullanılırsa reuse şüphesi kabul edilir ve zincir revoke edilir. Login/register/reset endpointlerinde rate limit, kullanıcı bazlı başarısız giriş sayacı ve geçici lockout vardır.
 
@@ -198,12 +217,12 @@ Controller, DTO ve workflow kuralları provider değişince değişmez. Tasarım
 ## 12. Test Stratejisi
 
 Test piramidi saf kurallar, relational SQLite servisleri,
-`WebApplicationFactory` HTTP güvenlik/yetki akışları, opt-in PostgreSQL migration
-smoke, frontend Vitest ve gerçekçi cross-role kabul zincirinden oluşur.
+`WebApplicationFactory` HTTP güvenlik/yetki akışları, OpenAPI/query regresyonları,
+opt-in PostgreSQL migration smoke, frontend Vitest ve Playwright E2E'den oluşur.
 
-Güncel sayılar, kapsam kataloğu, komutlar ve kalan Playwright boşluğu tek yerde
-tutulur: [Testing And Quality Gates](24-testing-and-quality-gates.md). Sunumdan
-önce oradaki komutları yeniden çalıştırın; manuel Transfer zinciri için
+Güncel sayılar, kapsam kataloğu ve komutlar tek yerde tutulur:
+[Testing And Quality Gates](24-testing-and-quality-gates.md). Sunumdan önce
+oradaki komutları yeniden çalıştırın; manuel Transfer zinciri için
 [Workflow Uçtan Uca Test Senaryoları](22-workflow-end-to-end-test-scenarios.md)
 belgesini izleyin.
 
@@ -239,7 +258,10 @@ Controller ve service sınırları var. Repository davranışını EF Core `DbCo
 
 ### “Rol kontrolü kodda nerede?”
 
-Permission kataloğu `PermissionNames.cs`; aktif permission çözümü `AuthService` + `MappingExtensions`; menü filtresi `navigation.ts`; süreç/task scope'u `WorkflowVisibilityService`; adaylık ve takım sorumlusu kuralı `TaskAssignmentResolver` içindedir. Kritik karar backend'dedir.
+Permission kataloğu `PermissionNames.cs`; aktif permission çözümü
+`AuthenticatedUserLoader` + `MappingExtensions`; menü filtresi `navigation.ts`;
+süreç/task scope'u `WorkflowVisibilityService`; adaylık ve takım sorumlusu kuralı
+`TaskAssignmentResolver` içindedir. Kritik karar backend'dedir.
 
 ### “Kullanıcıya rol verince tekrar login gerekli mi?”
 
@@ -269,9 +291,38 @@ Topluluk güvenlik/veri sınırı, rol yapılabilecek işlemler, takım ise işi
 
 Kritik process/task/form yazmaları transaction sınırındadır. Task oluşup audit oluşamazsa transaction rollback olur; yarım kayıt bırakılmaz.
 
+### “Health endpointleri katmanlı mimariye nasıl uyuyor?”
+
+`ISystemReadinessService` ve nötr rapor modeli Application'dadır. EF Core ile
+bağlantı, pending migration ve tam bir aktif SuperAdmin kontrolünü Infrastructure
+yapar. API yalnız `/health/live` ve `/health/ready` endpointlerini map eder.
+Domain/Application ayrı proses olmadığı için yapay “katman ayakta mı?” kontrolü
+yoktur.
+
+### “Neden Serilog, Sentry veya Datadog eklemediniz?”
+
+Bugün built-in `ILogger` ve production JSON console formatter ile correlation
+ID'li teknik log üretiyoruz; iş olayları ayrı `SystemAuditLog`'da kalıyor.
+Serilog/Sentry/Seq/OpenTelemetry bir hedef değil taşıma aracıdır. Gerçek hosting,
+retention, erişim ve maliyet kararı olmadan vendor bağımlılığı eklemek yerine,
+standart JSON çıktısını seçilecek platforma bağlamayı bilinçli sonraki adım
+olarak bıraktık.
+
+### “GitHub Actions PR olmadan ne işe yarıyor?”
+
+Workflow her push'ta test/lint/build çalışır; `master` veya manuel koşuda
+Playwright, PostgreSQL migration ve Docker doğrulaması da eklenir. PR zorunlu
+değildir ve otomatik deployment yapılmaz. Ama ekip doğrudan push etse bile bozuk
+commit merkezi olarak görünür ve aynı branch'in eski koşusu iptal edilir.
+
 ### “Sistem ne kadar production-ready?”
 
-Migrations, PostgreSQL desteği, hashing, cookie-only browser transport, revoke, CSRF, rate limit, lockout, permission scope, audit, transaction ve integration testleri güçlü temeldir. Kalan başlıca production işleri: gerçek object storage/antivirus, CI/CD, secret manager, gözlemlenebilirlik, backup/restore ve Playwright browser E2E paketini genişletmektir.
+Migrations, PostgreSQL desteği, hashing, cookie-only browser transport, revoke,
+CSRF, rate limit, lockout, permission scope, audit, transaction, health,
+ProblemDetails, güvenli JSON logları, integration testleri, Playwright ve CI
+güçlü temeldir. Kalan başlıca production işleri: gerçek object
+storage/antivirus, secret manager, backup/restore, hostinge bağlanmış
+observability/error tracking ve gelişmiş BPM node'larıdır.
 
 ## 15. Sunum Akışı Önerisi
 
@@ -292,7 +343,9 @@ Projeyi hızlı öğrenmek için şu sırayı izleyin:
 1. [README](../README.md) ve [Quick Start](../QUICKSTART.md)
 2. [Program.cs](../apps/api/src/TechYouthBpm.Api/Program.cs) ve [DependencyInjection.cs](../apps/api/src/TechYouthBpm.Infrastructure/DependencyInjection.cs)
 3. [PermissionNames.cs](../apps/api/src/TechYouthBpm.Application/Auth/PermissionNames.cs)
-4. [AuthService](../apps/api/src/TechYouthBpm.Infrastructure/Services/AuthService.cs) ve [WorkflowVisibilityService](../apps/api/src/TechYouthBpm.Infrastructure/Services/WorkflowVisibilityService.cs)
+4. [AuthenticationService](../apps/api/src/TechYouthBpm.Infrastructure/Services/Auth/AuthenticationService.cs),
+   [AuthenticatedUserLoader](../apps/api/src/TechYouthBpm.Infrastructure/Services/Auth/AuthenticatedUserLoader.cs)
+   ve [WorkflowVisibilityService](../apps/api/src/TechYouthBpm.Infrastructure/Services/WorkflowVisibilityService.cs)
 5. [ProcessGraphValidator](../apps/api/src/TechYouthBpm.Infrastructure/Services/ProcessGraphValidator.cs) ve [DynamicWorkflowEngine](../apps/api/src/TechYouthBpm.Infrastructure/Services/DynamicWorkflowEngine.cs)
 6. [(workspace) layout](<../apps/web/src/app/(workspace)/layout.tsx>), [navigation.ts](../apps/web/src/features/app-shell/navigation.ts) ve [sessionStore](../apps/web/src/features/session/sessionStore.ts)
 7. [workflowDraftStore](../apps/web/src/features/workflows/workflowDraftStore.ts) ve [apiGraphAdapter](../apps/web/src/features/workflows/apiGraphAdapter.ts)

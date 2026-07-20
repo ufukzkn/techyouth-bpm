@@ -46,8 +46,15 @@ form -> workflow -> process -> claim -> task -> audit path is in
 - `LoginView` starts empty and uses demo-account buttons only to fill credentials for testing.
 - `LoginView` supports both sign-in and register mode. Register creates a pending account and explains that admin approval is required.
 - `sessionStore` keeps the active user, expiry and preferences needed across routes; browser access/refresh secrets never enter Zustand or localStorage.
-- `AuthService` verifies PBKDF2 password hashes and stores only hashed session tokens. The normal browser receives HttpOnly cookies through `/api/auth/browser-login`; only explicit Swagger/API clients receive a raw Bearer token from `/api/auth/login`.
-- `AuthService` keeps the current opaque-session model instead of JWT because logout, revoke, lockout and pending approval need server-side state anyway.
+- Focused identity services verify PBKDF2 password hashes and store only hashed
+  session tokens. `AuthenticationService` handles login/refresh/current user,
+  while account, registration, session and user administration have separate
+  implementations. The normal browser receives HttpOnly cookies through
+  `/api/auth/browser-login`; only explicit Swagger/API clients receive a raw
+  Bearer token from `/api/auth/login`.
+- The identity boundary keeps the opaque-session model instead of JWT because
+  logout, revoke, lockout, pending approval and live permission changes need
+  server-side state anyway.
 - The shared `(workspace)` layout keeps navigation chrome mounted across route changes. `WorkspaceSessionController` verifies restored API sessions, schedules expiry and sends expired/unauthorized sessions to login.
 - The layout filters navigation by effective permissions while each route imports only its feature view. Sidebar links remain semantic App Router links and backend services still enforce authorization.
 - `DashboardView` reads process/task metrics from the API, then turns metric cards and BPM flow steps into role-aware workspace shortcuts.
