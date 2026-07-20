@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -14,6 +15,7 @@ internal sealed class ApiWebApplicationFactory(
     int rateLimitPermitLimit = 100,
     string databaseProvider = "Sqlite",
     string? connectionString = null,
+    string? databaseSchema = null,
     int sessionDurationMinutes = 120,
     Action<IServiceCollection>? configureServices = null,
     IReadOnlyDictionary<string, string?>? configurationOverrides = null,
@@ -34,6 +36,7 @@ internal sealed class ApiWebApplicationFactory(
             {
                 ["Database:Provider"] = databaseProvider,
                 ["ConnectionStrings:DefaultConnection"] = DatabaseConnectionString,
+                ["Database:Schema"] = databaseSchema,
                 ["Seed:MockData"] = "true",
                 ["Email:Provider"] = "Demo",
                 ["Auth:RateLimitPermitLimit"] = rateLimitPermitLimit.ToString(),
@@ -58,7 +61,15 @@ internal sealed class ApiWebApplicationFactory(
                 if (databaseProvider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase)
                     || databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
                 {
-                    options.UseNpgsql(DatabaseConnectionString);
+                    options.UseNpgsql(DatabaseConnectionString, providerOptions =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(databaseSchema))
+                        {
+                            providerOptions.MigrationsHistoryTable(
+                                HistoryRepository.DefaultTableName,
+                                databaseSchema);
+                        }
+                    });
                 }
                 else
                 {

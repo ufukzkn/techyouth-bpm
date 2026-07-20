@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TechYouthBpm.Application.Health;
@@ -17,6 +18,7 @@ public static class DependencyInjection
         var provider = configuration["Database:Provider"] ?? "Sqlite";
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? "Data Source=techyouth-bpm.db";
+        var databaseSchema = configuration["Database:Schema"];
 
         services.AddDbContext<AppDbContext>(options =>
         {
@@ -24,7 +26,15 @@ public static class DependencyInjection
             {
                 case "postgresql":
                 case "postgres":
-                    options.UseNpgsql(connectionString);
+                    options.UseNpgsql(connectionString, providerOptions =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(databaseSchema))
+                        {
+                            providerOptions.MigrationsHistoryTable(
+                                HistoryRepository.DefaultTableName,
+                                databaseSchema);
+                        }
+                    });
                     break;
                 case "sqlite":
                     options.UseSqlite(connectionString);
