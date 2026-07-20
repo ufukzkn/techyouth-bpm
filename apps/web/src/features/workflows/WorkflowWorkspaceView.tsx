@@ -179,7 +179,6 @@ export function WorkflowWorkspaceView() {
       return;
     }
     // Keep passive status text in sync when the language changes in place.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWorkspaceMessage(selectedVersion
       ? text(
         `v${selectedVersion.versionNumber} ${selectedVersion.status === "Published" ? "yayın sürümü" : "taslağı"} açık.`,

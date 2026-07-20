@@ -1,6 +1,6 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
-export const apiBaseUrl = "http://localhost:5291";
+export const apiBaseUrl = process.env.E2E_API_BASE_URL ?? "http://localhost:5292";
 
 export async function loginThroughUi(page: Page, username: string, password: string) {
   await page.goto("/login");
