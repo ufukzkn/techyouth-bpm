@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -5,16 +6,44 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using TechYouthBpm.Api;
 using TechYouthBpm.Api.Health;
+using TechYouthBpm.Api.Observability;
 using TechYouthBpm.Infrastructure;
 using TechYouthBpm.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (!builder.Environment.IsDevelopment())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+        options.UseUtcTimestamp = true;
+    });
+}
 
 builder.Services.AddControllers().AddJsonOptions(options =>
 {
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddProblemDetails(options =>
+{
+    options.CustomizeProblemDetails = context =>
+    {
+        var traceId = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+        context.ProblemDetails.Extensions["traceId"] = traceId;
+        context.ProblemDetails.Extensions["correlationId"] =
+            CorrelationIdMiddleware.GetCorrelationId(context.HttpContext);
+
+        if (context.ProblemDetails.Status >= StatusCodes.Status500InternalServerError)
+        {
+            context.ProblemDetails.Title = "An unexpected error occurred.";
+            context.ProblemDetails.Detail = "The request could not be completed.";
+        }
+    };
+});
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy(), tags: ["live"])
     .AddCheck<SystemReadinessHealthCheck>("system", tags: ["ready"]);
@@ -79,6 +108,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<SafeRequestLoggingMiddleware>();
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
 app.UseCors("Web");

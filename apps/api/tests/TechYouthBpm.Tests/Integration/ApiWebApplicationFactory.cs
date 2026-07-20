@@ -13,7 +13,8 @@ internal sealed class ApiWebApplicationFactory(
     int rateLimitPermitLimit = 100,
     string databaseProvider = "Sqlite",
     string? connectionString = null,
-    int sessionDurationMinutes = 120) : WebApplicationFactory<Program>
+    int sessionDurationMinutes = 120,
+    Action<IServiceCollection>? configureServices = null) : WebApplicationFactory<Program>
 {
     private readonly string databasePath = Path.Combine(
         Path.GetTempPath(),
@@ -53,6 +54,7 @@ internal sealed class ApiWebApplicationFactory(
                     options.UseSqlite(DatabaseConnectionString);
                 }
             });
+            configureServices?.Invoke(services);
         });
     }
 
