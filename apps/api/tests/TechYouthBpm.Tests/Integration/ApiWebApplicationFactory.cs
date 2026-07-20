@@ -14,7 +14,9 @@ internal sealed class ApiWebApplicationFactory(
     string databaseProvider = "Sqlite",
     string? connectionString = null,
     int sessionDurationMinutes = 120,
-    Action<IServiceCollection>? configureServices = null) : WebApplicationFactory<Program>
+    Action<IServiceCollection>? configureServices = null,
+    IReadOnlyDictionary<string, string?>? configurationOverrides = null,
+    string environment = "Development") : WebApplicationFactory<Program>
 {
     private readonly string databasePath = Path.Combine(
         Path.GetTempPath(),
@@ -24,10 +26,10 @@ internal sealed class ApiWebApplicationFactory(
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment(environment);
         builder.ConfigureAppConfiguration((_, configuration) =>
         {
-            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            var values = new Dictionary<string, string?>
             {
                 ["Database:Provider"] = databaseProvider,
                 ["ConnectionStrings:DefaultConnection"] = DatabaseConnectionString,
@@ -36,7 +38,13 @@ internal sealed class ApiWebApplicationFactory(
                 ["Auth:RateLimitPermitLimit"] = rateLimitPermitLimit.ToString(),
                 ["Auth:RateLimitWindowMinutes"] = "1",
                 ["Auth:SessionDurationMinutes"] = sessionDurationMinutes.ToString()
-            });
+            };
+            foreach (var item in configurationOverrides ?? new Dictionary<string, string?>())
+            {
+                values[item.Key] = item.Value;
+            }
+
+            configuration.AddInMemoryCollection(values);
         });
         builder.ConfigureServices(services =>
         {

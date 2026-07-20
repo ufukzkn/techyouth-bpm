@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using TechYouthBpm.Api;
+using TechYouthBpm.Api.Configuration;
 using TechYouthBpm.Api.Health;
 using TechYouthBpm.Api.Observability;
 using TechYouthBpm.Infrastructure;
@@ -28,6 +29,10 @@ builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(180);
+});
 builder.Services.AddProblemDetails(options =>
 {
     options.CustomizeProblemDetails = context =>
@@ -88,17 +93,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("Web", policy =>
-    {
-        policy
-            .WithOrigins("http://localhost:3000")
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
-    });
-});
+builder.Services.AddConfiguredWebCors(builder.Configuration);
 
 var app = builder.Build();
 
@@ -107,13 +102,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<SafeRequestLoggingMiddleware>();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
-app.UseCors("Web");
+app.UseCors(WebCorsConfiguration.PolicyName);
 app.UseRateLimiter();
 app.Use(async (context, next) =>
 {
