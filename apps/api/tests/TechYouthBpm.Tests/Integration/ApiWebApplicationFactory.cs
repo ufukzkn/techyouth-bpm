@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -52,6 +53,8 @@ internal sealed class ApiWebApplicationFactory(
             services.RemoveAll<DbContextOptions<AppDbContext>>();
             services.AddDbContext<AppDbContext>(options =>
             {
+                options.ConfigureWarnings(warnings =>
+                    warnings.Throw(RelationalEventId.MultipleCollectionIncludeWarning));
                 if (databaseProvider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase)
                     || databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
                 {

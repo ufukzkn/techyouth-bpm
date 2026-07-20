@@ -19,6 +19,7 @@ public class FormVersionServiceTests
         Assert.True(created.IsSuccess, string.Join(" | ", created.Errors));
         Assert.NotNull(created.Value!.LatestPublishedVersionId);
         var version = await db.FormDefinitionVersions
+            .AsSplitQuery()
             .Include(item => item.Pages)
             .ThenInclude(page => page.Fields)
             .SingleAsync(item => item.Id == created.Value.LatestPublishedVersionId);

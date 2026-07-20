@@ -144,6 +144,7 @@ internal sealed class AuthenticationService(
 
         var refreshTokenHash = SessionTokenHasher.Hash(refreshToken);
         var storedRefreshToken = await db.RefreshTokens
+            .AsSplitQuery()
             .Include(token => token.User)
             .ThenInclude(user => user!.CommunityMemberships)
             .ThenInclude(membership => membership.Community)

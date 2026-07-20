@@ -23,6 +23,7 @@ internal sealed class AuthenticatedUserLoader(AppDbContext db)
 
         var tokenHash = SessionTokenHasher.Hash(token);
         var session = await db.UserSessions
+            .AsSplitQuery()
             .Include(item => item.User)
             .ThenInclude(user => user!.CommunityMemberships)
             .ThenInclude(membership => membership.Community)

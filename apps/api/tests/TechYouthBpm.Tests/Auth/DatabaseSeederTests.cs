@@ -124,6 +124,7 @@ public class DatabaseSeederTests
         Assert.Contains(graph.Nodes, node => node.Key == "transferOperation" && node.RequiresTeamLead);
 
         var startForm = await db.FormDefinitionVersions
+            .AsSplitQuery()
             .Include(formVersion => formVersion.Pages)
             .ThenInclude(page => page.Fields)
             .SingleAsync(formVersion => formVersion.Id == version.FormDefinitionVersionId);
@@ -140,6 +141,7 @@ public class DatabaseSeederTests
         Assert.Contains(FieldType.FileUpload, fieldTypes);
 
         var starter = await db.Users
+            .AsSplitQuery()
             .Include(user => user.CommunityMemberships)
             .ThenInclude(membership => membership.CommunityRole)
             .ThenInclude(role => role!.Permissions)
@@ -227,6 +229,7 @@ public class DatabaseSeederTests
             node => Assert.True(node.RequiresTeamLead));
 
         var startForm = await db.FormDefinitionVersions
+            .AsSplitQuery()
             .Include(formVersion => formVersion.Pages)
             .ThenInclude(page => page.Fields)
             .SingleAsync(formVersion => formVersion.Id == version.FormDefinitionVersionId);
@@ -261,6 +264,7 @@ public class DatabaseSeederTests
             var processes = await db.ProcessInstances
                 .Where(process => process.ProcessDefinitionVersionId.HasValue
                     && versionIds.Contains(process.ProcessDefinitionVersionId.Value))
+                .AsSplitQuery()
                 .Include(process => process.Tasks)
                 .Include(process => process.StepExecutions)
                 .ToListAsync();

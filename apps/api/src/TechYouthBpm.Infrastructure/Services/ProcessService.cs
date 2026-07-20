@@ -194,6 +194,7 @@ public class ProcessService(
         }
 
         var formEntity = await db.FormDefinitions
+            .AsSplitQuery()
             .Include(item => item.Fields)
             .ThenInclude(field => field.ValidationRules)
             .Include(item => item.Versions)

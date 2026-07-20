@@ -23,6 +23,7 @@ internal static class ProcessInstanceDataSeeder
     private static async Task EnsureVersionedWorkflowSeedAsync(AppDbContext db, CancellationToken cancellationToken)
     {
         var forms = await db.FormDefinitions
+            .AsSplitQuery()
             .Include(form => form.Fields)
             .ThenInclude(field => field.ValidationRules)
             .Include(form => form.Versions)

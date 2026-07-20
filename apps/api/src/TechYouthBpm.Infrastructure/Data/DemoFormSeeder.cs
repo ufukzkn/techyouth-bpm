@@ -61,6 +61,7 @@ internal static class DemoFormSeeder
 
         var forms = await db.FormDefinitions
             .Where(form => ids.Contains(form.Id))
+            .AsSplitQuery()
             .Include(form => form.Fields)
             .ThenInclude(field => field.ValidationRules)
             .Include(form => form.Versions)
