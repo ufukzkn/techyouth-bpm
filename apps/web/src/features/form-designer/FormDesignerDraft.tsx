@@ -144,6 +144,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const [highlightedFieldId, setHighlightedFieldId] = useState("");
   const [moveFeedback, setMoveFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [displacedFeedback, setDisplacedFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
+  const [recentlyMovedPage, setRecentlyMovedPage] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
   const [paletteDragGhost, setPaletteDragGhost] = useState<{
     fieldType: FieldType;
@@ -381,6 +382,15 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     const timeoutId = window.setTimeout(() => setDisplacedFeedback(null), 680);
     return () => window.clearTimeout(timeoutId);
   }, [displacedFeedback]);
+
+  useEffect(() => {
+    if (!recentlyMovedPage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setRecentlyMovedPage(null), 440);
+    return () => window.clearTimeout(timeoutId);
+  }, [recentlyMovedPage]);
 
   function handleDragStart(event: DragStartEvent) {
     if (!isPaletteDragId(event.active.id)) {
@@ -713,6 +723,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     }
 
     setPages((current) => normalizeDesignerPages(arrayMove(current, currentIndex, targetIndex)));
+    setRecentlyMovedPage({ id, direction });
     markUnsaved();
   }
 
@@ -1249,11 +1260,11 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
 
           <section className="designer-pages-panel" aria-label={pagingCopy.pages}>
             <div className="designer-pages-header">
-              <div>
+              <div className="designer-pages-heading">
                 <span className="eyebrow">{pagingCopy.pages}</span>
                 <strong>{pagingCopy.pageDropHint}</strong>
               </div>
-              <button className="secondary-button" type="button" onClick={addPage}>
+              <button className="secondary-button designer-page-add-button" type="button" onClick={addPage}>
                 <FilePlus2 size={17} />
                 {pagingCopy.addPage}
               </button>
@@ -1264,30 +1275,44 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
               strategy={horizontalListSortingStrategy}
             >
               <div className="designer-page-tabs" role="tablist" aria-label={pagingCopy.pages}>
-                {pages.map((page, index) => (
-                  <SortablePageTab
-                    active={page.id === activePage?.id}
-                    canMoveLeft={index > 0}
-                    canMoveRight={index < pages.length - 1}
-                    canRemove={pages.length > 1}
-                    copy={pagingCopy}
-                    hasError={!page.title.trim()}
-                    index={index}
-                    key={page.id}
-                    page={page}
-                    onMove={(direction) => movePage(page.id, direction)}
-                    onRemove={() => removePage(page.id)}
-                    onSelect={() => {
-                      setActivePageId(page.id);
-                      setPaletteInsertIndex(null);
-                    }}
-                  />
-                ))}
+                {pages.map((page, index) => {
+                  const movedDirection = recentlyMovedPage?.id === page.id ? recentlyMovedPage.direction : null;
+                  return (
+                    <div
+                      className={`designer-page-card-motion${
+                        movedDirection === -1
+                          ? " designer-page-card-moved-left"
+                          : movedDirection === 1
+                            ? " designer-page-card-moved-right"
+                            : ""
+                      }`}
+                      key={page.id}
+                      role="presentation"
+                    >
+                      <SortablePageTab
+                        active={page.id === activePage?.id}
+                        canMoveLeft={index > 0}
+                        canMoveRight={index < pages.length - 1}
+                        canRemove={pages.length > 1}
+                        copy={pagingCopy}
+                        hasError={!page.title.trim()}
+                        index={index}
+                        page={page}
+                        onMove={(direction) => movePage(page.id, direction)}
+                        onRemove={() => removePage(page.id)}
+                        onSelect={() => {
+                          setActivePageId(page.id);
+                          setPaletteInsertIndex(null);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </SortableContext>
 
             {activePage ? (
-              <div className="designer-page-editor">
+              <div className="designer-page-editor designer-page-metadata">
                 <label>
                   {pagingCopy.pageTitle}
                   <input value={activePage.title} onChange={(event) => updatePage(activePage.id, { title: event.target.value })} />
