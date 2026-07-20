@@ -1,15 +1,8 @@
 "use client";
 
 import {
-  ChevronDown,
-  ChevronUp,
-  Archive,
   FilePlus2,
-  GripVertical,
   Plus,
-  Save,
-  Send,
-  Trash2,
 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -37,15 +30,19 @@ import {
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
+import { FormFieldEditor } from "@/features/form-designer/FormFieldEditor";
+import {
+  FormPrimaryVersionActions,
+  FormVersionActionRail,
+  type FormSaveState,
+} from "@/features/form-designer/FormVersionActions";
 import { MobileFieldPalette } from "@/features/form-designer/MobileFieldPalette";
 import {
-  ExpectedValueInput,
   FieldCanvasDropZone,
   FieldPaletteRail,
   FormDesignerOpeningSkeleton,
   PaletteFieldTypeCard,
   PaletteFieldTypeDragGhost,
-  SortableFieldCard,
   SortablePageTab,
   fieldTypeIcons,
 } from "@/features/form-designer/FormDesignerComponents";
@@ -73,11 +70,9 @@ import {
   fieldCanvasDropId,
   flattenDesignerFields,
   getDefaultExpectedValue,
-  getDependencyCandidates,
   getPageDragId,
   getPageIdFromDragId,
   getPaletteFieldDefaultLabel,
-  getVersionStatusLabel,
   hasPaletteDragDistance,
   isPageDragId,
   isPaletteDragId,
@@ -104,7 +99,6 @@ import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
 import type { Community, CreateFormRequest, FieldType, FormDefinition, Language, ValidationRule } from "@/lib/types";
 
-type SaveState = "idle" | "saving" | "publishing" | "archiving" | "success" | "error";
 type DesignerSaveFieldErrorSource = "client" | "api";
 type DesignerSaveFieldError = DesignerFieldErrors[string] & { source: DesignerSaveFieldErrorSource };
 type DesignerSaveFieldErrors = Record<string, DesignerSaveFieldError>;
@@ -143,7 +137,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const [isAddingManualField, setIsAddingManualField] = useState(false);
   const manualFieldFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newFormFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveState, setSaveState] = useState<FormSaveState>("idle");
   const [saveFieldErrors, setSaveFieldErrors] = useState<DesignerSaveFieldErrors>({});
   const [isArchiveConfirmationOpen, setIsArchiveConfirmationOpen] = useState(false);
   const [message, setMessage] = useState(() => t("form.designer.notSaved"));
@@ -1185,30 +1179,19 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                 ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
                 : t("form.designer.createOnSave")}
             </p>
-            <div className="designer-primary-version-actions" aria-label={pagingCopy.version}>
-              <button className="primary-button" disabled={isPersisting} type="button" onClick={saveDraft}>
-                <Save size={17} />
-                {saveState === "saving" ? t("form.designer.saving") : pagingCopy.saveDraft}
-              </button>
-              <button
-                className="success-button"
-                disabled={isPersisting || !versionAdapter?.publish || versionState.status !== "draft"}
-                type="button"
-                onClick={publishForm}
-              >
-                <Send size={17} />
-                {saveState === "publishing" ? pagingCopy.publishing : pagingCopy.publish}
-              </button>
-              <button
-                className="secondary-button"
-                disabled={isPersisting || !versionAdapter?.archive || versionState.status !== "published"}
-                type="button"
-                onClick={() => setIsArchiveConfirmationOpen(true)}
-              >
-                <Archive size={17} />
-                {saveState === "archiving" ? pagingCopy.archiving : pagingCopy.archive}
-              </button>
-            </div>
+            <FormPrimaryVersionActions
+              canArchive={Boolean(versionAdapter?.archive)}
+              canPublish={Boolean(versionAdapter?.publish)}
+              canSaveDraft={Boolean(versionAdapter?.saveDraft)}
+              isPersisting={isPersisting}
+              language={language}
+              onArchive={() => setIsArchiveConfirmationOpen(true)}
+              onPublish={() => void publishForm()}
+              onSaveDraft={() => void saveDraft()}
+              saveState={saveState}
+              savingLabel={t("form.designer.saving")}
+              versionState={versionState}
+            />
             <button
               className="secondary-button"
               disabled={isPersisting}
@@ -1336,316 +1319,33 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
                   {paletteInsertIndex === index ? (
                     <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
                   ) : null}
-                  <SortableFieldCard id={field.id} pageId={activePage?.id ?? ""}>
-                    {({ attributes, listeners, setActivatorNodeRef, isDragging }) => {
-                      const saveFieldError = saveFieldErrors[field.id];
-                      const liveFieldError = fieldErrors[field.id];
-                      const isApiSaveError = saveFieldError?.source === "api";
-                      const keyErrorMessage =
-                        liveFieldError?.key ?? (isApiSaveError ? saveFieldError?.key : undefined);
-                      const labelErrorMessage =
-                        liveFieldError?.label ?? (isApiSaveError ? saveFieldError?.label : undefined);
-                      const optionsErrorMessage =
-                        liveFieldError?.options ?? (isApiSaveError ? saveFieldError?.options : undefined);
-                      const hasKeyError = Boolean(keyErrorMessage);
-                      const hasLabelError = Boolean(labelErrorMessage);
-                      const hasOptionsError = Boolean(optionsErrorMessage);
-                      const optionErrorIndexes = getDesignerInvalidOptionIndexes(field, hasOptionsError);
-                      const showOptionEditorError = hasOptionsError && optionErrorIndexes.size === 0;
-
-                      return (
-                      <article
-                        className={`field-card field-editor${isDragging ? " field-editor-dragging" : ""}${
-                          highlightedFieldId === field.id ? " field-editor-highlighted" : ""
-                        }${
-                          moveFeedback?.id === field.id
-                            ? moveFeedback.direction === -1
-                              ? " field-editor-move-up"
-                              : " field-editor-move-down"
-                            : ""
-                        }${
-                          displacedFeedback?.id === field.id
-                            ? displacedFeedback.direction === -1
-                              ? " field-editor-displaced-up"
-                              : " field-editor-displaced-down"
-                            : ""
-                        }`}
-                        id={`designer-field-${field.id}`}
-                      >
-                      <div className="field-editor-header">
-                        <div>
-                          <strong>{field.label || t("form.designer.untitledField")}</strong>
-                          <span>
-                            {field.key || t("form.designer.noKey")} - {fieldTypeLabel(language, field.type)} -{" "}
-                            {t("form.designer.order", { sortOrder: index + 1 })}
-                          </span>
-                        </div>
-                        <div className="field-editor-actions">
-                          <button
-                            className="drag-handle"
-                            type="button"
-                            ref={setActivatorNodeRef}
-                            aria-label={t("form.designer.dragHandleAria", { label: field.label || field.key })}
-                            {...attributes}
-                            {...listeners}
-                          >
-                            <GripVertical size={17} />
-                            <span>{t("form.designer.dragHandleLabel")}</span>
-                          </button>
-                          <button
-                            className="icon-button"
-                            disabled={index === 0}
-                            onClick={() => moveField(field.id, -1)}
-                            type="button"
-                            aria-label={t("form.designer.moveUp", { label: field.label || field.key })}
-                          >
-                            <ChevronUp size={17} />
-                          </button>
-                          <button
-                            className="icon-button"
-                            disabled={index === activeFields.length - 1}
-                            onClick={() => moveField(field.id, 1)}
-                            type="button"
-                            aria-label={t("form.designer.moveDown", { label: field.label || field.key })}
-                          >
-                            <ChevronDown size={17} />
-                          </button>
-                          <button
-                            className="icon-button"
-                            onClick={() => removeField(field.id)}
-                            type="button"
-                            aria-label={t("form.designer.deleteField", { label: field.label || field.key })}
-                          >
-                            <Trash2 size={17} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="field-editor-grid">
-                        <label>
-                          {pagingCopy.fieldPage}
-                          <select value={activePage?.id ?? ""} onChange={(event) => moveFieldToPage(field.id, event.target.value)}>
-                            {pages.map((page, pageIndex) => (
-                              <option key={page.id} value={page.id}>
-                                {pageIndex + 1}. {page.title || `${pagingCopy.page} ${pageIndex + 1}`}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          Key
-                          <input
-                            aria-invalid={hasKeyError}
-                            className={
-                              hasKeyError
-                                ? "field-editor-control-error field-editor-control-save-error"
-                                : undefined
-                            }
-                            value={field.key}
-                            onChange={(event) => updateField(field.id, { key: event.target.value })}
-                          />
-                          {keyErrorMessage ? (
-                            <span className="field-error field-editor-inline-error">
-                              {keyErrorMessage}
-                            </span>
-                          ) : null}
-                        </label>
-                        <label>
-                          {t("form.designer.label")}
-                          <input
-                            aria-invalid={hasLabelError}
-                            className={
-                              hasLabelError
-                                ? "field-editor-control-error field-editor-control-save-error"
-                                : undefined
-                            }
-                            value={field.label}
-                            onChange={(event) => updateField(field.id, { label: event.target.value })}
-                          />
-                          {labelErrorMessage ? (
-                            <span className="field-error field-editor-inline-error">
-                              {labelErrorMessage}
-                            </span>
-                          ) : null}
-                        </label>
-                        <label>
-                          {t("form.designer.type")}
-                          <select value={field.type} onChange={(event) => updateFieldType(field.id, event.target.value as FieldType)}>
-                            {supportedFieldTypes.map((fieldType) => (
-                              <option key={fieldType} value={fieldType}>
-                                {fieldTypeLabel(language, fieldType)}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="checkbox-row field-required-toggle">
-                          <input checked={field.required} onChange={() => toggleRequired(field.id)} type="checkbox" />
-                          {t("form.designer.required")}
-                        </label>
-                      </div>
-
-                      {fieldTypeUsesOptions(field.type) ? (
-                        <div
-                          className={`option-editor${
-                            showOptionEditorError ? " option-editor-error option-editor-save-error" : ""
-                          }`}
-                        >
-                          <div className="option-editor-header">
-                            <strong>{t("form.designer.options")}</strong>
-                            <button className="secondary-button" type="button" onClick={() => addOption(field.id)}>
-                              <Plus size={16} />
-                              {t("form.designer.addOption")}
-                            </button>
-                          </div>
-                          {optionsErrorMessage ? (
-                            <span className="field-error field-editor-inline-error">
-                              {optionsErrorMessage}
-                            </span>
-                          ) : null}
-                          <div className="option-list">
-                            {field.options.map((option, optionIndex) => {
-                              const hasOptionError = optionErrorIndexes.has(optionIndex);
-
-                              return (
-                              <div className="option-row" key={`${field.id}-${optionIndex}`}>
-                                <label>
-                                  {t("form.designer.optionLabel")}
-                                  <input
-                                    aria-invalid={hasOptionError}
-                                    className={
-                                      hasOptionError
-                                        ? "field-editor-control-error field-editor-control-save-error"
-                                        : undefined
-                                    }
-                                    value={option}
-                                    onChange={(event) => updateOption(field.id, optionIndex, event.target.value)}
-                                  />
-                                </label>
-                                <button
-                                  className="icon-button"
-                                  type="button"
-                                  onClick={() => removeOption(field.id, optionIndex)}
-                                  aria-label={t("form.designer.deleteOption", { label: option || t("form.designer.options") })}
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {field.type === "FileUpload" ? (
-                        <div className="file-upload-policy-note">
-                          <strong>{t("form.fileUpload.policyTitle")}</strong>
-                          <span>{t("form.fileUpload.policyDescription")}</span>
-                          <span>{t("form.fileUpload.metadataNote")}</span>
-                        </div>
-                      ) : null}
-
-                      <div className="rule-editor">
-                        <div className="rule-editor-header">
-                          <div>
-                            <strong>{t("form.designer.dependentValidation")}</strong>
-                          </div>
-                          <button
-                            className="secondary-button"
-                            type="button"
-                            disabled={getDependencyCandidates(fields, field).length === 0}
-                            onClick={() => addRequiredWhenRule(field.id)}
-                          >
-                            <Plus size={16} />
-                            {t("form.designer.addRule")}
-                          </button>
-                        </div>
-
-                        {field.validationRules.length === 0 ? (
-                          <p className="empty-state">{t("form.designer.noDependentRule")}</p>
-                        ) : null}
-
-                        <div className="rule-list">
-                          {field.validationRules.map((rule, ruleIndex) => {
-                            const dependency = fields.find((candidate) => candidate.key.trim() === rule.dependsOnFieldKey);
-                            const candidates = getDependencyCandidates(fields, field);
-                            const liveRuleError = liveFieldError?.rules?.[ruleIndex];
-                            const saveRuleErrorMessage = saveFieldError?.rules?.[ruleIndex];
-                            const ruleErrorMessage =
-                              liveRuleError ?? (isApiSaveError ? saveRuleErrorMessage : undefined);
-                            const hasRuleError = Boolean(ruleErrorMessage);
-
-                            return (
-                              <div
-                                className={`rule-row${
-                                  hasRuleError ? " field-editor-rule-error field-editor-rule-save-error" : ""
-                                }`}
-                                key={`${field.id}-rule-${ruleIndex}`}
-                              >
-                                <label>
-                                  {t("form.designer.dependencyField")}
-                                  <select
-                                    aria-invalid={hasRuleError}
-                                    className={
-                                      hasRuleError
-                                        ? "field-editor-control-error field-editor-control-save-error"
-                                        : undefined
-                                    }
-                                    value={rule.dependsOnFieldKey}
-                                    onChange={(event) => updateRuleDependency(field.id, ruleIndex, event.target.value)}
-                                  >
-                                    <option value="">{t("form.designer.selectField")}</option>
-                                    {candidates.map((candidate) => (
-                                      <option key={candidate.id} value={candidate.key.trim()}>
-                                        {candidate.label || candidate.key}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-
-                                <ExpectedValueInput
-                                  dependency={dependency}
-                                  expectedValue={rule.expectedValue}
-                                  language={language}
-                                  onChange={(expectedValue) => updateRequiredWhenRule(field.id, ruleIndex, { expectedValue })}
-                                />
-
-                                <label>
-                                  {t("form.designer.message")}
-                                  <input
-                                    aria-invalid={hasRuleError}
-                                    className={
-                                      hasRuleError
-                                        ? "field-editor-control-error field-editor-control-save-error"
-                                        : undefined
-                                    }
-                                    value={rule.message}
-                                    onChange={(event) => updateRequiredWhenRule(field.id, ruleIndex, { message: event.target.value })}
-                                  />
-                                </label>
-
-                                <button
-                                  className="icon-button"
-                                  type="button"
-                                  onClick={() => removeRequiredWhenRule(field.id, ruleIndex)}
-                                  aria-label={t("form.designer.deleteRule")}
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-
-                                {ruleErrorMessage ? (
-                                  <span className="field-error rule-error field-editor-inline-error">
-                                    {ruleErrorMessage}
-                                  </span>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                      </article>
-                      );
-                    }}
-                  </SortableFieldCard>
+                  <FormFieldEditor
+                    activeFieldCount={activeFields.length}
+                    activePageId={activePage?.id ?? ""}
+                    displacedFeedback={displacedFeedback}
+                    field={field}
+                    fields={fields}
+                    highlighted={highlightedFieldId === field.id}
+                    index={index}
+                    language={language}
+                    liveFieldError={fieldErrors[field.id]}
+                    moveFeedback={moveFeedback}
+                    pages={pages}
+                    saveFieldError={saveFieldErrors[field.id]}
+                    onAddOption={addOption}
+                    onAddRule={addRequiredWhenRule}
+                    onMoveField={moveField}
+                    onMoveFieldToPage={moveFieldToPage}
+                    onRemoveField={removeField}
+                    onRemoveOption={removeOption}
+                    onRemoveRule={removeRequiredWhenRule}
+                    onToggleRequired={toggleRequired}
+                    onUpdateField={updateField}
+                    onUpdateFieldType={updateFieldType}
+                    onUpdateOption={updateOption}
+                    onUpdateRule={updateRequiredWhenRule}
+                    onUpdateRuleDependency={updateRuleDependency}
+                  />
                 </Fragment>
               ))}
               {paletteInsertIndex === activeFields.length ? (
@@ -1676,56 +1376,19 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
               </div>
             </div>
             <div className="designer-save-panel">
-              <div className="designer-version-summary">
-                <span>
-                  {pagingCopy.version} {versionState.version}
-                </span>
-                <strong className={`form-version-status form-version-status-${versionState.status}`}>
-                  {getVersionStatusLabel(pagingCopy, versionState.status)}
-                </strong>
-              </div>
-              <div className="designer-version-actions">
-                <button
-                  aria-label={saveState === "saving" ? t("form.designer.saving") : pagingCopy.saveDraft}
-                  className="icon-button designer-version-icon-action"
-                  disabled={isPersisting}
-                  title={saveState === "saving" ? t("form.designer.saving") : pagingCopy.saveDraft}
-                  type="button"
-                  onClick={saveDraft}
-                >
-                  <Save size={18} />
-                </button>
-                <button
-                  aria-label={saveState === "publishing" ? pagingCopy.publishing : pagingCopy.publish}
-                  className="icon-button designer-version-icon-action designer-version-icon-action-success"
-                  disabled={isPersisting || !versionAdapter?.publish || versionState.status !== "draft"}
-                  title={
-                    !versionAdapter?.publish
-                      ? pagingCopy.publishUnavailable
-                      : versionState.status === "published"
-                        ? pagingCopy.alreadyPublished
-                        : versionState.status === "archived"
-                          ? pagingCopy.archivedVersion
-                          : undefined
-                  }
-                  type="button"
-                  onClick={publishForm}
-                >
-                  <Send size={18} />
-                </button>
-                <button
-                  aria-label={saveState === "archiving" ? pagingCopy.archiving : pagingCopy.archive}
-                  className="icon-button designer-version-icon-action"
-                  disabled={isPersisting || !versionAdapter?.archive || versionState.status !== "published"}
-                  title={saveState === "archiving" ? pagingCopy.archiving : pagingCopy.archive}
-                  type="button"
-                  onClick={() => setIsArchiveConfirmationOpen(true)}
-                >
-                  <Archive size={18} />
-                </button>
-              </div>
-              {!versionAdapter?.saveDraft ? <p className="helper-copy">{pagingCopy.layoutPersistenceUnavailable}</p> : null}
-              {!versionAdapter?.publish ? <p className="helper-copy">{pagingCopy.publishUnavailable}</p> : null}
+              <FormVersionActionRail
+                canArchive={Boolean(versionAdapter?.archive)}
+                canPublish={Boolean(versionAdapter?.publish)}
+                canSaveDraft={Boolean(versionAdapter?.saveDraft)}
+                isPersisting={isPersisting}
+                language={language}
+                onArchive={() => setIsArchiveConfirmationOpen(true)}
+                onPublish={() => void publishForm()}
+                onSaveDraft={() => void saveDraft()}
+                saveState={saveState}
+                savingLabel={t("form.designer.saving")}
+                versionState={versionState}
+              />
               {hasFieldErrors ? (
                 <div className="field-error designer-blocking-error" role="alert">
                   <strong>{t("form.designer.saveBlockedTitle")}</strong>
@@ -1853,29 +1516,6 @@ function buildDesignerErrorSummary(
     remainingCount,
     text: textParts.join(" ") || translate(language, "form.designer.blockingErrors"),
   };
-}
-
-function getDesignerInvalidOptionIndexes(field: DesignerField, hasOptionsError: boolean) {
-  const invalidIndexes = new Set<number>();
-  if (!hasOptionsError) {
-    return invalidIndexes;
-  }
-
-  const normalizedOptions = field.options.map((option) => option.trim().toLocaleLowerCase("tr"));
-  const optionCounts = normalizedOptions.reduce<Record<string, number>>((counts, option) => {
-    if (option) {
-      counts[option] = (counts[option] ?? 0) + 1;
-    }
-    return counts;
-  }, {});
-
-  normalizedOptions.forEach((option, index) => {
-    if (!option || optionCounts[option] > 1) {
-      invalidIndexes.add(index);
-    }
-  });
-
-  return invalidIndexes;
 }
 
 function mapApiErrorToDesignerFields(

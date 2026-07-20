@@ -1,23 +1,21 @@
 "use client";
 
-import { Building2, ChevronDown, History, Info, RefreshCw, Search, ShieldCheck, Sparkles, UserCog, UserPlus, X } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { sortAuditNewestFirst } from "@/features/app-shell/auditUtils";
-import { ActionFeedback, InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { AccessChangeDialog, SessionRevokeDialog, UserDeleteDialog } from "@/features/app-shell/components/AccessDialogs";
 import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
-import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
-import { SystemAuditTimeline } from "@/features/app-shell/components/SystemAuditTimeline";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
-import { formatIpAddress, formatSessionExpiry, summarizeUserAgent, userStatusLabel } from "@/features/app-shell/sessionFormatters";
 import type { AccessDraft, PendingAccessChange, PendingSessionRevoke, PendingUserDelete, StatusTone } from "@/features/app-shell/types";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
 import type { Community, CommunityRole, CommunitySummary, Language, Role, SystemAuditLog, User, UserAdmin, UserSession, UserStatus } from "@/lib/types";
+import { UserCreatePanel } from "@/features/management/UserCreatePanel";
+import { UserDetailPanel } from "@/features/management/UserDetailPanel";
 import { UserListPanel } from "@/features/management/UserListPanel";
+import { UserManagementFilters } from "@/features/management/UserManagementFilters";
 import { clearUserManagementCache, useUserManagement } from "@/features/management/useUserManagement";
-import { UserTeamMembershipPanel } from "@/features/teams/UserTeamMembershipPanel";
 
 const userCommunitySummaryCache = new Map<string, CommunitySummary>();
 const allCommunitiesUserCountCache = new Map<string, number>();
@@ -307,7 +305,6 @@ export function UsersAndRolesView({
     (currentDetailSessionPage - 1) * detailSessionPageSize,
     currentDetailSessionPage * detailSessionPageSize,
   );
-  const isSelectedUserOnline = activeSessionCount > 0;
   const hasDraftChanges =
     !!selectedUser &&
     !!accessDraft &&
@@ -642,101 +639,47 @@ export function UsersAndRolesView({
         </div>
       </div>
 
-      <div className="identity-section">
-        <div className="filter-toolbar users-filter-toolbar">
-          <label className="search-field">
-            <Search size={16} />
-            <input
-              value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                setPage(1);
-              }}
-              placeholder={t("users.searchPlaceholder")}
-            />
-          </label>
-          <div className="user-community-scope">
-            <Building2 aria-hidden="true" size={17} />
-            <div>
-              {activeUser.role === "SuperAdmin" ? (
-                <>
-                  <select
-                    value={selectedCommunityId ?? ""}
-                    onChange={(event) => {
-                      setSelectedCommunityId(event.target.value || null);
-                      setCommunityRoleFilter(null);
-                      setPage(1);
-                      setSelectedUserId(null);
-                    }}
-                  >
-                    <option value="">Tüm topluluklar</option>
-                    {communities.map((community) => (
-                      <option key={community.id} value={community.id}>
-                        {community.name}
-                      </option>
-                    ))}
-                  </select>
-                  {!selectedCommunityId ? (
-                    <small className="all-communities-summary">
-                      {isLoadingCommunities || isLoadingAllCommunitiesUserCount || allCommunitiesUserCount === null
-                        ? <InlineValueLoader label="Toplam kullanıcı sayısı yükleniyor" />
-                        : `${communities.length} topluluk · ${allCommunitiesUserCount} kullanıcı`}
-                    </small>
-                  ) : null}
-                </>
-              ) : (
-                <strong>{activeUser.communityName}</strong>
-              )}
-            </div>
-            {selectedCommunityId ? (
-              <span className="community-member-count">
-                {isLoadingCommunitySummary || !selectedCommunitySummary ? <InlineValueLoader label="Üye sayısı yükleniyor" /> : `${selectedCommunitySummary.memberCount} üye`}
-              </span>
-            ) : null}
-          </div>
-          {selectedCommunityId ? (
-            <label className="filter-select-field compact-filter-field">
-              <UserCog size={16} />
-              <select
-                value={communityRoleFilter ?? ""}
-                onChange={(event) => {
-                  setCommunityRoleFilter(event.target.value || null);
-                  setPage(1);
-                }}
-              >
-                <option value="">Tüm roller</option>
-                {communityRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-        </div>
-        <div className="users-scope-summary">
-          <div className="status-line">
-            {selectedCommunity ? `${selectedCommunity.name} topluluğundaki kullanıcılar` : activeUser.role === "SuperAdmin" ? "Tüm topluluklardaki kullanıcılar" : activeUser.communityName}
-          </div>
-          <fieldset className="status-checkbox-filters">
-            <legend>Durum</legend>
-            {(["Active", "PendingApproval", "Rejected"] as UserStatus[]).map((status) => (
-              <label key={status}>
-                <input
-                  checked={selectedStatuses.includes(status)}
-                  onChange={() => {
-                    setSelectedStatuses((current) => current.includes(status) ? current.filter((item) => item !== status) : [...current, status]);
-                    setPage(1);
-                  }}
-                  type="checkbox"
-                />
-                <span>{userStatusLabel(language, status)}</span>
-              </label>
-            ))}
-          </fieldset>
-        </div>
-        {message ? <div className={userMessageClassName}>{message}</div> : null}
-      </div>
+      <UserManagementFilters
+        activeUser={activeUser}
+        allCommunitiesUserCount={allCommunitiesUserCount}
+        communities={communities}
+        communityRoleFilter={communityRoleFilter}
+        communityRoles={communityRoles}
+        isLoadingAllCommunitiesUserCount={isLoadingAllCommunitiesUserCount}
+        isLoadingCommunities={isLoadingCommunities}
+        isLoadingCommunitySummary={isLoadingCommunitySummary}
+        language={language}
+        message={message}
+        messageClassName={userMessageClassName}
+        onCommunityChange={(communityId) => {
+          setSelectedCommunityId(communityId);
+          setCommunityRoleFilter(null);
+          setPage(1);
+          setSelectedUserId(null);
+        }}
+        onRoleFilterChange={(communityRoleId) => {
+          setCommunityRoleFilter(communityRoleId);
+          setPage(1);
+        }}
+        onSearchChange={(query) => {
+          setSearchQuery(query);
+          setPage(1);
+        }}
+        onToggleStatus={(status) => {
+          setSelectedStatuses((current) =>
+            current.includes(status)
+              ? current.filter((item) => item !== status)
+              : [...current, status],
+          );
+          setPage(1);
+        }}
+        searchQuery={searchQuery}
+        selectedCommunity={selectedCommunity}
+        selectedCommunityId={selectedCommunityId}
+        selectedCommunitySummary={selectedCommunitySummary}
+        selectedStatuses={selectedStatuses}
+        t={t}
+      />
 
       <div className="management-layout">
         <div className="management-left-column">
@@ -753,222 +696,71 @@ export function UsersAndRolesView({
           totalPages={totalPages}
           users={visibleUsers}
         />
-        <section className="identity-section user-create-disclosure user-create-left-panel">
-          <div className="section-toolbar">
-            <div>
-              <span className="eyebrow">{t("users.createEyebrow")}</span>
-              <h3>{t("users.createTitle")}</h3>
-            </div>
-            <button
-              className={isCreateUserOpen ? "secondary-button" : "success-button create-user-toggle-button"}
-              type="button"
-              onClick={() => {
-                setIsCreateUserOpen((isOpen) => !isOpen);
-                showCreateUserMessage(null);
-              }}
-            >
-              <UserPlus size={17} />
-              {isCreateUserOpen ? t("common.close") : t("users.createUser")}
-            </button>
-          </div>
-          {isCreateUserOpen ? (
-            <div className="admin-create-panel">
-              <div className="admin-create-grid">
-                <input value={createUserDraft.username} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, username: event.target.value }))} placeholder={t("login.username")} />
-                <input value={createUserDraft.displayName} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, displayName: event.target.value }))} placeholder={t("login.displayName")} />
-                <input value={createUserDraft.email} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, email: event.target.value }))} placeholder={t("login.email")} type="email" />
-                {usesCustomTemporaryPassword ? <input value={createUserDraft.temporaryPassword} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: event.target.value }))} placeholder={t("users.temporaryPassword")} type="password" /> : <div className="generated-password-placeholder"><Sparkles size={16} /><span>{t("users.autoTemporaryPassword")}</span></div>}
-                {activeUser.role === "SuperAdmin" ? <select value={createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityId: event.target.value, communityRoleId: "" }))}><option value="">Topluluk seçin</option>{communities.map((community) => <option key={community.id} value={community.id}>{community.name}</option>)}</select> : null}
-                <select value={createUserDraft.communityRoleId} disabled={!createUserDraft.communityId} onChange={(event) => setCreateUserDraft((draft) => ({ ...draft, communityRoleId: event.target.value }))}><option value="">Topluluk rolü seçin</option>{createCommunityRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
-              </div>
-              {!createUserDraft.communityId ? <p className="helper-copy">Kullanıcının bağlı olacağı topluluğu seçin; ardından topluluk rolünü atayın.</p> : null}
-              <div className="admin-create-actions">
-                <label className="checkbox-line custom-password-toggle compact-password-toggle"><input checked={usesCustomTemporaryPassword} onChange={(event) => { setUsesCustomTemporaryPassword(event.target.checked); if (!event.target.checked) setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: "" })); }} type="checkbox" /><span>{t("users.useCustomTemporaryPassword")}</span></label>
-                <button className="success-button create-user-submit-button" type="button" disabled={isCreatingUser || !createUserDraft.communityId || !createUserDraft.communityRoleId} onClick={() => setIsCreateUserConfirmOpen(true)}>{isCreatingUser ? t("users.creatingUser") : t("users.createUser")}</button>
-              </div>
-              {createUserMessage ? <div className={createUserMessageClassName}>{createUserMessage}</div> : null}
-            </div>
-          ) : null}
-        </section>
+        <UserCreatePanel
+          activeUser={activeUser}
+          communities={communities}
+          communityRoles={createCommunityRoles}
+          draft={createUserDraft}
+          isCreating={isCreatingUser}
+          isOpen={isCreateUserOpen}
+          message={createUserMessage}
+          messageClassName={createUserMessageClassName}
+          onDraftChange={(patch) =>
+            setCreateUserDraft((draft) => ({ ...draft, ...patch }))
+          }
+          onRequestCreate={() => setIsCreateUserConfirmOpen(true)}
+          onToggleCustomPassword={(enabled) => {
+            setUsesCustomTemporaryPassword(enabled);
+            if (!enabled) {
+              setCreateUserDraft((draft) => ({ ...draft, temporaryPassword: "" }));
+            }
+          }}
+          onToggleOpen={() => {
+            setIsCreateUserOpen((isOpen) => !isOpen);
+            showCreateUserMessage(null);
+          }}
+          t={t}
+          usesCustomTemporaryPassword={usesCustomTemporaryPassword}
+        />
         </div>
 
-        <section className={selectedUser ? "identity-section user-detail-panel detail-expanded" : "identity-section user-detail-panel detail-placeholder"}>
-          <div className="section-toolbar">
-            <div>
-              <span className="eyebrow">{t("users.detailEyebrow")}</span>
-              <h3>{selectedUser ? selectedUser.displayName : t("users.noSelection")}</h3>
-            </div>
-            {selectedUser ? (
-              <button className="icon-button" type="button" onClick={() => setSelectedUserId(null)} title={t("common.close")}>
-                <X size={18} />
-              </button>
-            ) : (
-              <Info size={22} />
-            )}
-          </div>
-          {selectedUser ? (
-            <div className="user-detail-content">
-              <div className="settings-grid compact-grid">
-                <article className="settings-row">
-                  <span>{t("session.username")}</span>
-                  <strong>{selectedUser.username}</strong>
-                </article>
-                <article className="settings-row">
-                  <span>Topluluk rolü</span>
-                  <strong>{selectedUser.communityRoleName || "Atanmadı"}</strong>
-                  <small>{selectedUser.communityName || "Topluluk atanmadı"}</small>
-                </article>
-                <article className="settings-row">
-                  <span>Topluluk</span>
-                  <strong>{selectedUser.communityName || "-"}</strong>
-                </article>
-                <article className="settings-row">
-                  <span>{t("settings.emailStatus")}</span>
-                  <strong>{selectedUser.isEmailVerified ? t("settings.verified") : t("settings.notVerified")}</strong>
-                </article>
-                <article className="settings-row">
-                  <span>{t("users.onlineStatus")}</span>
-                  <strong>{isSelectedUserOnline ? t("users.online") : t("users.offline")}</strong>
-                  <small>{t("users.activeSessionCount", { count: activeSessionCount })}</small>
-                </article>
-                <article className="settings-row">
-                  <span>{t("users.mustChangePassword")}</span>
-                  <strong>{selectedUser.mustChangePassword ? t("common.yes") : t("common.no")}</strong>
-                </article>
-              </div>
-              <div className="access-editor">
-                <select
-                  value={accessDraft?.communityRoleId ?? selectedUser.communityRoleId ?? ""}
-                  onChange={(event) =>
-                    setAccessDraft({
-                      userId: selectedUser.id,
-                      status: accessDraft?.status ?? selectedUser.status,
-                      communityId: selectedUser.communityId,
-                      communityRoleId: event.target.value,
-                    })
-                  }
-                >
-                  {detailCommunityRoles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={accessDraft?.status ?? selectedUser.status}
-                  onChange={(event) =>
-                    setAccessDraft({
-                      userId: selectedUser.id,
-                      status: event.target.value as UserStatus,
-                      communityId: selectedUser.communityId,
-                      communityRoleId: accessDraft?.communityRoleId ?? selectedUser.communityRoleId,
-                    })
-                  }
-                >
-                  <option value="PendingApproval">{t("settings.statusPending")}</option>
-                  <option value="Active">{t("settings.statusActive")}</option>
-                  <option value="Rejected">{t("settings.statusRejected")}</option>
-                </select>
-                <button
-                  className="primary-button"
-                  type="button"
-                  disabled={!hasDraftChanges || isLoadingDetailCommunityRoles}
-                  onClick={requestDraftAccessChange}
-                >
-                  {t("users.applyAccessChange")}
-                </button>
-              </div>
-              {activeUser.role === "SuperAdmin" && selectedUser.role !== "SuperAdmin" ? (
-                <div className="password-reset-inline">
-                  <button className="danger-button" disabled={isResettingPassword} onClick={() => setIsPasswordResetConfirmOpen(true)} type="button">
-                    {isResettingPassword ? "Gönderiliyor" : "Şifreyi sıfırla"}
-                  </button>
-                  <ActionFeedback feedback={passwordResetFeedback} />
-                </div>
-              ) : null}
-              {selectedUser.role !== "SuperAdmin" ? (
-                <UserTeamMembershipPanel
-                  activeUser={activeUser}
-                  key={selectedUser.id}
-                  language={language}
-                  onChanged={refreshUsers}
-                  selectedUser={selectedUser}
-                  token={token}
-                />
-              ) : null}
-              <section className="identity-section nested-identity-section">
-                <div className="section-toolbar">
-                  <div>
-                    <span className="eyebrow">{t("users.sessionsEyebrow")}</span>
-                    <h3>{t("users.sessionsTitle")}</h3>
-                  </div>
-                  <ShieldCheck size={22} />
-                </div>
-                {isLoadingUserSessions ? <p className="status-line">{t("common.loading")}</p> : null}
-                <div className="session-list">
-                  {visibleSelectedUserSessions.map((session) => (
-                    <article className="settings-row session-row" key={session.id}>
-                      <div className="stacked-summary">
-                        <span>{session.isCurrent ? t("settings.currentSession") : t("settings.otherSession")}</span>
-                        <strong>{formatSessionExpiry(session.expiresAt, language)}</strong>
-                        <small>
-                          {session.lastSeenAt
-                            ? t("settings.lastSeen", { value: formatSessionExpiry(session.lastSeenAt, language) })
-                            : t("settings.notSeenYet")}
-                        </small>
-                        <small>{t("settings.createdAt", { value: formatSessionExpiry(session.createdAt, language) })}</small>
-                        <small>{t("settings.device", { value: summarizeUserAgent(session.userAgent, language) })}</small>
-                        <small>{t("settings.ipAddress", { value: formatIpAddress(session.ipAddress, language) })}</small>
-                        <small>{t(session.rememberedDevice ? "settings.rememberedDevice" : "settings.standardSession")}</small>
-                      </div>
-                      <button
-                        className="secondary-button danger-button"
-                        type="button"
-                        disabled={session.isCurrent && selectedUser.id === activeUser.id}
-                        onClick={() => requestSessionRevoke(session)}
-                      >
-                        {t("settings.revokeSession")}
-                      </button>
-                    </article>
-                  ))}
-                  {!selectedUserSessions.length && !isLoadingUserSessions ? (
-                    <p className="status-line">{t("users.noActiveSessions")}</p>
-                  ) : null}
-                </div>
-                {selectedUserSessions.length > detailSessionPageSize ? (
-                  <PaginationControls
-                    currentPage={currentDetailSessionPage}
-                    language={language}
-                    onNext={() => setDetailSessionPage((value) => Math.min(value + 1, detailSessionTotalPages))}
-                    onPageChange={setDetailSessionPage}
-                    onPrevious={() => setDetailSessionPage((value) => Math.max(value - 1, 1))}
-                    totalPages={detailSessionTotalPages}
-                  />
-                ) : null}
-              </section>
-              <div className="user-log-disclosure">
-                <button className="text-button" type="button" onClick={() => setIsUserLogHistoryOpen((isOpen) => !isOpen)}>
-                  <History size={16} />
-                  Kronolojik gecmis
-                  <ChevronDown className={isUserLogHistoryOpen ? "nav-group-chevron open" : "nav-group-chevron"} size={16} />
-                </button>
-                {isUserLogHistoryOpen ? <SystemAuditTimeline logs={selectedUserLogs} language={language} emptyText={t("users.noUserLogs")} isLoading={isLoadingUserLogs} /> : null}
-              </div>
-              <div className="detail-danger-action">
-                <button
-                  className="danger-button strong-danger-button"
-                  type="button"
-                  disabled={selectedUser.id === activeUser.id}
-                  onClick={() => requestUserDelete(selectedUser)}
-                >
-                  {t("users.deleteUser")}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <p className="status-line">{t("users.noSelectionHelp")}</p>
-          )}
-        </section>
+        <UserDetailPanel
+          accessDraft={accessDraft}
+          activeSessionCount={activeSessionCount}
+          activeUser={activeUser}
+          currentSessionPage={currentDetailSessionPage}
+          detailCommunityRoles={detailCommunityRoles}
+          hasDraftChanges={hasDraftChanges}
+          isLoadingDetailCommunityRoles={isLoadingDetailCommunityRoles}
+          isLoadingUserLogs={isLoadingUserLogs}
+          isLoadingUserSessions={isLoadingUserSessions}
+          isPasswordResetting={isResettingPassword}
+          isUserLogHistoryOpen={isUserLogHistoryOpen}
+          language={language}
+          onAccessDraftChange={setAccessDraft}
+          onClose={() => setSelectedUserId(null)}
+          onDelete={requestUserDelete}
+          onHistoryToggle={() => setIsUserLogHistoryOpen((isOpen) => !isOpen)}
+          onNextSessionPage={() =>
+            setDetailSessionPage((value) => Math.min(value + 1, detailSessionTotalPages))
+          }
+          onPasswordReset={() => setIsPasswordResetConfirmOpen(true)}
+          onPreviousSessionPage={() =>
+            setDetailSessionPage((value) => Math.max(value - 1, 1))
+          }
+          onRefreshUsers={refreshUsers}
+          onRequestAccessChange={requestDraftAccessChange}
+          onSessionPageChange={setDetailSessionPage}
+          onSessionRevoke={requestSessionRevoke}
+          passwordResetFeedback={passwordResetFeedback}
+          selectedUser={selectedUser}
+          selectedUserLogs={selectedUserLogs}
+          selectedUserSessions={selectedUserSessions}
+          sessionTotalPages={detailSessionTotalPages}
+          t={t}
+          token={token}
+          visibleSessions={visibleSelectedUserSessions}
+        />
       </div>
       {pendingAccessChange ? (
         <AccessChangeDialog
