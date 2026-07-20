@@ -15,7 +15,8 @@ copying counts that become stale.
 | HTTP integration | `WebApplicationFactory<Program>` | Routing, cookies, CSRF, Bearer, authorization and response contracts |
 | Provider smoke | Opt-in PostgreSQL temporary schema | EF migrations and provider compatibility without touching demo data |
 | Frontend unit | Vitest | Notification cache, scope isolation, form/version helpers and workflow draft behavior |
-| Manual acceptance | Cross-role workflow scenarios | Browser UX and the complete business narrative |
+| Browser E2E | Playwright + isolated SQLite | Real cookie session, route guard, form/workflow publication and candidate claim |
+| Manual acceptance | Cross-role workflow scenarios | Visual geometry, real-device touch and the complete presentation narrative |
 
 ## Backend Coverage Catalog
 
@@ -29,6 +30,8 @@ copying counts that become stale.
   lockout, remember-me, logout/revoke, refresh rotation and reuse handling.
 - HTTP security tests: cookie bootstrap, `/api/auth/me`, CSRF rejection and
   success, Bearer compatibility, rate limiting and forced logout.
+- Operational HTTP tests: liveness/readiness, migration/SuperAdmin invariant,
+  RFC 7807 responses, validated correlation IDs, CORS and production HSTS.
 - Form tests: create/update, ordered fields/pages, dependent validation,
   immutable published versions and task-form payload validation.
 - `ProcessDefinitionServiceTests`: graph validation, geometry round-trip,
@@ -43,6 +46,9 @@ copying counts that become stale.
 - Visibility and paging tests: personal/community/global scope, permission
   rejection, projected summaries, total counts, priority/deadline sorting and
   user-scoped cache assumptions.
+- Contract/performance regression: normalized OpenAPI path+verb snapshot,
+  `MultipleCollectionIncludeWarning` as an error and bounded query counts over
+  250 users, 500 audit entries and 180 process/task records.
 - Seed/migration tests: deterministic showcase workflows, idempotency, preservation
   of user-created records and SQLite/PostgreSQL schema compatibility.
 
@@ -69,8 +75,10 @@ copying counts that become stale.
 - Workflow tests protect graph conversion, draft state, SLA representation and
   publish-validation helpers.
 - Production build verifies App Router boundaries and route-level imports.
-- Responsive, drag/drop, focus, full-screen canvas and cross-role flows still
-  require browser acceptance because unit tests cannot prove visual geometry.
+- Playwright runs four real-server scenarios for session reload/logout, direct
+  route authorization, form/workflow publication/start and team-role claim.
+- Responsive geometry, drag/drop precision, focus, full-screen canvas and
+  real-device touch still require manual acceptance.
 
 The canonical manual chain is [Workflow End-to-End Test Scenarios](22-workflow-end-to-end-test-scenarios.md).
 
@@ -82,6 +90,7 @@ Set-Location apps/web
 npm run test
 npm run lint
 npm run build
+npm run test:e2e
 ```
 
 Optional PostgreSQL smoke:
@@ -96,21 +105,37 @@ Docker and direct startup commands are in [QUICKSTART.md](../QUICKSTART.md).
 
 ## Latest Verified Baseline
 
-On 19 July 2026:
+On 20 July 2026:
 
-- Backend: **194/194** tests passed.
-- Frontend: **49/49** tests passed.
+- Backend: **208/208** tests passed.
+- Frontend: **51/51** tests passed.
+- Playwright: **4/4** real-server scenarios passed.
 - Frontend production build passed.
-- ESLint had no errors and one non-blocking historical `unused eslint-disable`
-  warning in the workflow screen.
+- ESLint passed without errors or warnings.
+- Local/cloud Compose configuration, API/web image builds and PostgreSQL
+  migration smoke are part of the full GitHub Actions gate.
+- The locally built images were also inspected as non-root: API runs as `app`,
+  web runs as `nextjs`.
 
 Run the commands again before presenting; this snapshot is evidence, not a
 substitute for current verification.
 
+## GitHub Actions Policy
+
+- Every push runs .NET tests, frontend tests/lint/build and whitespace checks.
+- `master` pushes and `workflow_dispatch` additionally run Playwright,
+  PostgreSQL migration smoke and Docker Compose/image checks.
+- A newer push to the same branch cancels the obsolete run.
+- CI validates only; it does not deploy and does not require a pull request.
+- Failed Playwright runs upload screenshot, trace, video and HTML report
+  diagnostics for seven days.
+
 ## Remaining Quality Work
 
-- Add Playwright coverage for login, form publish, workflow publish, process
-  start, cross-user claim/action and audit inspection.
 - Run accessibility automation plus keyboard and real-device touch checks.
-- Add CI gates for backend tests, frontend tests/lint/build and migration smoke.
-- Add load tests for large audit, notification, process and task datasets.
+- Add true load/soak tests if production traffic targets are defined; current
+  large-fixture tests guard pagination/query regressions, not throughput.
+- Connect health/log/error signals to the selected hosting platform and define
+  alert ownership.
+- Expand browser coverage when new workflow nodes or community mutations are
+  introduced.

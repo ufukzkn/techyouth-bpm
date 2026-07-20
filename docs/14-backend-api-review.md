@@ -37,6 +37,17 @@ The backend now uses EF Core migrations instead of `EnsureCreated`. Startup appl
 
 The authorization model is now split between platform role and community permission data. `SuperAdmin` handles platform-wide administration. Everyday BPM access is represented by `CommunityRolePermission` records such as `Forms.Create`, `Processes.Start` or `Tasks.Act`. This is more extensible than adding a new enum value for every business job title.
 
+Identity is no longer only contractually modular. Login/refresh, registration,
+account recovery, session management and user administration are separate
+Infrastructure implementations. `AuthenticatedUserLoader` centralizes the live
+session/permission lookup, while the aggregate auth façade remains outside
+production DI for compatibility tests.
+
+Operational readiness also respects the layers: Application defines the neutral
+readiness report, Infrastructure checks the database/migrations/SuperAdmin
+invariant and API maps `/health/live` plus `/health/ready`. Unexpected failures
+use safe RFC 7807 responses and correlation IDs.
+
 ## Authentication and Security Review
 
 The auth model is intentionally not JWT-only. It uses opaque access session tokens, stores only token hashes, supports HttpOnly cookies for browser flow, keeps Bearer token support for Swagger, and adds CSRF protection for cookie-authenticated mutations. Passwords use PBKDF2 hashing. Login failures increment counters and can temporarily lock accounts.
@@ -58,9 +69,9 @@ Remaining hardening opportunities:
 
 - split rate limit policies per endpoint group instead of one shared `auth` policy
 - add refresh-token family/device identifiers for more precise suspicious-device handling
-- configure allowed CORS origins through environment variables for non-local deployments
 - extend concurrency protection from candidate claim to competing task-action submissions
-- move production CORS/cookie policy into environment-specific deployment configuration
+- connect built-in JSON logs and frontend/backend error reporting to a concrete
+  production sink only after the hosting target is selected
 
 ## BPM and Process Flow Review
 
@@ -81,17 +92,16 @@ Form update, process start and task action now use explicit EF Core transactions
 
 ## Test Coverage
 
-Backend coverage is strong for the project scope: it spans pure lifecycle rules,
-relational persistence, real HTTP authentication/authorization, workflow runtime,
-transactions, provider migrations and deterministic demonstration chains. The
-single canonical catalog, latest verified result and commands are maintained in
-[Testing And Quality Gates](24-testing-and-quality-gates.md).
+Backend coverage spans pure lifecycle rules, relational persistence, real HTTP
+authentication/authorization, workflow runtime, transactions, provider
+migrations, OpenAPI contract locking and large-fixture query bounds. Playwright
+adds four browser/API journeys covering cookie session, direct-route protection,
+form/workflow publication, process start and team-role claim enforcement.
 
-The remaining material gap is browser-level E2E coverage. Service, relational
-and `WebApplicationFactory` tests cannot prove focus behavior, drag/drop geometry
-or the complete login -> form -> process -> task -> audit experience in a real
-browser. That risk is recorded in the same quality document and the manual chain
-is specified in [Workflow End-to-End Test Scenarios](22-workflow-end-to-end-test-scenarios.md).
+The remaining browser risk is visual rather than contractual: real-device touch,
+drag geometry, zoom and full keyboard/accessibility review still need manual
+acceptance. The canonical catalog and current counts are maintained in
+[Testing And Quality Gates](24-testing-and-quality-gates.md).
 
 ## Presentation Defense Notes
 
@@ -106,22 +116,30 @@ itself remains canonical in [API And Services](04-api-and-services.md).
 
 ### High
 
-- Move CORS allowed origins and cookie security policy fully into environment-specific config.
-- Expand browser E2E coverage for cookie bootstrap, silent refresh and cross-role navigation.
-- Add Playwright coverage for the critical cross-role BPM journey.
+- Run final accessibility and real-device touch/zoom acceptance.
+- Select a production hosting/log destination before adding Sentry, Seq or
+  OpenTelemetry exporters.
 
 ### Medium
 
 - Add structured audit action enums/constants instead of free-form action strings.
 - Extend HTTP integration coverage when new community-scoped mutations are added.
+- Split rate limits into endpoint-specific policies if production traffic
+  measurements show different abuse profiles.
 
 ### Low
 
-- Add health check endpoints for database and SMTP readiness.
 - Add audit export endpoints for CSV/JSON reporting.
 - Add OpenAPI examples for common auth and BPM requests.
-- Add automated CI checks for backend tests and frontend lint/build.
+- Add timer/parallel workflow nodes through a new graph schema version.
 
 ## Reviewer Summary
 
-The backend is presentation-ready for the PDF scope. Its strongest points are layered architecture, immutable versioned definitions, a validated dynamic workflow runtime, community/team-aware assignment, hashed sessions/passwords, transactional audit traceability, migrations and real HTTP tests. The most valuable next step is browser-level E2E and CI automation, followed by advanced BPM nodes such as parallel gateways and timers.
+The backend is presentation-ready for the PDF scope. Its strongest points are
+layered and physically separated identity services, immutable versioned
+definitions, a validated dynamic workflow runtime, community/team-aware
+assignment, hashed sessions/passwords, transactional audit traceability,
+migrations, HTTP/browser tests and automated quality gates. The most valuable
+next work is deployment-specific observability, accessibility/real-device QA and,
+only if product scope demands it, advanced BPM nodes such as parallel gateways
+and timers.

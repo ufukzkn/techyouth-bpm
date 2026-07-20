@@ -90,7 +90,22 @@ Bildirim okundu/okunmadı değişikliği audit üretmez. Kaynak iş olayı audit
 
 `Existing_Session_Reevaluates_Role_And_Team_Membership_On_Every_Request` aynı access token açıkken community role değişiminin görevi görünür yaptığını, takım üyeliği kapatılınca aynı token ile görevin yeniden gizlendiğini kanıtlar. Token yetki snapshot'ı taşımaz; backend aktif rol ve takımları her protected istekte veritabanından çözer.
 
-Toplam otomatik kapsam şu anda 194 backend ve 49 frontend testidir. Servis/unit testleri ayrıca cookie-only browser transport, bir dakikalık access-session expiry, remembered refresh recovery, cookie logout, gateway, SendBack, Complete, Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transaction rollback, pagination ve scope davranışlarını kapsar. Tam cross-role tarayıcı zinciri hâlâ manuel kabul senaryosudur; bunun Playwright ile otomasyonu teslimat borcu olarak kalır.
+Güncel doğrulama tabanı 208 backend ve 51 frontend testidir. Servis/unit
+testleri ayrıca cookie-only browser transport, bir dakikalık access-session
+expiry, remembered refresh recovery, cookie logout, gateway, SendBack, Complete,
+Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transaction
+rollback, pagination, OpenAPI sözleşmesi ve büyük fixture sorgu sınırlarını kapsar.
+
+Dört Playwright senaryosu gerçek API ve web sunucularıyla şunları otomatikleştirir:
+
+- cookie session reload ve logout
+- normal kullanıcının doğrudan yönetim route'una erişememesi
+- form yayınlama, workflow'a bağlama ve süreç başlatma
+- takım+rol adaylığında claim zorunluluğu ve task action sınırı
+
+Bu otomasyon işlevsel zinciri korur; çok kullanıcılı tam Transfer sunumu,
+real-device touch/zoom ve görsel yerleşim hâlâ bu belgedeki manuel kabul
+adımlarıyla doğrulanır.
 
 ```powershell
 dotnet test apps/api/TechYouthBpm.slnx
@@ -98,6 +113,7 @@ cd apps/web
 npm run test
 npm run lint
 npm run build
+npm run test:e2e
 ```
 
 Opt-in PostgreSQL smoke testi için `TECHYOUTH_TEST_POSTGRES_CONNECTION` tanımlanır. Test geçici schema kullanır ve Neon demo verisini değiştirmez.

@@ -44,7 +44,10 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Outgoing verification and temporary-password emails use a simple HTML card template so the Mailtrap preview is readable during demo.
 - The email verification panel is two-step: opening the panel does not send mail; the user explicitly clicks `Kod gonder`. Codes are valid for 24 hours by default.
 - After sending a code, the UI shows a 5-minute resend countdown. The backend also blocks immediate resend requests so the cooldown is not only cosmetic.
-- OTP generation and verification now live behind `IOtpService`, and mail delivery lives behind `IEmailSender`, so AuthService only coordinates the email verification workflow.
+- OTP generation and verification live behind `IOtpService`, and mail delivery
+  lives behind `IEmailSender`. `RegistrationService` and `AccountService`
+  coordinate their own verification/recovery use cases instead of one monolithic
+  auth implementation.
 - Admin users can approve pending registrations, reject accounts and assign roles from the `Yonetim` screen.
 - The `Yonetim` user search is server-side paged and debounced. Search/status/page changes call `/api/users` with query parameters instead of loading every user into the browser.
 - Server-paged user and audit lists use single-page lazy loading. Page changes fetch only the active page, so previous/next prefetch does not repeat extra requests.
@@ -93,7 +96,10 @@ This work coordinates the user entry and navigation experience. It does not own 
 - Active sessions can be listed and revoked from settings. Revoking the current session logs the user out.
 - Settings includes a `Tum cihazlardan cikis yap` action, which revokes non-current sessions first and then revokes the current session.
 - Identity/access actions are written to `SystemAuditLogs` so Admin can review who registered, signed in, changed access, updated profile/email, changed password, verified email, created users or revoked sessions.
-- Auth, registration, account, session and user-administration controllers now consume focused Application interfaces. The Infrastructure implementation may remain shared internally, but HTTP boundaries no longer depend on one oversized auth contract.
+- Auth, registration, account, session and user-administration controllers consume
+  focused Application interfaces backed by separate Infrastructure classes.
+  `AuthenticatedUserLoader` is the only shared live-session/permission loader;
+  the aggregate compatibility façade is not registered in production DI.
 - Community metadata/lifecycle and community-role CRUD use separate service contracts; user membership operations stay in user administration.
 - Inbox results now use a user/filter/page-scoped Zustand cache with stale-while-revalidate behavior. Returning to `/inbox` shows cached content immediately, optimistic read-state updates roll back on API failure and only post-baseline visible polling creates live notification toasts.
 - `/management/teams` implements community-scoped teams, multi-team memberships and a virtual `Takimsiz` view. Team leadership is informational and never bypasses `Teams.View` or `Teams.Manage` checks.

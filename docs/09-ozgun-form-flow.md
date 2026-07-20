@@ -135,9 +135,11 @@ upload.
 - Real binary upload/storage is deferred.
 - Mobile palette selection is click-to-add; existing fields remain reorderable.
 - Cross-browser/zoom drag geometry and real-device touch remain manual acceptance
-  concerns until Playwright/device coverage is added.
-- `FormDesignerDraft.tsx` remains physically large and should be split into page,
-  field editor, palette and version-action modules without changing this contract.
+  concerns even though Playwright protects the critical publish/start route.
+- `FormDesignerDraft.tsx` remains the controller/orchestration view. Field editing,
+  version actions, shared visual sections, mobile palette and pure ordering/
+  validation logic now live in focused modules; further extraction should follow
+  measured change pressure rather than another behavior rewrite.
 
 ## Verification
 

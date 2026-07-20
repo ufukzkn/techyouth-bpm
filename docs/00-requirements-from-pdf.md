@@ -92,7 +92,9 @@ The PDF marks some items as bonus or optional. For this project, these are treat
 | Clean commit history | Ongoing repository discipline | Feature ownership and scoped commits are used; this is a Git-history quality criterion rather than an application feature. |
 | i18n, theme and responsive UX | Completed for current scope | TR/EN dictionaries, light/dark themes and desktop/mobile layouts are implemented. |
 
-Playwright browser automation, CI, binary file storage, parallel gateways and timer jobs are valuable next steps, but they are product/production extensions rather than missing core PDF requirements.
+Playwright browser automation and CI quality gates are implemented. Binary file
+storage, parallel gateways and timer jobs remain valuable product/production
+extensions rather than missing core PDF requirements.
 
 ## Production-Readiness Work Included
 
@@ -101,8 +103,13 @@ These items are not required by the PDF, but they strengthen the final review st
 - PostgreSQL/Neon provider and migration smoke flow for shared remote database development.
 - Separate local SQLite and cloud Neon Docker Compose stacks.
 - Production deployment hardening for HTTPS cookie settings, SMTP domain verification and environment-specific secrets.
+- GitHub Actions checks for backend/frontend tests, lint/build, PostgreSQL migrations, Docker images and Playwright browser journeys.
+- Layered liveness/readiness endpoints, RFC 7807 errors, correlation IDs and safe production JSON logs.
 
-Remaining delivery work is CI automation and browser-level Playwright coverage for the complete cross-role demo. Cookie-only browser auth is implemented: raw access/refresh tokens are no longer returned to or persisted by the normal web client.
+Remaining delivery work is final accessibility/real-device QA and environment-specific
+deployment/observability integration. Cookie-only browser auth is implemented:
+raw access/refresh tokens are no longer returned to or persisted by the normal
+web client.
 
 ## Important Evaluation Point
 
