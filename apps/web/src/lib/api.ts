@@ -64,6 +64,8 @@ type ApiErrorPayload = {
   message?: unknown;
   title?: unknown;
   detail?: unknown;
+  traceId?: unknown;
+  correlationId?: unknown;
 };
 
 let unauthorizedHandler: (() => Promise<boolean>) | null = null;
@@ -76,8 +78,11 @@ export class ApiError extends Error {
   constructor(
     public readonly errors: string[],
     public readonly statusCode?: number,
+    public readonly traceId?: string,
+    public readonly correlationId?: string,
   ) {
     super(errors.join(" "));
+    this.name = "ApiError";
   }
 }
 
@@ -115,6 +120,10 @@ function normalizeApiErrors(payload: unknown) {
   }
 
   return ["Request failed."];
+}
+
+function normalizeReference(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
 function normalizeErrorsValue(value: unknown) {
@@ -171,7 +180,12 @@ async function request<T>(
     }
 
     const payload: ApiErrorPayload = await response.json().catch(() => ({}));
-    throw new ApiError(normalizeApiErrors(payload), response.status);
+    throw new ApiError(
+      normalizeApiErrors(payload),
+      response.status,
+      normalizeReference(payload.traceId),
+      normalizeReference(payload.correlationId),
+    );
   }
 
   if (response.status === 204) {

@@ -26,6 +26,85 @@
   background: var(--danger);
 }
 
+.error-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--background);
+}
+
+.error-screen-panel {
+  width: min(100%, 620px);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-5);
+  padding: clamp(24px, 5vw, 42px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.error-screen-icon {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  color: var(--danger);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+}
+
+.error-screen-copy {
+  min-width: 0;
+}
+
+.error-screen-copy h1 {
+  margin: 4px 0 10px;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  letter-spacing: 0;
+}
+
+.error-screen-copy p,
+.error-screen-copy small {
+  color: var(--muted);
+}
+
+.error-screen-copy small {
+  display: block;
+  margin-top: var(--space-3);
+  overflow-wrap: anywhere;
+}
+
+.error-screen-actions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.error-screen-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+@media (max-width: 560px) {
+  .error-screen-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .error-screen-actions {
+    grid-column: 1;
+  }
+
+  .error-screen-actions button {
+    width: 100%;
+  }
+}
+
 .ui-empty-state {
   min-height: 128px;
   display: grid;
