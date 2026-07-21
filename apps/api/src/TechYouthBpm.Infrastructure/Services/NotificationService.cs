@@ -20,10 +20,19 @@ public class NotificationService(AppDbContext db) : INotificationService
             .AsNoTracking()
             .Where(notification => notification.UserId == currentUser.Id);
 
-        var allCount = await userNotifications.CountAsync(cancellationToken);
-        var unreadCount = await userNotifications.CountAsync(notification => notification.ReadAt == null, cancellationToken);
         var filtered = ApplyFilters(userNotifications, request);
+
+        var globalCounts = await userNotifications
+            .GroupBy(notification => 1)
+            .Select(grouped => new
+            {
+                AllCount = grouped.Count(),
+                UnreadCount = grouped.Count(notification => notification.ReadAt == null)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
         var totalCount = await filtered.CountAsync(cancellationToken);
+
         var notifications = await filtered
             .OrderByDescending(notification => notification.CreatedAt)
             .ThenByDescending(notification => notification.Id)
@@ -36,8 +45,8 @@ public class NotificationService(AppDbContext db) : INotificationService
             page,
             pageSize,
             totalCount,
-            allCount,
-            unreadCount);
+            globalCounts?.AllCount ?? 0,
+            globalCounts?.UnreadCount ?? 0);
     }
 
     public async Task<Result> MarkReadAsync(Guid notificationId, UserDto currentUser, CancellationToken cancellationToken = default)

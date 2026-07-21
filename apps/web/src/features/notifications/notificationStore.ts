@@ -191,7 +191,17 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         return;
       }
       cachePage(key, { data: result, params: { ...params, page: params.page ?? 1, pageSize: params.pageSize ?? 10 }, cachedAt: Date.now() });
-      set({ inboxResult: result, inboxStatus: "idle", allCount: result.allCount, unreadCount: result.unreadCount });
+      const isDefaultView = params.page === 1
+        && (!params.query || params.query === "")
+        && (!params.readStatus || params.readStatus === "all")
+        && (!params.category || params.category === "all");
+      set({
+        inboxResult: result,
+        inboxStatus: "idle",
+        allCount: result.allCount,
+        unreadCount: result.unreadCount,
+        ...(isDefaultView ? { previewItems: result.items.slice(0, 5) } : {}),
+      });
     } catch (error) {
       set({ inboxStatus: cached || get().inboxResult ? "idle" : "error" });
       throw error;
