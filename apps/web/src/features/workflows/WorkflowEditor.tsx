@@ -6,6 +6,7 @@ import "./workflow-editor.css";
 import {
   AlertCircle,
   CheckCircle2,
+  Download,
   Expand,
   Eye,
   GitBranch,
@@ -14,9 +15,10 @@ import {
   Save,
   Send,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { useSessionStore } from "@/features/session/sessionStore";
@@ -37,12 +39,15 @@ import { workflowText } from "@/features/workflows/workflowI18n";
 import { WorkflowPalette } from "@/features/workflows/WorkflowPalette";
 import { useWorkflowDraftStore } from "@/features/workflows/workflowDraftStore";
 import { validateWorkflow, workflowHasErrors } from "@/features/workflows/validation";
+import { parseWorkflowDraft, serializeWorkflowDraft } from "@/features/workflows/workflowDraftTransfer";
+import { downloadJsonDraft, readJsonDraftFile, toSafeFileName } from "@/lib/jsonDraftFile";
 
 export type WorkflowEditorProps = {
   canPublish?: boolean;
   initialDraft?: WorkflowDefinitionDraft;
   lookups?: WorkflowEditorLookups;
   onChange?: (draft: WorkflowDefinitionDraft) => void;
+  onImportDraft?: (draft: WorkflowDefinitionDraft) => void;
   onPublish: WorkflowPublishHandler;
   onSave: WorkflowSaveHandler;
   readOnly?: boolean;
@@ -60,6 +65,7 @@ export function WorkflowEditor({
   initialDraft,
   lookups = emptyWorkflowLookups,
   onChange,
+  onImportDraft,
   onPublish,
   onSave,
   readOnly = false,
@@ -79,6 +85,7 @@ export function WorkflowEditor({
   const [editorMode, setEditorMode] = useState<EditorMode>("normal");
   const [message, setMessage] = useState(() => text("Taslak düzenlemeye hazır.", "The draft is ready to edit."));
   const [serverValidation, setServerValidation] = useState<ServerValidationState | null>(null);
+  const draftFileInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useMobileEditorNotice();
   const draftFingerprint = useMemo(() => JSON.stringify(createWorkflowWriteModel(draft)), [draft]);
   const localIssues = useMemo(() => validateWorkflow(draft, lookups), [draft, lookups]);
@@ -193,6 +200,35 @@ export function WorkflowEditor({
     }
   }
 
+  function exportDraft() {
+    downloadJsonDraft(
+      `${toSafeFileName(draft.name, "workflow-draft")}.techyouth-workflow.json`,
+      serializeWorkflowDraft(draft),
+    );
+    setSubmissionState("success");
+    setMessage(text("Akış taslağı JSON dosyası olarak dışa aktarıldı.", "The workflow draft was exported as a JSON file."));
+  }
+
+  async function importDraft(file: File | undefined) {
+    if (!file || !onImportDraft) return;
+    try {
+      const imported = parseWorkflowDraft(await readJsonDraftFile(file));
+      onImportDraft(imported);
+      hydrate(imported);
+      setServerValidation(null);
+      setSubmissionState("success");
+      setMessage(text(
+        `${imported.requiresBinding?.length ?? 0} dış bağlantı temizlendi. Yayınlamadan önce form, takım ve rol bağlarını yeniden seçin.`,
+        `${imported.requiresBinding?.length ?? 0} external bindings were cleared. Rebind forms, teams, and roles before publishing.`,
+      ));
+    } catch (error) {
+      setSubmissionState("error");
+      setMessage(workflowDraftImportError(error, language));
+    } finally {
+      if (draftFileInputRef.current) draftFileInputRef.current.value = "";
+    }
+  }
+
   if (isMobile) {
     return <WorkflowMobileNotice draft={draft} errorCount={errorCount} language={language} />;
   }
@@ -217,6 +253,29 @@ export function WorkflowEditor({
           {isDirty ? <span className="workflow-unsaved-indicator">{text("Kaydedilmemiş", "Unsaved")}</span> : null}
         </div>
         <div className="workflow-editor-actions">
+          <IconButton
+            label={text("Taslağı dışa aktar", "Export draft")}
+            onClick={exportDraft}
+          >
+            <Download size={16} aria-hidden="true" />
+          </IconButton>
+          {onImportDraft ? (
+            <>
+              <IconButton
+                label={text("Taslak içe aktar", "Import draft")}
+                onClick={() => draftFileInputRef.current?.click()}
+              >
+                <Upload size={16} aria-hidden="true" />
+              </IconButton>
+              <input
+                ref={draftFileInputRef}
+                accept="application/json,.json"
+                className="draft-file-input"
+                onChange={(event) => void importDraft(event.currentTarget.files?.[0])}
+                type="file"
+              />
+            </>
+          ) : null}
           <IconButton
             label={editorMode === "wide"
               ? text("Normal görünüme dön", "Return to normal view")
@@ -286,6 +345,17 @@ export function WorkflowEditor({
   );
 
   return editorMode === "normal" ? editor : createPortal(editor, document.body);
+}
+
+function workflowDraftImportError(error: unknown, language: "tr" | "en") {
+  const text = (tr: string, en: string) => workflowText(language, tr, en);
+  if (error instanceof Error && error.message === "DRAFT_FILE_TOO_LARGE") {
+    return text("Akış taslak dosyası en fazla 1 MB olabilir.", "The workflow draft file cannot exceed 1 MB.");
+  }
+  if (error instanceof Error && error.message === "DRAFT_SCHEMA_UNSUPPORTED") {
+    return text("Bu akış taslak sürümü desteklenmiyor.", "This workflow draft version is not supported.");
+  }
+  return text("Akış taslak dosyası geçerli değil.", "The workflow draft file is not valid.");
 }
 
 function WorkflowMobileNotice({

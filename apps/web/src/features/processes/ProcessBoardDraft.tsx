@@ -53,7 +53,11 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const [taskResult, setTaskResult] = useState<PagedResult<ProcessTask> | null>(null);
   const [processPage, setProcessPage] = useState(1);
   const [taskPage, setTaskPage] = useState(1);
-  const [processStatus, setProcessStatus] = useState<ProcessStatus | "all">("all");
+  const requestedStatus = searchParams.get("status");
+  const initialProcessStatus = isProcessStatus(requestedStatus) ? requestedStatus : "all";
+  const requestedTaskView = searchParams.get("view");
+  const taskView: NonNullable<TaskListParams["view"]> = requestedTaskView === "history" ? "history" : "active";
+  const [processStatus, setProcessStatus] = useState<ProcessStatus | "all">(initialProcessStatus);
   const [processSortBy, setProcessSortBy] = useState<NonNullable<ProcessListParams["sortBy"]>>("startedAt");
   const [processSortDirection, setProcessSortDirection] = useState<"asc" | "desc">("desc");
   const [taskPriority, setTaskPriority] = useState<TaskPriority | "all">("all");
@@ -84,6 +88,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     priority: taskPriority,
     sortBy: taskSortBy,
     sortDirection: taskSortDirection,
+    view: taskView,
   };
   const processCacheKey = createProcessCacheKey(activeUserId, processParams);
   const taskCacheKey = createProcessCacheKey(activeUserId, taskParams);
@@ -127,6 +132,30 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     const boundedPage = Math.max(1, Math.min(totalPages, nextPage));
     prepareTaskQueryTransition({ page: boundedPage });
     setTaskPage(boundedPage);
+  }
+
+  function changeTaskView(nextView: NonNullable<TaskListParams["view"]>) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", nextView);
+    params.delete("taskId");
+    prepareTaskQueryTransition({ page: 1, view: nextView });
+    setTaskPage(1);
+    setSelectedTaskId("");
+    setDetail(null);
+    router.replace(`/tasks?${params.toString()}`);
+  }
+
+  function changeProcessStatus(nextStatus: ProcessStatus | "all") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextStatus === "all") params.delete("status");
+    else params.set("status", nextStatus);
+    params.delete("processId");
+    prepareProcessQueryTransition({ page: 1, status: nextStatus });
+    setProcessStatus(nextStatus);
+    setProcessPage(1);
+    setSelectedProcessId("");
+    setDetail(null);
+    router.replace(`/processes${params.size ? `?${params.toString()}` : ""}`);
   }
 
   useEffect(() => {
@@ -188,7 +217,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
         const [result, requestedTaskResult] = await Promise.all([
           api.listMyTasks(token, taskParams),
           requestedTaskId
-            ? api.listMyTasks(token, { page: 1, pageSize: 1, taskId: requestedTaskId })
+            ? api.listMyTasks(token, { page: 1, pageSize: 1, taskId: requestedTaskId, view: taskView })
             : Promise.resolve(null),
         ]);
         taskPageCache.set(taskCacheKey, result);
@@ -372,7 +401,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 onSelectProcess={(id) => void selectProcess(id)}
                 onSortByChange={(value) => { prepareProcessQueryTransition({ page: 1, sortBy: value }); setProcessSortBy(value); setProcessPage(1); }}
                 onSortDirectionChange={(value) => { prepareProcessQueryTransition({ page: 1, sortDirection: value }); setProcessSortDirection(value); setProcessPage(1); }}
-                onStatusChange={(value) => { prepareProcessQueryTransition({ page: 1, status: value }); setProcessStatus(value); setProcessPage(1); }}
+                onStatusChange={changeProcessStatus}
                 result={processResult}
                 selectedProcessId={selectedProcessId}
                 sortBy={processSortBy}
@@ -401,6 +430,8 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 sortBy={taskSortBy}
                 sortDirection={taskSortDirection}
                 status={status}
+                taskView={taskView}
+                onTaskViewChange={changeTaskView}
               />
             ) : null}
 
@@ -412,6 +443,14 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
       {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
     </section>
   );
+}
+
+function isProcessStatus(value: string | null): value is ProcessStatus {
+  return value === "Pending"
+    || value === "InProgress"
+    || value === "Completed"
+    || value === "Rejected"
+    || value === "Escalated";
 }
 
 function waitForMinimumDelay(startedAt: number, minimumDelayMs: number) {

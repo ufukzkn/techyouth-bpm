@@ -181,6 +181,7 @@ export type WorkflowDefinitionDraft = {
   status: WorkflowDefinitionStatus;
   nodes: WorkflowNode[];
   edges: WorkflowTransition[];
+  requiresBinding?: string[];
   updatedAt?: string;
   publishedAt?: string | null;
 };

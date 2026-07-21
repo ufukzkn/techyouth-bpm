@@ -269,6 +269,16 @@ export function WorkflowWorkspaceView() {
     setWorkspaceMessage(text("Yayın sürümünden yeni taslak oluşturuldu.", "A new draft was created from the published version."));
   }
 
+  function importWorkflowDraft(imported: WorkflowDefinitionDraft) {
+    setSelectedDefinition(null);
+    setSelectedVersion(null);
+    setDraft(imported);
+    setWorkspaceMessage(text(
+      "İçe aktarılan akış yeni taslak olarak açıldı. Ortam bağlantılarını yeniden seçin.",
+      "The imported workflow was opened as a new draft. Rebind its environment references.",
+    ));
+  }
+
   const editorKey = useMemo(
     () => `${selectedDefinition?.id ?? "new"}:${selectedVersion?.id ?? "draft"}:${draft.status}`,
     [draft.status, selectedDefinition?.id, selectedVersion?.id],
@@ -368,6 +378,7 @@ export function WorkflowWorkspaceView() {
           initialDraft={draft}
           key={editorKey}
           lookups={lookups}
+          onImportDraft={canCreateDefinition ? importWorkflowDraft : undefined}
           onPublish={publishWorkflow}
           onSave={saveWorkflow}
           readOnly={!canEditCurrent}

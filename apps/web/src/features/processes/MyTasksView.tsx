@@ -18,6 +18,7 @@ import { useState } from "react";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { TaskActionDialog } from "@/features/processes/TaskActionDialog";
+import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
 import { formatApiDateTime } from "@/lib/dateTime";
 import type {
   Language,
@@ -37,6 +38,7 @@ type MyTasksViewProps = {
   sortBy: NonNullable<TaskListParams["sortBy"]>;
   sortDirection: "asc" | "desc";
   status: "loading" | "refreshing" | "idle" | "acting" | "error";
+  taskView: NonNullable<TaskListParams["view"]>;
   onClaimTask: (taskId: string, claimVersion?: string | null) => void;
   onReleaseTask: (taskId: string, claimVersion?: string | null) => void;
   onSelectTask: (task: ProcessTask) => void;
@@ -52,6 +54,7 @@ type MyTasksViewProps = {
     note: string,
     formData?: Record<string, unknown>,
   ) => Promise<boolean>;
+  onTaskViewChange: (view: NonNullable<TaskListParams["view"]>) => void;
 };
 
 const priorities: Array<TaskPriority | "all"> = ["all", "Critical", "High", "Normal", "Low"];
@@ -65,6 +68,7 @@ export function MyTasksView({
   sortBy,
   sortDirection,
   status,
+  taskView,
   onClaimTask,
   onReleaseTask,
   onSelectTask,
@@ -75,6 +79,7 @@ export function MyTasksView({
   onPageChange,
   onPreviousPage,
   onExecuteTask,
+  onTaskViewChange,
 }: MyTasksViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const isTr = language === "tr";
@@ -99,12 +104,22 @@ export function MyTasksView({
         <div className="process-card-header">
           <div>
             <span className="eyebrow">{t("process.myTasks")}</span>
-            <strong>{t("process.openTaskCount", { count: result.totalCount })}</strong>
+            <strong>{t(taskView === "history" ? "process.historyTaskCount" : "process.openTaskCount", { count: result.totalCount })}</strong>
           </div>
           <CircleDot size={22} />
         </div>
 
         <div className="task-query-toolbar">
+          <SlidingSegmentedControl
+            ariaLabel={isTr ? "İş görünümü" : "Task view"}
+            name="task-list-view"
+            onChange={onTaskViewChange}
+            options={[
+              { value: "active", label: t("process.taskViewActive") },
+              { value: "history", label: t("process.taskViewHistory") },
+            ]}
+            value={taskView}
+          />
           <label>
             <span>{isTr ? "Öncelik" : "Priority"}</span>
             <select value={priorityFilter} onChange={(event) => onPriorityChange(event.target.value as TaskPriority | "all")}>
@@ -152,15 +167,17 @@ export function MyTasksView({
                       </div>
                       <span>{task.workflowName || task.formName || task.id.slice(0, 8)} · {task.communityName || task.assignedCommunityRoleName || (isTr ? "Topluluk yetkisi" : "Community access")}</span>
                       {task.formName ? <small>{task.formName}</small> : null}
+                      <TaskAssignmentContext language={language} task={task} />
                       <small className="task-date"><Clock3 size={13} /> {formatApiDateTime(task.createdAt, language)}</small>
                       {task.dueAt ? (
                         <small className={isOverdue ? "task-due-date is-overdue" : "task-due-date"}>
                           <Clock3 size={13} /> {isOverdue ? (isTr ? "Gecikti" : "Overdue") : (isTr ? "Son tarih" : "Due")} · {formatApiDateTime(task.dueAt, language)}
                         </small>
                       ) : null}
+                      {taskView === "history" ? <TaskCompletionContext language={language} task={task} /> : null}
                     </div>
                   </button>
-                  <div>
+                  {taskView === "active" ? <div>
                     <TaskControls
                       activeUserId={activeUserId}
                       disabled={status === "acting"}
@@ -170,13 +187,17 @@ export function MyTasksView({
                       onRelease={() => onReleaseTask(task.id, task.claimVersion)}
                       task={task}
                     />
-                  </div>
+                  </div> : null}
                 </div>
               );
             })}
           </div>
         ) : (
-          <p className="empty-state">{t("process.noOpenTasks", { role: isTr ? "topluluk rolünüz" : "your community role" })}</p>
+          <p className="empty-state">
+            {taskView === "history"
+              ? (isTr ? "Henüz tamamladığınız bir iş bulunmuyor." : "You have not completed a task yet.")
+              : t("process.noOpenTasks", { role: isTr ? "topluluk rolünüz" : "your community role" })}
+          </p>
         )}
 
         {totalPages > 1 ? (
@@ -202,6 +223,35 @@ export function MyTasksView({
         />
       ) : null}
     </>
+  );
+}
+
+function TaskAssignmentContext({ language, task }: { language: Language; task: ProcessTask }) {
+  const t = (key: TranslationKey) => translate(language, key);
+  const entries = [
+    task.candidateTeamName ? [t("process.assignmentTeam"), task.candidateTeamName] : null,
+    task.candidateCommunityRoleName ? [t("process.assignmentRole"), task.candidateCommunityRoleName] : null,
+    task.assignedUserDisplayName ? [t("process.assignmentUser"), task.assignedUserDisplayName] : null,
+    task.claimedByUserDisplayName ? [t("process.claimOwner"), task.claimedByUserDisplayName] : null,
+  ].filter((entry): entry is string[] => entry !== null);
+
+  if (entries.length === 0) return null;
+  return (
+    <dl className="task-assignment-context">
+      {entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+    </dl>
+  );
+}
+
+function TaskCompletionContext({ language, task }: { language: Language; task: ProcessTask }) {
+  const t = (key: TranslationKey) => translate(language, key);
+  return (
+    <div className="task-completion-context">
+      {task.completedByUserDisplayName ? <small><strong>{t("process.completedByLabel")}:</strong> {task.completedByUserDisplayName}</small> : null}
+      {task.completedAction ? <small><strong>{translate(language, `action.${task.completedAction}` as TranslationKey)}</strong></small> : null}
+      {task.completionNote ? <small><strong>{t("process.completionNote")}:</strong> {task.completionNote}</small> : null}
+      {task.completedAt ? <small><Clock3 size={13} /> {formatApiDateTime(task.completedAt, language)}</small> : null}
+    </div>
   );
 }
 
@@ -242,7 +292,13 @@ function TaskControls({
   }
 
   if (requiresClaim && !task.claimedByUserId) {
-    return <div className="task-actions"><button className="primary-button" disabled={disabled} onClick={onClaim} type="button"><Hand size={17} />{t("process.claim")}</button></div>;
+    return (
+      <div className="task-actions">
+        <button className="primary-button" disabled={disabled || task.canCurrentUserClaim === false} onClick={onClaim} type="button">
+          <Hand size={17} />{t("process.claim")}
+        </button>
+      </div>
+    );
   }
   if (requiresClaim && !isClaimedByCurrentUser) {
     return <span className="task-claim-state"><UserRoundCheck size={16} />{t("process.claimedByAnother")}</span>;

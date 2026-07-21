@@ -73,7 +73,30 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
             <dt>{t("process.tasks")}</dt>
             <dd>{t("process.taskSummary", { open: openTaskCount, completed: completedTaskCount })}</dd>
           </div>
-          {detail.currentNodeKey ? (
+          {detail.currentStep ? (
+            <>
+              <div>
+                <dt>{t("process.currentStepTitle")}</dt>
+                <dd>{detail.currentStep.title || detail.currentStep.nodeKey}</dd>
+              </div>
+              {detail.currentStep.teamName ? (
+                <div><dt>{t("process.assignmentTeam")}</dt><dd>{detail.currentStep.teamName}</dd></div>
+              ) : null}
+              {detail.currentStep.communityRoleName ? (
+                <div><dt>{t("process.assignmentRole")}</dt><dd>{detail.currentStep.communityRoleName}</dd></div>
+              ) : null}
+              {detail.currentStep.assignedUserDisplayName || detail.currentStep.claimedByUserDisplayName ? (
+                <div>
+                  <dt>{detail.currentStep.claimedByUserDisplayName ? t("process.claimOwner") : t("process.assignmentUser")}</dt>
+                  <dd>{detail.currentStep.claimedByUserDisplayName || detail.currentStep.assignedUserDisplayName}</dd>
+                </div>
+              ) : null}
+              <div>
+                <dt>{t("process.currentStepSince")}</dt>
+                <dd>{formatApiDateTime(detail.currentStep.enteredAt, language)}</dd>
+              </div>
+            </>
+          ) : detail.currentNodeKey ? (
             <div>
               <dt>{t("process.currentNode")}</dt>
               <dd>{detail.currentNodeKey}</dd>
