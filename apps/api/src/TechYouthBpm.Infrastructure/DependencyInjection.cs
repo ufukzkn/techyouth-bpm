@@ -45,6 +45,8 @@ public static class DependencyInjection
             }
         });
 
+        services.AddMemoryCache(options => options.SizeLimit = 10_000);
+        services.AddSingleton<ISessionValidationCache, SessionValidationCache>();
         services.AddScoped<ISystemReadinessService, SystemReadinessService>();
         services.AddScoped<AuthenticatedUserLoader>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();

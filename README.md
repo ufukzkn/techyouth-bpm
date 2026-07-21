@@ -71,6 +71,7 @@ Backend varsayilan olarak SQLite kullanir:
   },
   "Auth": {
     "SessionDurationMinutes": 120,
+    "SessionCacheSeconds": 15,
     "RememberMeDurationMinutes": 43200,
     "RefreshTokenDurationMinutes": 43200,
     "PasswordResetMinutes": 30,
@@ -87,7 +88,7 @@ Backend varsayilan olarak SQLite kullanir:
 }
 ```
 
-`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:RememberMeDurationMinutes` ve `Auth:RefreshTokenDurationMinutes` beni-hatirla/refresh-token akisi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:PasswordResetMinutes` sifre sifirlama token gecerliligini belirler. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:EmailVerificationMinutes` e-posta dogrulama kodu gecerliligini, `Auth:EmailVerificationResendCooldownMinutes` yeniden kod gonderme bekleme suresini belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register/verification/reset endpointlerini sinirlar.
+`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:SessionCacheSeconds` opaque session icin cozulmus kullanici/yetki DTO'sunun kisa omurlu memory-cache suresidir; `0` cache'i kapatir, desteklenen guvenlik ve uyelik mutasyonlari ilgili kaydi aninda gecersiz kilar. `Auth:RememberMeDurationMinutes` ve `Auth:RefreshTokenDurationMinutes` beni-hatirla/refresh-token akisi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:PasswordResetMinutes` sifre sifirlama token gecerliligini belirler. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:EmailVerificationMinutes` e-posta dogrulama kodu gecerliligini, `Auth:EmailVerificationResendCooldownMinutes` yeniden kod gonderme bekleme suresini belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register/verification/reset endpointlerini sinirlar.
 
 Auth modeli JWT degildir; backend opaque session token uretir ve yalniz hash'ini veritabaninda saklar. Normal web istemcisi token dondurmeyen `/api/auth/browser-login` endpointini kullanir: access/refresh token JSON body'ye veya Zustand/localStorage'a girmez, HttpOnly cookie'de kalir. Mutation istekleri okunabilir ancak kimlik dogrulama yetkisi tasimayan CSRF cookie'sini `X-CSRF-Token` header'i olarak geri yollar. Sayfa yenilenince oturum `/api/auth/me` ile toparlanir; access suresi dolmus ve beni-hatirla aktifse `/api/auth/refresh` cookie'leri sessizce rotate eder ve response body'de sir dondurmez. Swagger ve acik API istemcileri `/api/auth/login` ile Bearer token response'u almaya devam eder.
 

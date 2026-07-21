@@ -28,19 +28,22 @@ internal abstract class AuthServiceBase
     protected readonly ISystemAuditService auditService;
     protected readonly IOtpService otpService;
     protected readonly IEmailSender emailSender;
+    protected readonly ISessionValidationCache sessionCache;
 
     protected AuthServiceBase(
         AppDbContext db,
         IConfiguration configuration,
         ISystemAuditService auditService,
         IOtpService otpService,
-        IEmailSender emailSender)
+        IEmailSender emailSender,
+        ISessionValidationCache? sessionCache = null)
     {
         this.db = db;
         this.configuration = configuration;
         this.auditService = auditService;
         this.otpService = otpService;
         this.emailSender = emailSender;
+        this.sessionCache = sessionCache ?? NullSessionValidationCache.Instance;
     }
 
     protected static bool PasswordMatches(string password, string storedPassword) =>
@@ -468,6 +471,7 @@ internal abstract class AuthServiceBase
 
     protected async Task RevokeAllSessionsForUserAsync(Guid userId, CancellationToken cancellationToken)
     {
+        sessionCache.InvalidateUser(userId);
         var sessions = await db.UserSessions
             .Where(session => session.UserId == userId && session.RevokedAt == null)
             .ToListAsync(cancellationToken);

@@ -11,7 +11,8 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 public class CommunityService(
     AppDbContext db,
-    ISystemAuditService auditService) : ICommunityService, ICommunityRoleService
+    ISystemAuditService auditService,
+    ISessionValidationCache? sessionCache = null) : ICommunityService, ICommunityRoleService
 {
     public async Task<Result<IReadOnlyList<CommunityDto>>> ListAsync(UserDto currentUser, CancellationToken cancellationToken = default)
     {
@@ -169,6 +170,7 @@ public class CommunityService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache?.InvalidateCommunity(communityId);
         await auditService.LogAsync(
             currentUser,
             community.IsActive
@@ -305,6 +307,7 @@ public class CommunityService(
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         SynchronizePermissions(role, requestedPermissions);
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache?.InvalidateCommunity(communityId);
         await auditService.LogAsync(
             currentUser,
             "CommunityRole.Updated",
@@ -371,6 +374,7 @@ public class CommunityService(
 
         db.CommunityRoles.Remove(role);
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache?.InvalidateCommunity(communityId);
         await auditService.LogAsync(
             currentUser,
             "CommunityRole.Deleted",

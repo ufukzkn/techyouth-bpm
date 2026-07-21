@@ -17,7 +17,8 @@ internal sealed class SessionService(
     IConfiguration configuration,
     ISystemAuditService auditService,
     IOtpService otpService,
-    IEmailSender emailSender) : AuthServiceBase(db, configuration, auditService, otpService, emailSender), ISessionService
+    IEmailSender emailSender,
+    ISessionValidationCache sessionCache) : AuthServiceBase(db, configuration, auditService, otpService, emailSender, sessionCache), ISessionService
 {
     public async Task<Result<IReadOnlyList<UserSessionDto>>> ListSessionsAsync(
         UserDto currentUser,
@@ -96,6 +97,7 @@ internal sealed class SessionService(
 
         if (session is not null)
         {
+            sessionCache.InvalidateTokenHash(session.Token);
             session.RevokedAt = DateTime.UtcNow;
             await RevokeRefreshTokensForSessionAsync(session.Id, cancellationToken);
             await db.SaveChangesAsync(cancellationToken);
@@ -126,6 +128,7 @@ internal sealed class SessionService(
             return Result.Failure("Session not found.");
         }
 
+        sessionCache.InvalidateTokenHash(session.Token);
         session.RevokedAt = DateTime.UtcNow;
         await RevokeRefreshTokensForSessionAsync(session.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
@@ -170,6 +173,7 @@ internal sealed class SessionService(
             return Result.Failure("Session not found.");
         }
 
+        sessionCache.InvalidateTokenHash(session.Token);
         session.RevokedAt = DateTime.UtcNow;
         await RevokeRefreshTokensForSessionAsync(session.Id, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);

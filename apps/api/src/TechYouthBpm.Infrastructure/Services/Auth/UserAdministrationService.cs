@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
 using TechYouthBpm.Application.Services;
@@ -17,7 +18,8 @@ internal sealed class UserAdministrationService(
     IConfiguration configuration,
     ISystemAuditService auditService,
     IOtpService otpService,
-    IEmailSender emailSender) : AuthServiceBase(db, configuration, auditService, otpService, emailSender), IUserAdministrationService
+    IEmailSender emailSender,
+    ISessionValidationCache sessionCache) : AuthServiceBase(db, configuration, auditService, otpService, emailSender, sessionCache), IUserAdministrationService
 {
     public async Task<Result<AdminPasswordResetResponse>> ResetPasswordByAdminAsync(
         Guid userId,
@@ -420,12 +422,16 @@ internal sealed class UserAdministrationService(
         }
 
         var currentCommunityId = user.ToDto().CommunityId;
+        if (currentCommunityId != communityId)
+        {
+            return Result<UserAdminDto>.Failure(
+                "Community changes must use the dedicated community transfer action.");
+        }
+
         foreach (var membership in user.CommunityMemberships)
         {
             membership.IsActive = false;
         }
-
-        await DeactivateTeamMembershipsIfCommunityChangedAsync(user.Id, currentCommunityId, communityId, cancellationToken);
 
         var newMembership = new UserCommunityMembership
         {
@@ -450,6 +456,124 @@ internal sealed class UserAdministrationService(
         return Result<UserAdminDto>.Success(user.ToAdminDto());
     }
 
+    public Task<Result<CommunityTransferPreviewDto>> PreviewCommunityTransferAsync(
+        Guid userId,
+        CommunityTransferPreviewRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default) =>
+        BuildCommunityTransferPreviewAsync(
+            userId,
+            request.TargetCommunityId,
+            request.TargetCommunityRoleId,
+            currentUser,
+            cancellationToken);
+
+    public async Task<Result<UserAdminDto>> TransferCommunityAsync(
+        Guid userId,
+        CommunityTransferRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        if (!currentUser.IsSuperAdmin())
+        {
+            return Result<UserAdminDto>.Failure("Only SuperAdmin users can transfer users between communities.");
+        }
+
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        var previewResult = await BuildCommunityTransferPreviewAsync(
+            userId,
+            request.TargetCommunityId,
+            request.TargetCommunityRoleId,
+            currentUser,
+            cancellationToken);
+        if (!previewResult.IsSuccess)
+        {
+            return Result<UserAdminDto>.Failure(previewResult.Errors);
+        }
+
+        var preview = previewResult.Value!;
+        if (!preview.CanTransfer)
+        {
+            return Result<UserAdminDto>.Failure(
+                "User has directly assigned or claimed active tasks. Complete or release them before transfer.");
+        }
+
+        var user = await UserQuery().SingleAsync(item => item.Id == userId, cancellationToken);
+        var now = DateTime.UtcNow;
+        foreach (var membership in user.CommunityMemberships.Where(membership => membership.IsActive))
+        {
+            membership.IsActive = false;
+        }
+
+        foreach (var teamMembership in user.TeamMemberships.Where(membership => membership.IsActive))
+        {
+            teamMembership.IsActive = false;
+            teamMembership.IsLead = false;
+            teamMembership.UpdatedAt = now;
+        }
+
+        db.UserCommunityMemberships.Add(new UserCommunityMembership
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            CommunityId = request.TargetCommunityId,
+            CommunityRoleId = request.TargetCommunityRoleId,
+            IsActive = true,
+            CreatedAt = now
+        });
+
+        await RevokeAllSessionsForUserAsync(user.Id, cancellationToken);
+        db.Notifications.Add(new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Type = "User.CommunityTransferred",
+            Title = "Topluluk bilginiz guncellendi",
+            Message = $"{preview.TargetCommunityName} topluluguna {preview.TargetCommunityRoleName} roluyle tasindiniz. Yeniden giris yapmaniz gerekir.",
+            EntityType = "User",
+            EntityId = user.Id.ToString(),
+            CreatedAt = now
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        await auditService.LogAsync(
+            currentUser,
+            "User.CommunityTransferred",
+            "User",
+            user.Id.ToString(),
+            $"User '{user.Username}' moved from '{preview.CurrentCommunityName}/{preview.CurrentCommunityRoleName}' to '{preview.TargetCommunityName}/{preview.TargetCommunityRoleName}'.",
+            new SystemAuditContext(
+                preview.TargetCommunityId,
+                new
+                {
+                    before = new
+                    {
+                        communityId = preview.CurrentCommunityId,
+                        communityName = preview.CurrentCommunityName,
+                        communityRoleId = preview.CurrentCommunityRoleId,
+                        communityRoleName = preview.CurrentCommunityRoleName
+                    },
+                    after = new
+                    {
+                        communityId = preview.TargetCommunityId,
+                        communityName = preview.TargetCommunityName,
+                        communityRoleId = preview.TargetCommunityRoleId,
+                        communityRoleName = preview.TargetCommunityRoleName
+                    },
+                    sessionsRevoked = true,
+                    teamMembershipsDeactivated = true
+                },
+                SystemAuditCategories.Access),
+            cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        db.ChangeTracker.Clear();
+        var updated = await UserQuery()
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == user.Id, cancellationToken);
+        return Result<UserAdminDto>.Success(updated.ToAdminDto());
+    }
+
     public async Task<Result<UserAdminDto>> UpdateUserAccessAsync(
         Guid userId,
         UpdateUserAccessRequest request,
@@ -471,6 +595,13 @@ internal sealed class UserAdministrationService(
         if (!CanManageUsers(currentUser, userDto.CommunityId))
         {
             return Result<UserAdminDto>.Failure("Current user cannot update users in this community.");
+        }
+
+        if (request.CommunityId is { } requestedCommunityId
+            && requestedCommunityId != userDto.CommunityId)
+        {
+            return Result<UserAdminDto>.Failure(
+                "Community changes must use the dedicated community transfer action.");
         }
 
         if (user.Role == Role.SuperAdmin && request.Status != UserStatus.Active)
@@ -528,12 +659,6 @@ internal sealed class UserAdministrationService(
                 membership.IsActive = false;
             }
 
-            await DeactivateTeamMembershipsIfCommunityChangedAsync(
-                user.Id,
-                userDto.CommunityId,
-                targetCommunityId.Value,
-                cancellationToken);
-
             await db.SaveChangesAsync(cancellationToken);
             db.UserCommunityMemberships.Add(new UserCommunityMembership
             {
@@ -552,6 +677,7 @@ internal sealed class UserAdministrationService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache.InvalidateUser(user.Id);
         await auditService.LogAsync(
             currentUser,
             "User.AccessUpdated",
@@ -576,6 +702,95 @@ internal sealed class UserAdministrationService(
         await transaction.CommitAsync(cancellationToken);
         var updated = await UserQuery().SingleAsync(item => item.Id == user.Id, cancellationToken);
         return Result<UserAdminDto>.Success(updated.ToAdminDto());
+    }
+
+    private async Task<Result<CommunityTransferPreviewDto>> BuildCommunityTransferPreviewAsync(
+        Guid userId,
+        Guid targetCommunityId,
+        Guid targetCommunityRoleId,
+        UserDto currentUser,
+        CancellationToken cancellationToken)
+    {
+        if (!currentUser.IsSuperAdmin())
+        {
+            return Result<CommunityTransferPreviewDto>.Failure(
+                "Only SuperAdmin users can transfer users between communities.");
+        }
+
+        var user = await UserQuery()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return Result<CommunityTransferPreviewDto>.Failure("User not found.");
+        }
+
+        if (user.Role == Role.SuperAdmin)
+        {
+            return Result<CommunityTransferPreviewDto>.Failure("SuperAdmin users cannot be transferred to a community.");
+        }
+
+        var currentMembership = user.CommunityMemberships.SingleOrDefault(membership => membership.IsActive);
+        if (currentMembership?.CommunityId == targetCommunityId)
+        {
+            return Result<CommunityTransferPreviewDto>.Failure(
+                "User already belongs to this community. Use access management to change the role.");
+        }
+
+        var target = await db.CommunityRoles
+            .AsNoTracking()
+            .Where(role =>
+                role.Id == targetCommunityRoleId
+                && role.CommunityId == targetCommunityId
+                && role.Community != null
+                && role.Community.IsActive)
+            .Select(role => new
+            {
+                CommunityId = role.CommunityId,
+                CommunityName = role.Community!.Name,
+                RoleId = role.Id,
+                RoleName = role.Name
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (target is null)
+        {
+            return Result<CommunityTransferPreviewDto>.Failure(
+                "Target community is inactive or the selected role does not belong to it.");
+        }
+
+        var blockingTasks = await db.ProcessTasks
+            .AsNoTracking()
+            .Where(task =>
+                (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                && (task.AssignedUserId == userId || task.ClaimedByUserId == userId))
+            .OrderBy(task => task.DueAt == null)
+            .ThenBy(task => task.DueAt)
+            .ThenBy(task => task.CreatedAt)
+            .Select(task => new CommunityTransferBlockingTaskDto(
+                task.Id,
+                task.ProcessInstanceId,
+                task.Title,
+                task.ProcessInstance != null
+                    && task.ProcessInstance.ProcessDefinitionVersion != null
+                    && task.ProcessInstance.ProcessDefinitionVersion.ProcessDefinition != null
+                        ? task.ProcessInstance.ProcessDefinitionVersion.ProcessDefinition.Name
+                        : string.Empty,
+                task.Status))
+            .ToListAsync(cancellationToken);
+
+        return Result<CommunityTransferPreviewDto>.Success(new CommunityTransferPreviewDto(
+            user.Id,
+            user.Username,
+            user.DisplayName,
+            currentMembership?.CommunityId,
+            currentMembership?.Community?.Name ?? string.Empty,
+            currentMembership?.CommunityRoleId,
+            currentMembership?.CommunityRole?.Name ?? string.Empty,
+            target.CommunityId,
+            target.CommunityName,
+            target.RoleId,
+            target.RoleName,
+            blockingTasks));
     }
 
 }

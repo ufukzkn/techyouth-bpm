@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
+using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Services;
 using TechYouthBpm.Application.Teams;
 using TechYouthBpm.Domain.Entities;
@@ -12,7 +13,8 @@ namespace TechYouthBpm.Infrastructure.Services;
 public class TeamService(
     AppDbContext db,
     ISystemAuditService auditService,
-    INotificationService notificationService) : ITeamService
+    INotificationService notificationService,
+    ISessionValidationCache? sessionCache = null) : ITeamService
 {
     public async Task<Result<TeamPageDto>> ListAsync(
         TeamSearchRequest request,
@@ -177,6 +179,7 @@ public class TeamService(
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache?.InvalidateCommunity(team.CommunityId);
         await auditService.LogAsync(
             currentUser,
             wasActive == team.IsActive ? "Team.Updated" : team.IsActive ? "Team.Activated" : "Team.Deactivated",
@@ -286,7 +289,11 @@ public class TeamService(
                     .Select(communityMembership => communityMembership.CommunityRole != null ? communityMembership.CommunityRole.Name : string.Empty)
                     .FirstOrDefault() ?? string.Empty,
                 membership.IsLead,
-                membership.CreatedAt))
+                membership.CreatedAt,
+                db.ProcessTasks.Count(task =>
+                    (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                    && (task.AssignedUserId == membership.UserId
+                        || task.ClaimedByUserId == membership.UserId))))
             .ToListAsync(cancellationToken);
 
         return Result<TeamMemberPageDto>.Success(new TeamMemberPageDto(items, page, pageSize, totalCount));
@@ -353,10 +360,87 @@ public class TeamService(
                         ? communityMembership.CommunityRole.Name
                         : string.Empty)
                     .FirstOrDefault() ?? string.Empty,
-                membership.IsLead))
+                membership.IsLead,
+                db.ProcessTasks.Count(task =>
+                    (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                    && (task.AssignedUserId == membership.UserId
+                        || task.ClaimedByUserId == membership.UserId))))
             .ToListAsync(cancellationToken);
 
         return Result<TeamRosterPageDto>.Success(new TeamRosterPageDto(items, page, pageSize, totalCount));
+    }
+
+    public async Task<Result<PagedResult<ProcessTaskDto>>> ListMemberTasksAsync(
+        Guid teamId,
+        Guid userId,
+        TeamMemberTaskSearchRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default)
+    {
+        var team = await db.Teams
+            .AsNoTracking()
+            .Select(item => new { item.Id, item.CommunityId })
+            .SingleOrDefaultAsync(item => item.Id == teamId, cancellationToken);
+        if (team is null)
+        {
+            return Result<PagedResult<ProcessTaskDto>>.Failure("Team was not found.");
+        }
+
+        var targetIsMember = await db.TeamMemberships
+            .AsNoTracking()
+            .AnyAsync(membership =>
+                membership.TeamId == teamId
+                && membership.UserId == userId
+                && membership.IsActive,
+                cancellationToken);
+        if (!targetIsMember)
+        {
+            return Result<PagedResult<ProcessTaskDto>>.Failure("Active team membership was not found.");
+        }
+
+        var isTeamLead = currentUser.CommunityId == team.CommunityId
+            && await db.TeamMemberships
+                .AsNoTracking()
+                .AnyAsync(membership =>
+                    membership.TeamId == teamId
+                    && membership.UserId == currentUser.Id
+                    && membership.IsActive
+                    && membership.IsLead,
+                    cancellationToken);
+        var canViewDetails = currentUser.IsSuperAdmin()
+            || (currentUser.CommunityId == team.CommunityId
+                && currentUser.HasPermission(PermissionNames.TeamsManage))
+            || isTeamLead;
+        if (!canViewDetails)
+        {
+            return Result<PagedResult<ProcessTaskDto>>.Failure(
+                "Only a team lead or team manager can view member task details.");
+        }
+
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize, 1, 50);
+        var query = TeamMemberTaskQuery()
+            .AsNoTracking()
+            .Where(task =>
+                task.ProcessInstance != null
+                && task.ProcessInstance.CommunityId == team.CommunityId
+                && (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                && (task.AssignedUserId == userId || task.ClaimedByUserId == userId));
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(task => task.DueAt == null)
+            .ThenBy(task => task.DueAt)
+            .ThenByDescending(task => task.Priority)
+            .ThenBy(task => task.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return Result<PagedResult<ProcessTaskDto>>.Success(new PagedResult<ProcessTaskDto>(
+            items.Select(task => task.ToDto(currentUser)).ToArray(),
+            page,
+            pageSize,
+            totalCount));
     }
 
     public async Task<Result<TeamCandidatePageDto>> ListCandidatesAsync(
@@ -464,6 +548,7 @@ public class TeamService(
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache?.InvalidateUser(user.Id);
         await notificationService.CreateAsync(new CreateNotificationRequest(
             user.Id,
             "Team.MembershipAdded",
@@ -505,6 +590,7 @@ public class TeamService(
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache?.InvalidateUser(membership.UserId);
         if (wasLead != membership.IsLead)
         {
             await notificationService.CreateAsync(new CreateNotificationRequest(
@@ -548,6 +634,7 @@ public class TeamService(
 
         await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache?.InvalidateUser(membership.UserId);
         await notificationService.CreateAsync(new CreateNotificationRequest(
             membership.UserId,
             "Team.MembershipRemoved",
@@ -655,6 +742,23 @@ public class TeamService(
                 team.CreatedAt,
                 team.UpdatedAt))
             .SingleAsync(cancellationToken);
+
+    private IQueryable<ProcessTask> TeamMemberTaskQuery() =>
+        db.ProcessTasks
+            .Include(task => task.AssignedCommunityRole)
+            .Include(task => task.AssignedUser)
+            .Include(task => task.CandidateTeam)
+            .Include(task => task.CandidateCommunityRole)
+            .Include(task => task.ClaimedByUser)
+            .Include(task => task.CompletedByUser)
+            .Include(task => task.ProcessInstance)
+            .ThenInclude(process => process!.FormDefinition)
+            .Include(task => task.ProcessInstance)
+            .ThenInclude(process => process!.Community)
+            .Include(task => task.ProcessInstance)
+            .ThenInclude(process => process!.ProcessDefinitionVersion)
+            .ThenInclude(version => version!.ProcessDefinition)
+            .AsSplitQuery();
 
     private static TeamMemberDto ToMemberDto(User user, TeamMembership membership, Guid communityId)
     {

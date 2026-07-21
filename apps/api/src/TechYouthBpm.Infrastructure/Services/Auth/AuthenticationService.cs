@@ -18,7 +18,8 @@ internal sealed class AuthenticationService(
     ISystemAuditService auditService,
     IOtpService otpService,
     IEmailSender emailSender,
-    AuthenticatedUserLoader authenticatedUserLoader) : AuthServiceBase(db, configuration, auditService, otpService, emailSender), IAuthenticationService
+    AuthenticatedUserLoader authenticatedUserLoader,
+    ISessionValidationCache sessionCache) : AuthServiceBase(db, configuration, auditService, otpService, emailSender, sessionCache), IAuthenticationService
 {
     public async Task<Result<LoginResponse>> LoginAsync(
         LoginRequest request,
@@ -190,6 +191,7 @@ internal sealed class AuthenticationService(
 
         var user = storedRefreshToken.User;
         var previousSession = storedRefreshToken.UserSession;
+        sessionCache.InvalidateTokenHash(previousSession.Token);
         previousSession.RevokedAt = DateTime.UtcNow;
         storedRefreshToken.RevokedAt = DateTime.UtcNow;
 

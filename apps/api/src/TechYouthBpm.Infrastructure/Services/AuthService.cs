@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Mail;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.EntityFrameworkCore;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
@@ -28,14 +29,16 @@ public sealed class AuthService : IAuthService
         IOtpService otpService,
         IEmailSender emailSender)
     {
-        var authenticatedUserLoader = new AuthenticatedUserLoader(db);
+        var memoryCache = new MemoryCache(new MemoryCacheOptions { SizeLimit = 10_000 });
+        var sessionCache = new SessionValidationCache(memoryCache, configuration);
+        var authenticatedUserLoader = new AuthenticatedUserLoader(db, sessionCache);
         authenticationService = new AuthenticationService(
-            db, configuration, auditService, otpService, emailSender, authenticatedUserLoader);
+            db, configuration, auditService, otpService, emailSender, authenticatedUserLoader, sessionCache);
         registrationService = new RegistrationService(db, configuration, auditService, otpService, emailSender);
-        accountService = new AccountService(db, configuration, auditService, otpService, emailSender);
-        sessionService = new SessionService(db, configuration, auditService, otpService, emailSender);
+        accountService = new AccountService(db, configuration, auditService, otpService, emailSender, sessionCache);
+        sessionService = new SessionService(db, configuration, auditService, otpService, emailSender, sessionCache);
         userAdministrationService = new UserAdministrationService(
-            db, configuration, auditService, otpService, emailSender);
+            db, configuration, auditService, otpService, emailSender, sessionCache);
     }
 
     public AuthService(AppDbContext db, IConfiguration configuration)
@@ -143,6 +146,22 @@ public sealed class AuthService : IAuthService
         UserDto currentUser,
         CancellationToken cancellationToken = default) =>
         userAdministrationService.UpdateUserAccessAsync(userId, request, currentUser, cancellationToken);
+
+    public Task<Result<CommunityTransferPreviewDto>> PreviewCommunityTransferAsync(
+        Guid userId,
+        CommunityTransferPreviewRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default) =>
+        userAdministrationService.PreviewCommunityTransferAsync(
+            userId, request, currentUser, cancellationToken);
+
+    public Task<Result<UserAdminDto>> TransferCommunityAsync(
+        Guid userId,
+        CommunityTransferRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default) =>
+        userAdministrationService.TransferCommunityAsync(
+            userId, request, currentUser, cancellationToken);
 
     public Task<Result<IReadOnlyList<UserSessionDto>>> ListSessionsAsync(
         UserDto currentUser,

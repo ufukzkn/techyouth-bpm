@@ -1,4 +1,6 @@
 using System.Data.Common;
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -14,6 +16,44 @@ namespace TechYouthBpm.Tests.Integration;
 
 public sealed class QueryRegressionTests
 {
+    [Fact]
+    public async Task Opaque_session_validation_uses_cache_and_logout_invalidates_it()
+    {
+        var counter = new CommandCountingInterceptor();
+        await using var db = TestDbFactory.Create(counter);
+        var user = TestDbFactory.SeedUser(db, Role.User, "cached-session-user");
+        const string rawToken = "opaque-session-cache-test-token";
+        var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken))).ToLowerInvariant();
+        db.UserSessions.Add(new UserSession
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            Token = tokenHash,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddHours(1),
+        });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var service = new AuthService(db, new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Auth:SessionCacheSeconds"] = "30",
+        }).Build());
+
+        counter.Reset();
+        Assert.NotNull(await service.GetUserByTokenAsync(rawToken));
+        Assert.True(counter.Count > 0);
+
+        counter.Reset();
+        Assert.NotNull(await service.GetUserByTokenAsync(rawToken));
+        Assert.Equal(0, counter.Count);
+
+        Assert.True((await service.LogoutAsync(rawToken)).IsSuccess);
+        counter.Reset();
+        Assert.Null(await service.GetUserByTokenAsync(rawToken));
+        Assert.True(counter.Count > 0);
+    }
+
     [Fact]
     public async Task User_search_paginates_large_fixture_with_bounded_query_count()
     {

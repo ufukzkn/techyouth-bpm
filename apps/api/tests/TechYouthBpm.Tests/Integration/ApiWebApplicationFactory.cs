@@ -41,7 +41,8 @@ internal sealed class ApiWebApplicationFactory(
                 ["Email:Provider"] = "Demo",
                 ["Auth:RateLimitPermitLimit"] = rateLimitPermitLimit.ToString(),
                 ["Auth:RateLimitWindowMinutes"] = "1",
-                ["Auth:SessionDurationMinutes"] = sessionDurationMinutes.ToString()
+                ["Auth:SessionDurationMinutes"] = sessionDurationMinutes.ToString(),
+                ["Auth:SessionCacheSeconds"] = "0"
             };
             foreach (var item in configurationOverrides ?? new Dictionary<string, string?>())
             {

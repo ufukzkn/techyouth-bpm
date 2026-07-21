@@ -157,7 +157,7 @@ public class TeamServiceTests
     }
 
     [Fact]
-    public async Task Moving_User_To_Another_Community_Deactivates_Old_Team_Memberships()
+    public async Task Generic_Access_Update_Rejects_Cross_Community_Changes()
     {
         await using var db = TestDbFactory.Create();
         var superAdmin = TestDbFactory.SeedSuperAdmin(db, "team-superadmin");
@@ -183,8 +183,42 @@ public class TeamServiceTests
             new UpdateUserMembershipRequest(other.CommunityId, other.RoleId),
             SuperAdminDto(superAdmin.Id));
 
-        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
-        Assert.False(db.TeamMemberships.Single(item => item.TeamId == team.Id && item.UserId == member.Id).IsActive);
+        Assert.False(result.IsSuccess);
+        Assert.Contains("dedicated community transfer", result.Errors.Single(), StringComparison.OrdinalIgnoreCase);
+        Assert.True(db.TeamMemberships.Single(item => item.TeamId == team.Id && item.UserId == member.Id).IsActive);
+    }
+
+    [Fact]
+    public async Task Member_Task_Details_Require_Team_Lead_Or_Management_Permission()
+    {
+        await using var db = TestDbFactory.Create();
+        var lead = TestDbFactory.SeedUser(db, Role.User, "task-lead");
+        var member = TestDbFactory.SeedUser(db, Role.User, "task-member");
+        var observer = TestDbFactory.SeedUser(db, Role.User, "task-observer");
+        var team = SeedTeam(db, TestDbFactory.CommunityId, "Transfer Operasyon");
+        db.TeamMemberships.AddRange(
+            Membership(team.Id, lead.Id, isLead: true),
+            Membership(team.Id, member.Id),
+            Membership(team.Id, observer.Id));
+        var seeded = TestDbFactory.SeedOpenApproverTask(db, lead);
+        seeded.Task.AssignedUserId = member.Id;
+        await db.SaveChangesAsync();
+        var service = CreateService(db);
+
+        var leadResult = await service.ListMemberTasksAsync(
+            team.Id,
+            member.Id,
+            new TeamMemberTaskSearchRequest(),
+            CommunityUserDto(lead, []));
+        var observerResult = await service.ListMemberTasksAsync(
+            team.Id,
+            member.Id,
+            new TeamMemberTaskSearchRequest(),
+            CommunityUserDto(observer, []));
+
+        Assert.True(leadResult.IsSuccess, string.Join(" | ", leadResult.Errors));
+        Assert.Equal(seeded.Task.Id, Assert.Single(leadResult.Value!.Items).Id);
+        Assert.False(observerResult.IsSuccess);
     }
 
     [Fact]

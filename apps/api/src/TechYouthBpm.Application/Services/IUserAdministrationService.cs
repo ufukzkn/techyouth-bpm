@@ -23,6 +23,16 @@ public interface IUserAdministrationService
         UpdateUserAccessRequest request,
         UserDto currentUser,
         CancellationToken cancellationToken = default);
+    Task<Result<CommunityTransferPreviewDto>> PreviewCommunityTransferAsync(
+        Guid userId,
+        CommunityTransferPreviewRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default);
+    Task<Result<UserAdminDto>> TransferCommunityAsync(
+        Guid userId,
+        CommunityTransferRequest request,
+        UserDto currentUser,
+        CancellationToken cancellationToken = default);
     Task<Result> DeleteUserAsync(
         Guid userId,
         UserDto currentUser,

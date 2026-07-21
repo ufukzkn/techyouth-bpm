@@ -54,6 +54,46 @@ public class UsersController(
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
+    [HttpGet("{userId:guid}/community-transfer-preview")]
+    public async Task<IActionResult> PreviewCommunityTransfer(
+        Guid userId,
+        [FromQuery] CommunityTransferPreviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await userAdministrationService.PreviewCommunityTransferAsync(
+            userId,
+            request,
+            user,
+            cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpPost("{userId:guid}/community-transfer")]
+    public async Task<IActionResult> TransferCommunity(
+        Guid userId,
+        CommunityTransferRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var result = await userAdministrationService.TransferCommunityAsync(
+            userId,
+            request,
+            user,
+            cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
     [HttpDelete("{userId:guid}")]
     public async Task<IActionResult> Delete(Guid userId, CancellationToken cancellationToken)
     {

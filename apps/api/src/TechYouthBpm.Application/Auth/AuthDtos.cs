@@ -103,6 +103,38 @@ public record UserAdminDto(
 
 public record UpdateUserAccessRequest(Role Role, UserStatus Status, Guid? CommunityId = null, Guid? CommunityRoleId = null);
 
+public sealed class CommunityTransferPreviewRequest
+{
+    public Guid TargetCommunityId { get; init; }
+    public Guid TargetCommunityRoleId { get; init; }
+}
+
+public record CommunityTransferRequest(Guid TargetCommunityId, Guid TargetCommunityRoleId);
+
+public record CommunityTransferBlockingTaskDto(
+    Guid Id,
+    Guid ProcessInstanceId,
+    string Title,
+    string WorkflowName,
+    ProcessTaskStatus Status);
+
+public record CommunityTransferPreviewDto(
+    Guid UserId,
+    string Username,
+    string DisplayName,
+    Guid? CurrentCommunityId,
+    string CurrentCommunityName,
+    Guid? CurrentCommunityRoleId,
+    string CurrentCommunityRoleName,
+    Guid TargetCommunityId,
+    string TargetCommunityName,
+    Guid TargetCommunityRoleId,
+    string TargetCommunityRoleName,
+    IReadOnlyList<CommunityTransferBlockingTaskDto> BlockingTasks)
+{
+    public bool CanTransfer => BlockingTasks.Count == 0;
+}
+
 public record UserSessionDto(
     Guid Id,
     DateTime CreatedAt,

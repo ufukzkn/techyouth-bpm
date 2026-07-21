@@ -12,7 +12,9 @@ using TechYouthBpm.Infrastructure.Security;
 
 namespace TechYouthBpm.Infrastructure.Services;
 
-internal sealed class AuthenticatedUserLoader(AppDbContext db)
+internal sealed class AuthenticatedUserLoader(
+    AppDbContext db,
+    ISessionValidationCache sessionCache)
 {
     public async Task<UserDto?> LoadAsync(string token, CancellationToken cancellationToken = default)
     {
@@ -22,6 +24,11 @@ internal sealed class AuthenticatedUserLoader(AppDbContext db)
         }
 
         var tokenHash = SessionTokenHasher.Hash(token);
+        if (sessionCache.TryGet(tokenHash, out var cachedUser))
+        {
+            return cachedUser;
+        }
+
         var session = await db.UserSessions
             .AsSplitQuery()
             .Include(item => item.User)
@@ -57,7 +64,9 @@ internal sealed class AuthenticatedUserLoader(AppDbContext db)
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        return session.User.ToDto();
+        var user = session.User.ToDto();
+        sessionCache.Set(tokenHash, session.UserId, user.CommunityId, session.ExpiresAt, user);
+        return user;
     }
 }
 

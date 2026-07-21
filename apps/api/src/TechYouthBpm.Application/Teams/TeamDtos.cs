@@ -60,7 +60,8 @@ public record TeamMemberDto(
     string Email,
     string CommunityRoleName,
     bool IsLead,
-    DateTime JoinedAt);
+    DateTime JoinedAt,
+    int ActiveTaskCount = 0);
 
 public record TeamMemberPageDto(
     IReadOnlyList<TeamMemberDto> Items,
@@ -80,7 +81,14 @@ public record TeamRosterMemberDto(
     string Username,
     string DisplayName,
     string CommunityRoleName,
-    bool IsLead);
+    bool IsLead,
+    int ActiveTaskCount = 0);
+
+public sealed class TeamMemberTaskSearchRequest
+{
+    public int Page { get; init; } = 1;
+    public int PageSize { get; init; } = 10;
+}
 
 public record TeamRosterPageDto(
     IReadOnlyList<TeamRosterMemberDto> Items,

@@ -64,6 +64,19 @@ public class TeamsController(
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 
+    [HttpGet("{teamId:guid}/members/{userId:guid}/tasks")]
+    public async Task<IActionResult> MemberTasks(
+        Guid teamId,
+        Guid userId,
+        [FromQuery] TeamMemberTaskSearchRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null) return UnauthorizedProblem();
+        var result = await teamService.ListMemberTasksAsync(teamId, userId, request, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
     [HttpGet("{teamId:guid}/candidates")]
     public async Task<IActionResult> Candidates(Guid teamId, [FromQuery] TeamMemberSearchRequest request, CancellationToken cancellationToken)
     {

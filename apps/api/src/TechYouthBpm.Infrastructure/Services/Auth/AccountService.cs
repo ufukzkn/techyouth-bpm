@@ -17,7 +17,8 @@ internal sealed class AccountService(
     IConfiguration configuration,
     ISystemAuditService auditService,
     IOtpService otpService,
-    IEmailSender emailSender) : AuthServiceBase(db, configuration, auditService, otpService, emailSender), IAccountService
+    IEmailSender emailSender,
+    ISessionValidationCache sessionCache) : AuthServiceBase(db, configuration, auditService, otpService, emailSender, sessionCache), IAccountService
 {
     public async Task<Result<UserDto>> UpdateProfileAsync(
         UpdateProfileRequest request,
@@ -60,6 +61,7 @@ internal sealed class AccountService(
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache.InvalidateUser(user.Id);
         await auditService.LogAsync(
             currentUser,
             emailChanged ? "User.ProfileAndEmailUpdated" : "User.ProfileUpdated",
@@ -101,6 +103,7 @@ internal sealed class AccountService(
         user.LockedUntil = null;
 
         await db.SaveChangesAsync(cancellationToken);
+        sessionCache.InvalidateUser(user.Id);
         await auditService.LogAsync(
             currentUser,
             wasTemporary ? "Auth.TemporaryPasswordChanged" : "Auth.PasswordChanged",

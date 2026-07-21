@@ -28,6 +28,7 @@ public class DashboardService(
         CancellationToken cancellationToken = default)
     {
         var openTaskCount = 0;
+        int? teamQueueCount = null;
         IReadOnlyList<DashboardTaskItemDto> recentOpenTasks = [];
         if (user.HasPermission(PermissionNames.TasksView))
         {
@@ -52,11 +53,27 @@ public class DashboardService(
                     task.Status,
                     task.CreatedAt))
                 .ToListAsync(cancellationToken);
+
+            if (scope == WorkflowVisibilityScope.Personal
+                && user.CommunityId is { } communityId
+                && (user.Teams?.Count ?? 0) > 0)
+            {
+                var teamIds = user.Teams!.Select(team => team.Id).ToArray();
+                teamQueueCount = await db.ProcessTasks
+                    .AsNoTracking()
+                    .CountAsync(task =>
+                        task.ProcessInstance != null
+                        && task.ProcessInstance.CommunityId == communityId
+                        && (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                        && task.CandidateTeamId.HasValue
+                        && teamIds.Contains(task.CandidateTeamId.Value),
+                        cancellationToken);
+            }
         }
 
         if (!user.HasPermission(PermissionNames.ProcessesView))
         {
-            return new DashboardSummaryDto(openTaskCount, 0, 0, recentOpenTasks, []);
+            return new DashboardSummaryDto(openTaskCount, 0, 0, recentOpenTasks, [], teamQueueCount);
         }
 
         var processQuery = workflowVisibilityService.ApplyProcessScope(
@@ -86,6 +103,7 @@ public class DashboardService(
             inProgressProcessCount,
             completedProcessCount,
             recentOpenTasks,
-            recentProcesses);
+            recentProcesses,
+            teamQueueCount);
     }
 }

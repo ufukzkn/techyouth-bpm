@@ -20,4 +20,5 @@ public record DashboardSummaryDto(
     int InProgressProcessCount,
     int CompletedProcessCount,
     IReadOnlyList<DashboardTaskItemDto>? RecentOpenTasks = null,
-    IReadOnlyList<DashboardProcessItemDto>? RecentProcesses = null);
+    IReadOnlyList<DashboardProcessItemDto>? RecentProcesses = null,
+    int? TeamQueueCount = null);

@@ -220,4 +220,37 @@ public class DashboardServiceTests
 
         Assert.Equal(1, summary.InProgressProcessCount);
     }
+
+    [Fact]
+    public async Task Personal_Summary_Counts_The_Whole_Team_Queue_Without_Leaking_It_As_My_Work()
+    {
+        await using var db = TestDbFactory.Create();
+        var member = TestDbFactory.SeedUser(db, Role.Approver, "queue-member");
+        var teammate = TestDbFactory.SeedUser(db, Role.Approver, "queue-teammate");
+        var teamId = Guid.NewGuid();
+        db.Teams.Add(new Team
+        {
+            Id = teamId,
+            CommunityId = TestDbFactory.CommunityId,
+            Name = "Mali Isler",
+            NormalizedName = "MALI ISLER",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        });
+        var seeded = TestDbFactory.SeedOpenApproverTask(db, member);
+        seeded.Task.AssignmentType = TaskAssignmentType.Team;
+        seeded.Task.CandidateTeamId = teamId;
+        seeded.Task.Status = ProcessTaskStatus.Claimed;
+        seeded.Task.ClaimedByUserId = teammate.Id;
+        await db.SaveChangesAsync();
+        var user = TestDbFactory.ToDto(member) with
+        {
+            Teams = [new UserTeamDto(teamId, "Mali Isler", false)]
+        };
+
+        var summary = await new DashboardService(db).GetSummaryAsync(user);
+
+        Assert.Equal(0, summary.OpenTaskCount);
+        Assert.Equal(1, summary.TeamQueueCount);
+    }
 }
