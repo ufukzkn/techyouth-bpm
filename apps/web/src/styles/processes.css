@@ -230,7 +230,18 @@
   background: var(--surface-muted);
 }
 
-.task-item > div:first-child {
+.task-item-select {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-item-select > div {
   display: grid;
   gap: 4px;
 }
