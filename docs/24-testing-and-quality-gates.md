@@ -46,9 +46,14 @@ copying counts that become stale.
 - Visibility and paging tests: personal/community/global scope, permission
   rejection, projected summaries, total counts, priority/deadline sorting and
   user-scoped cache assumptions.
+- Task/history/transfer tests: claimed-candidate hiding, actor-only history,
+  completion snapshots, team-member detail authorization, atomic community
+  movement and session/team invalidation.
 - Contract/performance regression: normalized OpenAPI path+verb snapshot,
   `MultipleCollectionIncludeWarning` as an error and bounded query counts over
-  250 users, 500 audit entries and 180 process/task records.
+  250 users, 500 audit entries and 180 process/task records. Opaque-session
+  regression verifies that a repeated validation performs zero SQL commands and
+  logout invalidates the cached result.
 - Seed/migration tests: deterministic showcase workflows, idempotency, preservation
   of user-created records and SQLite/PostgreSQL schema compatibility.
 
@@ -105,10 +110,10 @@ Docker and direct startup commands are in [QUICKSTART.md](../QUICKSTART.md).
 
 ## Latest Verified Baseline
 
-On 20 July 2026:
+On 21 July 2026:
 
-- Backend: **208/208** tests passed.
-- Frontend: **51/51** tests passed.
+- Backend: **215/215** tests passed.
+- Frontend: **57/57** tests passed.
 - Playwright: **4/4** real-server scenarios passed.
 - Frontend production build passed.
 - ESLint passed without errors or warnings.

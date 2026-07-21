@@ -65,7 +65,13 @@ List visibility is independent from graph execution. `personal` means starter/di
 - `POST /api/tasks/{id}/claim` and `POST|DELETE /api/tasks/{id}/release|claim`: candidate-pool ownership.
 - `POST /api/tasks/{id}/actions`: submit action, note and optional task-form data.
 
-Process detail returns the active node, pinned version IDs, task attempts and `ProcessStepExecution` history including completing actor and output JSON.
+Designer import/export is a frontend draft transport contract rather than a
+backup API. The version-1 `techyouth.workflow-draft` envelope preserves node and
+edge identifiers/geometry, strips deployment-specific bindings and marks each
+cleared property in `requiresBinding`. Import creates a new local draft identity;
+publish validation remains the authority for missing bindings.
+
+Process detail returns the active node, pinned version IDs, task attempts and `ProcessStepExecution` history including node/assignment snapshots, completing actor, action, note and output JSON.
 
 ## Compatibility And Ownership
 

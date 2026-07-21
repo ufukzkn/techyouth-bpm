@@ -119,13 +119,15 @@ Bu model dört kavramı ayırır:
 
 Permission adlarının merkezi kaynağı [PermissionNames.cs](../apps/api/src/TechYouthBpm.Application/Auth/PermissionNames.cs) dosyasıdır. Örnekler: `Forms.Create`, `Processes.Start`, `Tasks.Act`, `Teams.Manage`, `Audit.View`.
 
-Aktif session her protected istekte DB'den kullanıcı, community role
+Aktif session ilk doğrulamada DB'den kullanıcı, community role
 permission'ları ve takım üyelikleriyle yüklenir;
 [AuthenticatedUserLoader](../apps/api/src/TechYouthBpm.Infrastructure/Services/Auth/AuthenticatedUserLoader.cs)
 bu tek canlı çözümleme sınırıdır. [MappingExtensions](../apps/api/src/TechYouthBpm.Infrastructure/Services/MappingExtensions.cs)
 SuperAdmin için tüm izinleri, diğer kullanıcılar için aktif community role
-izinlerini DTO'ya taşır. Bu sayede bir rol veya takım üyeliği değiştirilince eski
-token'a statik yetki gömülü kalmaz; sonraki istek güncel yetkiyi görür.
+izinlerini DTO'ya taşır. Sonuç en fazla 15 saniye `IMemoryCache` içinde tutulur;
+logout, rol/topluluk/takım, profil ve şifre mutasyonları ilgili token/user/community
+anahtarını anında düşürür. Yetki token'a gömülmez ve cache provider'ı ileride
+Redis ile değiştirilebilir.
 
 Süreç/task görünürlüğü [WorkflowVisibilityService](../apps/api/src/TechYouthBpm.Infrastructure/Services/WorkflowVisibilityService.cs) içinde merkezileştirilmiştir:
 
@@ -141,9 +143,10 @@ Proje JWT kullanmaz; merkezi, opaque session modeli kullanır:
 
 1. Login'de kriptografik olarak rastgele 32 byte token üretilir.
 2. Ham token istemciye verilir; DB'de yalnız SHA-256 hash'i saklanır.
-3. Protected istekte gelen token hashlenir; aktif, süresi dolmamış ve revoke edilmemiş session aranır.
-4. Kullanıcı durumu, topluluk durumu, permission ve takım üyelikleri DB'den yeniden değerlendirilir.
+3. Protected istekte gelen token hashlenir; kısa ömürlü doğrulama cache'i kontrol edilir.
+4. Cache miss durumunda aktif session, kullanıcı durumu, topluluk durumu, permission ve takım üyelikleri DB'den değerlendirilir.
 5. Logout, admin revoke veya password reset session'ı merkezi olarak kapatabilir.
+6. Güvenlik ve üyelik mutasyonları cache'i anında invalid eder; cache TTL'i `Auth:SessionCacheSeconds` ile ayarlanır.
 
 İlgili kod: [SessionTokenHasher](../apps/api/src/TechYouthBpm.Infrastructure/Security/SessionTokenHasher.cs),
 [PasswordHasher](../apps/api/src/TechYouthBpm.Infrastructure/Security/PasswordHasher.cs),
@@ -154,7 +157,7 @@ ve [AuthenticatedUserLoader](../apps/api/src/TechYouthBpm.Infrastructure/Service
 
 ### Neden JWT Değil?
 
-Bu ürünün pending approval, anlık rol değişimi, topluluk pasifleştirme, tüm cihazlardan çıkış ve admin revoke ihtiyacı güçlüdür. Opaque session, her istekte merkezi durumu doğruladığı için bu ihtiyaçları doğal çözer. JWT, kısa ömür/blacklist/refresh katmanlarıyla kurulabilirdi; fakat bu uygulamada tekrar merkezi state ihtiyacı doğuracaktı. Seçim “JWT güvensizdir” değil, ürünün revoke ve dinamik yetki karakterine opaque session'ın daha uygun olmasıdır.
+Bu ürünün pending approval, anlık rol değişimi, topluluk pasifleştirme, tüm cihazlardan çıkış ve admin revoke ihtiyacı güçlüdür. Opaque session merkezi revoke kaydını korurken kısa ömürlü ve açık invalidasyonlu cache tekrar eden ilişkisel sorguları azaltır. JWT, kısa ömür/blacklist/refresh katmanlarıyla kurulabilirdi; fakat bu uygulamada tekrar merkezi state ihtiyacı doğuracaktı. Seçim “JWT güvensizdir” değil, ürünün revoke ve dinamik yetki karakterine opaque session'ın daha uygun olmasıdır.
 
 Normal web istemcisi `/api/auth/browser-login` kullanır; API access/refresh sırlarını yalnız HttpOnly cookie'ye koyar ve response body'den çıkarır. `/api/auth/refresh` de yalnız kullanıcı ve süre bilgisini döndürüp cookie'leri rotate eder. Zustand/localStorage yalnız tema ve dil tercihini saklar. Sayfa yenilenince `/api/auth/me` ile kullanıcı toparlanır; access süresi dolmuş remembered session, refresh cookie ile rotate edilir. Swagger ve açık API istemcileri ayrı `/api/auth/login` endpointinden Bearer response almaya devam eder.
 
@@ -265,7 +268,7 @@ süreç/task scope'u `WorkflowVisibilityService`; adaylık ve takım sorumlusu k
 
 ### “Kullanıcıya rol verince tekrar login gerekli mi?”
 
-Hayır. Opaque token yalnız session kimliğidir; protected istek kullanıcı, rol izinleri ve takımları DB'den yeniden çözer. Revoke gerekirse session merkezi olarak kapatılır.
+Hayır. Opaque token yalnız session kimliğidir. Rol/takım değişikliği cache'i invalid eder; sonraki protected istek güncel kullanıcı bağlamını sunucudan çözer. Revoke gerekirse session merkezi olarak kapatılır.
 
 ### “JWT neden kullanılmadı?”
 

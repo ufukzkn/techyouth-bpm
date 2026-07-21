@@ -65,8 +65,14 @@ subject ownership map is in the [Documentation Guide](README.md).
 - Never track database passwords, SMTP credentials, tokens or private `.env`
   files. Commit only safe examples.
 - Passwords use PBKDF2; session and refresh tokens are stored as hashes.
-- Re-evaluate current user, status, permissions, community and team membership on
-  protected requests; never trust navigation visibility as authorization.
+- Resolve current user, status, permissions, community and team membership on
+  the server; never trust navigation visibility as authorization. The resolved
+  DTO may use the short-lived session cache, but logout/access/community/team
+  mutations must invalidate the affected token, user or community immediately.
+- Keep `ISessionValidationCache` provider-neutral. `IMemoryCache` is the
+  single-instance implementation; a distributed deployment may replace it with
+  Redis without changing auth services. `Auth:SessionCacheSeconds=0` disables
+  caching for strict integration tests.
 - Apply migrations before deterministic/idempotent seed data.
 
 ## Verification And Documentation

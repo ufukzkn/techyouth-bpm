@@ -95,6 +95,17 @@ In addition, all five demo communities receive a published workflow with bound s
 
 The shared contract was implemented in that order: team API, form versions, graph editor/validator, runtime and integration tests. The legacy one-step process remains available only as a compatibility path while new development uses version IDs.
 
+## Portable Drafts
+
+Form and workflow designers export versioned JSON envelopes named
+`techyouth.form-draft` and `techyouth.workflow-draft`. Import always creates a
+new editable draft; it never overwrites a published version. Workflow topology
+and canvas geometry survive export, while environment-specific user, team,
+community-role and form-version bindings are cleared and recorded in
+`requiresBinding`. A draft may be saved after import but cannot be published
+until those references are rebound. Files are limited to 1 MB and no imported
+expression is executed as JavaScript.
+
 ## PDF Fit
 
 The PDF-required form components, validation, JSON submission, first task, assigned work, approve/reject, status dates, Swagger, EF Core and audit behavior remain intact. Multi-page form drag/drop and the React Flow canvas directly strengthen the PDF bonus expectations for field ordering, role/user assignment and dynamic process design.

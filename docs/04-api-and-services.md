@@ -103,6 +103,7 @@ record token, cookie, password, e-mail or form payloads.
   - Accepts `scope=personal|community|global` with the same authorization policy as the process list; the default is `personal` for every role.
   - Pending task count reuses the exact `/api/tasks/my` candidate predicate in personal scope.
   - Ongoing count includes `InProgress` and manually `Escalated` processes; SLA expiry alone does not change process state.
+  - Returns `teamQueueCount`: distinct active tasks assigned to one of the current user's teams, including tasks claimed by another teammate.
   - Keeps the original three count fields for backward compatibility; recent collections are additive.
 
 ## Users And Access
@@ -133,6 +134,12 @@ record token, cookie, password, e-mail or form payloads.
   - Used for approving `PendingApproval` accounts, rejecting accounts, changing platform roles or assigning a community role.
   - Moving a user out of `Active` revokes existing sessions.
   - Audit text records the previous role/status and the new role/status.
+  - Cross-community movement is rejected here and must use the dedicated atomic transfer contract.
+- `GET /api/users/{userId}/community-transfer-preview`
+  - SuperAdmin-only preview of old/new community and role plus blocking directly assigned or claimed tasks.
+- `POST /api/users/{userId}/community-transfer`
+  - Moves a non-SuperAdmin user to an active community and selected role in one transaction.
+  - Deactivates old community/team memberships, revokes access and refresh sessions, then writes notification and before/after audit data.
 - `GET /api/users/{userId}/sessions`
   - Admin-only active-session list for the selected user.
   - Used by the `Yonetim` detail panel to show whether a user is online, which sessions are active and which device/IP last touched the API.
@@ -283,7 +290,8 @@ Graph JSON is data, not executable JavaScript. Gateway conditions use typed fiel
 - `GET /api/tasks/my`
   - Returns `PagedResult<ProcessTaskDto>` for direct assignments and eligible team/role candidate tasks.
   - Visibility uses community scope, `Tasks.View`, live assignment membership and claim state.
-  - Accepts `page`, `pageSize` (maximum 50), `priority`, `taskId`, `sortBy` and `sortDirection`.
+  - Accepts `view=active|history`, `page`, `pageSize` (maximum 50), `priority`, `taskId`, `sortBy` and `sortDirection`.
+  - `active` excludes candidate tasks already claimed by another user; `history` returns tasks completed by the current actor with action and note snapshots.
   - Deadline ordering keeps tasks without `DueAt` after dated tasks; exact `taskId` lookup supports deep-link navigation without selecting an unrelated process.
   - When a task is bound to a published form version, the response embeds the immutable `taskForm` page/field/rule snapshot needed by the action dialog.
   - A User Task may define an SLA between 1 minute and 365 days. The runtime stores `DueAt = CreatedAt + SlaDurationMinutes`; no SLA leaves `DueAt` null.
@@ -311,6 +319,7 @@ Most endpoints require `Authorization: Bearer <token>`. Use `POST /api/auth/logi
 Controllers should stay thin. Services own decisions:
 
 - `IAuthenticationService`: login, refresh, token/session validation and current-user resolution.
+- `ISessionValidationCache`: short-lived opaque-session user DTO cache with token/user/community invalidation; the current single-instance implementation uses `IMemoryCache`.
 - `IRegistrationService`: registration and public email verification.
 - `IAccountService`: profile, password, password recovery and authenticated verification operations.
 - `ISessionService`: logout, session listing and revoke operations.
@@ -346,10 +355,10 @@ Controllers should stay thin. Services own decisions:
 The frontend API client exposes methods for the implemented endpoint contracts:
 
 - Auth: `register`, `login`, `me`, `logout`, `updateProfile`, `changePassword`, `listSessions`, `revokeSession`, `startEmailVerification`, `confirmEmailVerification`
-- Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `listUserSessions`, `revokeUserSession`, `resetUserPasswordByAdmin`
+- Users: `listUsers` returns `PagedResult<UserAdmin>`, then `createUser`, `updateUserAccess`, `previewCommunityTransfer`, `transferUserCommunity`, `listUserSessions`, `revokeUserSession`, `resetUserPasswordByAdmin`
 - Communities: `listCommunities`, `createCommunity`, `updateCommunity`, `regenerateCommunityInviteCode`, `getCommunitySummary`, `listRoleTemplates`, `listCommunityRoles`, `createCommunityRole`, `updateCommunityRole`, `deleteCommunityRole`
 - Notifications: `listNotifications`, `markNotificationRead`, `setNotificationReadState`, `markAllNotificationsRead`
-- Teams: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `listTeamMembers`, `listTeamRoster`, `listUserTeamMemberships`, `listTeamCandidates`, `listUnassignedTeamMembers`, `addTeamMember`, `updateTeamMember`, `removeTeamMember`
+- Teams: `listTeams`, `getTeam`, `createTeam`, `updateTeam`, `listTeamMembers`, `listTeamRoster`, `listTeamMemberTasks`, `listUserTeamMemberships`, `listTeamCandidates`, `listUnassignedTeamMembers`, `addTeamMember`, `updateTeamMember`, `removeTeamMember`
 - Audit: `listSystemAuditLogs` returns `PagedResult<SystemAuditLog>`
 - Forms: `listForms`, `createForm`, `updateForm`, `getForm`, `listFormVersions`, `getFormVersion`, `createFormVersion`, `updateFormVersion`, `publishFormVersion`
 - Processes/tasks: paged `listProcesses`, exact `getProcess`, paged `listMyTasks`, `claimTask`, `releaseTask`, `executeTaskAction`
@@ -369,6 +378,7 @@ The implemented team package uses `Teams.View` and `Teams.Manage` with these com
 - `GET/PATCH /api/teams/{teamId}`
 - `GET /api/teams/{teamId}/members`
 - `GET /api/teams/{teamId}/roster`
+- `GET /api/teams/{teamId}/members/{userId}/tasks`
 - `GET /api/teams/{teamId}/candidates`
 - `GET /api/teams/unassigned/members`
 - `POST /api/teams/{teamId}/members`
@@ -378,6 +388,8 @@ The implemented team package uses `Teams.View` and `Teams.Manage` with these com
 List endpoints use server-side search and pagination. `Takimsiz` is computed from active approved community users without active team memberships; it is never stored as a team. A user may be active in multiple teams, while `IsLead` is descriptive and grants no permission by itself. Membership add/remove/lead mutations write system audit and notify the affected user. Moving a user to another community deactivates memberships in the previous community.
 
 `/members` is the management contract and may include administrative fields. `/roster` is the safe member-facing contract: an active team member can view only their own team's active roster, and the response omits email, session and audit data. User-detail membership reads are allowed to the target user, SuperAdmin or a same-community `Teams.Manage` holder; mutations continue to use the existing team endpoints.
+
+Roster rows expose cached-friendly active-task counts. Detailed member tasks are restricted to the same user, an active team lead, `Teams.Manage` holders or SuperAdmin and remain server-paged.
 
 ## Community Management Additions
 

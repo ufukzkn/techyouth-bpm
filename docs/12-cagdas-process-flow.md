@@ -79,6 +79,9 @@ Escalation is initiated by the explicit user action. Persisted SLA deadlines sup
 ### My Tasks
 
 - Open tasks are loaded one server page at a time from `GET /api/tasks/my`, filtered by direct assignment or live team/community-role candidate eligibility.
+- `Islerim` has `active` and `history` views. Active hides pool tasks claimed by another candidate; history lists only tasks completed by the signed-in actor and keeps completion action/note snapshots.
+- Task cards present human-readable step, team, community role, direct assignee and claim owner context. Raw node keys remain technical detail rather than the primary label.
+- Process detail uses `ProcessStepExecution` as a readable timeline: node title, assignment/team/role snapshots, actor, action, note, timestamps and output. Historical meaning therefore survives later role/team renames.
 - Management permission alone never places work in `Islerim`; the current user must be a direct assignee, claimant or live team/role candidate.
 - Each task shows workflow, form and community context plus priority, creation time and optional GMT+3 deadline.
 - Deadline/priority/created-time ordering happens before pagination; tasks with no deadline appear after dated tasks in nearest-deadline order.
