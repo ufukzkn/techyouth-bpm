@@ -58,6 +58,12 @@ textarea {
   font: inherit;
 }
 
+select optgroup,
+select option {
+  background: var(--surface);
+  color: var(--foreground);
+}
+
 button {
   cursor: pointer;
 }
