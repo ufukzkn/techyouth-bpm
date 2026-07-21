@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  Download,
   FilePlus2,
   Plus,
+  Upload,
 } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -56,6 +58,7 @@ import {
   supportedFieldTypes,
 } from "@/features/forms/fieldTypes";
 import { getFormPagingCopy } from "@/features/forms/formPagingCopy";
+import { parseFormDraft, serializeFormDraft } from "@/features/forms/formDraftTransfer";
 import {
   type FormVersionAdapter,
   type VersionedFormLayout,
@@ -97,6 +100,7 @@ import {
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { useSessionStore } from "@/features/session/sessionStore";
 import { api, ApiError } from "@/lib/api";
+import { downloadJsonDraft, readJsonDraftFile, toSafeFileName } from "@/lib/jsonDraftFile";
 import type { Community, CreateFormRequest, FieldType, FormDefinition, Language, ValidationRule } from "@/lib/types";
 
 type DesignerSaveFieldErrorSource = "client" | "api";
@@ -137,6 +141,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const [isAddingManualField, setIsAddingManualField] = useState(false);
   const manualFieldFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const newFormFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftFileInputRef = useRef<HTMLInputElement>(null);
   const [saveState, setSaveState] = useState<FormSaveState>("idle");
   const [saveFieldErrors, setSaveFieldErrors] = useState<DesignerSaveFieldErrors>({});
   const [isArchiveConfirmationOpen, setIsArchiveConfirmationOpen] = useState(false);
@@ -946,6 +951,38 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     }, 240);
   }
 
+  function exportDraft() {
+    downloadJsonDraft(
+      `${toSafeFileName(formName, "form-draft")}.techyouth-form.json`,
+      serializeFormDraft({ name: formName, description, pages }),
+    );
+    setSaveState("success");
+    setMessage(t("form.designer.draftExported"));
+  }
+
+  async function importDraft(file: File | undefined) {
+    if (!file) return;
+
+    try {
+      const imported = parseFormDraft(await readJsonDraftFile(file));
+      setSelectedFormId("");
+      setFormName(imported.name);
+      setDescription(imported.description);
+      setPages(imported.pages);
+      setActivePageId(imported.pages[0].id);
+      setVersionState({ version: 1, status: "draft" });
+      setSaveFieldErrors({});
+      setShowCommunityError(false);
+      setSaveState("success");
+      setMessage(t("form.designer.draftImported"));
+    } catch (error) {
+      setSaveState("error");
+      setMessage(formDraftImportError(error, t));
+    } finally {
+      if (draftFileInputRef.current) draftFileInputRef.current.value = "";
+    }
+  }
+
   async function saveDraft() {
     if (!token) {
       setSaveFieldErrors({});
@@ -1212,6 +1249,28 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
               <Plus size={18} />
               {t("form.designer.newForm")}
             </button>
+            <div className="designer-draft-transfer-actions">
+              <button className="secondary-button" disabled={isPersisting} onClick={exportDraft} type="button">
+                <Download size={17} aria-hidden="true" />
+                {t("form.designer.exportDraft")}
+              </button>
+              <button
+                className="secondary-button"
+                disabled={isPersisting}
+                onClick={() => draftFileInputRef.current?.click()}
+                type="button"
+              >
+                <Upload size={17} aria-hidden="true" />
+                {t("form.designer.importDraft")}
+              </button>
+              <input
+                ref={draftFileInputRef}
+                accept="application/json,.json"
+                className="draft-file-input"
+                onChange={(event) => void importDraft(event.currentTarget.files?.[0])}
+                type="file"
+              />
+            </div>
             <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
               <li>{t("form.designer.demoStepEdit")}</li>
               <li>{t("form.designer.demoStepOptions")}</li>
@@ -1478,6 +1537,19 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       ) : null}
     </section>
   );
+}
+
+function formDraftImportError(
+  error: unknown,
+  t: (key: TranslationKey, values?: Record<string, string | number>) => string,
+) {
+  if (error instanceof Error && error.message === "DRAFT_FILE_TOO_LARGE") {
+    return t("form.designer.draftImportTooLarge");
+  }
+  if (error instanceof Error && error.message === "DRAFT_SCHEMA_UNSUPPORTED") {
+    return t("form.designer.draftImportSchema");
+  }
+  return t("form.designer.draftImportInvalid");
 }
 
 function buildDesignerErrorSummary(

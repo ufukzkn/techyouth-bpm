@@ -191,15 +191,14 @@ export function FormRunnerDraft({ versionAdapter }: FormRunnerDraftProps = {}) {
 
   function handleChange(fieldKey: string, value: FormValue) {
     setValues((current) => ({ ...current, [fieldKey]: value }));
-    setErrors((current) => {
-      if (!(fieldKey in current)) {
-        return current;
-      }
-
-      const next = { ...current };
+    if (fieldKey in errors) {
+      const next = { ...errors };
       delete next[fieldKey];
-      return next;
-    });
+      setErrors(next);
+      if (Object.keys(next).length === 0 && selectedForm) {
+        setMessage(t("form.runner.selectedMessage", { name: selectedForm.name }));
+      }
+    }
     setSubmitStatus("idle");
     setSubmitResult(null);
   }
