@@ -51,8 +51,12 @@ internal sealed class AuthenticatedUserLoader(AppDbContext db)
             return null;
         }
 
-        session.LastSeenAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
+        if (session.LastSeenAt is null || (DateTime.UtcNow - session.LastSeenAt.Value).TotalMinutes >= 5)
+        {
+            session.LastSeenAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         return session.User.ToDto();
     }
 }
