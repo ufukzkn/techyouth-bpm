@@ -30,6 +30,7 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             Id = Guid.NewGuid(),
             ProcessInstanceId = process.Id,
             NodeKey = start.Key,
+            NodeTitle = start.Title,
             NodeType = start.Type,
             Attempt = NextAttempt(process, start.Key),
             Status = ProcessStepStatus.Completed,
@@ -167,6 +168,27 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             TaskAssignmentType.SpecificUser => assignment.UserId,
             _ => null
         };
+        var teamName = assignment.TeamId is { } teamId
+            ? await db.Teams
+                .AsNoTracking()
+                .Where(team => team.Id == teamId)
+                .Select(team => team.Name)
+                .SingleOrDefaultAsync(cancellationToken) ?? string.Empty
+            : string.Empty;
+        var communityRoleName = assignment.CommunityRoleId is { } communityRoleId
+            ? await db.CommunityRoles
+                .AsNoTracking()
+                .Where(role => role.Id == communityRoleId)
+                .Select(role => role.Name)
+                .SingleOrDefaultAsync(cancellationToken) ?? string.Empty
+            : string.Empty;
+        var assignedUserName = assignedUserId is { } userId
+            ? await db.Users
+                .AsNoTracking()
+                .Where(user => user.Id == userId)
+                .Select(user => user.DisplayName)
+                .SingleOrDefaultAsync(cancellationToken) ?? string.Empty
+            : string.Empty;
         var task = new ProcessTask
         {
             Id = Guid.NewGuid(),
@@ -195,7 +217,12 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             Id = Guid.NewGuid(),
             ProcessInstanceId = process.Id,
             NodeKey = node.Key,
+            NodeTitle = node.Title,
             NodeType = node.Type,
+            AssignmentType = assignment.Type,
+            TeamNameSnapshot = teamName,
+            CommunityRoleNameSnapshot = communityRoleName,
+            AssignedUserNameSnapshot = assignedUserName,
             Attempt = attempt,
             Status = ProcessStepStatus.Active,
             EnteredAt = now
@@ -231,6 +258,7 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             Id = Guid.NewGuid(),
             ProcessInstanceId = process.Id,
             NodeKey = node.Key,
+            NodeTitle = node.Title,
             NodeType = node.Type,
             Attempt = NextAttempt(process, node.Key),
             Status = ProcessStepStatus.Completed,

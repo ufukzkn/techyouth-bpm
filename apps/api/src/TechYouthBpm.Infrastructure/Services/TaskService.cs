@@ -51,12 +51,19 @@ public class TaskService(
             return new PagedResult<ProcessTaskDto>([], page, pageSize, 0);
         }
 
-        var query = workflowVisibilityService.ApplyTaskScope(
-            TaskQuery()
-            .AsNoTracking()
-            .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed),
-            user,
-            WorkflowVisibilityScope.Personal);
+        var view = request.View?.Trim().ToLowerInvariant();
+        var isHistory = view == "history";
+        var baseQuery = TaskQuery().AsNoTracking();
+        var query = isHistory
+            ? baseQuery.Where(task =>
+                task.Status == ProcessTaskStatus.Completed
+                && task.CompletedByUserId == user.Id)
+            : workflowVisibilityService.ApplyTaskScope(
+                baseQuery.Where(task =>
+                    task.Status == ProcessTaskStatus.Open
+                    || task.Status == ProcessTaskStatus.Claimed),
+                user,
+                WorkflowVisibilityScope.Personal);
 
         if (request.Priority is { } priority)
         {
@@ -69,7 +76,7 @@ public class TaskService(
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
-        var ordered = ApplyTaskOrdering(query, request.SortBy, request.SortDirection);
+        var ordered = ApplyTaskOrdering(query, request.SortBy, request.SortDirection, isHistory);
         var tasks = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -81,9 +88,17 @@ public class TaskService(
     private static IOrderedQueryable<ProcessTask> ApplyTaskOrdering(
         IQueryable<ProcessTask> query,
         string? sortBy,
-        string? sortDirection)
+        string? sortDirection,
+        bool history = false)
     {
         var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        if (history && string.Equals(sortBy, "dueAt", StringComparison.OrdinalIgnoreCase))
+        {
+            return query
+                .OrderByDescending(task => task.CompletedAt)
+                .ThenByDescending(task => task.CreatedAt);
+        }
+
         return sortBy?.Trim().ToLowerInvariant() switch
         {
             "priority" => descending
@@ -318,6 +333,8 @@ public class TaskService(
             task.Status = ProcessTaskStatus.Completed;
             task.CompletedAt = now;
             task.CompletedByUserId = user.Id;
+            task.CompletedAction = request.Action;
+            task.CompletionNote = request.Note?.Trim() ?? string.Empty;
             task.ClaimVersion = Guid.NewGuid();
 
             var activeStep = process.StepExecutions.SingleOrDefault(step =>
@@ -333,6 +350,7 @@ public class TaskService(
             activeStep.CompletedAt = now;
             activeStep.CompletedByUserId = user.Id;
             activeStep.Action = request.Action;
+            activeStep.Note = request.Note?.Trim() ?? string.Empty;
             activeStep.OutputJson = output.GetRawText();
             process.VariablesJson = request.Action == WorkflowAction.SendBack
                 ? RemoveInvalidatedStepOutputs(process.VariablesJson, graph, task.NodeKey)
@@ -406,6 +424,8 @@ public class TaskService(
             task.Status = ProcessTaskStatus.Completed;
             task.CompletedAt = DateTime.UtcNow;
             task.CompletedByUserId = user.Id;
+            task.CompletedAction = request.Action;
+            task.CompletionNote = request.Note?.Trim() ?? string.Empty;
             task.ClaimVersion = Guid.NewGuid();
 
             process.Status = transition.Value;
@@ -466,6 +486,11 @@ public class TaskService(
     private IQueryable<ProcessTask> TaskQuery() =>
         db.ProcessTasks
             .Include(task => task.AssignedCommunityRole)
+            .Include(task => task.AssignedUser)
+            .Include(task => task.CandidateTeam)
+            .Include(task => task.CandidateCommunityRole)
+            .Include(task => task.ClaimedByUser)
+            .Include(task => task.CompletedByUser)
             .Include(task => task.ProcessInstance)
             .ThenInclude(process => process!.FormDefinition)
             .Include(task => task.ProcessInstance)
@@ -484,6 +509,11 @@ public class TaskService(
     private IQueryable<ProcessTask> TaskExecutionQuery() =>
         db.ProcessTasks
             .Include(task => task.AssignedCommunityRole)
+            .Include(task => task.AssignedUser)
+            .Include(task => task.CandidateTeam)
+            .Include(task => task.CandidateCommunityRole)
+            .Include(task => task.ClaimedByUser)
+            .Include(task => task.CompletedByUser)
             .Include(task => task.ProcessInstance)
             .ThenInclude(process => process!.FormDefinition)
             .Include(task => task.ProcessInstance)
@@ -512,6 +542,16 @@ public class TaskService(
             .ThenInclude(version => version!.ProcessDefinition)
             .Include(item => item.Tasks)
             .ThenInclude(task => task.AssignedCommunityRole)
+            .Include(item => item.Tasks)
+            .ThenInclude(task => task.AssignedUser)
+            .Include(item => item.Tasks)
+            .ThenInclude(task => task.CandidateTeam)
+            .Include(item => item.Tasks)
+            .ThenInclude(task => task.CandidateCommunityRole)
+            .Include(item => item.Tasks)
+            .ThenInclude(task => task.ClaimedByUser)
+            .Include(item => item.Tasks)
+            .ThenInclude(task => task.CompletedByUser)
             .Include(item => item.Tasks)
             .ThenInclude(task => task.FormDefinitionVersion)
             .ThenInclude(version => version!.FormDefinition)

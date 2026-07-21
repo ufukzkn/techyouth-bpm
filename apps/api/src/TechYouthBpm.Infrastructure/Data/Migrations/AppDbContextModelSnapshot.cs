@@ -602,6 +602,13 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Property<int?>("Action")
                         .HasColumnType("integer");
 
+                    b.Property<string>("AssignedUserNameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("AssignmentType")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Attempt")
                         .HasColumnType("integer");
 
@@ -611,6 +618,10 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Property<Guid?>("CompletedByUserId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("CommunityRoleNameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("EnteredAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -618,8 +629,16 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("NodeTitle")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<int>("NodeType")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("OutputJson")
                         .IsRequired()
@@ -630,6 +649,10 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<string>("TeamNameSnapshot")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -685,8 +708,15 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("CompletedAction")
+                        .HasColumnType("integer");
+
                     b.Property<Guid?>("CompletedByUserId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("CompletionNote")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");

@@ -44,7 +44,17 @@ public record ProcessTaskDto(
     string CommunityName = "",
     bool RequiresTeamLead = false,
     bool CanCurrentUserAct = true,
-    string? ActionDenialReasonCode = null);
+    string? ActionDenialReasonCode = null,
+    string AssignedUserDisplayName = "",
+    string CandidateTeamName = "",
+    string CandidateCommunityRoleName = "",
+    string ClaimedByUserDisplayName = "",
+    Guid? CompletedByUserId = null,
+    string CompletedByUserDisplayName = "",
+    WorkflowAction? CompletedAction = null,
+    string CompletionNote = "",
+    bool CanCurrentUserClaim = false,
+    string? ClaimDenialReasonCode = null);
 
 public record ProcessSummaryDto(
     Guid Id,
@@ -83,7 +93,8 @@ public record TaskListRequest(
     TaskPriority? Priority = null,
     Guid? TaskId = null,
     string SortBy = "dueAt",
-    string SortDirection = "asc");
+    string SortDirection = "asc",
+    string View = "active");
 
 public record ProcessStepExecutionDto(
     Guid Id,
@@ -96,7 +107,28 @@ public record ProcessStepExecutionDto(
     Guid? CompletedByUserId,
     string? CompletedByUserDisplayName,
     WorkflowAction? Action,
-    JsonElement Output);
+    JsonElement Output,
+    string NodeTitle = "",
+    TaskAssignmentType? AssignmentType = null,
+    string TeamName = "",
+    string CommunityRoleName = "",
+    string AssignedUserDisplayName = "",
+    string Note = "");
+
+public record ProcessCurrentStepDto(
+    string NodeKey,
+    string Title,
+    TaskAssignmentType? AssignmentType,
+    Guid? TeamId,
+    string TeamName,
+    Guid? CommunityRoleId,
+    string CommunityRoleName,
+    Guid? AssignedUserId,
+    string AssignedUserDisplayName,
+    Guid? ClaimedByUserId,
+    string ClaimedByUserDisplayName,
+    DateTime EnteredAt,
+    DateTime? DueAt);
 
 public record ProcessDetailDto(
     Guid Id,
@@ -114,6 +146,7 @@ public record ProcessDetailDto(
     Guid? FormDefinitionVersionId = null,
     string CurrentNodeKey = "",
     JsonElement Variables = default,
-    IReadOnlyList<ProcessStepExecutionDto>? StepExecutions = null);
+    IReadOnlyList<ProcessStepExecutionDto>? StepExecutions = null,
+    ProcessCurrentStepDto? CurrentStep = null);
 
 public record TaskActionRequest(WorkflowAction Action, string? Note, JsonElement? FormData = null);

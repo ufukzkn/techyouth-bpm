@@ -38,4 +38,6 @@ public class ProcessTask
     public DateTime? CompletedAt { get; set; }
     public Guid? CompletedByUserId { get; set; }
     public User? CompletedByUser { get; set; }
+    public WorkflowAction? CompletedAction { get; set; }
+    public string CompletionNote { get; set; } = string.Empty;
 }

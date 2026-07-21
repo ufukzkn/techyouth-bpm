@@ -163,11 +163,7 @@ internal static class MappingExtensions
 
     public static ProcessTaskDto ToDto(this ProcessTask task, UserDto? currentUser = null)
     {
-        var canCurrentUserAct = !task.RequiresTeamLead
-            || currentUser is null
-            || currentUser.IsSuperAdmin()
-            || (task.CandidateTeamId is { } teamId
-                && (currentUser.Teams ?? []).Any(team => team.Id == teamId && team.IsLead));
+        var access = ResolveTaskAccess(task, currentUser);
 
         return new(
             task.Id,
@@ -199,8 +195,18 @@ internal static class MappingExtensions
                 ?? string.Empty,
             task.ProcessInstance?.Community?.Name ?? string.Empty,
             task.RequiresTeamLead,
-            canCurrentUserAct,
-            canCurrentUserAct ? null : TaskActionDenialReasonCodes.TeamLeadRequired);
+            access.CanAct,
+            access.ActionDenialReasonCode,
+            task.AssignedUser?.DisplayName ?? string.Empty,
+            task.CandidateTeam?.Name ?? string.Empty,
+            task.CandidateCommunityRole?.Name ?? string.Empty,
+            task.ClaimedByUser?.DisplayName ?? string.Empty,
+            task.CompletedByUserId,
+            task.CompletedByUser?.DisplayName ?? string.Empty,
+            task.CompletedAction,
+            task.CompletionNote,
+            access.CanClaim,
+            access.ClaimDenialReasonCode);
     }
 
     public static ProcessSummaryDto ToSummaryDto(this ProcessInstance process) =>
@@ -228,8 +234,42 @@ internal static class MappingExtensions
                 .Select(task => (TaskPriority?)task.Priority)
                 .FirstOrDefault());
 
-    public static ProcessDetailDto ToDetailDto(this ProcessInstance process, UserDto? currentUser = null) =>
-        new(
+    public static ProcessDetailDto ToDetailDto(this ProcessInstance process, UserDto? currentUser = null)
+    {
+        var activeTask = process.Tasks
+            .Where(task => task.Status is ProcessTaskStatus.Open or ProcessTaskStatus.Claimed)
+            .OrderByDescending(task => task.CreatedAt)
+            .FirstOrDefault(task => string.Equals(task.NodeKey, process.CurrentNodeKey, StringComparison.Ordinal))
+            ?? process.Tasks
+                .Where(task => task.Status is ProcessTaskStatus.Open or ProcessTaskStatus.Claimed)
+                .OrderByDescending(task => task.CreatedAt)
+                .FirstOrDefault();
+        var activeStep = process.StepExecutions
+            .Where(step => step.Status == ProcessStepStatus.Active)
+            .OrderByDescending(step => step.EnteredAt)
+            .FirstOrDefault(step => string.Equals(step.NodeKey, process.CurrentNodeKey, StringComparison.Ordinal))
+            ?? process.StepExecutions
+                .Where(step => step.Status == ProcessStepStatus.Active)
+                .OrderByDescending(step => step.EnteredAt)
+                .FirstOrDefault();
+        var currentStep = activeTask is null && activeStep is null
+            ? null
+            : new ProcessCurrentStepDto(
+                activeTask?.NodeKey ?? activeStep!.NodeKey,
+                activeTask?.Title ?? activeStep?.NodeTitle ?? process.CurrentNodeKey,
+                activeTask?.AssignmentType ?? activeStep?.AssignmentType,
+                activeTask?.CandidateTeamId,
+                activeTask?.CandidateTeam?.Name ?? activeStep?.TeamNameSnapshot ?? string.Empty,
+                activeTask?.CandidateCommunityRoleId,
+                activeTask?.CandidateCommunityRole?.Name ?? activeStep?.CommunityRoleNameSnapshot ?? string.Empty,
+                activeTask?.AssignedUserId,
+                activeTask?.AssignedUser?.DisplayName ?? activeStep?.AssignedUserNameSnapshot ?? string.Empty,
+                activeTask?.ClaimedByUserId,
+                activeTask?.ClaimedByUser?.DisplayName ?? string.Empty,
+                activeStep?.EnteredAt ?? activeTask!.CreatedAt,
+                activeTask?.DueAt);
+
+        return new(
             process.Id,
             process.FormDefinitionId,
             process.FormDefinition?.Name ?? "Unknown form",
@@ -267,8 +307,16 @@ internal static class MappingExtensions
                     step.CompletedByUserId,
                     step.CompletedByUser?.DisplayName,
                     step.Action,
-                    JsonHelpers.ToElement(step.OutputJson)))
-                .ToArray());
+                    JsonHelpers.ToElement(step.OutputJson),
+                    step.NodeTitle,
+                    step.AssignmentType,
+                    step.TeamNameSnapshot,
+                    step.CommunityRoleNameSnapshot,
+                    step.AssignedUserNameSnapshot,
+                    step.Note))
+                .ToArray(),
+            currentStep);
+    }
 
     public static CommunityDto ToDto(this Community community) =>
         new(community.Id, community.Name, community.Description, community.InviteCode, community.IsActive, community.CreatedAt);
@@ -296,4 +344,111 @@ internal static class MappingExtensions
 
     private static UserCommunityMembership? ActiveMembership(User user) =>
         user.CommunityMemberships.FirstOrDefault(membership => membership.IsActive);
+
+    private static TaskAccess ResolveTaskAccess(ProcessTask task, UserDto? currentUser)
+    {
+        if (currentUser is null)
+        {
+            return new TaskAccess(true, false, null, null);
+        }
+
+        if (task.Status is ProcessTaskStatus.Completed or ProcessTaskStatus.Cancelled)
+        {
+            return new TaskAccess(
+                false,
+                false,
+                TaskActionDenialReasonCodes.TaskClosed,
+                TaskActionDenialReasonCodes.TaskClosed);
+        }
+
+        if (!currentUser.IsSuperAdmin()
+            && task.ProcessInstance?.CommunityId is { } communityId
+            && currentUser.CommunityId != communityId)
+        {
+            return new TaskAccess(
+                false,
+                false,
+                TaskActionDenialReasonCodes.CommunityMismatch,
+                TaskActionDenialReasonCodes.CommunityMismatch);
+        }
+
+        if (!currentUser.IsSuperAdmin() && !currentUser.HasPermission(task.RequiredPermission))
+        {
+            return new TaskAccess(
+                false,
+                false,
+                TaskActionDenialReasonCodes.PermissionRequired,
+                TaskActionDenialReasonCodes.PermissionRequired);
+        }
+
+        if (!TaskAssignmentResolver.IsCandidatePool(task.AssignmentType))
+        {
+            var directlyAssigned = task.AssignmentType is null
+                || currentUser.IsSuperAdmin()
+                || task.AssignedUserId == currentUser.Id;
+            return directlyAssigned
+                ? new TaskAccess(true, false, null, null)
+                : new TaskAccess(
+                    false,
+                    false,
+                    TaskActionDenialReasonCodes.AssignedToAnotherUser,
+                    TaskActionDenialReasonCodes.AssignedToAnotherUser);
+        }
+
+        var teams = currentUser.Teams ?? [];
+        if (!currentUser.IsSuperAdmin()
+            && task.AssignmentType is TaskAssignmentType.Team or TaskAssignmentType.TeamAndCommunityRole
+            && (task.CandidateTeamId is not { } teamId || teams.All(team => team.Id != teamId)))
+        {
+            return new TaskAccess(
+                false,
+                false,
+                TaskActionDenialReasonCodes.TeamMembershipRequired,
+                TaskActionDenialReasonCodes.TeamMembershipRequired);
+        }
+
+        if (!currentUser.IsSuperAdmin()
+            && task.AssignmentType is TaskAssignmentType.CommunityRole or TaskAssignmentType.TeamAndCommunityRole
+            && task.CandidateCommunityRoleId != currentUser.CommunityRoleId)
+        {
+            return new TaskAccess(
+                false,
+                false,
+                TaskActionDenialReasonCodes.CommunityRoleRequired,
+                TaskActionDenialReasonCodes.CommunityRoleRequired);
+        }
+
+        if (!currentUser.IsSuperAdmin()
+            && task.RequiresTeamLead
+            && (task.CandidateTeamId is not { } leadTeamId
+                || teams.All(team => team.Id != leadTeamId || !team.IsLead)))
+        {
+            return new TaskAccess(
+                false,
+                false,
+                TaskActionDenialReasonCodes.TeamLeadRequired,
+                TaskActionDenialReasonCodes.TeamLeadRequired);
+        }
+
+        if (task.ClaimedByUserId is { } claimantId)
+        {
+            return claimantId == currentUser.Id || currentUser.IsSuperAdmin()
+                ? new TaskAccess(true, false, null, null)
+                : new TaskAccess(
+                    false,
+                    false,
+                    TaskActionDenialReasonCodes.ClaimedByAnotherUser,
+                    TaskActionDenialReasonCodes.ClaimedByAnotherUser);
+        }
+
+        return currentUser.IsSuperAdmin()
+            ? new TaskAccess(true, true, null, null)
+            : new TaskAccess(false, true, null, null);
+    }
+
+    private sealed record TaskAccess(
+        bool CanAct,
+        bool CanClaim,
+        string? ActionDenialReasonCode,
+        string? ClaimDenialReasonCode);
 }

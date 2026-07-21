@@ -59,7 +59,10 @@ public class WorkflowVisibilityService : IWorkflowVisibilityService
         {
             return scope == WorkflowVisibilityScope.Personal
                 ? query.Where(process => process.StartedByUserId == user.Id
-                    || process.Tasks.Any(task => task.AssignedUserId == user.Id || task.ClaimedByUserId == user.Id))
+                    || process.Tasks.Any(task =>
+                        task.AssignedUserId == user.Id
+                        || task.ClaimedByUserId == user.Id
+                        || task.CompletedByUserId == user.Id))
                 : query.Where(_ => false);
         }
 
@@ -78,12 +81,26 @@ public class WorkflowVisibilityService : IWorkflowVisibilityService
             || process.Tasks.Any(task =>
                 task.AssignedUserId == user.Id
                 || task.ClaimedByUserId == user.Id
-                || (task.AssignmentType == null && canViewTasks && canAct)
-                || (canAct && task.AssignmentType == TaskAssignmentType.Team
+                || task.CompletedByUserId == user.Id
+                || (task.Status == ProcessTaskStatus.Open
+                    && task.ClaimedByUserId == null
+                    && task.AssignmentType == null
+                    && canViewTasks
+                    && canAct)
+                || (task.Status == ProcessTaskStatus.Open
+                    && task.ClaimedByUserId == null
+                    && canAct
+                    && task.AssignmentType == TaskAssignmentType.Team
                     && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty))
-                || (canAct && task.AssignmentType == TaskAssignmentType.CommunityRole
+                || (task.Status == ProcessTaskStatus.Open
+                    && task.ClaimedByUserId == null
+                    && canAct
+                    && task.AssignmentType == TaskAssignmentType.CommunityRole
                     && task.CandidateCommunityRoleId == roleId)
-                || (canAct && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
+                || (task.Status == ProcessTaskStatus.Open
+                    && task.ClaimedByUserId == null
+                    && canAct
+                    && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
                     && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty)
                     && task.CandidateCommunityRoleId == roleId)));
     }
@@ -101,7 +118,9 @@ public class WorkflowVisibilityService : IWorkflowVisibilityService
         if (user.CommunityId is not { } communityId)
         {
             return scope == WorkflowVisibilityScope.Personal
-                ? query.Where(task => task.AssignedUserId == user.Id || task.ClaimedByUserId == user.Id)
+                ? query.Where(task => task.AssignedUserId == user.Id
+                    || task.ClaimedByUserId == user.Id
+                    || task.CompletedByUserId == user.Id)
                 : query.Where(_ => false);
         }
 
@@ -119,14 +138,27 @@ public class WorkflowVisibilityService : IWorkflowVisibilityService
         return communityQuery.Where(task =>
             task.AssignedUserId == user.Id
             || task.ClaimedByUserId == user.Id
-            || (task.AssignmentType == null && canView && canAct)
-            || (canAct && task.AssignmentType == TaskAssignmentType.Team
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && task.AssignmentType == null
+                && canView
+                && canAct)
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && canAct
+                && task.AssignmentType == TaskAssignmentType.Team
                 && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty))
-            || (canAct && task.AssignmentType == TaskAssignmentType.CommunityRole
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && canAct
+                && task.AssignmentType == TaskAssignmentType.CommunityRole
                 && task.CandidateCommunityRoleId == roleId)
-            || (canAct && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && canAct
+                && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
                 && teamIds.Contains(task.CandidateTeamId ?? Guid.Empty)
-            && task.CandidateCommunityRoleId == roleId));
+                && task.CandidateCommunityRoleId == roleId));
     }
 
     public bool CanViewProcess(ProcessInstance process, UserDto user)
@@ -154,13 +186,27 @@ public class WorkflowVisibilityService : IWorkflowVisibilityService
         return process.Tasks.Any(task =>
             task.AssignedUserId == user.Id
             || task.ClaimedByUserId == user.Id
-            || (task.AssignmentType is null && canViewTasks && canAct)
-            || (canAct && task.AssignmentType == TaskAssignmentType.Team
+            || task.CompletedByUserId == user.Id
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && task.AssignmentType is null
+                && canViewTasks
+                && canAct)
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && canAct
+                && task.AssignmentType == TaskAssignmentType.Team
                 && task.CandidateTeamId is { } teamId
                 && teamIds.Contains(teamId))
-            || (canAct && task.AssignmentType == TaskAssignmentType.CommunityRole
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && canAct
+                && task.AssignmentType == TaskAssignmentType.CommunityRole
                 && task.CandidateCommunityRoleId == user.CommunityRoleId)
-            || (canAct && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
+            || (task.Status == ProcessTaskStatus.Open
+                && task.ClaimedByUserId == null
+                && canAct
+                && task.AssignmentType == TaskAssignmentType.TeamAndCommunityRole
                 && task.CandidateTeamId is { } intersectionTeamId
                 && teamIds.Contains(intersectionTeamId)
                 && task.CandidateCommunityRoleId == user.CommunityRoleId));
