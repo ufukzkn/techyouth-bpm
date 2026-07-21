@@ -92,6 +92,7 @@ export function DashboardView({
   const openTaskCount = summary?.openTaskCount ?? 0;
   const inProgressCount = summary?.inProgressProcessCount ?? 0;
   const completedCount = summary?.completedProcessCount ?? 0;
+  const teamQueueCount = summary?.teamQueueCount ?? 0;
   const recentOpenTasks = summary?.recentOpenTasks ?? [];
   const recentProcesses = summary?.recentProcesses ?? [];
   const chartTotal = openTaskCount + inProgressCount + completedCount;
@@ -139,10 +140,13 @@ export function DashboardView({
 
   function openChartSegment(segmentKey: string) {
     if (segmentKey === "open") {
-      if (scope === "personal" && canOpen("tasks")) router.push("/tasks");
+      if (scope === "personal" && canOpen("tasks")) router.push("/tasks?view=active");
       return;
     }
-    if (canOpen("processes")) router.push(`/processes?scope=${scope}`);
+    if (canOpen("processes")) {
+      const status = segmentKey === "completed" ? "Completed" : "InProgress";
+      router.push(`/processes?scope=${scope}&status=${status}`);
+    }
   }
 
   async function openNotification(notification: NotificationItem) {
@@ -239,6 +243,13 @@ export function DashboardView({
                 </button>
               ))}
             </div>
+            {scope === "personal" && user.communityId ? (
+              <p className="dashboard-team-queue">
+                <Network size={15} />
+                <span>{language === "tr" ? "Takım kuyruğu" : "Team queue"}</span>
+                {shouldShowMetricLoader ? <InlineValueLoader label={t("common.loading")} /> : <strong>{teamQueueCount}</strong>}
+              </p>
+            ) : null}
           </div>
           <div
             className={shouldShowMetricLoader ? "dashboard-donut is-loading" : "dashboard-donut"}
@@ -283,7 +294,7 @@ export function DashboardView({
         <article className="dashboard-work-card dashboard-priority-card">
           <div className="dashboard-card-heading">
             <div><span className="eyebrow">{t(focusEyebrowKey)}</span><h3>{t(focusTitleKey)}</h3></div>
-            <button className="dashboard-heading-action" onClick={() => router.push(showTaskFocus ? "/tasks" : `/processes?scope=${scope}`)} type="button">
+            <button className="dashboard-heading-action" onClick={() => router.push(showTaskFocus ? "/tasks?view=active" : `/processes?scope=${scope}`)} type="button">
               {t("dashboard.viewAll")} <ArrowRight size={15} />
             </button>
           </div>

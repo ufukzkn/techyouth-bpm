@@ -196,6 +196,29 @@
   font-size: 18px;
 }
 
+.dashboard-team-queue {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  font-size: 12px;
+}
+
+.dashboard-team-queue svg {
+  color: var(--primary-strong);
+}
+
+.dashboard-team-queue strong {
+  color: var(--foreground);
+  font-size: 14px;
+}
+
 .dashboard-donut {
   width: 126px;
   aspect-ratio: 1;

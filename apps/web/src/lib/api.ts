@@ -15,6 +15,8 @@ import type {
   FormDefinition,
   FormDefinitionVersion,
   Community,
+  CommunityTransferPreview,
+  CommunityTransferRequest,
   CommunityRole,
   CommunitySummary,
   DashboardSummary,
@@ -349,6 +351,27 @@ export const api = {
       body: JSON.stringify({ role: "User", status, communityId, communityRoleId }),
     });
   },
+  previewUserCommunityTransfer(
+    token: string,
+    userId: string,
+    payload: CommunityTransferRequest,
+  ) {
+    const search = new URLSearchParams({
+      targetCommunityId: payload.targetCommunityId,
+      targetCommunityRoleId: payload.targetCommunityRoleId,
+    });
+    return request<CommunityTransferPreview>(
+      `/api/users/${userId}/community-transfer-preview?${search}`,
+      { token },
+    );
+  },
+  transferUserCommunity(token: string, userId: string, payload: CommunityTransferRequest) {
+    return request<UserAdmin>(`/api/users/${userId}/community-transfer`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
   listCommunities(token: string) {
     return request<Community[]>("/api/communities", { token });
   },
@@ -434,6 +457,20 @@ export const api = {
   listTeamRoster(token: string, teamId: string, params: { query?: string; page?: number; pageSize?: number } = {}) {
     const search = buildTeamMemberSearch(params);
     return request<TeamRosterPage>(`/api/teams/${teamId}/roster${search.size ? `?${search}` : ""}`, { token });
+  },
+  listTeamMemberTasks(
+    token: string,
+    teamId: string,
+    userId: string,
+    params: { page?: number; pageSize?: number } = {},
+  ) {
+    const search = new URLSearchParams();
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    return request<PagedResult<ProcessTask>>(
+      `/api/teams/${teamId}/members/${userId}/tasks${search.size ? `?${search}` : ""}`,
+      { token },
+    );
   },
   listUserTeamMemberships(token: string, userId: string) {
     return request<UserTeamMembership[]>(`/api/users/${userId}/team-memberships`, { token });
@@ -672,6 +709,7 @@ export const api = {
     if (params.taskId) search.set("taskId", params.taskId);
     if (params.sortBy) search.set("sortBy", params.sortBy);
     if (params.sortDirection) search.set("sortDirection", params.sortDirection);
+    if (params.view) search.set("view", params.view);
     return request<PagedResult<ProcessTask> | ProcessTask[]>(
       `/api/tasks/my${search.size ? `?${search}` : ""}`,
       { token },

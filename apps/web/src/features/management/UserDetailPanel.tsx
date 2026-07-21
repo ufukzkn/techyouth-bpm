@@ -10,7 +10,9 @@ import {
 import type { AccessDraft } from "@/features/app-shell/types";
 import type { TranslationKey } from "@/features/i18n/translations";
 import { UserTeamMembershipPanel } from "@/features/teams/UserTeamMembershipPanel";
+import { UserCommunityTransferPanel } from "@/features/management/UserCommunityTransferPanel";
 import type {
+  Community,
   CommunityRole,
   Language,
   SystemAuditLog,
@@ -30,6 +32,7 @@ export function UserDetailPanel({
   accessDraft,
   activeSessionCount,
   activeUser,
+  communities,
   currentSessionPage,
   detailCommunityRoles,
   hasDraftChanges,
@@ -47,6 +50,7 @@ export function UserDetailPanel({
   onPasswordReset,
   onPreviousSessionPage,
   onRefreshUsers,
+  onCommunityTransferred,
   onRequestAccessChange,
   onSessionPageChange,
   onSessionRevoke,
@@ -62,6 +66,7 @@ export function UserDetailPanel({
   accessDraft: AccessDraft | null;
   activeSessionCount: number;
   activeUser: User;
+  communities: Community[];
   currentSessionPage: number;
   detailCommunityRoles: CommunityRole[];
   hasDraftChanges: boolean;
@@ -79,6 +84,7 @@ export function UserDetailPanel({
   onPasswordReset: () => void;
   onPreviousSessionPage: () => void;
   onRefreshUsers: () => void;
+  onCommunityTransferred: () => Promise<void> | void;
   onRequestAccessChange: () => void;
   onSessionPageChange: (page: number) => void;
   onSessionRevoke: (session: UserSession) => void;
@@ -203,14 +209,25 @@ export function UserDetailPanel({
           ) : null}
 
           {selectedUser.role !== "SuperAdmin" ? (
-            <UserTeamMembershipPanel
-              activeUser={activeUser}
-              key={selectedUser.id}
-              language={language}
-              onChanged={onRefreshUsers}
-              selectedUser={selectedUser}
-              token={token}
-            />
+            <>
+              {activeUser.role === "SuperAdmin" ? (
+                <UserCommunityTransferPanel
+                  communities={communities}
+                  language={language}
+                  onTransferred={onCommunityTransferred}
+                  selectedUser={selectedUser}
+                  token={token}
+                />
+              ) : null}
+              <UserTeamMembershipPanel
+                activeUser={activeUser}
+                key={selectedUser.id}
+                language={language}
+                onChanged={onRefreshUsers}
+                selectedUser={selectedUser}
+                token={token}
+              />
+            </>
           ) : null}
 
           <section className="identity-section nested-identity-section">

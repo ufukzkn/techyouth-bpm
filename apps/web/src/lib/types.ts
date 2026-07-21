@@ -373,6 +373,16 @@ export type ProcessTask = {
   requiresTeamLead?: boolean;
   canCurrentUserAct?: boolean;
   actionDenialReasonCode?: string | null;
+  assignedUserDisplayName?: string;
+  candidateTeamName?: string;
+  candidateCommunityRoleName?: string;
+  claimedByUserDisplayName?: string;
+  completedByUserId?: string | null;
+  completedByUserDisplayName?: string;
+  completedAction?: WorkflowAction | null;
+  completionNote?: string;
+  canCurrentUserClaim?: boolean;
+  claimDenialReasonCode?: string | null;
 };
 
 export type ProcessListParams = {
@@ -393,6 +403,7 @@ export type TaskListParams = {
   taskId?: string;
   sortBy?: "dueAt" | "priority" | "newest" | "oldest";
   sortDirection?: "asc" | "desc";
+  view?: "active" | "history";
 };
 
 export type AuditLog = {
@@ -462,6 +473,28 @@ export type ProcessStepExecution = {
   completedByUserDisplayName?: string | null;
   action?: WorkflowAction | null;
   output: Record<string, unknown>;
+  nodeTitle?: string;
+  assignmentType?: TaskAssignmentType | null;
+  teamName?: string;
+  communityRoleName?: string;
+  assignedUserDisplayName?: string;
+  note?: string;
+};
+
+export type ProcessCurrentStep = {
+  nodeKey: string;
+  title: string;
+  assignmentType?: TaskAssignmentType | null;
+  teamId?: string | null;
+  teamName?: string;
+  communityRoleId?: string | null;
+  communityRoleName?: string;
+  assignedUserId?: string | null;
+  assignedUserDisplayName?: string;
+  claimedByUserId?: string | null;
+  claimedByUserDisplayName?: string;
+  enteredAt: string;
+  dueAt?: string | null;
 };
 
 export type ProcessDetail = ProcessSummary & {
@@ -470,6 +503,7 @@ export type ProcessDetail = ProcessSummary & {
   auditLogs: AuditLog[];
   variables?: Record<string, unknown>;
   stepExecutions?: ProcessStepExecution[];
+  currentStep?: ProcessCurrentStep | null;
 };
 
 export type StartProcessRequest = {
@@ -491,6 +525,7 @@ export type DashboardSummary = {
   openTaskCount: number;
   inProgressProcessCount: number;
   completedProcessCount: number;
+  teamQueueCount?: number;
   recentOpenTasks?: DashboardTaskItem[];
   recentProcesses?: DashboardProcessItem[];
 };
@@ -591,6 +626,7 @@ export type TeamMember = {
   communityRoleName: string;
   isLead: boolean;
   joinedAt: string;
+  activeTaskCount: number;
 };
 
 export type TeamMemberPage = PagedResult<TeamMember>;
@@ -609,9 +645,39 @@ export type TeamRosterMember = {
   displayName: string;
   communityRoleName: string;
   isLead: boolean;
+  activeTaskCount: number;
 };
 
 export type TeamRosterPage = PagedResult<TeamRosterMember>;
+
+export type CommunityTransferBlockingTask = {
+  id: string;
+  processInstanceId: string;
+  title: string;
+  workflowName: string;
+  status: ProcessTaskStatus;
+};
+
+export type CommunityTransferPreview = {
+  userId: string;
+  username: string;
+  displayName: string;
+  currentCommunityId?: string | null;
+  currentCommunityName: string;
+  currentCommunityRoleId?: string | null;
+  currentCommunityRoleName: string;
+  targetCommunityId: string;
+  targetCommunityName: string;
+  targetCommunityRoleId: string;
+  targetCommunityRoleName: string;
+  blockingTasks: CommunityTransferBlockingTask[];
+  canTransfer: boolean;
+};
+
+export type CommunityTransferRequest = {
+  targetCommunityId: string;
+  targetCommunityRoleId: string;
+};
 
 export type TeamCandidate = {
   userId: string;

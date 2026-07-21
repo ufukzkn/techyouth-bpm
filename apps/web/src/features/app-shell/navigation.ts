@@ -17,7 +17,7 @@ export type ViewId =
   | "logs"
   | "settings";
 
-export type NavGroupId = "forms" | "processes" | "management";
+export type NavGroupId = "design" | "processes" | "management";
 
 export type NavItem = {
   labelKey: TranslationKey;
@@ -29,7 +29,7 @@ export type NavItem = {
 };
 
 export const navGroups: Record<NavGroupId, { icon: typeof LayoutDashboard; labelKey: TranslationKey }> = {
-  forms: { icon: FolderKanban, labelKey: "nav.formGroup" },
+  design: { icon: FolderKanban, labelKey: "nav.designGroup" },
   processes: { icon: Workflow, labelKey: "nav.processGroup" },
   management: { icon: UsersRound, labelKey: "nav.management" },
 };
@@ -53,7 +53,7 @@ export const navItems: NavItem[] = [
     path: "/forms",
     icon: FilePlus2,
     permissions: ["Forms.Create", "Forms.Update"],
-    group: "forms",
+    group: "design",
   },
   {
     labelKey: "nav.runner",
@@ -61,7 +61,7 @@ export const navItems: NavItem[] = [
     path: "/runner",
     icon: FilePlay,
     permissions: ["Forms.View", "Processes.Start"],
-    group: "forms",
+    group: "processes",
   },
   {
     labelKey: "nav.workflows",
@@ -69,7 +69,7 @@ export const navItems: NavItem[] = [
     path: "/workflows",
     icon: GitBranch,
     permissions: ["Workflows.View", "Workflows.Create", "Workflows.Update"],
-    group: "processes",
+    group: "design",
   },
   {
     labelKey: "nav.processes",

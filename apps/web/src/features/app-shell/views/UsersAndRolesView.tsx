@@ -214,6 +214,19 @@ export function UsersAndRolesView({
     void loadUsers({ manual: true });
   }
 
+  async function refreshAfterCommunityTransfer() {
+    clearUserManagementCache();
+    userCommunitySummaryCache.clear();
+    allCommunitiesUserCountCache.clear();
+    setSelectedUserId(null);
+    await Promise.all([
+      loadUsers(),
+      loadAllCommunitiesUserCount(true),
+      selectedCommunityId ? loadCommunitySummary(true) : Promise.resolve(),
+    ]);
+    showUserMessage(language === "tr" ? "Kullanıcı topluluğu ve rolü güncellendi." : "User community and role were updated.", "success");
+  }
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadCommunityContext();
@@ -728,6 +741,7 @@ export function UsersAndRolesView({
           accessDraft={accessDraft}
           activeSessionCount={activeSessionCount}
           activeUser={activeUser}
+          communities={communities}
           currentSessionPage={currentDetailSessionPage}
           detailCommunityRoles={detailCommunityRoles}
           hasDraftChanges={hasDraftChanges}
@@ -736,9 +750,11 @@ export function UsersAndRolesView({
           isLoadingUserSessions={isLoadingUserSessions}
           isPasswordResetting={isResettingPassword}
           isUserLogHistoryOpen={isUserLogHistoryOpen}
+          key={selectedUser?.id ?? "no-selected-user"}
           language={language}
           onAccessDraftChange={setAccessDraft}
           onClose={() => setSelectedUserId(null)}
+          onCommunityTransferred={refreshAfterCommunityTransfer}
           onDelete={requestUserDelete}
           onHistoryToggle={() => setIsUserLogHistoryOpen((isOpen) => !isOpen)}
           onNextSessionPage={() =>
