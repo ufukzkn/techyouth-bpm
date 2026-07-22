@@ -197,27 +197,29 @@ function SelectedNodeInspector({
 
         {node.type === "teamSwimlane" ? (
           <InspectorSection title={text("Takım", "Team")}>
-            <LookupSelect
-              disabled={readOnly}
-              emptyLabel={text("Takım seçin", "Select team")}
-              onChange={(teamId, teamName) => {
-                const previousTeamId = node.data.teamId;
-                updateNodeData(
-                  node.id,
-                  (data) => data.kind === "teamSwimlane" ? { ...data, teamId, teamName } : data,
-                );
-                draft.nodes
-                  .filter((candidate) => candidate.parentId === node.id && candidate.type === "userTask")
-                  .forEach((candidate) => updateNodeData(candidate.id, (data) => {
-                    if (data.kind !== "userTask" || data.assignment.type !== "team") return data;
-                    if (data.assignment.teamId && data.assignment.teamId !== previousTeamId) return data;
-                    return { ...data, assignment: { type: "team", teamId, teamName } };
-                  }));
-              }}
-              options={lookups.teams}
-              value={node.data.teamId}
-              valueLabel={node.data.teamName}
-            />
+            <InspectorField label={text("Atanan takım", "Assigned team")}>
+              <LookupSelect
+                disabled={readOnly}
+                emptyLabel={text("Takım seçin", "Select team")}
+                onChange={(teamId, teamName) => {
+                  const previousTeamId = node.data.teamId;
+                  updateNodeData(
+                    node.id,
+                    (data) => data.kind === "teamSwimlane" ? { ...data, teamId, teamName } : data,
+                  );
+                  draft.nodes
+                    .filter((candidate) => candidate.parentId === node.id && candidate.type === "userTask")
+                    .forEach((candidate) => updateNodeData(candidate.id, (data) => {
+                      if (data.kind !== "userTask" || data.assignment.type !== "team") return data;
+                      if (data.assignment.teamId && data.assignment.teamId !== previousTeamId) return data;
+                      return { ...data, assignment: { type: "team", teamId, teamName } };
+                    }));
+                }}
+                options={lookups.teams}
+                value={node.data.teamId}
+                valueLabel={node.data.teamName}
+              />
+            </InspectorField>
           </InspectorSection>
         ) : null}
       </div>
