@@ -30,7 +30,8 @@ public class DashboardService(
         var openTaskCount = 0;
         int? teamQueueCount = null;
         IReadOnlyList<DashboardTaskItemDto> recentOpenTasks = [];
-        if (user.HasPermission(PermissionNames.TasksView))
+        if (user.HasPermission(PermissionNames.TasksView)
+            || user.HasPermission(PermissionNames.TasksManageAll))
         {
             var taskQuery = workflowVisibilityService.ApplyTaskScope(
                 db.ProcessTasks
@@ -81,13 +82,15 @@ public class DashboardService(
             user,
             scope);
 
-        var inProgressProcessCount = await processQuery.CountAsync(
-            process => process.Status == ProcessStatus.InProgress
-                || process.Status == ProcessStatus.Escalated,
-            cancellationToken);
-        var completedProcessCount = await processQuery.CountAsync(
-            process => process.Status == ProcessStatus.Completed,
-            cancellationToken);
+        var processCounts = await processQuery
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                InProgress = group.Count(process => process.Status == ProcessStatus.InProgress
+                    || process.Status == ProcessStatus.Escalated),
+                Completed = group.Count(process => process.Status == ProcessStatus.Completed),
+            })
+            .SingleOrDefaultAsync(cancellationToken);
         var recentProcesses = await processQuery
             .OrderByDescending(process => process.StartedAt)
             .Take(4)
@@ -100,8 +103,8 @@ public class DashboardService(
 
         return new DashboardSummaryDto(
             openTaskCount,
-            inProgressProcessCount,
-            completedProcessCount,
+            processCounts?.InProgress ?? 0,
+            processCounts?.Completed ?? 0,
             recentOpenTasks,
             recentProcesses,
             teamQueueCount);

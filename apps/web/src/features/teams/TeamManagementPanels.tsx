@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Crown, Network, UserPlus, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, Crown, Network, UserMinus, UserPlus, UsersRound } from "lucide-react";
 import { SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
 import { EmptyState } from "@/features/ui/EmptyState";
@@ -129,12 +129,20 @@ export function TeamMemberList({
           <article className="team-person-row" key={member.userId}>
             <span className={member.isLead ? "team-person-avatar is-lead" : "team-person-avatar"}>{member.displayName.slice(0, 1).toUpperCase()}</span>
             <div className="team-person-copy"><strong>{member.displayName}</strong><small>@{member.username} · {member.communityRoleName || (isTr ? "Atanmadı" : "Unassigned")}</small></div>
-            <span className="team-member-task-count is-readonly"><BriefcaseBusiness size={13} /> {member.activeTaskCount}</span>
-            {member.isLead ? <span className="team-lead-pill"><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</span> : null}
+            <div className="team-person-meta">
+              <span className="team-member-task-count is-readonly"><BriefcaseBusiness size={13} /> {member.activeTaskCount}</span>
+              {member.isLead ? <span className="team-lead-pill"><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</span> : null}
+            </div>
             {canManage ? (
               <div className="team-person-actions">
-              <button className="text-button" onClick={() => onToggleLead(member)} type="button">{member.isLead ? (isTr ? "Sorumluluğu kaldır" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}</button>
-                <button className="text-button danger-text-button" onClick={() => onRemove(member)} type="button">{isTr ? "Çıkar" : "Remove"}</button>
+                <button className="text-button" onClick={() => onToggleLead(member)} type="button">
+                  <Crown size={14} />
+                  {member.isLead ? (isTr ? "Sorumluluğu kaldır" : "Remove lead") : (isTr ? "Sorumlu yap" : "Make lead")}
+                </button>
+                <button className="text-button danger-text-button" onClick={() => onRemove(member)} type="button">
+                  <UserMinus size={14} />
+                  {isTr ? "Çıkar" : "Remove"}
+                </button>
               </div>
             ) : null}
           </article>

@@ -50,6 +50,50 @@ main:has(> .workspace-route-content > .runner-section) {
   gap: var(--designer-grid-gap);
 }
 
+.designer-canvas-skeleton {
+  grid-column: 1 / -1;
+  min-height: 480px;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.designer-canvas-skeleton-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 24px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.designer-canvas-skeleton-page-tabs,
+.designer-canvas-skeleton-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.designer-canvas-skeleton-page-tabs {
+  grid-template-columns: repeat(3, minmax(96px, 150px));
+}
+
+.designer-canvas-skeleton-page-tabs span,
+.designer-canvas-skeleton-fields span {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--surface-muted) 88%, var(--border)) 25%, color-mix(in srgb, var(--surface) 72%, var(--border)) 50%, color-mix(in srgb, var(--surface-muted) 88%, var(--border)) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.designer-canvas-skeleton-page-tabs span { height: 58px; }
+.designer-canvas-skeleton-fields span { height: 160px; }
+
 .tool-panel,
 .field-card,
 .json-preview {

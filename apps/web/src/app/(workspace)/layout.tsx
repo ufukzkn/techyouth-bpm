@@ -51,6 +51,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
 
   const currentViewId = navItems.find((item) => item.path === pathname)?.viewId;
   const canAccessCurrentRoute = visibleNavItems.some((item) => item.viewId === currentViewId);
+  const canAccessTasks = visibleNavItems.some((item) => item.viewId === "tasks");
   const toggleNavGroup = useCallback((groupId: NavGroupId) => {
     setOpenNavGroups((current) =>
       current.includes(groupId) ? current.filter((candidate) => candidate !== groupId) : [...current, groupId],
@@ -129,6 +130,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
           />
           <div className={pathname === "/forms" ? "main-area main-area-designer" : "main-area"}>
             <WorkspaceTopbar
+              canAccessTasks={canAccessTasks}
               expiresAt={expiresAt}
               isMobileNavOpen={isMobileNavOpen}
               language={language}

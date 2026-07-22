@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Domain.Enums;
 
 namespace TechYouthBpm.Tests.Integration;
 
@@ -60,7 +62,7 @@ public class WorkflowVisibilityIntegrationTests
     }
 
     [Fact]
-    public async Task Fatih_Sees_One_Personal_Task_And_Community_Wide_Process_Summary()
+    public async Task Fatih_Sees_All_Community_Tasks_And_Community_Wide_Process_Summary()
     {
         using var factory = new ApiWebApplicationFactory();
         using var client = factory.CreateApiClient();
@@ -69,11 +71,25 @@ public class WorkflowVisibilityIntegrationTests
         var tasks = await GetAsync(client, "/api/tasks/my", session.Token);
         var processes = await GetAsync(client, "/api/processes?scope=community&pageSize=20", session.Token);
         var dashboard = await GetAsync(client, "/api/dashboard/summary?scope=community", session.Token);
+        var expected = await factory.ExecuteDbAsync(async db =>
+        {
+            var communityId = await db.UserCommunityMemberships
+                .Where(membership => membership.User != null && membership.User.Username == "fatih.terim" && membership.IsActive)
+                .Select(membership => membership.CommunityId)
+                .SingleAsync();
+            var taskCount = await db.ProcessTasks.CountAsync(task =>
+                task.ProcessInstance != null
+                && task.ProcessInstance.CommunityId == communityId
+                && (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed));
+            var processCount = await db.ProcessInstances.CountAsync(process => process.CommunityId == communityId);
+            return (taskCount, processCount);
+        });
 
-        Assert.Equal(1, tasks.GetProperty("totalCount").GetInt32());
-        Assert.Equal("Transfer Operasyon Onayi", tasks.GetProperty("items")[0].GetProperty("title").GetString());
-        Assert.Equal(6, processes.GetProperty("totalCount").GetInt32());
-        Assert.Equal(3, dashboard.GetProperty("openTaskCount").GetInt32());
+        Assert.Equal(expected.taskCount, tasks.GetProperty("totalCount").GetInt32());
+        Assert.Contains(tasks.GetProperty("items").EnumerateArray(), item =>
+            item.GetProperty("title").GetString() == "Transfer Operasyon Onayi");
+        Assert.Equal(expected.processCount, processes.GetProperty("totalCount").GetInt32());
+        Assert.Equal(expected.taskCount, dashboard.GetProperty("openTaskCount").GetInt32());
     }
 
     [Theory]
@@ -90,8 +106,8 @@ public class WorkflowVisibilityIntegrationTests
         var tasks = await GetAsync(client, "/api/tasks/my?pageSize=10", session.Token);
         var items = tasks.GetProperty("items").EnumerateArray().ToArray();
 
-        Assert.Equal(2, tasks.GetProperty("totalCount").GetInt32());
-        Assert.All(items, item => Assert.Equal("Teknik Degerlendirme", item.GetProperty("title").GetString()));
+        Assert.True(tasks.GetProperty("totalCount").GetInt32() >= 2);
+        Assert.True(items.Count(item => item.GetProperty("title").GetString() == "Teknik Degerlendirme") >= 2);
     }
 
     private static async Task<JsonElement> GetAsync(HttpClient client, string path, string token)

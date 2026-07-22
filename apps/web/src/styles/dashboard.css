@@ -176,8 +176,8 @@
 }
 
 .dashboard-chart-card {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
 }
 
 .dashboard-chart-card-prominent {
@@ -194,6 +194,13 @@
 
 .dashboard-chart-copy h3 {
   font-size: 18px;
+}
+
+.dashboard-chart-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
 }
 
 .dashboard-team-queue {
@@ -223,10 +230,10 @@
   width: 126px;
   aspect-ratio: 1;
   display: grid;
-  align-self: start;
+  align-self: center;
   place-items: center;
   position: relative;
-  margin-top: 52px;
+  margin-top: 0;
   border-radius: 999px;
 }
 
@@ -346,7 +353,7 @@
   border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
 }
 
-.dashboard-metric-legend button:disabled {
+.dashboard-metric-legend button[aria-disabled="true"] {
   cursor: default;
   opacity: 0.82;
 }
@@ -365,6 +372,15 @@
 
 .legend-completed {
   background: var(--teal);
+}
+
+.dashboard-chart-explanation {
+  grid-column: 1 / -1;
+  min-height: 17px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .dashboard-context-card p {
@@ -691,6 +707,10 @@
   }
 
   .dashboard-chart-card {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-chart-body {
     grid-template-columns: 1fr;
   }
 

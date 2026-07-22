@@ -2,6 +2,7 @@
 
 import { CheckCircle2, CircleDot, RotateCcw, XCircle } from "lucide-react";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
+import { describeProcessAssignment } from "@/features/processes/processAssignment";
 import { JsonViewer } from "@/features/ui/JsonViewer";
 import { formatApiDateTime } from "@/lib/dateTime";
 import type { Language, ProcessStepExecution } from "@/lib/types";
@@ -29,14 +30,14 @@ export function ProcessStepTimeline({ executions, language }: { executions: Proc
             <span className={`process-step-marker status-${execution.status.toLowerCase()}`}><StepIcon size={16} /></span>
             <div className="process-step-content">
               <div className="process-step-heading">
-                <strong>{execution.nodeTitle || execution.nodeKey}</strong>
+                <strong>{execution.nodeTitle || t("process.nodeKey")}</strong>
                 <span>{t("process.attempt", { count: execution.attempt })}</span>
               </div>
-              <div className="process-step-assignment">
-                {execution.teamName ? <small><strong>{t("process.assignmentTeam")}:</strong> {execution.teamName}</small> : null}
-                {execution.communityRoleName ? <small><strong>{t("process.assignmentRole")}:</strong> {execution.communityRoleName}</small> : null}
-                {execution.assignedUserDisplayName ? <small><strong>{t("process.assignmentUser")}:</strong> {execution.assignedUserDisplayName}</small> : null}
-              </div>
+              {execution.assignmentType || execution.teamName || execution.communityRoleName || execution.assignedUserDisplayName ? (
+                <div className="process-step-assignment">
+                  <small><strong>{t("process.currentResponsible")}:</strong> {describeProcessAssignment(language, execution)}</small>
+                </div>
+              ) : null}
               <small>{t("process.enteredAt")}: {formatApiDateTime(execution.enteredAt, language)}</small>
               {execution.completedAt ? <small>{t("process.completedAt")}: {formatApiDateTime(execution.completedAt, language)}</small> : null}
               {execution.completedByUserDisplayName ? <small>{t("process.completedBy")}: {execution.completedByUserDisplayName}</small> : null}

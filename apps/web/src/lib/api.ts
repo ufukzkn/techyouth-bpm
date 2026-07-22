@@ -715,6 +715,9 @@ export const api = {
       { token },
     ).then((result) => normalizePagedResult(result, params.page, params.pageSize));
   },
+  getTask(token: string, taskId: string) {
+    return request<ProcessTask>(`/api/tasks/${taskId}`, { token });
+  },
   startProcessVersion(token: string, processDefinitionVersionId: string, formData: Record<string, unknown>) {
     return request<ProcessDetail>("/api/processes/start/version", {
       method: "POST",

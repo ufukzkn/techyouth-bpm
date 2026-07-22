@@ -21,6 +21,18 @@ Kullanılacak demo hesapları:
 | Lojistik depo sorumlusu | `atiba` | `atiba123` |
 | Lojistik teslimat sorumlusu | `sergen.yalcin` | `sergen123` |
 
+Hizli Sportif Faaliyetler demo akislari icin ortak parola `sport123` kullanilir:
+
+| Amaç | Kullanıcı |
+| --- | --- |
+| Topluluk Admin | `sport.admin` |
+| Süreç başlatıcı | `sport.starter` |
+| Scout Ekibi sorumlusu, Onay Sorumlusu rolü | `sport.scout` |
+| Teknik takım sorumlusu, Onay Sorumlusu rolü | `sport.approver` |
+| Mali İşler takım sorumlusu, Onay Sorumlusu rolü | `sport.finance` |
+| Transfer Operasyon sorumlusu, Onay Sorumlusu rolü | `sport.operations` |
+| Gözlemci | `sport.viewer` |
+
 ## Senaryo A: Transfer Teklif ve Onay
 
 1. `fatih.terim` ile giriş yapın ve Form Başlat alanından son published workflow sürümünü seçin.
@@ -34,6 +46,8 @@ Kullanılacak demo hesapları:
 9. `quaresma` ile Transfer Operasyonu işini görüntüleyin. Kullanıcı adaydır fakat takım sorumlusu olmadığı için claim/aksiyon reddedilmeli ve açıklayıcı kilit mesajı görünmelidir.
 10. `fatih.terim` ile aynı işi claim edin; sözleşme metadata dosyasını, tarihi ve operasyon notunu girip tamamlayın.
 11. Süreç `Completed` olmalı; bütün task, step, form çıktısı, actor, tarih, bildirim ve audit zinciri görüntülenmelidir.
+
+Takım adları operasyon bağlamını, ortak `Onay Sorumlusu` rolü permission paketini belirler. Seed bu dört takım için aynı izinleri taşıyan ayrı rol kopyaları üretmez.
 
 Ek dallar:
 
@@ -61,6 +75,8 @@ Ek dallar:
 - Task formu eksik veya hatalıysa backend aksiyonu reddetmeli ve task açık kalmalıdır.
 - İki aday aynı task’ı eş zamanlı claim ederse yalnız biri kazanmalıdır.
 - Takım sorumlusu olmayan adayın doğrudan API claim/action çağrısı da reddedilmelidir.
+- Claim edilmemiş lider görevinde yetkili lider veya `Tasks.ManageAll` sahibi kullanıcı `CanClaim=true` görmelidir; `CanAct=false` değeri claim öncesinde lider engeli olarak yorumlanmamalıdır.
+- `Geçmiş İşlerim` yalnız oturumdaki kullanıcının tamamladığı taskları göstermeli; süresi geçmiş açık task aktif listede kalmalıdır.
 - Dosya alanı gerçek binary saklamaz; ad, boyut, MIME, uzantı ve `lastModified` metadata’sını doğrular.
 
 ## Audit ve Bildirim Beklentileri
@@ -90,18 +106,25 @@ Bildirim okundu/okunmadı değişikliği audit üretmez. Kaynak iş olayı audit
 
 `Existing_Session_Reevaluates_Role_And_Team_Membership_On_Every_Request` aynı access token açıkken community role değişiminin görevi görünür yaptığını, takım üyeliği kapatılınca aynı token ile görevin yeniden gizlendiğini kanıtlar. Token yetki snapshot'ı taşımaz; backend aktif rol ve takımları her protected istekte veritabanından çözer.
 
-Güncel doğrulama tabanı 208 backend ve 51 frontend testidir. Servis/unit
+`Three_sportif_demo_workflows_complete_both_http_outcomes_with_their_real_candidates` üç hızlı Sportif Faaliyetler akışını gerçek login, process start, claim, task formu ve action endpointleri üzerinden hem Onay hem Ret çıkışında tamamlar. Böylece takım, takım+rol ve yalnız takım sorumlusu atamaları aynı tekrarlanabilir demo setinde sınanır.
+
+Güncel doğrulama tabanı 231 backend ve 60 frontend testidir. Servis/unit
 testleri ayrıca cookie-only browser transport, bir dakikalık access-session
 expiry, remembered refresh recovery, cookie logout, gateway, SendBack, Complete,
 Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transaction
-rollback, pagination, OpenAPI sözleşmesi ve büyük fixture sorgu sınırlarını kapsar.
+rollback, pagination, OpenAPI sözleşmesi, task özet/detail ayrımı ve büyük fixture
+sorgu sınırlarını kapsar.
 
-Dört Playwright senaryosu gerçek API ve web sunucularıyla şunları otomatikleştirir:
+Sekiz Playwright senaryosu gerçek API ve web sunucularıyla şunları otomatikleştirir:
 
 - cookie session reload ve logout
 - normal kullanıcının doğrudan yönetim route'una erişememesi
 - form yayınlama, workflow'a bağlama ve süreç başlatma
 - takım+rol adaylığında claim zorunluluğu ve task action sınırı
+- Aktif/Geçmiş geçişinde slider'ın sabit kalması ve son isteğin state'i kazanması
+- Süreç durum filtresinde toolbar sabitken yalnız liste gövdesinin yenilenmesi
+- Takım üyesi iş yükünün seçilen kişinin kartının hemen altında açılması
+- Form Designer kabuğunun DnD canvas chunk'ından bağımsız yüklenmesi
 
 Bu otomasyon işlevsel zinciri korur; çok kullanıcılı tam Transfer sunumu,
 real-device touch/zoom ve görsel yerleşim hâlâ bu belgedeki manuel kabul

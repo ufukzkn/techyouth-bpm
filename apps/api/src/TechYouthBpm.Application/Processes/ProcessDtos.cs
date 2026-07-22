@@ -70,7 +70,28 @@ public record ProcessSummaryDto(
     string CurrentNodeKey = "",
     string WorkflowName = "",
     DateTime? NearestOpenTaskDueAt = null,
-    TaskPriority? HighestOpenTaskPriority = null);
+    TaskPriority? HighestOpenTaskPriority = null,
+    ProcessCurrentStepSummaryDto? CurrentStep = null,
+    ProcessCompletedStepSummaryDto? LastCompletedStep = null);
+
+public record ProcessCurrentStepSummaryDto(
+    string NodeKey,
+    string Title,
+    TaskAssignmentType? AssignmentType,
+    string TeamName,
+    string CommunityRoleName,
+    string AssignedUserDisplayName,
+    string ClaimedByUserDisplayName,
+    bool RequiresTeamLead,
+    DateTime EnteredAt,
+    DateTime? DueAt);
+
+public record ProcessCompletedStepSummaryDto(
+    string NodeKey,
+    string Title,
+    string CompletedByUserDisplayName,
+    WorkflowAction? Action,
+    DateTime CompletedAt);
 
 public enum WorkflowVisibilityScope
 {
@@ -128,7 +149,8 @@ public record ProcessCurrentStepDto(
     Guid? ClaimedByUserId,
     string ClaimedByUserDisplayName,
     DateTime EnteredAt,
-    DateTime? DueAt);
+    DateTime? DueAt,
+    bool RequiresTeamLead = false);
 
 public record ProcessDetailDto(
     Guid Id,

@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Menu } from "lucide-react";
+import { ListTodo, LogOut, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
@@ -17,6 +17,7 @@ import type { Language, NotificationItem, ThemeMode, User } from "@/lib/types";
 type WorkspaceTopbarProps = {
   expiresAt: string | null;
   isMobileNavOpen: boolean;
+  canAccessTasks: boolean;
   language: Language;
   theme: ThemeMode;
   token: string | null;
@@ -30,6 +31,7 @@ type WorkspaceTopbarProps = {
 export function WorkspaceTopbar({
   expiresAt,
   isMobileNavOpen,
+  canAccessTasks,
   language,
   theme,
   token,
@@ -186,6 +188,17 @@ export function WorkspaceTopbar({
         <span className="role-pill">{effectiveRole}</span>
       </div>
       <div className="topbar-actions">
+        {canAccessTasks ? (
+          <button
+            aria-label={t("common.openMyTasks")}
+            className="icon-button tasks-shortcut-button"
+            onClick={() => router.push("/tasks?view=active")}
+            title={t("common.openMyTasks")}
+            type="button"
+          >
+            <ListTodo size={18} />
+          </button>
+        ) : null}
         <NotificationMenu
           emptyLabel={t("notifications.empty")}
           inboxLabel={t("notifications.openInbox")}

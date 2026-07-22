@@ -101,7 +101,32 @@ public class ProcessService(
                     .Min(task => task.DueAt),
                 process.Tasks
                     .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
-                    .Max(task => (TaskPriority?)task.Priority)))
+                    .Max(task => (TaskPriority?)task.Priority),
+                process.Tasks
+                    .Where(task => task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
+                    .OrderByDescending(task => task.CreatedAt)
+                    .Select(task => new ProcessCurrentStepSummaryDto(
+                        task.NodeKey,
+                        task.Title,
+                        task.AssignmentType,
+                        task.CandidateTeam != null ? task.CandidateTeam.Name : string.Empty,
+                        task.CandidateCommunityRole != null ? task.CandidateCommunityRole.Name : string.Empty,
+                        task.AssignedUser != null ? task.AssignedUser.DisplayName : string.Empty,
+                        task.ClaimedByUser != null ? task.ClaimedByUser.DisplayName : string.Empty,
+                        task.RequiresTeamLead,
+                        task.CreatedAt,
+                        task.DueAt))
+                    .FirstOrDefault(),
+                process.StepExecutions
+                    .Where(step => step.Status == ProcessStepStatus.Completed && step.CompletedAt.HasValue)
+                    .OrderByDescending(step => step.CompletedAt)
+                    .Select(step => new ProcessCompletedStepSummaryDto(
+                        step.NodeKey,
+                        step.NodeTitle,
+                        step.CompletedByUser != null ? step.CompletedByUser.DisplayName : string.Empty,
+                        step.Action,
+                        step.CompletedAt!.Value))
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return new PagedResult<ProcessSummaryDto>(items, page, pageSize, totalCount);

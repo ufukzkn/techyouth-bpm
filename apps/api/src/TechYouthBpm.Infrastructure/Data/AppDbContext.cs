@@ -54,9 +54,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<ProcessDefinitionVersion>().HasIndex(version => new { version.ProcessDefinitionId, version.VersionNumber }).IsUnique();
         modelBuilder.Entity<ProcessDefinitionVersion>().HasIndex(version => new { version.ProcessDefinitionId, version.Status });
         modelBuilder.Entity<ProcessStepExecution>().HasIndex(step => new { step.ProcessInstanceId, step.NodeKey, step.Attempt }).IsUnique();
+        modelBuilder.Entity<ProcessInstance>().HasIndex(process => new { process.CommunityId, process.Status, process.StartedAt });
+        modelBuilder.Entity<ProcessInstance>().HasIndex(process => new { process.StartedByUserId, process.Status, process.StartedAt });
         modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.Status, task.DueAt, task.Priority, task.CreatedAt });
         modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.AssignedUserId, task.Status });
         modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.ClaimedByUserId, task.Status });
+        modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.CandidateTeamId, task.Status, task.ClaimedByUserId });
+        modelBuilder.Entity<ProcessTask>().HasIndex(task => new { task.CandidateCommunityRoleId, task.Status, task.ClaimedByUserId });
         modelBuilder.Entity<ProcessTask>().Property(task => task.ClaimVersion).IsConcurrencyToken();
 
         modelBuilder.Entity<Community>()

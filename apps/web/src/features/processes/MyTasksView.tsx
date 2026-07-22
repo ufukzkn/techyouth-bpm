@@ -10,6 +10,7 @@ import {
   Clock3,
   Hand,
   Crown,
+  RefreshCw,
   Undo2,
   UserRoundCheck,
   XCircle,
@@ -18,7 +19,9 @@ import { useState } from "react";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { TaskActionDialog } from "@/features/processes/TaskActionDialog";
+import { describeProcessAssignment, describeProcessClaim } from "@/features/processes/processAssignment";
 import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
+import { deriveTaskControlState } from "@/features/processes/taskControlState";
 import { formatApiDateTime } from "@/lib/dateTime";
 import type {
   Language,
@@ -38,6 +41,9 @@ type MyTasksViewProps = {
   sortBy: NonNullable<TaskListParams["sortBy"]>;
   sortDirection: "asc" | "desc";
   status: "loading" | "refreshing" | "idle" | "acting" | "error";
+  isListLoading: boolean;
+  showListSkeleton: boolean;
+  listError: string | null;
   taskView: NonNullable<TaskListParams["view"]>;
   onClaimTask: (taskId: string, claimVersion?: string | null) => void;
   onReleaseTask: (taskId: string, claimVersion?: string | null) => void;
@@ -54,7 +60,9 @@ type MyTasksViewProps = {
     note: string,
     formData?: Record<string, unknown>,
   ) => Promise<boolean>;
+  onLoadTaskDetail: (taskId: string) => Promise<ProcessTask | null>;
   onTaskViewChange: (view: NonNullable<TaskListParams["view"]>) => void;
+  onRetry: () => void;
 };
 
 const priorities: Array<TaskPriority | "all"> = ["all", "Critical", "High", "Normal", "Low"];
@@ -68,6 +76,9 @@ export function MyTasksView({
   sortBy,
   sortDirection,
   status,
+  isListLoading,
+  showListSkeleton,
+  listError,
   taskView,
   onClaimTask,
   onReleaseTask,
@@ -79,23 +90,41 @@ export function MyTasksView({
   onPageChange,
   onPreviousPage,
   onExecuteTask,
+  onLoadTaskDetail,
   onTaskViewChange,
+  onRetry,
 }: MyTasksViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const isTr = language === "tr";
   const tasks = result.items;
   const [renderedAt] = useState(() => Date.now());
   const [pendingAction, setPendingAction] = useState<{
-    taskId: string;
+    task: ProcessTask;
     action: Exclude<WorkflowAction, "Start">;
   } | null>(null);
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
   const totalPages = Math.max(1, Math.ceil(result.totalCount / result.pageSize));
 
   async function handleConfirm(note: string, formData?: Record<string, unknown>) {
     if (!pendingAction) return false;
-    const succeeded = await onExecuteTask(pendingAction.taskId, pendingAction.action, note, formData);
+    const succeeded = await onExecuteTask(pendingAction.task.id, pendingAction.action, note, formData);
     if (succeeded) setPendingAction(null);
     return succeeded;
+  }
+
+  async function openTaskAction(task: ProcessTask, action: Exclude<WorkflowAction, "Start">) {
+    if (!task.formDefinitionVersionId || task.taskForm) {
+      setPendingAction({ task, action });
+      return;
+    }
+
+    setLoadingTaskId(task.id);
+    try {
+      const detailedTask = await onLoadTaskDetail(task.id);
+      if (detailedTask) setPendingAction({ task: detailedTask, action });
+    } finally {
+      setLoadingTaskId(null);
+    }
   }
 
   return (
@@ -104,7 +133,12 @@ export function MyTasksView({
         <div className="process-card-header">
           <div>
             <span className="eyebrow">{t("process.myTasks")}</span>
-            <strong>{t(taskView === "history" ? "process.historyTaskCount" : "process.openTaskCount", { count: result.totalCount })}</strong>
+            <strong>
+              {showListSkeleton
+                ? t("common.loading")
+                : t(taskView === "history" ? "process.historyTaskCount" : "process.openTaskCount", { count: result.totalCount })}
+              {isListLoading && !showListSkeleton ? <RefreshCw aria-label={t("process.refreshing")} className="inline-refresh-icon spin-icon" size={14} /> : null}
+            </strong>
           </div>
           <CircleDot size={22} />
         </div>
@@ -149,7 +183,14 @@ export function MyTasksView({
           </button>
         </div>
 
-        {tasks.length > 0 ? (
+        {listError ? (
+          <div className="process-list-load-error" role="alert">
+            <p>{listError}</p>
+            <button className="secondary-button" onClick={onRetry} type="button"><RefreshCw size={16} />{t("common.refresh")}</button>
+          </div>
+        ) : showListSkeleton ? (
+          <TaskListRegionSkeleton label={t("process.skeletonTasks")} />
+        ) : tasks.length > 0 ? (
           <div className="task-list">
             {tasks.map((task) => {
               const isOverdue = Boolean(task.dueAt && Date.parse(task.dueAt) < renderedAt);
@@ -180,9 +221,9 @@ export function MyTasksView({
                   {taskView === "active" ? <div>
                     <TaskControls
                       activeUserId={activeUserId}
-                      disabled={status === "acting"}
+                      disabled={status === "acting" || loadingTaskId === task.id}
                       language={language}
-                      onAction={(action) => setPendingAction({ taskId: task.id, action })}
+                      onAction={(action) => void openTaskAction(task, action)}
                       onClaim={() => onClaimTask(task.id, task.claimVersion)}
                       onRelease={() => onReleaseTask(task.id, task.claimVersion)}
                       task={task}
@@ -219,26 +260,30 @@ export function MyTasksView({
           language={language}
           onCancel={() => setPendingAction(null)}
           onConfirm={handleConfirm}
-          taskForm={tasks.find((task) => task.id === pendingAction.taskId)?.taskForm}
+          taskForm={pendingAction.task.taskForm}
         />
       ) : null}
     </>
   );
 }
 
+function TaskListRegionSkeleton({ label }: { label: string }) {
+  return (
+    <div aria-label={label} className="task-list task-list-skeleton" role="status">
+      {[0, 1, 2].map((item) => <span key={item} />)}
+    </div>
+  );
+}
+
 function TaskAssignmentContext({ language, task }: { language: Language; task: ProcessTask }) {
   const t = (key: TranslationKey) => translate(language, key);
-  const entries = [
-    task.candidateTeamName ? [t("process.assignmentTeam"), task.candidateTeamName] : null,
-    task.candidateCommunityRoleName ? [t("process.assignmentRole"), task.candidateCommunityRoleName] : null,
-    task.assignedUserDisplayName ? [t("process.assignmentUser"), task.assignedUserDisplayName] : null,
-    task.claimedByUserDisplayName ? [t("process.claimOwner"), task.claimedByUserDisplayName] : null,
-  ].filter((entry): entry is string[] => entry !== null);
+  const assignment = describeProcessAssignment(language, task);
+  const claimant = describeProcessClaim(task);
 
-  if (entries.length === 0) return null;
   return (
     <dl className="task-assignment-context">
-      {entries.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+      <div><dt>{t("process.currentResponsible")}</dt><dd>{assignment}</dd></div>
+      {claimant ? <div><dt>{t("process.claimOwner")}</dt><dd>{claimant}</dd></div> : null}
     </dl>
   );
 }
@@ -273,16 +318,13 @@ function TaskControls({
   task: ProcessTask;
 }) {
   const t = (key: TranslationKey) => translate(language, key);
-  const requiresClaim = task.assignmentType === "Team" || task.assignmentType === "CommunityRole" || task.assignmentType === "TeamAndCommunityRole";
-  const isClaimedByCurrentUser = task.claimedByUserId === activeUserId;
-  const isTeamLeadBlocked = task.requiresTeamLead && task.canCurrentUserAct === false;
-  const canAct = (!requiresClaim || isClaimedByCurrentUser || !task.assignmentType) && !isTeamLeadBlocked;
+  const controlState = deriveTaskControlState(task, activeUserId);
 
-  if (isTeamLeadBlocked) {
+  if (controlState.kind === "team-lead-restricted") {
     return (
       <div className="task-lead-restriction">
         <span><Crown size={16} />{t("process.teamLeadRequired")}</span>
-        {requiresClaim && isClaimedByCurrentUser ? (
+        {controlState.canRelease ? (
           <button className="secondary-button" disabled={disabled} onClick={onRelease} type="button">
             <Undo2 size={17} />{t("process.release")}
           </button>
@@ -291,16 +333,16 @@ function TaskControls({
     );
   }
 
-  if (requiresClaim && !task.claimedByUserId) {
+  if (controlState.kind === "claim") {
     return (
       <div className="task-actions">
-        <button className="primary-button" disabled={disabled || task.canCurrentUserClaim === false} onClick={onClaim} type="button">
+        <button className="primary-button" disabled={disabled || !controlState.canClaim} onClick={onClaim} type="button">
           <Hand size={17} />{t("process.claim")}
         </button>
       </div>
     );
   }
-  if (requiresClaim && !isClaimedByCurrentUser) {
+  if (controlState.kind === "claimed-by-another") {
     return <span className="task-claim-state"><UserRoundCheck size={16} />{t("process.claimedByAnother")}</span>;
   }
 
@@ -315,9 +357,9 @@ function TaskControls({
           SendBack: { className: "secondary-button", icon: Undo2 },
         }[action];
         const ActionIcon = config.icon;
-        return <button className={config.className} disabled={disabled || !canAct} key={action} onClick={() => onAction(action)} type="button"><ActionIcon size={17} />{translate(language, `action.${action}` as TranslationKey)}</button>;
+        return <button className={config.className} disabled={disabled || !controlState.canAct} key={action} onClick={() => onAction(action)} type="button"><ActionIcon size={17} />{translate(language, `action.${action}` as TranslationKey)}</button>;
       })}
-      {requiresClaim && isClaimedByCurrentUser ? <button className="secondary-button" disabled={disabled} onClick={onRelease} type="button"><Undo2 size={17} />{t("process.release")}</button> : null}
+      {controlState.canRelease ? <button className="secondary-button" disabled={disabled} onClick={onRelease} type="button"><Undo2 size={17} />{t("process.release")}</button> : null}
     </div>
   );
 }

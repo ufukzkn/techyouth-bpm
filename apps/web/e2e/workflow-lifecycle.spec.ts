@@ -156,3 +156,105 @@ test("team and role candidates enforce claim before workflow action", async ({ r
   expect(advanced.tasks.some((task) => task.nodeKey === "technicalReview" && task.status === "Open")).toBeTruthy();
   expect(advanced.auditLogs.some((entry) => entry.action === "Approve")).toBeTruthy();
 });
+
+test("task view slider stays mounted while rapid filters resolve", async ({ page }) => {
+  await loginThroughUi(page, "sport.admin", "sport123");
+  await page.goto("/tasks");
+
+  const viewSelector = page.getByRole("radiogroup", { name: "İş görünümü" });
+  await expect(viewSelector).toBeVisible();
+
+  await viewSelector.getByText("Geçmiş işlerim", { exact: true }).click();
+  await viewSelector.getByText("Aktif", { exact: true }).click();
+  await viewSelector.getByText("Geçmiş işlerim", { exact: true }).click();
+
+  await expect(viewSelector).toBeVisible();
+  await expect(page).toHaveURL(/\/tasks\?view=history/);
+  await expect(page.getByLabel("Geçmiş işlerim", { exact: true })).toBeChecked();
+  await expect(page.locator(".process-list-load-error")).toHaveCount(0);
+});
+
+test("process status filters stay mounted while only the list refreshes", async ({ page }) => {
+  await loginThroughUi(page, "sport.admin", "sport123");
+  await page.goto("/processes");
+
+  const filters = page.locator(".status-filters");
+  await expect(filters).toBeVisible();
+  await page.route("**/api/processes?**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.continue();
+  });
+
+  await filters.getByRole("button", { name: "Devam Eden" }).click();
+  await page.waitForTimeout(100);
+
+  expect(await filters.isVisible()).toBe(true);
+  await expect(page.locator(".process-list-skeleton")).toBeVisible();
+  await expect(page).toHaveURL(/\/processes\?status=InProgress/);
+  await expect(page.locator(".process-list-skeleton")).toHaveCount(0);
+});
+
+test("community admin and finance lead can claim the open finance lead task", async ({ page }) => {
+  const verifyClaimAndRelease = async (username: string) => {
+    await loginThroughUi(page, username, "sport123");
+    await page.goto("/tasks?view=active");
+
+    const claimableTask = page.locator(".task-item")
+      .filter({ hasText: "Mali Lider Onayı" })
+      .filter({ has: page.getByRole("button", { name: "Üzerime al" }) })
+      .first();
+    await expect(claimableTask).toBeVisible();
+    await claimableTask.getByRole("button", { name: "Üzerime al" }).click();
+    const claimedTask = page.locator(".task-item")
+      .filter({ hasText: "Mali Lider Onayı" })
+      .filter({ has: page.getByRole("button", { name: "Havuza bırak" }) })
+      .first();
+    await expect(claimedTask).toBeVisible();
+    await claimedTask.getByRole("button", { name: "Havuza bırak" }).click();
+    await expect(page.locator(".task-item")
+      .filter({ hasText: "Mali Lider Onayı" })
+      .filter({ has: page.getByRole("button", { name: "Üzerime al" }) })
+      .first()).toBeVisible();
+
+    await page.getByRole("button", { name: "Çıkış yap" }).click();
+    await expect(page).toHaveURL(/\/login$/);
+  };
+
+  await verifyClaimAndRelease("sport.admin");
+  await verifyClaimAndRelease("sport.finance");
+});
+
+test("dashboard pending label and explanation follow the task scope", async ({ page }) => {
+  await loginThroughUi(page, "sport.admin", "sport123");
+  await page.goto("/dashboard");
+
+  const pendingLegend = page.getByRole("button", { name: /Topluluktaki bekleyen işler/ });
+  await expect(pendingLegend).toBeVisible();
+  await pendingLegend.hover();
+  await expect(page.getByText("Topluluğunuzda görüntüleyip yönetebildiğiniz açık işleri gösterir.")).toBeVisible();
+});
+
+test("team member workload opens directly beneath the selected teammate", async ({ page }) => {
+  await loginThroughUi(page, "sport.scout", "sport123");
+  await page.goto("/teams");
+
+  const workloadButton = page.locator("button.team-member-task-count").first();
+  await expect(workloadButton).toBeVisible();
+  const memberBlock = workloadButton.locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' team-roster-member-block ')]");
+
+  await workloadButton.click();
+
+  await expect(memberBlock.locator(".team-member-workload")).toBeVisible();
+  await expect(page.locator(".team-member-workload")).toHaveCount(1);
+});
+
+test("form designer shell and deferred drag canvas load independently", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await loginThroughUi(page, "admin", "admin123");
+  await page.goto("/forms");
+
+  await expect(page.getByRole("heading", { name: "Dinamik form modeli" })).toBeVisible();
+  await expect(page.locator(".designer-form-info-panel")).toBeVisible();
+  await expect(page.locator(".designer-pages-panel")).toBeVisible();
+  await expect(page.locator(".field-palette")).toBeVisible();
+});

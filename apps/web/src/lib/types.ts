@@ -45,6 +45,7 @@ export type PermissionName =
   | "Processes.Start"
   | "Tasks.View"
   | "Tasks.Act"
+  | "Tasks.ManageAll"
   | "Audit.View";
 
 export type BrowserSessionResponse = {
@@ -459,6 +460,29 @@ export type ProcessSummary = {
   workflowName?: string;
   nearestOpenTaskDueAt?: string | null;
   highestOpenTaskPriority?: TaskPriority | null;
+  currentStep?: ProcessCurrentStepSummary | null;
+  lastCompletedStep?: ProcessCompletedStepSummary | null;
+};
+
+export type ProcessCurrentStepSummary = {
+  nodeKey: string;
+  title: string;
+  assignmentType?: TaskAssignmentType | null;
+  teamName?: string;
+  communityRoleName?: string;
+  assignedUserDisplayName?: string;
+  claimedByUserDisplayName?: string;
+  requiresTeamLead: boolean;
+  enteredAt: string;
+  dueAt?: string | null;
+};
+
+export type ProcessCompletedStepSummary = {
+  nodeKey: string;
+  title: string;
+  completedByUserDisplayName?: string;
+  action?: WorkflowAction | null;
+  completedAt: string;
 };
 
 export type ProcessStepExecution = {
@@ -495,6 +519,7 @@ export type ProcessCurrentStep = {
   claimedByUserDisplayName?: string;
   enteredAt: string;
   dueAt?: string | null;
+  requiresTeamLead?: boolean;
 };
 
 export type ProcessDetail = ProcessSummary & {

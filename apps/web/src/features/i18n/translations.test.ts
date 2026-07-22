@@ -10,4 +10,9 @@ describe("translations", () => {
   it("keeps technical keys ASCII and stable", () => {
     expect(Object.keys(translations.tr).every((key) => /^[\x20-\x7E]+$/.test(key))).toBe(true);
   });
+
+  it("uses the request wording for the dashboard runner action", () => {
+    expect(translations.tr["dashboard.quick.start"]).toBe("Yeni Talep");
+    expect(translations.en["dashboard.quick.start"]).toBe("New request");
+  });
 });

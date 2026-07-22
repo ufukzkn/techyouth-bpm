@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
+import { InlineValueLoader, SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { applyStoredOrder } from "@/features/processes/processOrder";
 import { SortableProcessCard } from "@/features/processes/SortableProcessCard";
@@ -33,6 +34,7 @@ type ProcessListViewProps = {
   sortBy: NonNullable<ProcessListParams["sortBy"]>;
   sortDirection: "asc" | "desc";
   statusFilter: StatusFilter;
+  showListSkeleton?: boolean;
   onNextPage: () => void;
   onPageChange: (page: number) => void;
   onPreviousPage: () => void;
@@ -44,7 +46,6 @@ type ProcessListViewProps = {
 
 const filterOptions: { value: StatusFilter; labelKey: TranslationKey }[] = [
   { value: "all", labelKey: "process.filterAll" },
-  { value: "Pending", labelKey: "process.filterPending" },
   { value: "InProgress", labelKey: "process.filterInProgress" },
   { value: "Completed", labelKey: "process.filterCompleted" },
   { value: "Rejected", labelKey: "process.filterRejected" },
@@ -59,6 +60,7 @@ export function ProcessListView({
   sortBy,
   sortDirection,
   statusFilter,
+  showListSkeleton = false,
   onNextPage,
   onPageChange,
   onPreviousPage,
@@ -116,7 +118,11 @@ export function ProcessListView({
       <div className="process-card-header">
         <div>
           <span className="eyebrow">{t("process.listEyebrow")}</span>
-          <strong>{t("process.records", { visible: orderedProcesses.length, total: result.totalCount })}</strong>
+          <strong>
+            {showListSkeleton
+              ? <InlineValueLoader label={t("process.loading")} />
+              : t("process.records", { visible: orderedProcesses.length, total: result.totalCount })}
+          </strong>
         </div>
         <CircleDot size={22} />
       </div>
@@ -157,7 +163,20 @@ export function ProcessListView({
         </div>
       </div>
 
-      {orderedProcesses.length === 0 ? (
+      {showListSkeleton ? (
+        <div className="process-list process-list-skeleton" aria-label={t("process.skeletonProcesses")} role="status">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div className="process-list-item process-list-item-skeleton" key={index}>
+              <SkeletonBlock className="process-list-skeleton-icon" />
+              <span>
+                <SkeletonBlock className="process-list-skeleton-title" />
+                <SkeletonBlock className="process-list-skeleton-meta" />
+                <SkeletonBlock className="process-list-skeleton-meta process-list-skeleton-meta-short" />
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : orderedProcesses.length === 0 ? (
         <p className="empty-state">{result.totalCount === 0 ? t("process.noProcess") : t("process.noFilterMatch")}</p>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

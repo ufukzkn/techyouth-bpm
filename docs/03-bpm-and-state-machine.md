@@ -20,7 +20,7 @@ A state machine defines which status changes are allowed.
 
 The process lifecycle uses these statuses:
 
-- `Pending`: process exists but is waiting for the first action.
+- `Pending`: process creation inside the transaction before the runtime follows the Start node. The current synchronous runtime immediately moves a successfully created process to `InProgress`, so this is an internal transition state rather than a persistent list filter.
 - `InProgress`: process is actively waiting for a task decision.
 - `Completed`: process was approved and finished.
 - `Rejected`: process was rejected and finished.
@@ -55,5 +55,6 @@ This separation keeps status rules small while allowing new workflow shapes with
 - A missing candidate or downstream failure rolls the entire operation back.
 - Automatic routing has a 100-hop limit to stop accidental infinite loops.
 - Dashboard, process-list and task-list reads do not create audit entries. Start, claim, release, action, publish and team-membership mutations remain auditable.
+- `Islerim > Gecmis Islerim` contains tasks completed by the signed-in user. Overdue but still-open work remains in the active list; community-wide history is inspected from process history and system audit.
 
 Invalid lifecycle transitions, unavailable actions, invalid graph edges and unauthorized claims are rejected by the backend. This is the central code-review point for BPM correctness.

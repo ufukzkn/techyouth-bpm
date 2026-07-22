@@ -20,6 +20,8 @@ Iki Compose uygulamasi da ayni host portlarini kullanir: web `3000`, API `5291`.
 
 Her iki API de baslangicta `Database.MigrateAsync()` ile semayi uygular ve `Seed__MockData=true` ile deterministic demo verisini ekler. Cloud API, gitignored `.env.neon.local` dosyasindan provider, Neon connection string ve mail ayarlarini alir. Web build asamasinda tarayicinin erisecegi `NEXT_PUBLIC_API_BASE_URL=http://localhost:5291` degerini alir.
 
+Local Compose'ta API her zaman non-root `app` kullanicisiyla calisir. Eski bir image tarafindan root sahipligiyle olusturulmus `sqlite-data` volume'u varsa, `sqlite-volume-init` ayni API image'ini yalniz bir kez root olarak calistirir ve `/data` sahipligini uygulama UID/GID `1654` icin duzeltir. API bu init adimi basariyla bitmeden acilmaz. Web de API'nin `/health/ready` endpointi saglikli olana kadar bekler. Bu nedenle eski volume'lerde gorulen `attempt to write a readonly database` hatasi volume silmeden giderilir.
+
 Adresler:
 
 - Web: `http://localhost:3000`
@@ -31,6 +33,9 @@ Kapatma ve reset:
 # local SQLite stack
 docker compose down
 docker compose down -v # SQLite volume ve demo verisini de siler
+
+# Mevcut local stack'in API readiness durumunu kontrol et
+powershell -ExecutionPolicy Bypass -File scripts/smoke-local-compose.ps1
 
 # Neon cloud stack
 docker compose -f compose.cloud.yaml down
@@ -68,7 +73,9 @@ SMTP, Mailtrap, Neon ve benzeri secret'lar `.env.*`, user-secrets veya CI secret
 
 API runtime image'i root olarak çalışmaz. .NET image'indeki `app` kullanıcısı
 uygulamayı çalıştırır; yalnız SQLite için gereken `/data` dizini bu kullanıcıya
-yazılabilir bırakılır. Web runtime da ayrı `nextjs` kullanıcısıyla çalışır.
+yazılabilir bırakılır. `sqlite-volume-init` yalnız legacy local volume sahipligini
+düzeltmek icin root kullanir ve uygulama prosesi olarak calismaz. Web runtime da
+ayrı `nextjs` kullanıcısıyla çalışır.
 Production ortamında CORS origin'leri `Cors__AllowedOrigins__0` benzeri
 konfigürasyonla açıkça verilmelidir; credentials kullanılırken wildcard kabul
 edilmez. HTTPS terminasyonu arkasında HSTS ve `Secure` cookie davranışı
