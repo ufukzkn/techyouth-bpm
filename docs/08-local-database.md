@@ -187,6 +187,7 @@ When mock data is enabled, the seeder also creates:
 - Published `Legacy Basic Approval` compatibility workflow.
 - Published `Transfer Talep Akisi` with four team swimlanes, a typed budget gateway and version-pinned task forms.
 - Published workflow demos for Sportif Faaliyetler, Lojistik, Urun Siparisi, Insan Kaynaklari and Satin Alma.
+- Published `Transfer Aksiyon Laboratuvarı` and `Operasyon Aksiyon Laboratuvarı` definitions. Each has team-pool, team-plus-role, specific-user and team-lead-only assignments plus five deterministic instances covering Approve, Reject, Complete, SendBack and Escalate.
 - Five graph-consistent scenarios per community: overdue review, upcoming approval, completed, rejected and sent-back/reopened.
 - Open tasks with overdue, upcoming and future `DueAt` values plus version-pinned task forms.
 - Namespaced start/task output, step execution, process audit, system audit and notification records that refer to the same workflow instance.
