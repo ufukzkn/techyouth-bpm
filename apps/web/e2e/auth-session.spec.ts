@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { loginThroughUi } from "./helpers";
+import { gotoApp, loginThroughUi } from "./helpers";
 
 test("cookie session survives reload and logout returns to login", async ({ page }) => {
-  await page.goto("/management/users");
+  await gotoApp(page, "/management/users");
   await expect(page).toHaveURL(/\/login$/);
 
   await loginThroughUi(page, "admin", "admin123");

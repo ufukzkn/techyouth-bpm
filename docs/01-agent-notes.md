@@ -59,6 +59,10 @@ subject ownership map is in the [Documentation Guide](README.md).
   affected keys after mutations or explicit refresh.
 - Every destructive or privilege-changing action requires explicit confirmation
   and backend authorization.
+- Treat candidate-task `CanClaim` and post-claim `CanAct` as separate states.
+  Never infer a team-lead denial solely from `CanAct=false` before claim.
+- Keep technical workflow node keys out of normal cards. Show the node title,
+  assignment team/role/lead restriction and claim owner as separate context.
 
 ## Security And Configuration
 

@@ -27,10 +27,10 @@ Hizli Sportif Faaliyetler demo akislari icin ortak parola `sport123` kullanilir:
 | --- | --- |
 | Topluluk Admin | `sport.admin` |
 | Süreç başlatıcı | `sport.starter` |
-| Scout Ekibi sorumlusu | `sport.scout` |
-| Teknik takım ve rol adayı | `sport.approver` |
-| Mali İşler takım sorumlusu | `sport.finance` |
-| Transfer Operasyon sorumlusu | `sport.operations` |
+| Scout Ekibi sorumlusu, Onay Sorumlusu rolü | `sport.scout` |
+| Teknik takım sorumlusu, Onay Sorumlusu rolü | `sport.approver` |
+| Mali İşler takım sorumlusu, Onay Sorumlusu rolü | `sport.finance` |
+| Transfer Operasyon sorumlusu, Onay Sorumlusu rolü | `sport.operations` |
 | Gözlemci | `sport.viewer` |
 
 ## Senaryo A: Transfer Teklif ve Onay
@@ -46,6 +46,8 @@ Hizli Sportif Faaliyetler demo akislari icin ortak parola `sport123` kullanilir:
 9. `quaresma` ile Transfer Operasyonu işini görüntüleyin. Kullanıcı adaydır fakat takım sorumlusu olmadığı için claim/aksiyon reddedilmeli ve açıklayıcı kilit mesajı görünmelidir.
 10. `fatih.terim` ile aynı işi claim edin; sözleşme metadata dosyasını, tarihi ve operasyon notunu girip tamamlayın.
 11. Süreç `Completed` olmalı; bütün task, step, form çıktısı, actor, tarih, bildirim ve audit zinciri görüntülenmelidir.
+
+Takım adları operasyon bağlamını, ortak `Onay Sorumlusu` rolü permission paketini belirler. Seed bu dört takım için aynı izinleri taşıyan ayrı rol kopyaları üretmez.
 
 Ek dallar:
 
@@ -73,6 +75,8 @@ Ek dallar:
 - Task formu eksik veya hatalıysa backend aksiyonu reddetmeli ve task açık kalmalıdır.
 - İki aday aynı task’ı eş zamanlı claim ederse yalnız biri kazanmalıdır.
 - Takım sorumlusu olmayan adayın doğrudan API claim/action çağrısı da reddedilmelidir.
+- Claim edilmemiş lider görevinde yetkili lider veya `Tasks.ManageAll` sahibi kullanıcı `CanClaim=true` görmelidir; `CanAct=false` değeri claim öncesinde lider engeli olarak yorumlanmamalıdır.
+- `Geçmiş İşlerim` yalnız oturumdaki kullanıcının tamamladığı taskları göstermeli; süresi geçmiş açık task aktif listede kalmalıdır.
 - Dosya alanı gerçek binary saklamaz; ad, boyut, MIME, uzantı ve `lastModified` metadata’sını doğrular.
 
 ## Audit ve Bildirim Beklentileri

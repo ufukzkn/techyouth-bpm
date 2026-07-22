@@ -43,6 +43,8 @@ Direct assignments (`ProcessStarter`, `SpecificUser`) do not require a separate 
 
 `Tasks.ManageAll` is an explicit community-scoped operational override. It lets a community manager list and act on unclaimed work without matching the candidate team, role or team-lead condition. It never crosses the user's community and never permits taking over a task claimed by another user. SuperAdmin keeps the separate global platform behavior.
 
+The active task list applies that override so community administrators can operate their community queue. The history view is deliberately actor-scoped for every role: `GET /api/tasks/my?view=history` returns only tasks whose `CompletedByUserId` is the signed-in user. Community-wide completed work remains available through process timelines and system audit instead of being presented as the administrator's personal history.
+
 Only one user may claim a task. A provider-independent concurrency token protects simultaneous SQLite and PostgreSQL updates. Task priority values are `Low`, `Normal`, `High` and `Critical`. Optional SLA is validated between 1 minute and 365 days; the runtime calculates a nullable `DueAt` each time a task attempt is created, including a new attempt after `SendBack`.
 
 Process start, task creation, process variables, step execution, notifications and audit entries share a transaction. Task action, next-node routing and completion use a second atomic transaction. Any failure rolls the whole operation back.
@@ -52,6 +54,8 @@ Runtime actions are `Approve`, `Reject`, `Complete`, `Escalate` and `SendBack`. 
 `Escalate` is an explicit task action, not a timer side effect. `SlaDurationMinutes` is converted to nullable `ProcessTask.DueAt` when a task is created. The current runtime uses it for display and ordering; automatic reminders, reassignment and SLA escalation remain deferred.
 
 List visibility is independent from graph execution. `personal` means starter/direct assignment/claim/live team-role candidacy, plus the current community task set for `Tasks.ManageAll`; `community` requires `Processes.ViewAll`, and `global` requires SuperAdmin. All visibility, `CanAct`/`CanClaim`, claim and action decisions share `TaskAccessPolicy`, and live permissions/team membership are resolved again on every protected request.
+
+Technical node keys are stable runtime identifiers and may appear in graph JSON or process variables, but normal process/task cards present the node title and assignment context. Team and community role are shown together; a claim owner is additional context and never replaces the original assignment target.
 
 ## HTTP Contract
 
