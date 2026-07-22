@@ -1,7 +1,7 @@
 "use client";
 
 import { AuditTimeline } from "@/features/processes/AuditTimeline";
-import { describeProcessAssignment } from "@/features/processes/processAssignment";
+import { describeProcessAssignment, describeProcessClaim } from "@/features/processes/processAssignment";
 import { ProcessStepTimeline } from "@/features/processes/ProcessStepTimeline";
 
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
@@ -41,6 +41,7 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
 
   const openTaskCount = detail.tasks.filter((t) => t.status === "Open" || t.status === "Claimed").length;
   const completedTaskCount = detail.tasks.filter((t) => t.status === "Completed").length;
+  const currentStepClaim = detail.currentStep ? describeProcessClaim(detail.currentStep) : null;
 
   return (
     <>
@@ -76,40 +77,27 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
           </div>
           {detail.currentStep ? (
             <>
-              <div>
-                <dt>{t("process.currentStepTitle")}</dt>
-                <dd>{detail.currentStep.title || detail.currentStep.nodeKey}</dd>
-              </div>
+              {detail.currentStep.title ? (
+                <div>
+                  <dt>{t("process.currentStepTitle")}</dt>
+                  <dd>{detail.currentStep.title}</dd>
+                </div>
+              ) : null}
               <div className="detail-list-wide">
                 <dt>{t("process.currentResponsible")}</dt>
                 <dd>{describeProcessAssignment(language, detail.currentStep)}</dd>
               </div>
-              {detail.currentStep.teamName ? (
-                <div><dt>{t("process.assignmentTeam")}</dt><dd>{detail.currentStep.teamName}</dd></div>
-              ) : null}
-              {detail.currentStep.communityRoleName ? (
-                <div><dt>{t("process.assignmentRole")}</dt><dd>{detail.currentStep.communityRoleName}</dd></div>
-              ) : null}
-              {detail.currentStep.assignedUserDisplayName || detail.currentStep.claimedByUserDisplayName ? (
+              {currentStepClaim ? (
                 <div>
-                  <dt>{detail.currentStep.claimedByUserDisplayName ? t("process.claimOwner") : t("process.assignmentUser")}</dt>
-                  <dd>{detail.currentStep.claimedByUserDisplayName || detail.currentStep.assignedUserDisplayName}</dd>
+                  <dt>{t("process.claimOwner")}</dt>
+                  <dd>{currentStepClaim}</dd>
                 </div>
               ) : null}
               <div>
                 <dt>{t("process.currentStepSince")}</dt>
                 <dd>{formatApiDateTime(detail.currentStep.enteredAt, language)}</dd>
               </div>
-              <div>
-                <dt>{t("process.nodeKey")}</dt>
-                <dd>{detail.currentStep.nodeKey}</dd>
-              </div>
             </>
-          ) : detail.currentNodeKey ? (
-            <div>
-              <dt>{t("process.currentNode")}</dt>
-              <dd>{detail.currentNodeKey}</dd>
-            </div>
           ) : null}
           {detail.processDefinitionVersionId ? (
             <div>

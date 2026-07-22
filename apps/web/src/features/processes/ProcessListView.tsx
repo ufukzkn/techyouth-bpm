@@ -46,7 +46,6 @@ type ProcessListViewProps = {
 
 const filterOptions: { value: StatusFilter; labelKey: TranslationKey }[] = [
   { value: "all", labelKey: "process.filterAll" },
-  { value: "Pending", labelKey: "process.filterPending" },
   { value: "InProgress", labelKey: "process.filterInProgress" },
   { value: "Completed", labelKey: "process.filterCompleted" },
   { value: "Rejected", labelKey: "process.filterRejected" },

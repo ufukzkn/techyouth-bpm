@@ -30,7 +30,7 @@ export function ProcessStepTimeline({ executions, language }: { executions: Proc
             <span className={`process-step-marker status-${execution.status.toLowerCase()}`}><StepIcon size={16} /></span>
             <div className="process-step-content">
               <div className="process-step-heading">
-                <strong>{execution.nodeTitle || execution.nodeKey}</strong>
+                <strong>{execution.nodeTitle || t("process.nodeKey")}</strong>
                 <span>{t("process.attempt", { count: execution.attempt })}</span>
               </div>
               {execution.assignmentType || execution.teamName || execution.communityRoleName || execution.assignedUserDisplayName ? (

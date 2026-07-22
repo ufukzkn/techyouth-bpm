@@ -21,11 +21,9 @@ export function describeProcessAssignment(language: Language, source: Assignment
       ? source.communityRoleName
       : undefined;
   const assignedUserDisplayName = source.assignedUserDisplayName;
-  const claimedByUserDisplayName = "claimedByUserDisplayName" in source ? source.claimedByUserDisplayName : undefined;
   const requiresTeamLead = "requiresTeamLead" in source && source.requiresTeamLead;
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
 
-  if (claimedByUserDisplayName) return t("process.assignmentClaimed", { user: claimedByUserDisplayName });
   if (assignmentType === "SpecificUser" && assignedUserDisplayName) return t("process.assignmentSpecificUser", { user: assignedUserDisplayName });
   if (assignmentType === "ProcessStarter") return t("process.assignmentProcessStarter");
   if (assignmentType === "TeamAndCommunityRole" && teamName && communityRoleName) {
@@ -43,4 +41,9 @@ export function describeProcessAssignment(language: Language, source: Assignment
   if (communityRoleName) return t("process.assignmentCommunityRole", { role: communityRoleName });
   if (teamName) return requiresTeamLead ? t("process.assignmentTeamLead", { team: teamName }) : t("process.assignmentTeamCandidate", { team: teamName });
   return t("process.assignmentUnspecified");
+}
+
+export function describeProcessClaim(source: AssignmentSource): string | null {
+  const claimedByUserDisplayName = "claimedByUserDisplayName" in source ? source.claimedByUserDisplayName : undefined;
+  return claimedByUserDisplayName || null;
 }

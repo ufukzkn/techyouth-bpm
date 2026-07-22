@@ -3,7 +3,7 @@
 import { Clock3, Workflow } from "lucide-react";
 import { useState } from "react";
 import { actionLabel, translate, type TranslationKey } from "@/features/i18n/translations";
-import { describeProcessAssignment } from "@/features/processes/processAssignment";
+import { describeProcessAssignment, describeProcessClaim } from "@/features/processes/processAssignment";
 import { StatusBadge } from "@/features/processes/StatusBadge";
 import { formatApiDateTime } from "@/lib/dateTime";
 import type { Language, ProcessSummary, TaskPriority } from "@/lib/types";
@@ -20,7 +20,8 @@ export function ProcessCard({ process, language, isSelected, onSelect }: Process
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const currentStep = process.currentStep;
   const lastCompletedStep = process.lastCompletedStep;
-  const currentStepTitle = currentStep?.title || currentStep?.nodeKey || process.currentNodeKey;
+  const currentStepTitle = currentStep?.title || null;
+  const claimDescription = currentStep ? describeProcessClaim(currentStep) : null;
   return (
     <button
       className={isSelected ? "process-list-item active" : "process-list-item"}
@@ -37,9 +38,10 @@ export function ProcessCard({ process, language, isSelected, onSelect }: Process
         {currentStep ? (
           <small className="process-context-line"><strong>{t("process.currentResponsible")}:</strong> {describeProcessAssignment(language, currentStep)}</small>
         ) : null}
-        {lastCompletedStep ? (
+        {claimDescription ? <small className="process-context-line"><strong>{t("process.claimOwner")}:</strong> {claimDescription}</small> : null}
+        {lastCompletedStep?.title ? (
           <small className="process-context-line">
-            <strong>{t("process.previousStep")}:</strong> {lastCompletedStep.title || lastCompletedStep.nodeKey}
+            <strong>{t("process.previousStep")}:</strong> {lastCompletedStep.title}
             {lastCompletedStep.completedByUserDisplayName || lastCompletedStep.action ? (
               <> · {t("process.stepCompleted", {
                 user: lastCompletedStep.completedByUserDisplayName || "-",
