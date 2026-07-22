@@ -27,8 +27,8 @@ export function resolvePendingTaskCopy(
 
   if (managesAllTasks) {
     return {
-      labelKey: "dashboard.pendingTasksCommunity",
-      descriptionKey: "dashboard.pendingDescriptionManaged",
+      labelKey: "dashboard.pendingTasksTeam",
+      descriptionKey: "dashboard.pendingDescriptionTeam",
     };
   }
 

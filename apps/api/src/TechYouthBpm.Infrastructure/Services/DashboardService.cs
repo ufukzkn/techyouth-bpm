@@ -10,10 +10,11 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 public class DashboardService(
     AppDbContext db,
-    IWorkflowVisibilityService workflowVisibilityService) : IDashboardService
+    IWorkflowVisibilityService workflowVisibilityService,
+    TaskAccessPolicy taskAccessPolicy) : IDashboardService
 {
     public DashboardService(AppDbContext db)
-        : this(db, new WorkflowVisibilityService())
+        : this(db, new WorkflowVisibilityService(), new TaskAccessPolicy())
     {
     }
 
@@ -33,13 +34,13 @@ public class DashboardService(
         if (user.HasPermission(PermissionNames.TasksView)
             || user.HasPermission(PermissionNames.TasksManageAll))
         {
-            var taskQuery = workflowVisibilityService.ApplyTaskScope(
-                db.ProcessTasks
+            var baseTaskQuery = db.ProcessTasks
                 .AsNoTracking()
                 .Where(task => task.Status == ProcessTaskStatus.Open
-                    || task.Status == ProcessTaskStatus.Claimed),
-                user,
-                scope);
+                    || task.Status == ProcessTaskStatus.Claimed);
+            var taskQuery = UseParticipantDashboardScope(user, scope)
+                ? taskAccessPolicy.ApplyPersonalTaskScope(baseTaskQuery, user, includeManagementOverride: false)
+                : workflowVisibilityService.ApplyTaskScope(baseTaskQuery, user, scope);
 
             openTaskCount = await taskQuery.CountAsync(cancellationToken);
             recentOpenTasks = await taskQuery
@@ -56,17 +57,13 @@ public class DashboardService(
                 .ToListAsync(cancellationToken);
 
             if (scope == WorkflowVisibilityScope.Personal
-                && user.CommunityId is { } communityId
+                && user.CommunityId is not null
                 && (user.Teams?.Count ?? 0) > 0)
             {
                 var teamIds = user.Teams!.Select(team => team.Id).ToArray();
-                teamQueueCount = await db.ProcessTasks
-                    .AsNoTracking()
+                teamQueueCount = await taskQuery
                     .CountAsync(task =>
-                        task.ProcessInstance != null
-                        && task.ProcessInstance.CommunityId == communityId
-                        && (task.Status == ProcessTaskStatus.Open || task.Status == ProcessTaskStatus.Claimed)
-                        && task.CandidateTeamId.HasValue
+                        task.CandidateTeamId.HasValue
                         && teamIds.Contains(task.CandidateTeamId.Value),
                         cancellationToken);
             }
@@ -77,10 +74,10 @@ public class DashboardService(
             return new DashboardSummaryDto(openTaskCount, 0, 0, recentOpenTasks, [], teamQueueCount);
         }
 
-        var processQuery = workflowVisibilityService.ApplyProcessScope(
-            db.ProcessInstances.AsNoTracking(),
-            user,
-            scope);
+        var baseProcessQuery = db.ProcessInstances.AsNoTracking();
+        var processQuery = UseParticipantDashboardScope(user, scope)
+            ? taskAccessPolicy.ApplyPersonalProcessScope(baseProcessQuery, user, includeManagementOverride: false)
+            : workflowVisibilityService.ApplyProcessScope(baseProcessQuery, user, scope);
 
         var processCounts = await processQuery
             .GroupBy(_ => 1)
@@ -109,4 +106,10 @@ public class DashboardService(
             recentProcesses,
             teamQueueCount);
     }
+
+    private static bool UseParticipantDashboardScope(UserDto user, WorkflowVisibilityScope scope) =>
+        scope == WorkflowVisibilityScope.Personal
+        && !user.IsSuperAdmin()
+        && user.CommunityId is not null
+        && user.HasPermission(PermissionNames.TasksManageAll);
 }

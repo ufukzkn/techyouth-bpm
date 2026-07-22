@@ -11,8 +11,8 @@ describe("dashboard pending task copy", () => {
 
   it("uses managed community copy for Tasks.ManageAll", () => {
     expect(resolvePendingTaskCopy("personal", false, true)).toEqual({
-      labelKey: "dashboard.pendingTasksCommunity",
-      descriptionKey: "dashboard.pendingDescriptionManaged",
+      labelKey: "dashboard.pendingTasksTeam",
+      descriptionKey: "dashboard.pendingDescriptionTeam",
     });
   });
 

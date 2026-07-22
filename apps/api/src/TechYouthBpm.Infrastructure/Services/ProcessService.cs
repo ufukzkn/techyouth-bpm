@@ -431,8 +431,8 @@ public class ProcessService(
                 Id = Guid.NewGuid(),
                 UserId = userId,
                 Type = "Task.Assigned",
-                Title = "Yeni onay gorevi",
-                Message = $"{formName} sureci icin onay bekleyen yeni bir task var.",
+                Title = "Yeni onay görevi",
+                Message = $"{formName} süreci için onay bekleyen yeni bir iş var.",
                 EntityType = "ProcessInstance",
                 EntityId = processId.ToString(),
                 CreatedAt = DateTime.UtcNow

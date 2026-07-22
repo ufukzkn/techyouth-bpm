@@ -110,8 +110,8 @@ internal sealed class RegistrationService(
         await NotifyCommunityManagersAsync(
             community.Id,
             "User.PendingApproval",
-            "Yeni kayit onayi bekliyor",
-            $"{user.DisplayName} kullanicisi {community.Name} topluluguna katilmak icin onay bekliyor.",
+            "Yeni kayıt onayı bekliyor",
+            $"{user.DisplayName} kullanıcısı {community.Name} topluluğuna katılmak için onay bekliyor.",
             "User",
             user.Id.ToString(),
             cancellationToken);

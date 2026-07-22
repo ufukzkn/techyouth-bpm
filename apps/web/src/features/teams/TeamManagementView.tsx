@@ -258,7 +258,7 @@ export function TeamManagementView({ activeUser, language, token }: { activeUser
         await reloadAfterMutation(selectedTeam.id, action.member.userId);
         return;
       }
-      setDetailFeedback({ tone: "loading", text: isTr ? "Üyelik kaldiriliyor..." : "Removing membership..." });
+      setDetailFeedback({ tone: "loading", text: isTr ? "Üyelik kaldırılıyor..." : "Removing membership..." });
       await api.removeTeamMember(token, selectedTeam.id, action.member.userId);
       setDetailFeedback({ tone: "success", text: isTr ? `${action.member.displayName} takımdan çıkarıldı.` : `${action.member.displayName} removed.` });
       await reloadAfterMutation(selectedTeam.id, action.member.userId);

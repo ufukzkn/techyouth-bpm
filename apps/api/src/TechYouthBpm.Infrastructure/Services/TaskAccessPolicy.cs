@@ -14,7 +14,10 @@ public sealed class TaskAccessPolicy
             or TaskAssignmentType.CommunityRole
             or TaskAssignmentType.TeamAndCommunityRole;
 
-    public IQueryable<ProcessTask> ApplyPersonalTaskScope(IQueryable<ProcessTask> query, UserDto user)
+    public IQueryable<ProcessTask> ApplyPersonalTaskScope(
+        IQueryable<ProcessTask> query,
+        UserDto user,
+        bool includeManagementOverride = true)
     {
         if (user.IsSuperAdmin())
         {
@@ -31,7 +34,7 @@ public sealed class TaskAccessPolicy
 
         var communityQuery = query.Where(task => task.ProcessInstance != null
             && task.ProcessInstance.CommunityId == communityId);
-        if (user.HasPermission(PermissionNames.TasksManageAll))
+        if (includeManagementOverride && user.HasPermission(PermissionNames.TasksManageAll))
         {
             return communityQuery;
         }
@@ -67,7 +70,10 @@ public sealed class TaskAccessPolicy
                 && task.CandidateCommunityRoleId == roleId));
     }
 
-    public IQueryable<ProcessInstance> ApplyPersonalProcessScope(IQueryable<ProcessInstance> query, UserDto user)
+    public IQueryable<ProcessInstance> ApplyPersonalProcessScope(
+        IQueryable<ProcessInstance> query,
+        UserDto user,
+        bool includeManagementOverride = true)
     {
         if (user.IsSuperAdmin())
         {
@@ -84,14 +90,15 @@ public sealed class TaskAccessPolicy
         }
 
         var communityQuery = query.Where(process => process.CommunityId == communityId);
-        if (user.HasPermission(PermissionNames.TasksManageAll))
+        if (includeManagementOverride && user.HasPermission(PermissionNames.TasksManageAll))
         {
             return communityQuery.Where(process => process.StartedByUserId == user.Id || process.Tasks.Any());
         }
 
         var visibleTaskIds = ApplyPersonalTaskScope(
             query.SelectMany(process => process.Tasks),
-            user).Select(task => task.Id);
+            user,
+            includeManagementOverride).Select(task => task.Id);
         return communityQuery.Where(process =>
             process.StartedByUserId == user.Id
             || process.Tasks.Any(task => visibleTaskIds.Contains(task.Id)));
