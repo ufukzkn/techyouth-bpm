@@ -1,6 +1,17 @@
 name: eczacibasi-local
 
 services:
+  sqlite-volume-init:
+    image: techyouth-bpm-api:local
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c", "mkdir -p /data && chown -R 1654:1654 /data"]
+    volumes:
+      - sqlite-data:/data
+    restart: "no"
+
   api:
     image: techyouth-bpm-api:local
     build:
@@ -14,8 +25,17 @@ services:
       Seed__MockData: "true"
     volumes:
       - sqlite-data:/data
+    depends_on:
+      sqlite-volume-init:
+        condition: service_completed_successfully
     ports:
       - "5291:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/health/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
 
   web:
     image: techyouth-bpm-web:local
@@ -25,7 +45,8 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:5291
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     ports:
       - "3000:3000"
 

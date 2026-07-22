@@ -16,7 +16,11 @@ WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
-RUN mkdir -p /data && chown -R app:app /app /data
+RUN mkdir -p /data \
+    && chown -R app:app /app /data \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends wget \
+    && rm -rf /var/lib/apt/lists/*
 COPY --chown=app:app --from=build /app/publish ./
 USER app
 ENTRYPOINT ["dotnet", "TechYouthBpm.Api.dll"]
