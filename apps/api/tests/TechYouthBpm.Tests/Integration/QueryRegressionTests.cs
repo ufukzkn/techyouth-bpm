@@ -17,6 +17,22 @@ namespace TechYouthBpm.Tests.Integration;
 public sealed class QueryRegressionTests
 {
     [Fact]
+    public async Task Workflow_scope_queries_use_their_composite_sqlite_indexes()
+    {
+        await using var db = TestDbFactory.Create();
+
+        var processPlan = await ExplainAsync(
+            db.Database.GetDbConnection(),
+            "EXPLAIN QUERY PLAN SELECT Id FROM ProcessInstances WHERE CommunityId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND Status = 2 ORDER BY StartedAt DESC");
+        var taskPlan = await ExplainAsync(
+            db.Database.GetDbConnection(),
+            "EXPLAIN QUERY PLAN SELECT Id FROM ProcessTasks WHERE CandidateTeamId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' AND Status = 1 AND ClaimedByUserId IS NULL");
+
+        Assert.Contains(processPlan, line => line.Contains("IX_ProcessInstances_CommunityId_Status_StartedAt", StringComparison.Ordinal));
+        Assert.Contains(taskPlan, line => line.Contains("IX_ProcessTasks_CandidateTeamId_Status_ClaimedByUserId", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Opaque_session_validation_uses_cache_and_logout_invalidates_it()
     {
         var counter = new CommandCountingInterceptor();
@@ -136,6 +152,40 @@ public sealed class QueryRegressionTests
     }
 
     [Fact]
+    public async Task Audit_category_counts_use_one_conditional_aggregate_query()
+    {
+        var counter = new CommandCountingInterceptor();
+        await using var db = TestDbFactory.Create(counter);
+        var superAdmin = TestDbFactory.SeedSuperAdmin(db, "audit-count-superadmin");
+        db.SystemAuditLogs.AddRange(Enumerable.Range(1, 60).Select(index => new SystemAuditLog
+        {
+            Id = Guid.NewGuid(),
+            ActorUserId = superAdmin.Id,
+            Category = index % 3 == 0
+                ? SystemAuditCategories.Identity
+                : index % 3 == 1
+                    ? SystemAuditCategories.Processes
+                    : SystemAuditCategories.Tasks,
+            Action = "Fixture.Action",
+            EntityType = "Fixture",
+            Description = $"Audit count fixture {index:000}",
+            CreatedAt = DateTime.UtcNow.AddSeconds(-index),
+        }));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        counter.Reset();
+
+        var result = await new SystemAuditService(db).CountByCategoryAsync(TestDbFactory.ToDto(superAdmin));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(60, result.Value!.All);
+        Assert.Equal(20, result.Value.Identity);
+        Assert.Equal(20, result.Value.Processes);
+        Assert.Equal(20, result.Value.Tasks);
+        Assert.Equal(1, counter.Count);
+    }
+
+    [Fact]
     public async Task Process_and_task_lists_keep_large_fixtures_server_paged_with_bounded_queries()
     {
         var counter = new CommandCountingInterceptor();
@@ -201,7 +251,22 @@ public sealed class QueryRegressionTests
             TestDbFactory.ToDto(approver));
         Assert.Equal(180, taskResult.TotalCount);
         Assert.Equal(25, taskResult.Items.Count);
-        Assert.InRange(counter.Count, 1, 12);
+        Assert.All(taskResult.Items, task => Assert.Null(task.TaskForm));
+        Assert.Equal(2, counter.Count);
+    }
+
+    private static async Task<IReadOnlyList<string>> ExplainAsync(DbConnection connection, string sql)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await using var reader = await command.ExecuteReaderAsync();
+        var lines = new List<string>();
+        while (await reader.ReadAsync())
+        {
+            lines.Add(reader.GetString(3));
+        }
+
+        return lines;
     }
 }
 

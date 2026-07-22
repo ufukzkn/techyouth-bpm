@@ -212,7 +212,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CommunityId");
+                    b.HasIndex("CommunityId", "Status", "StartedAt");
 
                     b.HasIndex("CreatedByUserId");
 
@@ -588,7 +588,7 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("ProcessDefinitionVersionId");
 
-                    b.HasIndex("StartedByUserId");
+                    b.HasIndex("StartedByUserId", "Status", "StartedAt");
 
                     b.ToTable("ProcessInstances");
                 });
@@ -755,9 +755,9 @@ namespace TechYouthBpm.Infrastructure.Data.Migrations
 
                     b.HasIndex("AssignedCommunityRoleId");
 
-                    b.HasIndex("CandidateCommunityRoleId");
+                    b.HasIndex("CandidateCommunityRoleId", "Status", "ClaimedByUserId");
 
-                    b.HasIndex("CandidateTeamId");
+                    b.HasIndex("CandidateTeamId", "Status", "ClaimedByUserId");
 
                     b.HasIndex("CompletedByUserId");
 

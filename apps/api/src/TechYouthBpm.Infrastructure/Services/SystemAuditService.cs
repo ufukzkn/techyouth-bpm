@@ -186,13 +186,27 @@ public class SystemAuditService(AppDbContext db) : ISystemAuditService
         }
 
         var baseQuery = ApplyCommunityScope(db.SystemAuditLogs.Include(log => log.ActorUser), currentUser);
-        var counts = new SystemAuditCategoryCountsDto(
-            await baseQuery.CountAsync(cancellationToken),
-            await ApplyCategoryFilter(baseQuery, "identity").CountAsync(cancellationToken),
-            await ApplyCategoryFilter(baseQuery, "access").CountAsync(cancellationToken),
-            await ApplyCategoryFilter(baseQuery, "forms").CountAsync(cancellationToken),
-            await ApplyCategoryFilter(baseQuery, "processes").CountAsync(cancellationToken),
-            await ApplyCategoryFilter(baseQuery, "tasks").CountAsync(cancellationToken));
+        var aggregate = await baseQuery
+            .GroupBy(_ => 1)
+            .Select(group => new
+            {
+                All = group.Count(),
+                Identity = group.Count(log => log.Category == SystemAuditCategories.Identity),
+                Access = group.Count(log => log.Category == SystemAuditCategories.Access),
+                Forms = group.Count(log => log.Category == SystemAuditCategories.Forms),
+                Processes = group.Count(log => log.Category == SystemAuditCategories.Processes),
+                Tasks = group.Count(log => log.Category == SystemAuditCategories.Tasks)
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+        var counts = aggregate is null
+            ? new SystemAuditCategoryCountsDto(0, 0, 0, 0, 0, 0)
+            : new SystemAuditCategoryCountsDto(
+                aggregate.All,
+                aggregate.Identity,
+                aggregate.Access,
+                aggregate.Forms,
+                aggregate.Processes,
+                aggregate.Tasks);
 
         return Result<SystemAuditCategoryCountsDto>.Success(counts);
     }

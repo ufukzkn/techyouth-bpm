@@ -224,6 +224,7 @@ internal static class TestDbFactory
                 PermissionNames.ProcessesStart,
                 PermissionNames.TasksView,
                 PermissionNames.TasksAct,
+                PermissionNames.TasksManageAll,
                 PermissionNames.AuditView
             ]);
         EnsureRole(
