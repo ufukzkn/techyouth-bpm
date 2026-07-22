@@ -20,21 +20,13 @@ internal static class SportifQuickDemoSeeder
 {
     private static readonly IReadOnlyList<DemoAccount> Accounts =
     [
-        new(SportDemoAdminId, "sport.admin", "Sportif Demo Admin", "community-admin", null, null, false),
-        new(SportDemoStarterId, "sport.starter", "Sportif Demo Baslatici", "process-starter", null, null, false),
-        new(SportDemoScoutId, "sport.scout", "Sportif Demo Scout", "custom-scout-lead", SportScoutTeamId, SportScoutLeadRoleId, true),
-        new(SportDemoApproverId, "sport.approver", "Sportif Demo Teknik Onay", "custom-technical-approver", SportTechnicalTeamId, SportTechnicalApproverRoleId, true),
-        new(SportDemoFinanceId, "sport.finance", "Sportif Demo Mali Onay", "custom-finance-approver", SportFinanceTeamId, SportFinanceApproverRoleId, true),
-        new(SportDemoOperationsId, "sport.operations", "Sportif Demo Transfer Operasyon", "custom-transfer-operations", SportTransferTeamId, SportOperationsRoleId, true),
-        new(SportDemoViewerId, "sport.viewer", "Sportif Demo Gozlemci", "read-only", null, null, false)
-    ];
-
-    private static readonly IReadOnlyList<CustomRoleSpec> CustomRoles =
-    [
-        new(SportScoutLeadRoleId, "Scout Sorumlusu", "Scout incelemelerini gorur ve aksiyon alir.", "custom-scout-lead", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
-        new(SportTechnicalApproverRoleId, "Teknik Onay Sorumlusu", "Teknik degerlendirme islerini gorur ve aksiyon alir.", "custom-technical-approver", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
-        new(SportFinanceApproverRoleId, "Mali Onay Sorumlusu", "Mali onay islerini gorur ve aksiyon alir.", "custom-finance-approver", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct]),
-        new(SportOperationsRoleId, "Transfer Operasyon Sorumlusu", "Transfer operasyon islerini gorur ve aksiyon alir.", "custom-transfer-operations", [PermissionNames.ProcessesView, PermissionNames.TasksView, PermissionNames.TasksAct])
+        new(SportDemoAdminId, "sport.admin", "Sportif Demo Admin", "community-admin", null, false),
+        new(SportDemoStarterId, "sport.starter", "Sportif Demo Baslatici", "process-starter", null, false),
+        new(SportDemoScoutId, "sport.scout", "Sportif Demo Scout", "approver", SportScoutTeamId, true),
+        new(SportDemoApproverId, "sport.approver", "Sportif Demo Teknik Onay", "approver", SportTechnicalTeamId, true),
+        new(SportDemoFinanceId, "sport.finance", "Sportif Demo Mali Onay", "approver", SportFinanceTeamId, true),
+        new(SportDemoOperationsId, "sport.operations", "Sportif Demo Transfer Operasyon", "approver", SportTransferTeamId, true),
+        new(SportDemoViewerId, "sport.viewer", "Sportif Demo Gozlemci", "read-only", null, false)
     ];
 
     private static readonly IReadOnlyList<FormSpec> Forms =
@@ -47,18 +39,26 @@ internal static class SportifQuickDemoSeeder
         new(SportQuickLeadTaskFormId, SportQuickLeadTaskFormVersionId, "Hizli Mali Karar", "Takim sorumlusu mali karar formu.", "maliNot", "Mali not")
     ];
 
-    private static readonly IReadOnlyList<WorkflowSpec> Workflows =
+    private static readonly IReadOnlyList<Guid> LegacyRoleIds =
+    [
+        SportScoutLeadRoleId,
+        SportTechnicalApproverRoleId,
+        SportFinanceApproverRoleId,
+        SportOperationsRoleId
+    ];
+
+    private static readonly IReadOnlyList<WorkflowSpec> WorkflowTemplates =
     [
         new(
             "quick-scout",
             SportQuickScoutWorkflowId,
-            SportQuickScoutWorkflowVersionId,
+            SportQuickScoutWorkflowVersionV2Id,
             "Hizli Scout Incelemesi",
             "Scout Ekibi icin iki cikisli kisa inceleme akisi.",
             SportQuickScoutStartFormId,
             SportQuickScoutTaskFormVersionId,
             "scoutReview",
-            "Scout Incelemesi",
+            "Scout Değerlendirmesi",
             TaskAssignmentType.Team,
             SportScoutTeamId,
             null,
@@ -68,29 +68,29 @@ internal static class SportifQuickDemoSeeder
         new(
             "quick-technical",
             SportQuickTechnicalWorkflowId,
-            SportQuickTechnicalWorkflowVersionId,
+            SportQuickTechnicalWorkflowVersionV2Id,
             "Hizli Teknik Onay",
             "Teknik takim ve role atanan iki cikisli kisa onay akisi.",
             SportQuickTechnicalStartFormId,
             SportQuickTechnicalTaskFormVersionId,
             "technicalApproval",
-            "Teknik Onay",
+            "İlk İnceleme",
             TaskAssignmentType.TeamAndCommunityRole,
             SportTechnicalTeamId,
-            SportTechnicalApproverRoleId,
+            SportApproverRoleId,
             false,
             SportDemoStarterId,
             SportDemoApproverId),
         new(
             "quick-lead",
             SportQuickLeadWorkflowId,
-            SportQuickLeadWorkflowVersionId,
+            SportQuickLeadWorkflowVersionV2Id,
             "Hizli Lider Onayi",
             "Mali Isler takim sorumlusuna atanan iki cikisli kisa onay akisi.",
             SportQuickLeadStartFormId,
             SportQuickLeadTaskFormVersionId,
             "financeLeadApproval",
-            "Mali Lider Onayi",
+            "Mali Lider Onayı",
             TaskAssignmentType.Team,
             SportFinanceTeamId,
             null,
@@ -101,49 +101,38 @@ internal static class SportifQuickDemoSeeder
 
     public static async Task SeedAsync(AppDbContext db, CancellationToken cancellationToken = default)
     {
-        await EnsureRolesAsync(db, cancellationToken);
+        var sportApproverRoleId = await EnsureRolesAsync(db, cancellationToken);
+        var workflows = ResolveWorkflowRoles(sportApproverRoleId);
         await EnsureAccountsAsync(db, cancellationToken);
         await EnsureFormsAsync(db, cancellationToken);
-        var versions = await EnsureWorkflowsAsync(db, cancellationToken);
-        await EnsureScenarioProcessesAsync(db, versions, cancellationToken);
+        var versions = await EnsureWorkflowsAsync(db, workflows, cancellationToken);
+        await UpgradeLegacySeedDataAsync(db, workflows, versions, cancellationToken);
+        await EnsureScenarioProcessesAsync(db, workflows, versions, cancellationToken);
+        await RetireLegacyRolesAsync(db, cancellationToken);
     }
 
-    private static async Task EnsureRolesAsync(AppDbContext db, CancellationToken cancellationToken)
+    private static async Task<Guid> EnsureRolesAsync(AppDbContext db, CancellationToken cancellationToken)
     {
-        var existing = await db.CommunityRoles
+        var approverRoleId = await db.CommunityRoles
             .Where(role => role.CommunityId == SportCommunityId)
-            .Select(role => new { role.Id, role.Name })
-            .ToListAsync(cancellationToken);
+            .Where(role => role.TemplateKey == "approver" && role.IsSystemRole)
+            .Select(role => role.Id)
+            .SingleOrDefaultAsync(cancellationToken);
 
-        foreach (var role in CustomRoles)
+        if (approverRoleId == Guid.Empty)
         {
-            if (existing.Any(item => item.Id == role.Id || item.Name == role.Name))
-            {
-                continue;
-            }
-
-            db.CommunityRoles.Add(new CommunityRole
-            {
-                Id = role.Id,
-                CommunityId = SportCommunityId,
-                Name = role.Name,
-                Description = role.Description,
-                TemplateKey = role.TemplateKey,
-                IsSystemRole = false,
-                CreatedAt = DateTime.UtcNow.AddDays(-12),
-                Permissions = role.Permissions.Select(permission => new CommunityRolePermission
-                {
-                    Id = StableGuid($"sportif-quick-role:{role.Id}:{permission}"),
-                    Permission = permission
-                }).ToList()
-            });
+            throw new InvalidOperationException("Sportif Faaliyetler icin Onay Sorumlusu sistem rolu bulunamadi.");
         }
 
-        if (db.ChangeTracker.HasChanges())
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
+        return approverRoleId;
     }
+
+    private static IReadOnlyList<WorkflowSpec> ResolveWorkflowRoles(Guid sportApproverRoleId) =>
+        WorkflowTemplates
+            .Select(workflow => workflow.CommunityRoleId == SportApproverRoleId
+                ? workflow with { CommunityRoleId = sportApproverRoleId }
+                : workflow)
+            .ToArray();
 
     private static async Task EnsureAccountsAsync(AppDbContext db, CancellationToken cancellationToken)
     {
@@ -332,16 +321,17 @@ internal static class SportifQuickDemoSeeder
 
     private static async Task<IReadOnlyDictionary<string, ProcessDefinitionVersion>> EnsureWorkflowsAsync(
         AppDbContext db,
+        IReadOnlyList<WorkflowSpec> workflows,
         CancellationToken cancellationToken)
     {
-        var definitionIds = Workflows.Select(workflow => workflow.DefinitionId).ToArray();
+        var definitionIds = workflows.Select(workflow => workflow.DefinitionId).ToArray();
         var definitions = await db.ProcessDefinitions
             .Where(definition => definitionIds.Contains(definition.Id))
             .Include(definition => definition.Versions)
             .ToDictionaryAsync(definition => definition.Id, cancellationToken);
         var now = DateTime.UtcNow;
 
-        foreach (var workflow in Workflows)
+        foreach (var workflow in workflows)
         {
             if (!definitions.TryGetValue(workflow.DefinitionId, out var definition))
             {
@@ -385,10 +375,91 @@ internal static class SportifQuickDemoSeeder
         }
 
         return await db.ProcessDefinitionVersions
-            .Where(version => Workflows.Select(workflow => workflow.VersionId).Contains(version.Id))
+            .Where(version => workflows.Select(workflow => workflow.VersionId).Contains(version.Id))
             .ToDictionaryAsync(
-                version => Workflows.Single(workflow => workflow.VersionId == version.Id).Key,
+                version => workflows.Single(workflow => workflow.VersionId == version.Id).Key,
                 cancellationToken);
+    }
+
+    private static async Task UpgradeLegacySeedDataAsync(
+        AppDbContext db,
+        IReadOnlyList<WorkflowSpec> workflows,
+        IReadOnlyDictionary<string, ProcessDefinitionVersion> versions,
+        CancellationToken cancellationToken)
+    {
+        var workflowByProcessId = workflows
+            .SelectMany(workflow => Enum.GetValues<Scenario>()
+                .Select(scenario => new { ProcessId = ProcessId(workflow.Key, scenario), Workflow = workflow }))
+            .ToDictionary(item => item.ProcessId, item => item.Workflow);
+        var processIds = workflowByProcessId.Keys.ToArray();
+        var processes = await db.ProcessInstances
+            .Where(process => processIds.Contains(process.Id))
+            .AsSplitQuery()
+            .Include(process => process.Tasks)
+            .Include(process => process.StepExecutions)
+            .ToListAsync(cancellationToken);
+
+        foreach (var process in processes)
+        {
+            var workflow = workflowByProcessId[process.Id];
+            var version = versions[workflow.Key];
+
+            // These IDs belong only to deterministic demo scenarios. User-created instances stay pinned.
+            process.ProcessDefinitionVersionId = version.Id;
+            process.FormDefinitionId = workflow.StartFormId;
+            process.FormDefinitionVersionId = version.FormDefinitionVersionId;
+
+            foreach (var task in process.Tasks)
+            {
+                task.Title = workflow.TaskTitle;
+                task.AssignmentType = workflow.AssignmentType;
+                task.CandidateTeamId = workflow.TeamId;
+                task.AssignedCommunityRoleId = workflow.CommunityRoleId;
+                task.CandidateCommunityRoleId = workflow.CommunityRoleId;
+                task.RequiresTeamLead = workflow.RequiresTeamLead;
+            }
+
+            foreach (var step in process.StepExecutions.Where(step => step.NodeKey == workflow.TaskNodeKey))
+            {
+                step.NodeTitle = workflow.TaskTitle;
+                step.AssignmentType = workflow.AssignmentType;
+                step.TeamNameSnapshot = TeamName(workflow.TeamId);
+                step.CommunityRoleNameSnapshot = workflow.CommunityRoleId is null
+                    ? string.Empty
+                    : RoleName(workflow.CommunityRoleId.Value);
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static async Task RetireLegacyRolesAsync(AppDbContext db, CancellationToken cancellationToken)
+    {
+        var legacyRoles = await db.CommunityRoles
+            .Where(role => role.CommunityId == SportCommunityId && LegacyRoleIds.Contains(role.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var role in legacyRoles)
+        {
+            var hasMembershipReference = await db.UserCommunityMemberships
+                .AnyAsync(membership => membership.CommunityRoleId == role.Id, cancellationToken);
+            var hasTaskReference = await db.ProcessTasks
+                .AnyAsync(task => task.AssignedCommunityRoleId == role.Id
+                    || task.CandidateCommunityRoleId == role.Id, cancellationToken);
+
+            if (!hasMembershipReference && !hasTaskReference)
+            {
+                db.CommunityRoles.Remove(role);
+            }
+        }
+
+        if (db.ChangeTracker.HasChanges())
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     private static ProcessGraphDto BuildGraph(WorkflowSpec workflow, Guid startFormVersionId) =>
@@ -422,10 +493,11 @@ internal static class SportifQuickDemoSeeder
 
     private static async Task EnsureScenarioProcessesAsync(
         AppDbContext db,
+        IReadOnlyList<WorkflowSpec> workflows,
         IReadOnlyDictionary<string, ProcessDefinitionVersion> versions,
         CancellationToken cancellationToken)
     {
-        var desiredIds = Workflows
+        var desiredIds = workflows
             .SelectMany(workflow => Enum.GetValues<Scenario>().Select(scenario => ProcessId(workflow.Key, scenario)))
             .ToArray();
         var existingIds = (await db.ProcessInstances
@@ -434,7 +506,7 @@ internal static class SportifQuickDemoSeeder
                 .ToListAsync(cancellationToken))
             .ToHashSet();
 
-        foreach (var workflow in Workflows)
+        foreach (var workflow in workflows)
         {
             foreach (var scenario in Enum.GetValues<Scenario>())
             {
@@ -728,20 +800,13 @@ internal static class SportifQuickDemoSeeder
     private static string TeamName(Guid teamId) => teamId switch
     {
         var id when id == SportScoutTeamId => "Scout Ekibi",
-        var id when id == SportTechnicalTeamId => "Teknik Degerlendirme",
-        var id when id == SportFinanceTeamId => "Mali Isler",
+        var id when id == SportTechnicalTeamId => "Teknik Değerlendirme",
+        var id when id == SportFinanceTeamId => "Mali İşler",
         var id when id == SportTransferTeamId => "Transfer Operasyon",
         _ => string.Empty
     };
 
-    private static string RoleName(Guid roleId) => roleId switch
-    {
-        var id when id == SportScoutLeadRoleId => "Scout Sorumlusu",
-        var id when id == SportTechnicalApproverRoleId => "Teknik Onay Sorumlusu",
-        var id when id == SportFinanceApproverRoleId => "Mali Onay Sorumlusu",
-        var id when id == SportOperationsRoleId => "Transfer Operasyon Sorumlusu",
-        _ => string.Empty
-    };
+    private static string RoleName(Guid _) => "Onay Sorumlusu";
 
     private static Guid ProcessId(string key, Scenario scenario) =>
         StableGuid($"sportif-quick-process:{key}:{scenario}");
@@ -758,15 +823,7 @@ internal static class SportifQuickDemoSeeder
         string DisplayName,
         string RoleTemplateKey,
         Guid? TeamId,
-        Guid? CustomRoleId,
         bool IsLead);
-
-    private sealed record CustomRoleSpec(
-        Guid Id,
-        string Name,
-        string Description,
-        string TemplateKey,
-        IReadOnlyList<string> Permissions);
 
     private sealed record FormSpec(
         Guid FormId,

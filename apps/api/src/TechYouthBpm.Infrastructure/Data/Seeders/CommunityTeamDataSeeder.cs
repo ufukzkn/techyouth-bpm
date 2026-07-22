@@ -81,6 +81,21 @@ internal static class CommunityTeamDataSeeder
         var existingNames = existingTeams
             .Select(team => (team.CommunityId, team.NormalizedName))
             .ToHashSet();
+        var teamSeedsById = teamSeeds.ToDictionary(team => team.Id);
+
+        foreach (var existingTeam in existingTeams)
+        {
+            if (!teamSeedsById.TryGetValue(existingTeam.Id, out var seedTeam)
+                || (existingTeam.Name == seedTeam.Name && existingTeam.NormalizedName == seedTeam.NormalizedName))
+            {
+                continue;
+            }
+
+            // Stable seed IDs identify demo-owned teams; user-created teams are never renamed here.
+            existingTeam.Name = seedTeam.Name;
+            existingTeam.NormalizedName = seedTeam.NormalizedName;
+            existingTeam.UpdatedAt = DateTime.UtcNow;
+        }
 
         var missingTeams = teamSeeds
             .Where(team => !existingTeamIds.Contains(team.Id)
@@ -89,6 +104,9 @@ internal static class CommunityTeamDataSeeder
         if (missingTeams.Length > 0)
         {
             db.Teams.AddRange(missingTeams);
+        }
+        if (db.ChangeTracker.HasChanges())
+        {
             await db.SaveChangesAsync(cancellationToken);
         }
 
@@ -124,8 +142,8 @@ internal static class CommunityTeamDataSeeder
     private static IReadOnlyList<Team> BuildTeamSeeds() =>
     [
         TeamSeed(SportScoutTeamId, SportCommunityId, "Scout Ekibi", "Oyuncu izleme ve ilk teknik raporlama.", FatihTerimId),
-        TeamSeed(SportTechnicalTeamId, SportCommunityId, "Teknik Degerlendirme", "Teknik uygunluk ve kadro degerlendirmesi.", FatihTerimId),
-        TeamSeed(SportFinanceTeamId, SportCommunityId, "Mali Isler", "Transfer butcesi ve mali uygunluk kontrolu.", FatihTerimId),
+        TeamSeed(SportTechnicalTeamId, SportCommunityId, "Teknik Değerlendirme", "Teknik uygunluk ve kadro değerlendirmesi.", FatihTerimId),
+        TeamSeed(SportFinanceTeamId, SportCommunityId, "Mali İşler", "Transfer bütçesi ve mali uygunluk kontrolü.", FatihTerimId),
         TeamSeed(SportTransferTeamId, SportCommunityId, "Transfer Operasyon", "Sozlesme ve transfer operasyon takibi.", FatihTerimId),
         TeamSeed(LogisticsPlanningTeamId, LogisticsCommunityId, "Sevkiyat Planlama", "Sevkiyat rotasi ve kapasite planlamasi.", AtibaId),
         TeamSeed(LogisticsWarehouseTeamId, LogisticsCommunityId, "Depo Operasyon", "Depo cikis ve stok hareketleri.", AtibaId),

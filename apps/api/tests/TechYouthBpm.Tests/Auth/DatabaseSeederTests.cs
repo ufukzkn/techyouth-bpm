@@ -383,14 +383,30 @@ public class DatabaseSeederTests
             .Where(item => demoUsers.Select(user => user.Id).Contains(item.UserId) && item.IsActive)
             .ToListAsync();
         Assert.All(memberships, membership => Assert.Equal(community.Id, membership.CommunityId));
-        Assert.Contains(memberships, membership => membership.CommunityRole!.Name == "Scout Sorumlusu");
-        Assert.Contains(memberships, membership => membership.CommunityRole!.Name == "Teknik Onay Sorumlusu");
-        Assert.Contains(memberships, membership => membership.CommunityRole!.Name == "Mali Onay Sorumlusu");
+        var commonApproverRole = await db.CommunityRoles.SingleAsync(role =>
+            role.CommunityId == community.Id && role.IsSystemRole && role.TemplateKey == "approver");
+        var teamSpecialists = demoUsers
+            .Where(user => user.Username is "sport.scout" or "sport.approver" or "sport.finance" or "sport.operations")
+            .Select(user => user.Id)
+            .ToHashSet();
+        Assert.All(
+            memberships.Where(membership => teamSpecialists.Contains(membership.UserId)),
+            membership => Assert.Equal(commonApproverRole.Id, membership.CommunityRoleId));
         Assert.Contains(memberships, membership => membership.CommunityRole!.TemplateKey == "read-only");
+        var legacyRoleIds = new[]
+        {
+            Guid.Parse("20202020-0000-0000-0000-000000000030"),
+            Guid.Parse("20202020-0000-0000-0000-000000000031"),
+            Guid.Parse("20202020-0000-0000-0000-000000000032"),
+            Guid.Parse("20202020-0000-0000-0000-000000000033")
+        };
+        Assert.False(await db.CommunityRoles.AnyAsync(role => legacyRoleIds.Contains(role.Id)));
 
         var leads = await db.TeamMemberships
             .Where(item => demoUsers.Select(user => user.Id).Contains(item.UserId) && item.IsActive && item.IsLead)
             .ToListAsync();
+        Assert.Contains(await db.Teams.Where(team => team.CommunityId == community.Id).Select(team => team.Name).ToListAsync(), name => name == "Teknik Değerlendirme");
+        Assert.Contains(await db.Teams.Where(team => team.CommunityId == community.Id).Select(team => team.Name).ToListAsync(), name => name == "Mali İşler");
         Assert.Contains(leads, item => item.UserId == demoUsers.Single(user => user.Username == "sport.scout").Id);
         Assert.Contains(leads, item => item.UserId == demoUsers.Single(user => user.Username == "sport.approver").Id);
         Assert.Contains(leads, item => item.UserId == demoUsers.Single(user => user.Username == "sport.finance").Id);
@@ -407,7 +423,12 @@ public class DatabaseSeederTests
             definition => definition.Name,
             definition => JsonSerializer.Deserialize<ProcessGraphDto>(definition.Versions.Single().GraphJson, options)!);
         Assert.Equal(TaskAssignmentType.Team, graphs["Hizli Scout Incelemesi"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).Assignment!.Type);
-        Assert.Equal(TaskAssignmentType.TeamAndCommunityRole, graphs["Hizli Teknik Onay"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).Assignment!.Type);
+        var technicalTask = graphs["Hizli Teknik Onay"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask);
+        Assert.Equal("İlk İnceleme", technicalTask.Title);
+        Assert.Equal(TaskAssignmentType.TeamAndCommunityRole, technicalTask.Assignment!.Type);
+        Assert.Equal(commonApproverRole.Id, technicalTask.Assignment.CommunityRoleId);
+        Assert.Equal("Scout Değerlendirmesi", graphs["Hizli Scout Incelemesi"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).Title);
+        Assert.Equal("Mali Lider Onayı", graphs["Hizli Lider Onayi"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).Title);
         Assert.True(graphs["Hizli Lider Onayi"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).RequiresTeamLead);
         var validator = new ProcessGraphValidator(db);
         foreach (var definition in definitions)
@@ -486,5 +507,100 @@ public class DatabaseSeederTests
         Assert.True(await db.Users.AnyAsync(user => user.Id == userCreatedId));
         Assert.Equal(12, await db.ProcessInstances.CountAsync(process =>
             process.ProcessDefinitionVersionId.HasValue && quickVersionIds.Contains(process.ProcessDefinitionVersionId.Value)));
+    }
+
+    [Fact]
+    public async Task SeedAsync_Upgrades_Only_Known_Sportif_Legacy_Role_References()
+    {
+        await using var db = TestDbFactory.Create();
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        var community = await db.Communities.SingleAsync(item => item.Name == "Sportif Faaliyetler");
+        var commonApproverRole = await db.CommunityRoles.SingleAsync(role =>
+            role.CommunityId == community.Id && role.IsSystemRole && role.TemplateKey == "approver");
+        var legacyRoleId = Guid.Parse("20202020-0000-0000-0000-000000000032");
+        var legacyRole = new CommunityRole
+        {
+            Id = legacyRoleId,
+            CommunityId = community.Id,
+            Name = "Mali Onay Sorumlusu",
+            Description = "Legacy deterministic demo role.",
+            TemplateKey = "custom-finance-approver",
+            IsSystemRole = false,
+            CreatedAt = DateTime.UtcNow,
+            Permissions =
+            [
+                new CommunityRolePermission { Id = Guid.NewGuid(), Permission = PermissionNames.ProcessesView },
+                new CommunityRolePermission { Id = Guid.NewGuid(), Permission = PermissionNames.TasksView },
+                new CommunityRolePermission { Id = Guid.NewGuid(), Permission = PermissionNames.TasksAct }
+            ]
+        };
+        db.CommunityRoles.Add(legacyRole);
+
+        var financeUserId = await db.Users
+            .Where(user => user.Username == "sport.finance")
+            .Select(user => user.Id)
+            .SingleAsync();
+        var financeMembership = await db.UserCommunityMemberships.SingleAsync(membership =>
+            membership.UserId == financeUserId && membership.CommunityId == community.Id && membership.IsActive);
+        financeMembership.CommunityRoleId = legacyRoleId;
+
+        var technicalDefinition = await db.ProcessDefinitions
+            .Include(definition => definition.Versions)
+            .SingleAsync(definition => definition.Name == "Hizli Teknik Onay");
+        var currentVersion = technicalDefinition.Versions.Single();
+        var legacyVersionId = Guid.Parse("16161616-1000-0000-0000-000000000002");
+        db.ProcessDefinitionVersions.Add(new ProcessDefinitionVersion
+        {
+            Id = legacyVersionId,
+            ProcessDefinitionId = technicalDefinition.Id,
+            VersionNumber = currentVersion.VersionNumber + 1,
+            Status = DefinitionVersionStatus.Published,
+            FormDefinitionVersionId = currentVersion.FormDefinitionVersionId,
+            GraphJson = currentVersion.GraphJson.Replace(commonApproverRole.Id.ToString(), legacyRoleId.ToString(), StringComparison.OrdinalIgnoreCase),
+            CreatedByUserId = currentVersion.CreatedByUserId,
+            CreatedAt = currentVersion.CreatedAt,
+            PublishedByUserId = currentVersion.PublishedByUserId,
+            PublishedAt = currentVersion.PublishedAt
+        });
+
+        var deterministicProcess = await db.ProcessInstances
+            .Include(process => process.Tasks)
+            .SingleAsync(process => process.ProcessDefinitionVersionId == currentVersion.Id
+                && process.Tasks.Any(task => task.NodeKey == "technicalApproval" && task.Status == ProcessTaskStatus.Open));
+        deterministicProcess.ProcessDefinitionVersionId = legacyVersionId;
+        var deterministicTask = Assert.Single(deterministicProcess.Tasks);
+        deterministicTask.AssignedCommunityRoleId = legacyRoleId;
+        deterministicTask.CandidateCommunityRoleId = legacyRoleId;
+
+        var userCreatedRole = new CommunityRole
+        {
+            Id = Guid.NewGuid(),
+            CommunityId = community.Id,
+            Name = "Kullaniciya Ait Es Rol",
+            Description = "Must not be merged by permission equality.",
+            TemplateKey = "user-created-same-permissions",
+            IsSystemRole = false,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.CommunityRoles.Add(userCreatedRole);
+        await db.SaveChangesAsync();
+
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        Assert.Equal(commonApproverRole.Id, await db.UserCommunityMemberships
+            .Where(membership => membership.UserId == financeUserId && membership.IsActive)
+            .Select(membership => membership.CommunityRoleId)
+            .SingleAsync());
+        Assert.Equal(commonApproverRole.Id, await db.ProcessTasks
+            .Where(task => task.Id == deterministicTask.Id)
+            .Select(task => task.CandidateCommunityRoleId)
+            .SingleAsync());
+        Assert.Equal(currentVersion.Id, await db.ProcessInstances
+            .Where(process => process.Id == deterministicProcess.Id)
+            .Select(process => process.ProcessDefinitionVersionId)
+            .SingleAsync());
+        Assert.False(await db.CommunityRoles.AnyAsync(role => role.Id == legacyRoleId));
+        Assert.True(await db.CommunityRoles.AnyAsync(role => role.Id == userCreatedRole.Id));
     }
 }

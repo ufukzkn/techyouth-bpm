@@ -113,4 +113,7 @@ internal static class DemoSeedIds
     internal static readonly Guid SportQuickTechnicalWorkflowVersionId = Guid.Parse("16161616-1000-0000-0000-000000000002");
     internal static readonly Guid SportQuickLeadWorkflowId = Guid.Parse("16161616-0000-0000-0000-000000000003");
     internal static readonly Guid SportQuickLeadWorkflowVersionId = Guid.Parse("16161616-1000-0000-0000-000000000003");
+    internal static readonly Guid SportQuickScoutWorkflowVersionV2Id = Guid.Parse("16161616-2000-0000-0000-000000000001");
+    internal static readonly Guid SportQuickTechnicalWorkflowVersionV2Id = Guid.Parse("16161616-2000-0000-0000-000000000002");
+    internal static readonly Guid SportQuickLeadWorkflowVersionV2Id = Guid.Parse("16161616-2000-0000-0000-000000000003");
 }
