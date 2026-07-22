@@ -68,6 +68,10 @@
   color: var(--muted);
 }
 
+.process-context-line strong {
+  color: var(--foreground);
+}
+
 /* Drag & Drop Reorder Styles */
 
 .process-sortable-item {
@@ -212,6 +216,10 @@
   font-weight: 700;
 }
 
+.detail-list-wide {
+  grid-column: 1 / -1;
+}
+
 .compact-json {
   grid-column: auto;
   max-height: 220px;
@@ -220,6 +228,37 @@
 .task-list {
   display: grid;
   gap: 10px;
+}
+
+.task-list-skeleton span {
+  display: block;
+  min-height: 122px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-muted), color-mix(in srgb, var(--surface-muted) 72%, var(--surface)), var(--surface-muted));
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.35s ease-in-out infinite;
+}
+
+.process-list-load-error {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+}
+
+.process-list-load-error p {
+  margin: 0;
+  color: var(--danger);
+}
+
+.inline-refresh-icon {
+  display: inline-block;
+  margin-left: 8px;
+  vertical-align: -2px;
 }
 
 .task-item {

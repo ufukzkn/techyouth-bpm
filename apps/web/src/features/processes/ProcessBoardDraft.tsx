@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
@@ -67,9 +67,13 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [detail, setDetail] = useState<ProcessDetail | null>(null);
   const [status, setStatus] = useState<BoardStatus>("loading");
+  const [taskListState, setTaskListState] = useState<"loading" | "refreshing" | "idle" | "error">("loading");
+  const [taskListError, setTaskListError] = useState<string | null>(null);
+  const [hasTaskTargetResult, setHasTaskTargetResult] = useState(false);
   const [message, setMessage] = useState(() => t("process.loading"));
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const [toast, setToast] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const latestRequestRef = useRef(0);
 
   const availableScopes = activeUser ? getAvailableWorkflowScopes(activeUser) : ["personal"] as WorkflowVisibilityScope[];
   const processScope = resolveWorkflowScope(searchParams.get("scope"), availableScopes);
@@ -104,9 +108,14 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   }
 
   function prepareTaskQueryTransition(overrides: Partial<TaskListParams>) {
+    latestRequestRef.current += 1;
+    setIsManualRefreshing(false);
     const nextParams = { ...taskParams, ...overrides };
     const cached = taskPageCache.get(createProcessCacheKey(activeUserId, nextParams));
-    setTaskResult(cached ?? null);
+    if (cached) setTaskResult(cached);
+    setHasTaskTargetResult(Boolean(cached));
+    setTaskListState(cached ? "refreshing" : "loading");
+    setTaskListError(null);
     setStatus(cached ? "refreshing" : "loading");
     setMessage(t(cached ? "process.refreshing" : "process.loading"));
   }
@@ -180,7 +189,10 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   }
 
   async function refreshData(options: { manual?: boolean; force?: boolean; startedAt?: number } = {}) {
+    const requestId = ++latestRequestRef.current;
+    const isLatestRequest = () => latestRequestRef.current === requestId;
     if (!token) {
+      if (!isLatestRequest()) return;
       setStatus("error");
       setMessage(t("process.sessionRequired"));
       setToast({ kind: "error", text: t("process.toastSessionRequired") });
@@ -192,17 +204,25 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     const activeCache = mode === "processes"
       ? processPageCache.get(processCacheKey)
       : taskPageCache.get(taskCacheKey);
-    if (activeCache && !options.force) {
+    if (activeCache) {
       if (mode === "processes") setProcessResult(activeCache as PagedResult<ProcessSummary>);
       else setTaskResult(activeCache as PagedResult<ProcessTask>);
+    }
+    if (mode === "tasks") {
+      const hasCachedResult = Boolean(activeCache);
+      setHasTaskTargetResult(hasCachedResult);
+      setTaskListState(hasCachedResult ? "refreshing" : "loading");
+      setTaskListError(null);
     }
     setStatus(activeCache ? "refreshing" : "loading");
     setMessage(t(activeCache ? "process.refreshing" : "process.loading"));
     if (isManual) setIsManualRefreshing(true);
+    else setIsManualRefreshing(false);
 
     try {
       if (mode === "processes") {
         const result = await api.listProcesses(token, processParams);
+        if (!isLatestRequest()) return;
         processPageCache.set(processCacheKey, result);
         setProcessResult(result);
         if (requestedProcessId || selectedProcessId) {
@@ -220,8 +240,11 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
             ? api.listMyTasks(token, { page: 1, pageSize: 1, taskId: requestedTaskId, view: taskView })
             : Promise.resolve(null),
         ]);
+        if (!isLatestRequest()) return;
         taskPageCache.set(taskCacheKey, result);
         setTaskResult(result);
+        setHasTaskTargetResult(true);
+        setTaskListState("idle");
         const targetTask = requestedTaskResult?.items[0]
           ?? result.items.find((task) => task.id === selectedTaskId)
           ?? null;
@@ -235,19 +258,27 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
         setMessage(result.totalCount > 0 ? t("process.loaded") : t("process.empty"));
       }
 
+      if (!isLatestRequest()) return;
       setStatus("idle");
       if (isManual) {
         await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
         setToast({ kind: "success", text: t("process.toastRefreshed") });
       }
     } catch (error) {
+      if (!isLatestRequest()) return;
+      const errorMessage = error instanceof ApiError ? error.errors.join(" ") : t("process.loadFailed");
+      if (mode === "tasks") {
+        setTaskListError(errorMessage);
+        setTaskListState("error");
+      }
       setStatus("error");
-      setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.loadFailed"));
+      setMessage(errorMessage);
       setToast({
         kind: "error",
         text: error instanceof ApiError ? t("process.toastRefreshFailed") : t("process.toastUnexpectedRefreshFailed"),
       });
     } finally {
+      if (!isLatestRequest()) return;
       if (isManual) {
         await waitForMinimumDelay(refreshStartedAt, minimumRefreshDelayMs);
         setIsManualRefreshing(false);
@@ -287,6 +318,16 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof ApiError ? error.errors.join(" ") : t("process.detailFailed"));
+    }
+  }
+
+  async function loadTaskForAction(taskId: string) {
+    if (!token) return null;
+    try {
+      return await api.getTask(token, taskId);
+    } catch (error) {
+      setToast({ kind: "error", text: error instanceof ApiError ? error.errors.join(" ") : t("process.detailFailed") });
+      return null;
     }
   }
 
@@ -337,9 +378,12 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   }
 
   const activeResult = mode === "processes" ? processResult : taskResult;
-  const isInitialLoading = status === "loading" && !activeResult;
-  const isListLoading = status === "loading" || status === "refreshing";
+  const isInitialLoading = mode === "processes" && status === "loading" && !activeResult;
+  const isListLoading = mode === "tasks"
+    ? taskListState === "loading" || taskListState === "refreshing"
+    : status === "loading" || status === "refreshing";
   const totalPages = Math.max(1, Math.ceil((activeResult?.totalCount ?? 0) / pageSize));
+  const visibleTaskResult = taskResult ?? { items: [], page: taskPage, pageSize, totalCount: 0 };
 
   return (
     <section className="process-section">
@@ -375,7 +419,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
               <InlineValueLoader label={t(status === "refreshing" ? "process.refreshing" : "process.loading")} />
               <span>{t(status === "refreshing" ? "process.refreshing" : "process.loading")}</span>
             </>
-          ) : message}
+          ) : mode === "tasks" && taskListError ? null : message}
         </p>
         <button
           className="secondary-button refresh-button"
@@ -410,12 +454,13 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
               />
             ) : null}
 
-            {mode === "tasks" && taskResult ? (
+            {mode === "tasks" ? (
               <MyTasksView
                 activeUserId={activeUserId}
                 language={language}
                 onClaimTask={(taskId, claimVersion) => void updateTaskClaim(taskId, "claim", claimVersion)}
                 onExecuteTask={executeTask}
+                onLoadTaskDetail={loadTaskForAction}
                 onNextPage={() => changeTaskPage(taskPage + 1)}
                 onPageChange={changeTaskPage}
                 onPreviousPage={() => changeTaskPage(taskPage - 1)}
@@ -425,11 +470,15 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 onSortByChange={(value) => { prepareTaskQueryTransition({ page: 1, sortBy: value }); setTaskSortBy(value); setTaskPage(1); }}
                 onSortDirectionChange={(value) => { prepareTaskQueryTransition({ page: 1, sortDirection: value }); setTaskSortDirection(value); setTaskPage(1); }}
                 priorityFilter={taskPriority}
-                result={taskResult}
+                result={visibleTaskResult}
                 selectedTaskId={selectedTaskId}
                 sortBy={taskSortBy}
                 sortDirection={taskSortDirection}
                 status={status}
+                isListLoading={isListLoading}
+                listError={taskListError}
+                showListSkeleton={!hasTaskTargetResult && taskListState === "loading"}
+                onRetry={() => void refreshData({ force: true })}
                 taskView={taskView}
                 onTaskViewChange={changeTaskView}
               />

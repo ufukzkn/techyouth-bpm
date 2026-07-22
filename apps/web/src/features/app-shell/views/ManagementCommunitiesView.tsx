@@ -37,6 +37,7 @@ const allPermissions: PermissionName[] = [
   "Processes.Start",
   "Tasks.View",
   "Tasks.Act",
+  "Tasks.ManageAll",
   "Audit.View",
 ];
 

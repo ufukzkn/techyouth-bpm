@@ -10,6 +10,7 @@ import {
   Clock3,
   Hand,
   Crown,
+  RefreshCw,
   Undo2,
   UserRoundCheck,
   XCircle,
@@ -38,6 +39,9 @@ type MyTasksViewProps = {
   sortBy: NonNullable<TaskListParams["sortBy"]>;
   sortDirection: "asc" | "desc";
   status: "loading" | "refreshing" | "idle" | "acting" | "error";
+  isListLoading: boolean;
+  showListSkeleton: boolean;
+  listError: string | null;
   taskView: NonNullable<TaskListParams["view"]>;
   onClaimTask: (taskId: string, claimVersion?: string | null) => void;
   onReleaseTask: (taskId: string, claimVersion?: string | null) => void;
@@ -54,7 +58,9 @@ type MyTasksViewProps = {
     note: string,
     formData?: Record<string, unknown>,
   ) => Promise<boolean>;
+  onLoadTaskDetail: (taskId: string) => Promise<ProcessTask | null>;
   onTaskViewChange: (view: NonNullable<TaskListParams["view"]>) => void;
+  onRetry: () => void;
 };
 
 const priorities: Array<TaskPriority | "all"> = ["all", "Critical", "High", "Normal", "Low"];
@@ -68,6 +74,9 @@ export function MyTasksView({
   sortBy,
   sortDirection,
   status,
+  isListLoading,
+  showListSkeleton,
+  listError,
   taskView,
   onClaimTask,
   onReleaseTask,
@@ -79,23 +88,41 @@ export function MyTasksView({
   onPageChange,
   onPreviousPage,
   onExecuteTask,
+  onLoadTaskDetail,
   onTaskViewChange,
+  onRetry,
 }: MyTasksViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const isTr = language === "tr";
   const tasks = result.items;
   const [renderedAt] = useState(() => Date.now());
   const [pendingAction, setPendingAction] = useState<{
-    taskId: string;
+    task: ProcessTask;
     action: Exclude<WorkflowAction, "Start">;
   } | null>(null);
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
   const totalPages = Math.max(1, Math.ceil(result.totalCount / result.pageSize));
 
   async function handleConfirm(note: string, formData?: Record<string, unknown>) {
     if (!pendingAction) return false;
-    const succeeded = await onExecuteTask(pendingAction.taskId, pendingAction.action, note, formData);
+    const succeeded = await onExecuteTask(pendingAction.task.id, pendingAction.action, note, formData);
     if (succeeded) setPendingAction(null);
     return succeeded;
+  }
+
+  async function openTaskAction(task: ProcessTask, action: Exclude<WorkflowAction, "Start">) {
+    if (!task.formDefinitionVersionId || task.taskForm) {
+      setPendingAction({ task, action });
+      return;
+    }
+
+    setLoadingTaskId(task.id);
+    try {
+      const detailedTask = await onLoadTaskDetail(task.id);
+      if (detailedTask) setPendingAction({ task: detailedTask, action });
+    } finally {
+      setLoadingTaskId(null);
+    }
   }
 
   return (
@@ -104,7 +131,12 @@ export function MyTasksView({
         <div className="process-card-header">
           <div>
             <span className="eyebrow">{t("process.myTasks")}</span>
-            <strong>{t(taskView === "history" ? "process.historyTaskCount" : "process.openTaskCount", { count: result.totalCount })}</strong>
+            <strong>
+              {showListSkeleton
+                ? t("common.loading")
+                : t(taskView === "history" ? "process.historyTaskCount" : "process.openTaskCount", { count: result.totalCount })}
+              {isListLoading && !showListSkeleton ? <RefreshCw aria-label={t("process.refreshing")} className="inline-refresh-icon spin-icon" size={14} /> : null}
+            </strong>
           </div>
           <CircleDot size={22} />
         </div>
@@ -149,7 +181,14 @@ export function MyTasksView({
           </button>
         </div>
 
-        {tasks.length > 0 ? (
+        {listError ? (
+          <div className="process-list-load-error" role="alert">
+            <p>{listError}</p>
+            <button className="secondary-button" onClick={onRetry} type="button"><RefreshCw size={16} />{t("common.refresh")}</button>
+          </div>
+        ) : showListSkeleton ? (
+          <TaskListRegionSkeleton label={t("process.skeletonTasks")} />
+        ) : tasks.length > 0 ? (
           <div className="task-list">
             {tasks.map((task) => {
               const isOverdue = Boolean(task.dueAt && Date.parse(task.dueAt) < renderedAt);
@@ -180,9 +219,9 @@ export function MyTasksView({
                   {taskView === "active" ? <div>
                     <TaskControls
                       activeUserId={activeUserId}
-                      disabled={status === "acting"}
+                      disabled={status === "acting" || loadingTaskId === task.id}
                       language={language}
-                      onAction={(action) => setPendingAction({ taskId: task.id, action })}
+                      onAction={(action) => void openTaskAction(task, action)}
                       onClaim={() => onClaimTask(task.id, task.claimVersion)}
                       onRelease={() => onReleaseTask(task.id, task.claimVersion)}
                       task={task}
@@ -219,10 +258,18 @@ export function MyTasksView({
           language={language}
           onCancel={() => setPendingAction(null)}
           onConfirm={handleConfirm}
-          taskForm={tasks.find((task) => task.id === pendingAction.taskId)?.taskForm}
+          taskForm={pendingAction.task.taskForm}
         />
       ) : null}
     </>
+  );
+}
+
+function TaskListRegionSkeleton({ label }: { label: string }) {
+  return (
+    <div aria-label={label} className="task-list task-list-skeleton" role="status">
+      {[0, 1, 2].map((item) => <span key={item} />)}
+    </div>
   );
 }
 

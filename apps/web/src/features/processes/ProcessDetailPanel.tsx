@@ -1,6 +1,7 @@
 "use client";
 
 import { AuditTimeline } from "@/features/processes/AuditTimeline";
+import { describeProcessAssignment } from "@/features/processes/processAssignment";
 import { ProcessStepTimeline } from "@/features/processes/ProcessStepTimeline";
 
 import { statusLabel, translate, type TranslationKey } from "@/features/i18n/translations";
@@ -79,6 +80,10 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
                 <dt>{t("process.currentStepTitle")}</dt>
                 <dd>{detail.currentStep.title || detail.currentStep.nodeKey}</dd>
               </div>
+              <div className="detail-list-wide">
+                <dt>{t("process.currentResponsible")}</dt>
+                <dd>{describeProcessAssignment(language, detail.currentStep)}</dd>
+              </div>
               {detail.currentStep.teamName ? (
                 <div><dt>{t("process.assignmentTeam")}</dt><dd>{detail.currentStep.teamName}</dd></div>
               ) : null}
@@ -94,6 +99,10 @@ export function ProcessDetailPanel({ detail, language }: ProcessDetailPanelProps
               <div>
                 <dt>{t("process.currentStepSince")}</dt>
                 <dd>{formatApiDateTime(detail.currentStep.enteredAt, language)}</dd>
+              </div>
+              <div>
+                <dt>{t("process.nodeKey")}</dt>
+                <dd>{detail.currentStep.nodeKey}</dd>
               </div>
             </>
           ) : detail.currentNodeKey ? (
