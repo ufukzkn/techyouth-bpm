@@ -111,13 +111,15 @@ Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transacti
 rollback, pagination, OpenAPI sözleşmesi, task özet/detail ayrımı ve büyük fixture
 sorgu sınırlarını kapsar.
 
-Altı Playwright senaryosu gerçek API ve web sunucularıyla şunları otomatikleştirir:
+Sekiz Playwright senaryosu gerçek API ve web sunucularıyla şunları otomatikleştirir:
 
 - cookie session reload ve logout
 - normal kullanıcının doğrudan yönetim route'una erişememesi
 - form yayınlama, workflow'a bağlama ve süreç başlatma
 - takım+rol adaylığında claim zorunluluğu ve task action sınırı
 - Aktif/Geçmiş geçişinde slider'ın sabit kalması ve son isteğin state'i kazanması
+- Süreç durum filtresinde toolbar sabitken yalnız liste gövdesinin yenilenmesi
+- Takım üyesi iş yükünün seçilen kişinin kartının hemen altında açılması
 - Form Designer kabuğunun DnD canvas chunk'ından bağımsız yüklenmesi
 
 Bu otomasyon işlevsel zinciri korur; çok kullanıcılı tam Transfer sunumu,

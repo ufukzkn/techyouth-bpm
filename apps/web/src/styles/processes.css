@@ -38,6 +38,40 @@
   gap: 10px;
 }
 
+.process-list-skeleton {
+  min-height: 356px;
+}
+
+.process-list-item-skeleton {
+  pointer-events: none;
+}
+
+.process-list-item-skeleton > span:last-child {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+}
+
+.process-list-skeleton-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+
+.process-list-skeleton-title {
+  width: min(280px, 72%);
+  height: 18px;
+}
+
+.process-list-skeleton-meta {
+  width: min(420px, 90%);
+  height: 13px;
+}
+
+.process-list-skeleton-meta-short {
+  width: min(220px, 58%);
+}
+
 .process-list-item {
   min-height: 64px;
   display: flex;

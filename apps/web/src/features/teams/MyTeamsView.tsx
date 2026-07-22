@@ -2,7 +2,7 @@
 
 import { BriefcaseBusiness, Crown, Handshake, RefreshCw, Search, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SkeletonBlock } from "@/features/app-shell/components/AsyncState";
 import { PaginationControls } from "@/features/app-shell/components/PaginationControls";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
@@ -32,6 +32,7 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
   const [memberTasks, setMemberTasks] = useState<PagedResult<ProcessTask> | null>(null);
   const [memberTaskPage, setMemberTaskPage] = useState(1);
   const [isLoadingMemberTasks, setIsLoadingMemberTasks] = useState(false);
+  const memberTaskRequestRef = useRef(0);
 
   const selectedMembership = memberships.find((membership) => membership.teamId === selectedTeamId) ?? null;
   const rosterKey = useMemo(() => `${activeUser.id}:${selectedTeamId ?? "none"}:${query.trim()}:${page}`, [activeUser.id, page, query, selectedTeamId]);
@@ -119,12 +120,14 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
 
   async function selectMemberWorkload(member: TeamRosterMember, nextPage = 1) {
     if (!token || !selectedTeamId || !canInspectTeamWorkload || member.activeTaskCount <= 0) return;
+    const requestId = ++memberTaskRequestRef.current;
     const cacheKey = `${selectedTeamId}:${member.userId}:${nextPage}`;
     setSelectedWorkloadMember(member);
     setMemberTaskPage(nextPage);
     const cached = memberTaskCache.get(cacheKey);
     if (cached) {
       setMemberTasks(cached);
+      setIsLoadingMemberTasks(false);
       return;
     }
 
@@ -135,6 +138,7 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
         page: nextPage,
         pageSize: 5,
       });
+      if (memberTaskRequestRef.current !== requestId) return;
       memberTaskCache.set(cacheKey, result);
       setMemberTasks(result);
     } catch (error) {
@@ -143,7 +147,7 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
         text: localizeApiError(error, language, isTr ? "Üyenin işleri yüklenemedi." : "Member tasks could not be loaded."),
       });
     } finally {
-      setIsLoadingMemberTasks(false);
+      if (memberTaskRequestRef.current === requestId) setIsLoadingMemberTasks(false);
     }
   }
 
@@ -163,7 +167,7 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
           <section className="identity-section my-team-selector">
             <div className="section-toolbar"><div><span className="eyebrow">{isTr ? "Üyelikler" : "Memberships"}</span><h3>{isTr ? "Takımlar" : "Teams"}</h3></div><Handshake size={20} /></div>
             <div className="my-team-list">
-              {memberships.map((membership) => <button className={membership.teamId === selectedTeamId ? "my-team-option is-active" : "my-team-option"} key={membership.teamId} onClick={() => { setSelectedTeamId(membership.teamId); setPage(1); setQuery(""); setSelectedWorkloadMember(null); setMemberTasks(null); }} type="button"><span><UsersRound size={17} />{membership.teamName}</span>{membership.isLead ? <small><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</small> : null}</button>)}
+              {memberships.map((membership) => <button className={membership.teamId === selectedTeamId ? "my-team-option is-active" : "my-team-option"} key={membership.teamId} onClick={() => { memberTaskRequestRef.current += 1; setSelectedTeamId(membership.teamId); setPage(1); setQuery(""); setSelectedWorkloadMember(null); setMemberTasks(null); setIsLoadingMemberTasks(false); }} type="button"><span><UsersRound size={17} />{membership.teamName}</span>{membership.isLead ? <small><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</small> : null}</button>)}
             </div>
           </section>
 
@@ -174,55 +178,95 @@ export function MyTeamsView({ activeUser, language, token }: { activeUser: User;
             {!isLoadingRoster && roster?.items.length === 0 ? <p className="status-line">{isTr ? "Bu takımda görüntülenecek aktif üye yok." : "This team has no active members to display."}</p> : null}
             <div className={isLoadingRoster ? "team-roster-list is-refreshing" : "team-roster-list"}>
               {roster?.items.map((member) => (
-                <article className="settings-row team-roster-row" key={member.userId}>
-                  <div className="stacked-summary"><span>@{member.username}</span><strong>{member.displayName}</strong><small>{member.communityRoleName || (isTr ? "Rol atanmadı" : "No role assigned")}</small></div>
-                  <div className="team-roster-member-meta">
-                    {member.isLead ? <span className="status-pill status-pending"><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</span> : null}
-                    {canInspectTeamWorkload && member.activeTaskCount > 0 ? (
-                      <button className="team-member-task-count" onClick={() => void selectMemberWorkload(member)} type="button">
-                        <BriefcaseBusiness size={14} /> {member.activeTaskCount} {isTr ? "aktif iş" : "active tasks"}
-                      </button>
-                    ) : (
-                      <span className="team-member-task-count is-readonly">
-                        <BriefcaseBusiness size={14} /> {member.activeTaskCount} {isTr ? "aktif iş" : "active tasks"}
-                      </span>
-                    )}
-                  </div>
-                </article>
+                <div className="team-roster-member-block" key={member.userId}>
+                  <article className="settings-row team-roster-row">
+                    <div className="stacked-summary"><span>@{member.username}</span><strong>{member.displayName}</strong><small>{member.communityRoleName || (isTr ? "Rol atanmadı" : "No role assigned")}</small></div>
+                    <div className="team-roster-member-meta">
+                      {member.isLead ? <span className="status-pill status-pending"><Crown size={13} /> {isTr ? "Sorumlu" : "Lead"}</span> : null}
+                      {canInspectTeamWorkload && member.activeTaskCount > 0 ? (
+                        <button className="team-member-task-count" onClick={() => void selectMemberWorkload(member)} type="button">
+                          <BriefcaseBusiness size={14} /> {member.activeTaskCount} {isTr ? "aktif iş" : "active tasks"}
+                        </button>
+                      ) : (
+                        <span className="team-member-task-count is-readonly">
+                          <BriefcaseBusiness size={14} /> {member.activeTaskCount} {isTr ? "aktif iş" : "active tasks"}
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                  {selectedWorkloadMember?.userId === member.userId ? (
+                    <TeamMemberWorkloadPanel
+                      isLoading={isLoadingMemberTasks}
+                      isTr={isTr}
+                      language={language}
+                      member={member}
+                      onClose={() => { memberTaskRequestRef.current += 1; setSelectedWorkloadMember(null); setMemberTasks(null); setIsLoadingMemberTasks(false); }}
+                      onOpenTask={(processId) => router.push(`/processes?processId=${processId}`)}
+                      onPageChange={(nextPage) => void selectMemberWorkload(member, nextPage)}
+                      page={memberTaskPage}
+                      result={memberTasks}
+                    />
+                  ) : null}
+                </div>
               ))}
             </div>
             {totalPages > 1 ? <PaginationControls currentPage={page} language={language} onNext={() => setPage((value) => Math.min(totalPages, value + 1))} onPageChange={setPage} onPrevious={() => setPage((value) => Math.max(1, value - 1))} totalPages={totalPages} /> : null}
-            {selectedWorkloadMember ? (
-              <section className="team-member-workload">
-                <div className="section-toolbar">
-                  <div><span className="eyebrow">{isTr ? "İş yükü" : "Workload"}</span><h4>{selectedWorkloadMember.displayName}</h4></div>
-                  <button className="text-button" onClick={() => { setSelectedWorkloadMember(null); setMemberTasks(null); }} type="button">{isTr ? "Kapat" : "Close"}</button>
-                </div>
-                {isLoadingMemberTasks && !memberTasks ? <div className="team-roster-skeleton"><SkeletonBlock className="team-roster-row-skeleton" /><SkeletonBlock className="team-roster-row-skeleton" /></div> : null}
-                <div className="team-member-task-list">
-                  {memberTasks?.items.map((task) => (
-                    <button key={task.id} onClick={() => router.push(`/processes?processId=${task.processInstanceId}`)} type="button">
-                      <span><strong>{task.title || task.formName}</strong><small>{task.workflowName || task.communityName}</small></span>
-                      <span>{task.claimedByUserDisplayName || (isTr ? "Aday havuzu" : "Candidate pool")}</span>
-                    </button>
-                  ))}
-                </div>
-                {memberTasks && memberTasks.totalCount > memberTasks.pageSize ? (
-                  <PaginationControls
-                    currentPage={memberTaskPage}
-                    language={language}
-                    onNext={() => void selectMemberWorkload(selectedWorkloadMember, memberTaskPage + 1)}
-                    onPageChange={(nextPage) => void selectMemberWorkload(selectedWorkloadMember, nextPage)}
-                    onPrevious={() => void selectMemberWorkload(selectedWorkloadMember, Math.max(1, memberTaskPage - 1))}
-                    totalPages={Math.max(1, Math.ceil(memberTasks.totalCount / memberTasks.pageSize))}
-                  />
-                ) : null}
-              </section>
-            ) : null}
           </section>
         </div>
       )}
       {toast ? <WorkspaceToast kind={toast.kind} text={toast.text} /> : null}
+    </section>
+  );
+}
+
+function TeamMemberWorkloadPanel({
+  isLoading,
+  isTr,
+  language,
+  member,
+  onClose,
+  onOpenTask,
+  onPageChange,
+  page,
+  result,
+}: {
+  isLoading: boolean;
+  isTr: boolean;
+  language: Language;
+  member: TeamRosterMember;
+  onClose: () => void;
+  onOpenTask: (processId: string) => void;
+  onPageChange: (page: number) => void;
+  page: number;
+  result: PagedResult<ProcessTask> | null;
+}) {
+  const totalPages = Math.max(1, Math.ceil((result?.totalCount ?? 0) / (result?.pageSize ?? 5)));
+
+  return (
+    <section className="team-member-workload">
+      <div className="section-toolbar">
+        <div><span className="eyebrow">{isTr ? "İş yükü" : "Workload"}</span><h4>{member.displayName}</h4></div>
+        <button className="text-button" onClick={onClose} type="button">{isTr ? "Kapat" : "Close"}</button>
+      </div>
+      {isLoading && !result ? <div className="team-roster-skeleton"><SkeletonBlock className="team-roster-row-skeleton" /><SkeletonBlock className="team-roster-row-skeleton" /></div> : null}
+      <div className="team-member-task-list">
+        {result?.items.map((task) => (
+          <button key={task.id} onClick={() => onOpenTask(task.processInstanceId)} type="button">
+            <span><strong>{task.title || task.formName}</strong><small>{task.workflowName || task.communityName}</small></span>
+            <span>{task.claimedByUserDisplayName || (isTr ? "Aday havuzu" : "Candidate pool")}</span>
+          </button>
+        ))}
+      </div>
+      {result && result.totalCount > result.pageSize ? (
+        <PaginationControls
+          currentPage={page}
+          language={language}
+          onNext={() => onPageChange(Math.min(totalPages, page + 1))}
+          onPageChange={onPageChange}
+          onPrevious={() => onPageChange(Math.max(1, page - 1))}
+          totalPages={totalPages}
+        />
+      ) : null}
     </section>
   );
 }

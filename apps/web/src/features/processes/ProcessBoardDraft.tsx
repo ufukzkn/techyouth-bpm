@@ -41,6 +41,7 @@ type BoardStatus = "loading" | "refreshing" | "idle" | "acting" | "error";
 
 const pageSize = 10;
 const minimumRefreshDelayMs = 500;
+const emptyProcessItems: ProcessSummary[] = [];
 export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const token = useSessionStore((state) => state.token);
   const activeUser = useSessionStore((state) => state.user);
@@ -383,6 +384,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     ? taskListState === "loading" || taskListState === "refreshing"
     : status === "loading" || status === "refreshing";
   const totalPages = Math.max(1, Math.ceil((activeResult?.totalCount ?? 0) / pageSize));
+  const visibleProcessResult = processResult ?? { items: emptyProcessItems, page: processPage, pageSize, totalCount: 0 };
   const visibleTaskResult = taskResult ?? { items: [], page: taskPage, pageSize, totalCount: 0 };
 
   return (
@@ -433,9 +435,9 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
       </div>
 
       <div className={status === "refreshing" ? "process-grid is-refreshing" : "process-grid"}>
-        {isInitialLoading ? <ProcessBoardSkeleton mode={mode} /> : (
+        {mode === "tasks" && isInitialLoading ? <ProcessBoardSkeleton mode={mode} /> : (
           <>
-            {mode === "processes" && processResult ? (
+            {mode === "processes" ? (
               <ProcessListView
                 cacheScope={`${activeUserId}:${processScope}:${processPage}:${processStatus}:${processSortBy}:${processSortDirection}`}
                 language={language}
@@ -446,8 +448,9 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 onSortByChange={(value) => { prepareProcessQueryTransition({ page: 1, sortBy: value }); setProcessSortBy(value); setProcessPage(1); }}
                 onSortDirectionChange={(value) => { prepareProcessQueryTransition({ page: 1, sortDirection: value }); setProcessSortDirection(value); setProcessPage(1); }}
                 onStatusChange={changeProcessStatus}
-                result={processResult}
+                result={visibleProcessResult}
                 selectedProcessId={selectedProcessId}
+                showListSkeleton={isInitialLoading}
                 sortBy={processSortBy}
                 sortDirection={processSortDirection}
                 statusFilter={processStatus}

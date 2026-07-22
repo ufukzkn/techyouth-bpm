@@ -174,6 +174,40 @@ test("task view slider stays mounted while rapid filters resolve", async ({ page
   await expect(page.locator(".process-list-load-error")).toHaveCount(0);
 });
 
+test("process status filters stay mounted while only the list refreshes", async ({ page }) => {
+  await loginThroughUi(page, "sport.admin", "sport123");
+  await page.goto("/processes");
+
+  const filters = page.locator(".status-filters");
+  await expect(filters).toBeVisible();
+  await page.route("**/api/processes?**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    await route.continue();
+  });
+
+  await filters.getByRole("button", { name: "Beklemede" }).click();
+  await page.waitForTimeout(100);
+
+  expect(await filters.isVisible()).toBe(true);
+  await expect(page.locator(".process-list-skeleton")).toBeVisible();
+  await expect(page).toHaveURL(/\/processes\?status=Pending/);
+  await expect(page.locator(".process-list-skeleton")).toHaveCount(0);
+});
+
+test("team member workload opens directly beneath the selected teammate", async ({ page }) => {
+  await loginThroughUi(page, "sport.scout", "sport123");
+  await page.goto("/teams");
+
+  const workloadButton = page.locator("button.team-member-task-count").first();
+  await expect(workloadButton).toBeVisible();
+  const memberBlock = workloadButton.locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' team-roster-member-block ')]");
+
+  await workloadButton.click();
+
+  await expect(memberBlock.locator(".team-member-workload")).toBeVisible();
+  await expect(page.locator(".team-member-workload")).toHaveCount(1);
+});
+
 test("form designer shell and deferred drag canvas load independently", async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 1000 });
   await loginThroughUi(page, "admin", "admin123");

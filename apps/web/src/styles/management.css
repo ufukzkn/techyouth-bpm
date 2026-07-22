@@ -881,6 +881,11 @@
   gap: 6px;
 }
 
+.team-roster-member-block {
+  min-width: 0;
+  display: grid;
+}
+
 .team-member-task-count {
   min-height: 28px;
   display: inline-flex;
@@ -910,7 +915,7 @@ button.team-member-task-count:focus-visible {
 .team-member-workload {
   display: grid;
   gap: 10px;
-  margin-top: 12px;
+  margin: 6px 0 4px;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 7px;

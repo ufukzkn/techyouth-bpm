@@ -89,9 +89,10 @@ copying counts that become stale.
 - Workflow tests protect graph conversion, draft state, SLA representation and
   publish-validation helpers.
 - Production build verifies App Router boundaries and route-level imports.
-- Playwright runs six real-server scenarios for session reload/logout, direct
+- Playwright runs eight real-server scenarios for session reload/logout, direct
   route authorization, form/workflow publication/start, team-role claim, rapid
-  task-filter races and deferred Form Designer canvas loading.
+  task-filter races, stable process-filter loading, inline team workload details
+  and deferred Form Designer canvas loading.
 - Responsive geometry, drag/drop precision, focus, full-screen canvas and
   real-device touch still require manual acceptance.
 
@@ -124,7 +125,7 @@ On 22 July 2026:
 
 - Backend: **231/231** tests passed.
 - Frontend: **60/60** tests passed.
-- Playwright: **6/6** real-server scenarios passed.
+- Playwright: **8/8** real-server scenarios passed.
 - Frontend production build passed.
 - ESLint passed without errors or warnings.
 - Local/cloud Compose configuration, API/web image builds, old SQLite volume
