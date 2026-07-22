@@ -27,7 +27,7 @@
 
 .workflow-definition-select > span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -52,7 +52,7 @@
   align-self: center;
   justify-self: end;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   text-align: right;
 }
@@ -217,7 +217,7 @@
 .workflow-panel-heading span,
 .workflow-mobile-notice small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1.2;
   text-transform: uppercase;
@@ -255,7 +255,7 @@
   padding: 0 9px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -273,7 +273,7 @@
 
 .workflow-unsaved-indicator {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -301,7 +301,7 @@
   padding: 6px 14px;
   border-bottom: 1px solid var(--border);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   background: var(--surface-muted);
 }
 
@@ -313,7 +313,7 @@
 
 .workflow-editor-feedback strong {
   color: var(--foreground);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .workflow-feedback-icon {
@@ -351,7 +351,7 @@
 }
 
 .workflow-panel-heading strong {
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .workflow-palette-groups,
@@ -372,7 +372,7 @@
 .workflow-palette-group h3,
 .workflow-inspector-section h3 {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -449,7 +449,7 @@
 
 .workflow-palette-item > span:nth-child(2) {
   overflow: hidden;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -567,7 +567,7 @@
 }
 
 .workflow-node-heading strong {
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .workflow-node-icon {
@@ -592,7 +592,7 @@
 .workflow-node-task-meta,
 .workflow-node-action-count {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -678,14 +678,14 @@
 .workflow-gateway-copy > span,
 .workflow-gateway-copy small {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .workflow-gateway-copy strong {
   overflow: hidden;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -715,11 +715,11 @@
 
 .workflow-swimlane-heading strong {
   color: var(--foreground);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .workflow-swimlane-heading small {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -746,7 +746,7 @@
 
 .workflow-canvas .react-flow__edge-text {
   fill: var(--foreground);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
 }
 
@@ -812,7 +812,7 @@
 }
 
 .workflow-inspector-heading strong {
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .workflow-inspector-fields {
@@ -830,7 +830,7 @@
 .workflow-inspector-hint {
   margin: -4px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -842,7 +842,7 @@
 
 .workflow-inspector-field > span,
 .workflow-switch-row > span {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 750;
 }
 
@@ -855,7 +855,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--foreground);
-  font-size: 12px;
+  font-size: 14px;
   background: var(--surface);
 }
 
@@ -867,7 +867,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   background: var(--surface-muted);
 }
 
@@ -917,13 +917,13 @@
 
 .workflow-inspector-facts dt {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .workflow-inspector-facts dd {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -946,7 +946,7 @@
   padding: 6px 7px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   background: var(--surface-muted);
 }
@@ -992,14 +992,14 @@
   place-items: center;
   border-radius: 50%;
   color: var(--workflow-amber);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   background: var(--workflow-amber-soft);
 }
 
 .workflow-route-list strong {
   overflow: hidden;
-  font-size: 10px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1007,7 +1007,7 @@
 .workflow-route-list p,
 .workflow-validation-empty {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .workflow-edge-endpoints {
@@ -1017,7 +1017,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 750;
   background: var(--surface-muted);
 }
@@ -1038,7 +1038,7 @@
   padding: 8px 12px;
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -1064,12 +1064,12 @@
 }
 
 .workflow-validation-heading strong {
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .workflow-validation-heading small {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .workflow-validation-status-error,
@@ -1120,7 +1120,7 @@
 
 .workflow-validation-item span {
   color: var(--foreground);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -1156,7 +1156,7 @@
 .workflow-mobile-notice p {
   margin-top: 8px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
 }
 
@@ -1182,7 +1182,7 @@
 
 .workflow-mobile-notice dt {
   color: var(--muted);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
 }
