@@ -2,53 +2,17 @@
 
 import {
   Download,
-  FilePlus2,
   Plus,
   Upload,
 } from "lucide-react";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import {
-  closestCenter,
-  type CollisionDetection,
-  DndContext,
-  type DragCancelEvent,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
-  KeyboardSensor,
-  pointerWithin,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  horizontalListSortingStrategy,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { getEventCoordinates } from "@dnd-kit/utilities";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { ConfirmationDialog } from "@/features/app-shell/components/ConfirmationDialog";
-import { FormFieldEditor } from "@/features/form-designer/FormFieldEditor";
 import {
   FormPrimaryVersionActions,
-  FormVersionActionRail,
   type FormSaveState,
 } from "@/features/form-designer/FormVersionActions";
-import { MobileFieldPalette } from "@/features/form-designer/MobileFieldPalette";
-import {
-  FieldCanvasDropZone,
-  FieldPaletteRail,
-  FormDesignerOpeningSkeleton,
-  PaletteFieldTypeCard,
-  PaletteFieldTypeDragGhost,
-  SortablePageTab,
-  fieldTypeIcons,
-} from "@/features/form-designer/FormDesignerComponents";
-import { JsonViewer } from "@/features/ui/JsonViewer";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import {
   createDefaultField,
@@ -70,24 +34,15 @@ import {
   createVersionedLayout,
   findDesignerFieldLocation,
   findFirstDependencyField,
-  fieldCanvasDropId,
   flattenDesignerFields,
   getDefaultExpectedValue,
-  getPageDragId,
-  getPageIdFromDragId,
   getPaletteFieldDefaultLabel,
-  hasPaletteDragDistance,
-  isPageDragId,
-  isPaletteDragId,
-  isSupportedFieldType,
   moveFieldBetweenPages,
   moveFieldWithinPage,
   normalizeDesignerPages,
-  paletteDragDistanceThreshold,
   removeDesignerPage,
   reorderDesignerPages,
   reorderFieldsInPage,
-  resolvePaletteInsertIndex,
   toDesignerPages,
   updateDesignerField,
   upsertForm,
@@ -106,6 +61,14 @@ import type { Community, CreateFormRequest, FieldType, FormDefinition, Language,
 type DesignerSaveFieldErrorSource = "client" | "api";
 type DesignerSaveFieldError = DesignerFieldErrors[string] & { source: DesignerSaveFieldErrorSource };
 type DesignerSaveFieldErrors = Record<string, DesignerSaveFieldError>;
+
+const FormDesignerCanvas = dynamic(
+  () => import("@/features/form-designer/FormDesignerCanvas").then((module) => module.FormDesignerCanvas),
+  {
+    ssr: false,
+    loading: () => <FormDesignerCanvasSkeleton />,
+  },
+);
 
 export type FormDesignerDraftProps = {
   versionAdapter?: FormVersionAdapter;
@@ -150,16 +113,6 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const [moveFeedback, setMoveFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [displacedFeedback, setDisplacedFeedback] = useState<{ id: string; direction: -1 | 1 } | null>(null);
   const [recentlyMovedPage, setRecentlyMovedPage] = useState<{ id: string; direction: -1 | 1 } | null>(null);
-  const [paletteInsertIndex, setPaletteInsertIndex] = useState<number | null>(null);
-  const [paletteDragGhost, setPaletteDragGhost] = useState<{
-    fieldType: FieldType;
-    x: number;
-    y: number;
-  } | null>(null);
-  const paletteGhostFrameRef = useRef<number | null>(null);
-  const pendingPaletteGhostCoordinatesRef = useRef<{ x: number; y: number } | null>(null);
-  const lastPalettePointerYRef = useRef<number | null>(null);
-  const activePaletteGhostFieldType = paletteDragGhost?.fieldType ?? null;
   const fields = useMemo(() => flattenDesignerFields(pages), [pages]);
   const activePage = useMemo(
     () => pages.find((page) => page.id === activePageId) ?? pages[0],
@@ -178,44 +131,6 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
   const selectedFormName = savedForms.find((form) => form.id === selectedFormId)?.name;
   const isInitialDesignerLoading = Boolean(token) && !hasLoadedForms;
   const isPersisting = saveState === "saving" || saveState === "publishing";
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: paletteDragDistanceThreshold,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
-  const paletteAwareCollisionDetection = useCallback<CollisionDetection>(
-    (args) => {
-      if (!isPaletteDragId(args.active.id)) {
-        const isExistingFieldDrag = fields.some((field) => field.id === args.active.id);
-        if (!isExistingFieldDrag) return closestCenter(args);
-
-        const validIds = new Set([
-          ...activeFields.map((field) => field.id),
-          ...pages.map((page) => getPageDragId(page.id)),
-        ]);
-        const pointerTargets = pointerWithin(args).filter((collision) => validIds.has(String(collision.id)));
-        return pointerTargets.length > 0
-          ? pointerTargets
-          : closestCenter(args).filter((collision) => validIds.has(String(collision.id)));
-      }
-
-      lastPalettePointerYRef.current = args.pointerCoordinates?.y ?? null;
-      return pointerWithin(args).sort((left, right) => {
-        const leftIsField = activeFields.some((field) => field.id === left.id);
-        const rightIsField = activeFields.some((field) => field.id === right.id);
-        if (leftIsField !== rightIsField) return leftIsField ? -1 : 1;
-        if (left.id === fieldCanvasDropId && right.id !== fieldCanvasDropId) return 1;
-        if (right.id === fieldCanvasDropId && left.id !== fieldCanvasDropId) return -1;
-        return 0;
-      });
-    },
-    [activeFields, fields, pages],
-  );
 
   const formModel = useMemo<CreateFormRequest>(
     () => ({
@@ -264,35 +179,6 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     },
     [],
   );
-
-  useEffect(() => {
-    const activeFieldType = activePaletteGhostFieldType;
-    if (!activeFieldType) return;
-
-    function handlePalettePointerMove(event: PointerEvent) {
-      pendingPaletteGhostCoordinatesRef.current = { x: event.clientX, y: event.clientY };
-      if (paletteGhostFrameRef.current !== null) return;
-
-      paletteGhostFrameRef.current = window.requestAnimationFrame(() => {
-        paletteGhostFrameRef.current = null;
-        const coordinates = pendingPaletteGhostCoordinatesRef.current;
-        if (!coordinates) return;
-        setPaletteDragGhost((current) =>
-          current?.fieldType === activeFieldType ? { ...current, ...coordinates } : current,
-        );
-      });
-    }
-
-    window.addEventListener("pointermove", handlePalettePointerMove, { passive: true });
-    return () => {
-      window.removeEventListener("pointermove", handlePalettePointerMove);
-      if (paletteGhostFrameRef.current !== null) {
-        window.cancelAnimationFrame(paletteGhostFrameRef.current);
-        paletteGhostFrameRef.current = null;
-      }
-      pendingPaletteGhostCoordinatesRef.current = null;
-    };
-  }, [activePaletteGhostFieldType]);
 
   useEffect(() => {
     if (!token) {
@@ -396,96 +282,6 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     const timeoutId = window.setTimeout(() => setRecentlyMovedPage(null), 440);
     return () => window.clearTimeout(timeoutId);
   }, [recentlyMovedPage]);
-
-  function handleDragStart(event: DragStartEvent) {
-    if (!isPaletteDragId(event.active.id)) {
-      setPaletteDragGhost(null);
-      return;
-    }
-
-    const fieldType = event.active.data.current?.fieldType;
-    const pointerCoordinates = getEventCoordinates(event.activatorEvent);
-    setPaletteDragGhost(
-      isSupportedFieldType(fieldType) && pointerCoordinates
-        ? { fieldType, x: pointerCoordinates.x, y: pointerCoordinates.y }
-        : null,
-    );
-    setPaletteInsertIndex(null);
-    lastPalettePointerYRef.current = null;
-  }
-
-  function handleDragOver(event: DragOverEvent) {
-    if (!isPaletteDragId(event.active.id)) {
-      return;
-    }
-
-    setPaletteInsertIndex(resolvePaletteInsertIndex(event, activeFields, lastPalettePointerYRef.current));
-  }
-
-  function handleDragCancel(event: DragCancelEvent) {
-    if (isPaletteDragId(event.active.id)) {
-      setPaletteDragGhost(null);
-      setPaletteInsertIndex(null);
-      lastPalettePointerYRef.current = null;
-    }
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-
-    if (isPaletteDragId(active.id)) {
-      const fieldType = active.data.current?.fieldType;
-      const hasValidDropTarget = Boolean(
-        over && (over.id === fieldCanvasDropId || activeFields.some((field) => field.id === over.id)),
-      );
-      if (
-        paletteInsertIndex !== null &&
-        hasValidDropTarget &&
-        hasPaletteDragDistance(event.delta) &&
-        isSupportedFieldType(fieldType)
-      ) {
-        addFieldFromPalette(fieldType, paletteInsertIndex);
-      }
-      setPaletteDragGhost(null);
-      setPaletteInsertIndex(null);
-      lastPalettePointerYRef.current = null;
-      return;
-    }
-
-    if (isPageDragId(active.id)) {
-      if (over && isPageDragId(over.id) && active.id !== over.id) {
-        const activeId = getPageIdFromDragId(active.id);
-        const overId = getPageIdFromDragId(over.id);
-        setPages((current) => reorderDesignerPages(current, activeId, overId));
-        markUnsaved();
-      }
-      return;
-    }
-
-    if (!over) {
-      setPaletteInsertIndex(null);
-      return;
-    }
-
-    const destinationPageId = getPageIdFromDragId(over.id);
-    if (destinationPageId) {
-      moveFieldToPage(String(active.id), destinationPageId);
-      return;
-    }
-
-    if (active.id === over.id) {
-      return;
-    }
-
-    const activeFieldIndex = activeFields.findIndex((field) => field.id === active.id);
-    const overFieldIndex = activeFields.findIndex((field) => field.id === over.id);
-    if (activeFieldIndex < 0 || overFieldIndex < 0) {
-      return;
-    }
-
-    setPages((current) => reorderFieldsInPage(current, activePageId, String(active.id), String(over.id)));
-    markUnsaved();
-  }
 
   function addFieldFromPalette(fieldType: FieldType, insertIndex: number) {
     const defaultLabel = getPaletteFieldDefaultLabel(language, fieldType);
@@ -692,7 +488,6 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       },
     ]);
     setActivePageId(id);
-    setPaletteInsertIndex(null);
     markUnsaved();
   }
 
@@ -716,7 +511,6 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
     if (activePageId === id) {
       setActivePageId(destination.id);
     }
-    setPaletteInsertIndex(null);
     markUnsaved();
   }
 
@@ -727,7 +521,7 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
       return;
     }
 
-    setPages((current) => normalizeDesignerPages(arrayMove(current, currentIndex, targetIndex)));
+    setPages((current) => reorderDesignerPages(current, id, current[targetIndex].id));
     setRecentlyMovedPage({ id, direction });
     markUnsaved();
   }
@@ -740,12 +534,25 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
 
     setPages((current) => moveFieldBetweenPages(current, fieldId, destinationPageId));
     setActivePageId(destinationPageId);
-    setPaletteInsertIndex(null);
     triggerFieldHighlight(fieldId);
     markUnsaved();
     window.requestAnimationFrame(() => {
       document.getElementById(`designer-field-${fieldId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
+  }
+
+  function reorderPagesFromCanvas(sourcePageId: string, destinationPageId: string) {
+    setPages((current) => reorderDesignerPages(current, sourcePageId, destinationPageId));
+    markUnsaved();
+  }
+
+  function reorderFieldsFromCanvas(sourceFieldId: string, destinationFieldId: string) {
+    setPages((current) => reorderFieldsInPage(current, activePageId, sourceFieldId, destinationFieldId));
+    markUnsaved();
+  }
+
+  function selectPageFromCanvas(pageId: string) {
+    setActivePageId(pageId);
   }
 
   function addOption(fieldId: string) {
@@ -1130,401 +937,93 @@ export function FormDesignerDraft({ versionAdapter }: FormDesignerDraftProps = {
         <p>{t("form.designer.description")}</p>
       </div>
 
-      {isInitialDesignerLoading ? <FormDesignerOpeningSkeleton label={t("form.designer.loadingForms")} /> : null}
+      {isInitialDesignerLoading ? <FormDesignerCanvasSkeleton label={t("form.designer.loadingForms")} /> : null}
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={paletteAwareCollisionDetection}
-        onDragCancel={handleDragCancel}
-        onDragEnd={handleDragEnd}
-        onDragOver={handleDragOver}
-        onDragStart={handleDragStart}
-      >
+      {!isInitialDesignerLoading ? (
         <div className="designer-grid">
           <div className="tool-panel designer-form-info-panel" aria-busy={isSwitchingForm || isCreatingNewForm}>
             {isSwitchingForm || isCreatingNewForm ? (
               <div className="designer-form-transition-overlay" role="status" aria-live="polite">
-                <span className="designer-form-transition-indicator">
-                  <InlineValueLoader
-                    label={isCreatingNewForm ? t("form.designer.preparingNewForm") : t("form.designer.loadingForms")}
-                  />
-                </span>
+                <span className="designer-form-transition-indicator"><InlineValueLoader label={isCreatingNewForm ? t("form.designer.preparingNewForm") : t("form.designer.loadingForms")} /></span>
               </div>
             ) : null}
             <h3>{t("form.designer.formInfo")}</h3>
-            {isLoadingForms && !isSwitchingForm ? (
-              <div className="designer-loading-state" aria-live="polite">
-                <InlineValueLoader label={t("form.designer.loadingForms")} />
-                <span>{t("form.designer.loadingForms")}</span>
-              </div>
-            ) : null}
-            <label>
-              {t("form.designer.savedForm")}
-              <select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}>
-                <option value="">{isLoadingForms ? t("form.designer.loadingForms") : t("form.designer.newDraft")}</option>
-                {savedForms.map((form) => (
-                  <option key={form.id} value={form.id}>
-                    {form.name}{isSuperAdmin ? ` · ${form.communityName}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {isSuperAdmin ? (
-              <label>
-                {t("form.designer.communityLabel")}
-                <select
-                  disabled={isLoadingCommunities || Boolean(selectedFormId)}
-                  value={selectedCommunityId}
-                  onChange={(event) => {
-                    setSelectedCommunityId(event.target.value);
-                    setShowCommunityError(false);
-                    markUnsaved();
-                  }}
-                >
-                  <option value="">
-                    {isLoadingCommunities
-                      ? t("form.designer.loadingCommunities")
-                      : t("form.designer.selectCommunity")}
-                  </option>
-                  {communities
-                    .filter((community) => community.isActive || community.id === selectedCommunityId)
-                    .map((community) => (
-                      <option key={community.id} value={community.id}>
-                        {community.name}{community.isActive ? "" : ` (${t("form.designer.inactiveCommunity")})`}
-                      </option>
-                    ))}
-                </select>
-                <span className="helper-copy">
-                  {selectedFormId
-                    ? t("form.designer.communityLocked")
-                    : t("form.designer.communityHelp")}
-                </span>
-                {showCommunityError ? <span className="field-error">{t("form.designer.communityRequired")}</span> : null}
-              </label>
-            ) : null}
-            <label>
-              {t("form.designer.formName")}
-              <input
-                value={formName}
-                onChange={(event) => {
-                  setFormName(event.target.value);
-                  markUnsaved();
-                }}
-              />
-            </label>
-            <label>
-              {t("form.designer.descriptionLabel")}
-              <input
-                value={description}
-                onChange={(event) => {
-                  setDescription(event.target.value);
-                  markUnsaved();
-                }}
-              />
-            </label>
-            <p className="helper-copy">
-              {selectedFormId
-                ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") })
-                : t("form.designer.createOnSave")}
-            </p>
-            <FormPrimaryVersionActions
-              canArchive={Boolean(versionAdapter?.archive)}
-              canPublish={Boolean(versionAdapter?.publish)}
-              canSaveDraft={Boolean(versionAdapter?.saveDraft)}
-              isPersisting={isPersisting}
-              language={language}
-              onArchive={() => setIsArchiveConfirmationOpen(true)}
-              onPublish={() => void publishForm()}
-              onSaveDraft={() => void saveDraft()}
-              saveState={saveState}
-              savingLabel={t("form.designer.saving")}
-              versionState={versionState}
-            />
-            <button
-              className="secondary-button"
-              disabled={isPersisting}
-              type="button"
-              onClick={startNewForm}
-            >
-              <Plus size={18} />
-              {t("form.designer.newForm")}
-            </button>
-            <div className="designer-draft-transfer-actions">
-              <button className="secondary-button" disabled={isPersisting} onClick={exportDraft} type="button">
-                <Download size={17} aria-hidden="true" />
-                {t("form.designer.exportDraft")}
-              </button>
-              <button
-                className="secondary-button"
-                disabled={isPersisting}
-                onClick={() => draftFileInputRef.current?.click()}
-                type="button"
-              >
-                <Upload size={17} aria-hidden="true" />
-                {t("form.designer.importDraft")}
-              </button>
-              <input
-                ref={draftFileInputRef}
-                accept="application/json,.json"
-                className="draft-file-input"
-                onChange={(event) => void importDraft(event.currentTarget.files?.[0])}
-                type="file"
-              />
-            </div>
-            <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}>
-              <li>{t("form.designer.demoStepEdit")}</li>
-              <li>{t("form.designer.demoStepOptions")}</li>
-              <li>{t("form.designer.demoStepRequiredWhen")}</li>
-              <li>{t("form.designer.demoStepOrdering")}</li>
-            </ol>
+            {isLoadingForms && !isSwitchingForm ? <div className="designer-loading-state" aria-live="polite"><InlineValueLoader label={t("form.designer.loadingForms")} /><span>{t("form.designer.loadingForms")}</span></div> : null}
+            <label>{t("form.designer.savedForm")}<select disabled={isLoadingForms} value={selectedFormId} onChange={(event) => loadSavedForm(event.target.value)}><option value="">{isLoadingForms ? t("form.designer.loadingForms") : t("form.designer.newDraft")}</option>{savedForms.map((form) => <option key={form.id} value={form.id}>{form.name}{isSuperAdmin ? ` · ${form.communityName}` : ""}</option>)}</select></label>
+            {isSuperAdmin ? <label>{t("form.designer.communityLabel")}<select disabled={isLoadingCommunities || Boolean(selectedFormId)} value={selectedCommunityId} onChange={(event) => { setSelectedCommunityId(event.target.value); setShowCommunityError(false); markUnsaved(); }}><option value="">{isLoadingCommunities ? t("form.designer.loadingCommunities") : t("form.designer.selectCommunity")}</option>{communities.filter((community) => community.isActive || community.id === selectedCommunityId).map((community) => <option key={community.id} value={community.id}>{community.name}{community.isActive ? "" : ` (${t("form.designer.inactiveCommunity")})`}</option>)}</select><span className="helper-copy">{selectedFormId ? t("form.designer.communityLocked") : t("form.designer.communityHelp")}</span>{showCommunityError ? <span className="field-error">{t("form.designer.communityRequired")}</span> : null}</label> : null}
+            <label>{t("form.designer.formName")}<input value={formName} onChange={(event) => { setFormName(event.target.value); markUnsaved(); }} /></label>
+            <label>{t("form.designer.descriptionLabel")}<input value={description} onChange={(event) => { setDescription(event.target.value); markUnsaved(); }} /></label>
+            <p className="helper-copy">{selectedFormId ? t("form.designer.editingSelected", { name: selectedFormName ?? t("form.designer.selectedForm") }) : t("form.designer.createOnSave")}</p>
+            <FormPrimaryVersionActions canArchive={Boolean(versionAdapter?.archive)} canPublish={Boolean(versionAdapter?.publish)} canSaveDraft={Boolean(versionAdapter?.saveDraft)} isPersisting={isPersisting} language={language} onArchive={() => setIsArchiveConfirmationOpen(true)} onPublish={() => void publishForm()} onSaveDraft={() => void saveDraft()} saveState={saveState} savingLabel={t("form.designer.saving")} versionState={versionState} />
+            <button className="secondary-button" disabled={isPersisting} type="button" onClick={startNewForm}><Plus size={18} />{t("form.designer.newForm")}</button>
+            <div className="designer-draft-transfer-actions"><button className="secondary-button" disabled={isPersisting} onClick={exportDraft} type="button"><Download size={17} aria-hidden="true" />{t("form.designer.exportDraft")}</button><button className="secondary-button" disabled={isPersisting} onClick={() => draftFileInputRef.current?.click()} type="button"><Upload size={17} aria-hidden="true" />{t("form.designer.importDraft")}</button><input ref={draftFileInputRef} accept="application/json,.json" className="draft-file-input" onChange={(event) => void importDraft(event.currentTarget.files?.[0])} type="file" /></div>
+            <ol className="demo-steps" aria-label={t("form.designer.demoStepsAria")}><li>{t("form.designer.demoStepEdit")}</li><li>{t("form.designer.demoStepOptions")}</li><li>{t("form.designer.demoStepRequiredWhen")}</li><li>{t("form.designer.demoStepOrdering")}</li></ol>
           </div>
 
           <div className="tool-panel designer-manual-field-panel" aria-busy={isAddingManualField}>
-            {isAddingManualField ? (
-              <div className="designer-manual-field-overlay" role="status" aria-live="polite">
-                <span className="designer-manual-field-indicator">
-                  <InlineValueLoader label={t("form.designer.addingField")} />
-                  <span>{t("form.designer.addingField")}</span>
-                </span>
-              </div>
-            ) : null}
+            {isAddingManualField ? <div className="designer-manual-field-overlay" role="status" aria-live="polite"><span className="designer-manual-field-indicator"><InlineValueLoader label={t("form.designer.addingField")} /><span>{t("form.designer.addingField")}</span></span></div> : null}
             <h3>{t("form.designer.addFieldTitle")}</h3>
-            <label>
-              {t("form.designer.label")}
-              <input
-                value={label}
-                onChange={(event) => setLabel(event.target.value)}
-                placeholder={t("form.designer.labelPlaceholder")}
-              />
-            </label>
-            <label>
-              {t("form.designer.type")}
-              <select value={type} onChange={(event) => setType(event.target.value as FieldType)}>
-                {supportedFieldTypes.map((fieldType) => (
-                  <option key={fieldType} value={fieldType}>
-                    {fieldTypeLabel(language, fieldType)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="checkbox-row">
-              <input checked={required} onChange={(event) => setRequired(event.target.checked)} type="checkbox" />
-              {t("form.designer.requiredField")}
-            </label>
-            <button className="secondary-button" type="button" onClick={addField}>
-              <Plus size={18} />
-              {t("form.designer.addField")}
-            </button>
+            <label>{t("form.designer.label")}<input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t("form.designer.labelPlaceholder")} /></label>
+            <label>{t("form.designer.type")}<select value={type} onChange={(event) => setType(event.target.value as FieldType)}>{supportedFieldTypes.map((fieldType) => <option key={fieldType} value={fieldType}>{fieldTypeLabel(language, fieldType)}</option>)}</select></label>
+            <label className="checkbox-row"><input checked={required} onChange={(event) => setRequired(event.target.checked)} type="checkbox" />{t("form.designer.requiredField")}</label>
+            <button className="secondary-button" type="button" onClick={addField}><Plus size={18} />{t("form.designer.addField")}</button>
           </div>
 
-          <section className="designer-pages-panel" aria-label={pagingCopy.pages}>
-            <div className="designer-pages-header">
-              <div className="designer-pages-heading">
-                <span className="eyebrow">{pagingCopy.pages}</span>
-                <strong>{pagingCopy.pageDropHint}</strong>
-              </div>
-              <button className="secondary-button designer-page-add-button" type="button" onClick={addPage}>
-                <FilePlus2 size={17} />
-                {pagingCopy.addPage}
-              </button>
-            </div>
-
-            <SortableContext
-              items={pages.map((page) => getPageDragId(page.id))}
-              strategy={horizontalListSortingStrategy}
-            >
-              <div className="designer-page-tabs" role="tablist" aria-label={pagingCopy.pages}>
-                {pages.map((page, index) => {
-                  const movedDirection = recentlyMovedPage?.id === page.id ? recentlyMovedPage.direction : null;
-                  return (
-                    <div
-                      className={`designer-page-card-motion${
-                        movedDirection === -1
-                          ? " designer-page-card-moved-left"
-                          : movedDirection === 1
-                            ? " designer-page-card-moved-right"
-                            : ""
-                      }`}
-                      key={page.id}
-                      role="presentation"
-                    >
-                      <SortablePageTab
-                        active={page.id === activePage?.id}
-                        canMoveLeft={index > 0}
-                        canMoveRight={index < pages.length - 1}
-                        canRemove={pages.length > 1}
-                        copy={pagingCopy}
-                        hasError={!page.title.trim()}
-                        index={index}
-                        page={page}
-                        onMove={(direction) => movePage(page.id, direction)}
-                        onRemove={() => removePage(page.id)}
-                        onSelect={() => {
-                          setActivePageId(page.id);
-                          setPaletteInsertIndex(null);
-                        }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </SortableContext>
-
-            {activePage ? (
-              <div className="designer-page-editor designer-page-metadata">
-                <label>
-                  {pagingCopy.pageTitle}
-                  <input value={activePage.title} onChange={(event) => updatePage(activePage.id, { title: event.target.value })} />
-                  {!activePage.title.trim() ? <span className="field-error">{pagingCopy.pageTitleRequired}</span> : null}
-                </label>
-                <label>
-                  {pagingCopy.pageDescription}
-                  <input
-                    value={activePage.description}
-                    onChange={(event) => updatePage(activePage.id, { description: event.target.value })}
-                    placeholder={pagingCopy.pageDescriptionPlaceholder}
-                  />
-                </label>
-              </div>
-            ) : null}
-          </section>
-
-          <SortableContext items={activeFields.map((field) => field.id)} strategy={verticalListSortingStrategy}>
-            <FieldCanvasDropZone label={t("form.designer.fieldListAria")}>
-              <div className="designer-help-panel">
-                <strong>{activePage?.title || t("form.designer.dropZoneTitle")}</strong>
-                <span>
-                  {t("form.designer.fieldListHelpDescription")} {pagingCopy.pageDropHint}
-                </span>
-              </div>
-              {activeFields.length === 0 ? <p className="empty-state designer-page-empty">{pagingCopy.emptyPage}</p> : null}
-              {activeFields.map((field, index) => (
-                <Fragment key={field.id}>
-                  {paletteInsertIndex === index ? (
-                    <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
-                  ) : null}
-                  <FormFieldEditor
-                    activeFieldCount={activeFields.length}
-                    activePageId={activePage?.id ?? ""}
-                    displacedFeedback={displacedFeedback}
-                    field={field}
-                    fields={fields}
-                    highlighted={highlightedFieldId === field.id}
-                    index={index}
-                    language={language}
-                    liveFieldError={fieldErrors[field.id]}
-                    moveFeedback={moveFeedback}
-                    pages={pages}
-                    saveFieldError={saveFieldErrors[field.id]}
-                    onAddOption={addOption}
-                    onAddRule={addRequiredWhenRule}
-                    onMoveField={moveField}
-                    onMoveFieldToPage={moveFieldToPage}
-                    onRemoveField={removeField}
-                    onRemoveOption={removeOption}
-                    onRemoveRule={removeRequiredWhenRule}
-                    onToggleRequired={toggleRequired}
-                    onUpdateField={updateField}
-                    onUpdateFieldType={updateFieldType}
-                    onUpdateOption={updateOption}
-                    onUpdateRule={updateRequiredWhenRule}
-                    onUpdateRuleDependency={updateRuleDependency}
-                  />
-                </Fragment>
-              ))}
-              {paletteInsertIndex === activeFields.length ? (
-                <div className="field-insert-indicator field-insert-indicator-preview" aria-hidden="true" />
-              ) : null}
-            </FieldCanvasDropZone>
-          </SortableContext>
-
-          <div className="json-preview-panel">
-            <div>
-              <span className="eyebrow">{t("form.designer.jsonPreviewEyebrow")}</span>
-              <h3>{t("form.designer.jsonPreviewTitle")}</h3>
-              <p>{t("form.designer.jsonPreviewDescription")}</p>
-            </div>
-            <JsonViewer language={language} value={previewModel} />
-          </div>
-
-          <FieldPaletteRail label={t("form.designer.fieldPaletteStickyTitle")}>
-            <div className="field-palette">
-              <div className="field-palette-header">
-                <strong>{t("form.designer.fieldPaletteStickyTitle")}</strong>
-                <span>{t("form.designer.fieldPaletteStickyDescription")}</span>
-              </div>
-              <div className="field-palette-grid">
-                {supportedFieldTypes.map((fieldType) => (
-                  <PaletteFieldTypeCard fieldType={fieldType} key={fieldType} language={language} />
-                ))}
-              </div>
-            </div>
-            <div className="designer-save-panel">
-              <FormVersionActionRail
-                canArchive={Boolean(versionAdapter?.archive)}
-                canPublish={Boolean(versionAdapter?.publish)}
-                canSaveDraft={Boolean(versionAdapter?.saveDraft)}
-                isPersisting={isPersisting}
-                language={language}
-                onArchive={() => setIsArchiveConfirmationOpen(true)}
-                onPublish={() => void publishForm()}
-                onSaveDraft={() => void saveDraft()}
-                saveState={saveState}
-                savingLabel={t("form.designer.saving")}
-                versionState={versionState}
-              />
-              {hasFieldErrors ? (
-                <div className="field-error designer-blocking-error" role="alert">
-                  <strong>{t("form.designer.saveBlockedTitle")}</strong>
-                  {fieldErrorSummary.messages.length === 1 ? (
-                    <span>{fieldErrorSummary.messages[0]}</span>
-                  ) : (
-                    <ul>
-                      {fieldErrorSummary.messages.map((errorMessage) => (
-                        <li key={errorMessage}>{errorMessage}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {fieldErrorSummary.remainingCount > 0 ? (
-                    <span className="designer-blocking-error-more">
-                      {t("form.designer.moreErrors", { count: fieldErrorSummary.remainingCount })}
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-              {showCommunityError ? <p className="field-error">{t("form.designer.communityRequired")}</p> : null}
-              <p className={`status-line status-line-${saveState}`} aria-live="polite">
-                {message}
-              </p>
-            </div>
-          </FieldPaletteRail>
+          <FormDesignerCanvas
+            activeFieldCount={activeFields.length}
+            activeFields={activeFields}
+            activePage={activePage}
+            activePageId={activePageId}
+            canArchive={Boolean(versionAdapter?.archive)}
+            canPublish={Boolean(versionAdapter?.publish)}
+            canSaveDraft={Boolean(versionAdapter?.saveDraft)}
+            displacedFeedback={displacedFeedback}
+            fieldErrorSummary={fieldErrorSummary}
+            fieldErrors={fieldErrors}
+            fields={fields}
+            hasFieldErrors={hasFieldErrors}
+            highlightedFieldId={highlightedFieldId}
+            isPersisting={isPersisting}
+            language={language}
+            message={message}
+            moveFeedback={moveFeedback}
+            onAddOption={addOption}
+            onAddPage={addPage}
+            onAddPaletteField={addFieldFromPalette}
+            onAddRule={addRequiredWhenRule}
+            onArchive={() => setIsArchiveConfirmationOpen(true)}
+            onMoveField={moveField}
+            onMoveFieldToPage={moveFieldToPage}
+            onMovePage={movePage}
+            onPublish={() => void publishForm()}
+            onRemoveField={removeField}
+            onRemoveOption={removeOption}
+            onRemovePage={removePage}
+            onRemoveRule={removeRequiredWhenRule}
+            onReorderFields={reorderFieldsFromCanvas}
+            onReorderPages={reorderPagesFromCanvas}
+            onSaveDraft={() => void saveDraft()}
+            onSelectPage={selectPageFromCanvas}
+            onToggleRequired={toggleRequired}
+            onUpdateField={updateField}
+            onUpdateFieldType={updateFieldType}
+            onUpdateOption={updateOption}
+            onUpdatePage={updatePage}
+            onUpdateRule={updateRequiredWhenRule}
+            onUpdateRuleDependency={updateRuleDependency}
+            pages={pages}
+            previewModel={previewModel}
+            recentlyMovedPage={recentlyMovedPage}
+            saveFieldErrors={saveFieldErrors}
+            saveState={saveState}
+            savingLabel={t("form.designer.saving")}
+            showCommunityError={showCommunityError}
+            t={t}
+            versionState={versionState}
+          />
         </div>
-      </DndContext>
-      {paletteDragGhost && typeof document !== "undefined" && document.body
-        ? createPortal(
-            <div
-              className="field-palette-drag-ghost"
-              style={{ left: paletteDragGhost.x, top: paletteDragGhost.y }}
-              aria-hidden="true"
-            >
-              <PaletteFieldTypeDragGhost fieldType={paletteDragGhost.fieldType} language={language} />
-            </div>,
-            document.body,
-          )
-        : null}
-      <MobileFieldPalette
-        closeLabel={t("common.close")}
-        description={t("form.designer.mobilePaletteDescription")}
-        items={supportedFieldTypes.map((fieldType) => ({
-          type: fieldType,
-          label: fieldTypeLabel(language, fieldType),
-          description: translate(language, `form.designer.fieldType${fieldType}Description` as TranslationKey),
-          icon: fieldTypeIcons[fieldType],
-        }))}
-        onSelect={(fieldType) => addFieldFromPalette(fieldType, activeFields.length)}
-        openLabel={t("form.designer.mobilePaletteOpen")}
-        title={t("form.designer.fieldPaletteTitle")}
-      />
+      ) : null}
+
       {isArchiveConfirmationOpen ? (
         <ConfirmationDialog
           confirmLabel={pagingCopy.archiveConfirm}
@@ -1550,6 +1049,16 @@ function formDraftImportError(
     return t("form.designer.draftImportSchema");
   }
   return t("form.designer.draftImportInvalid");
+}
+
+function FormDesignerCanvasSkeleton({ label = "Loading form designer" }: { label?: string }) {
+  return (
+    <div className="designer-canvas-skeleton" role="status" aria-label={label}>
+      <div className="designer-canvas-skeleton-heading"><InlineValueLoader label={label} /><span>{label}</span></div>
+      <div className="designer-canvas-skeleton-page-tabs"><span /><span /><span /></div>
+      <div className="designer-canvas-skeleton-fields"><span /><span /></div>
+    </div>
+  );
 }
 
 function buildDesignerErrorSummary(

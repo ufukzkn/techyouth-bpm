@@ -156,3 +156,31 @@ test("team and role candidates enforce claim before workflow action", async ({ r
   expect(advanced.tasks.some((task) => task.nodeKey === "technicalReview" && task.status === "Open")).toBeTruthy();
   expect(advanced.auditLogs.some((entry) => entry.action === "Approve")).toBeTruthy();
 });
+
+test("task view slider stays mounted while rapid filters resolve", async ({ page }) => {
+  await loginThroughUi(page, "sport.admin", "sport123");
+  await page.goto("/tasks");
+
+  const viewSelector = page.getByRole("radiogroup", { name: "İş görünümü" });
+  await expect(viewSelector).toBeVisible();
+
+  await viewSelector.getByText("Geçmiş", { exact: true }).click();
+  await viewSelector.getByText("Aktif", { exact: true }).click();
+  await viewSelector.getByText("Geçmiş", { exact: true }).click();
+
+  await expect(viewSelector).toBeVisible();
+  await expect(page).toHaveURL(/\/tasks\?view=history/);
+  await expect(page.getByLabel("Geçmiş", { exact: true })).toBeChecked();
+  await expect(page.locator(".process-list-load-error")).toHaveCount(0);
+});
+
+test("form designer shell and deferred drag canvas load independently", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await loginThroughUi(page, "admin", "admin123");
+  await page.goto("/forms");
+
+  await expect(page.getByRole("heading", { name: "Dinamik form modeli" })).toBeVisible();
+  await expect(page.locator(".designer-form-info-panel")).toBeVisible();
+  await expect(page.locator(".designer-pages-panel")).toBeVisible();
+  await expect(page.locator(".field-palette")).toBeVisible();
+});
