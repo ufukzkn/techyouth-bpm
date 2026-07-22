@@ -17,6 +17,7 @@ public static class DatabaseSeeder
         {
             await ProcessInstanceDataSeeder.SeedAsync(db, cancellationToken);
             await SportifQuickDemoSeeder.SeedAsync(db, cancellationToken);
+            await WorkflowActionDemoSeeder.SeedAsync(db, cancellationToken);
         }
     }
 }

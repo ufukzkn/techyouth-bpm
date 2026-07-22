@@ -510,6 +510,73 @@ public class DatabaseSeederTests
     }
 
     [Fact]
+    public async Task SeedAsync_Adds_Two_Idempotent_Action_Labs_With_All_Assignments_And_Actions()
+    {
+        await using var db = TestDbFactory.Create();
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        var names = new[] { "Transfer Aksiyon Laboratuvarı", "Operasyon Aksiyon Laboratuvarı" };
+        var definitions = await db.ProcessDefinitions
+            .Where(definition => names.Contains(definition.Name))
+            .Include(definition => definition.Versions)
+            .ToListAsync();
+        Assert.Equal(2, definitions.Count);
+
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        var validator = new ProcessGraphValidator(db);
+        foreach (var definition in definitions)
+        {
+            var version = Assert.Single(definition.Versions);
+            var graph = JsonSerializer.Deserialize<ProcessGraphDto>(version.GraphJson, options)!;
+            var validation = await validator.ValidateForPublishAsync(graph, definition.CommunityId, version.FormDefinitionVersionId);
+
+            Assert.True(validation.IsSuccess, string.Join(" | ", validation.Errors));
+            Assert.Contains(graph.Nodes, node => node.Assignment?.Type == TaskAssignmentType.Team && !node.RequiresTeamLead);
+            Assert.Contains(graph.Nodes, node => node.Assignment?.Type == TaskAssignmentType.TeamAndCommunityRole);
+            Assert.Contains(graph.Nodes, node => node.Assignment?.Type == TaskAssignmentType.SpecificUser);
+            Assert.Contains(graph.Nodes, node => node.Assignment?.Type == TaskAssignmentType.Team && node.RequiresTeamLead);
+            var actions = graph.Nodes
+                .Where(node => node.Type == ProcessNodeType.UserTask)
+                .SelectMany(node => node.Actions ?? [])
+                .ToHashSet();
+            Assert.All(
+                new[] { WorkflowAction.Approve, WorkflowAction.Reject, WorkflowAction.Complete, WorkflowAction.SendBack, WorkflowAction.Escalate },
+                action => Assert.Contains(action, actions));
+        }
+
+        var versionIds = definitions.SelectMany(definition => definition.Versions).Select(version => version.Id).ToArray();
+        var instances = await db.ProcessInstances
+            .Where(process => process.ProcessDefinitionVersionId.HasValue && versionIds.Contains(process.ProcessDefinitionVersionId.Value))
+            .AsSplitQuery()
+            .Include(process => process.Tasks)
+            .Include(process => process.StepExecutions)
+            .Include(process => process.AuditLogs)
+            .ToListAsync();
+        Assert.Equal(10, instances.Count);
+        foreach (var versionId in versionIds)
+        {
+            var workflowInstances = instances.Where(process => process.ProcessDefinitionVersionId == versionId).ToList();
+            Assert.Equal(5, workflowInstances.Count);
+            var actions = workflowInstances.SelectMany(process => process.AuditLogs).Select(audit => audit.Action).ToHashSet();
+            Assert.All(
+                new[] { WorkflowAction.Approve, WorkflowAction.Reject, WorkflowAction.Complete, WorkflowAction.SendBack, WorkflowAction.Escalate },
+                action => Assert.Contains(action, actions));
+        }
+
+        Assert.Equal(2, instances.Count(process => process.AuditLogs.Any(audit => audit.Action == WorkflowAction.SendBack)
+            && process.Tasks.Any(task => task.NodeKey == "teamPool" && task.Attempt == 2 && task.Status == ProcessTaskStatus.Open)));
+        Assert.Equal(2, instances.Count(process => process.AuditLogs.Any(audit => audit.Action == WorkflowAction.Escalate)
+            && process.Tasks.Any(task => task.NodeKey == "teamLead" && task.Status == ProcessTaskStatus.Open && task.RequiresTeamLead)));
+
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        Assert.Equal(2, await db.ProcessDefinitions.CountAsync(definition => names.Contains(definition.Name)));
+        Assert.Equal(10, await db.ProcessInstances.CountAsync(process =>
+            process.ProcessDefinitionVersionId.HasValue && versionIds.Contains(process.ProcessDefinitionVersionId.Value)));
+    }
+
+    [Fact]
     public async Task SeedAsync_Adds_Missing_Quick_Workflow_Versions_To_Existing_Definitions()
     {
         await using var db = TestDbFactory.Create();

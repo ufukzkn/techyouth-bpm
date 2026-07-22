@@ -66,6 +66,48 @@ Ek dallar:
 7. Alternatif çalıştırmada `Acil Sevkiyat` seçmeyin. Gateway `standardDispatch` dalını seçmeli ve altı saat SLA uygulamalıdır.
 8. Teslimat adımında `SendBack`, işi acil depo düzeltme adımına döndürmelidir.
 
+## Senaryo C: Aksiyon Laboratuvarları
+
+Seed, Sportif Faaliyetler topluluğunda iki yayınlanmış akış oluşturur:
+
+- `Transfer Aksiyon Laboratuvarı`
+- `Operasyon Aksiyon Laboratuvarı`
+
+Her graph aynı dört atama biçimini içerir:
+
+1. **Takım havuzu:** Seçilen takımdaki uygun üyeler işi görebilir ve claim edebilir.
+2. **Takım + rol:** Kullanıcı hem seçilen takımın üyesi hem `Onay Sorumlusu` rolünde olmalıdır.
+3. **Kişiye özel:** İş yalnız graph içinde seçilen kullanıcıya doğrudan atanır.
+4. **Takım sorumlusu:** Takım havuzu görünür fakat claim ve aksiyon yalnız aktif takım sorumlusuna açıktır.
+
+Her akış için beş deterministik process instance bulunur; böylece her aksiyon veritabanında iki ayrı akışta örneklenir:
+
+| Instance | Beklenen geçmiş ve sonuç |
+| --- | --- |
+| `Complete` | Takım havuzu işi `Tamamla` ile kapanır; takım + rol işi açık kalır. |
+| `Approve` | Havuz tamamlanır, takım + rol onaylanır, kişiye özel iş tamamlanır ve takım sorumlusu nihai onay vererek süreci bitirir. |
+| `SendBack` | Havuz tamamlanır, takım + rol adımı `Geri Gönder` uygular; havuz görevi ikinci deneme olarak yeniden açılır ve geçersiz adım çıktıları temizlenir. |
+| `Reject` | Havuz tamamlandıktan sonra takım + rol adımı talebi reddeder; süreç `Rejected` durumunda kapanır. |
+| `Escalate` | Havuz ve rol adımları geçilir; kişiye özel kullanıcı `Yükselt` uygular ve açık görev yalnız takım sorumlusuna taşınır. |
+
+### Hızlı manuel test
+
+1. Local veritabanını yeniden oluşturup API’yi başlatın: `./scripts/run-api-local.ps1 -ResetDb -Force`.
+2. Web uygulamasını başlatın: `cd apps/web; npm run dev`.
+3. `sport.admin / sport123` ile girip Akış Tasarımı ekranında iki laboratuvarın yayınlanmış olduğunu doğrulayın.
+4. Süreçler ekranında her laboratuvar için beş instance ve adım geçmişini kontrol edin.
+5. `sport.scout`, `sport.approver`, `sport.operations` ve `sport.finance` hesaplarıyla ilgili açık görevleri görüntüleyin.
+6. `Escalate` instance’ındaki lider görevini normal takım üyesinin alamadığını, ilgili takım sorumlusunun alabildiğini doğrulayın.
+7. `SendBack` instance’ında havuz görevinin `Attempt=2` olarak açık olduğunu ve önceki aksiyonların audit timeline’da kaldığını kontrol edin.
+
+Otomatik seeder doğrulaması:
+
+```powershell
+dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj --filter "FullyQualifiedName~SeedAsync_Adds_Two_Idempotent_Action_Labs"
+```
+
+Test; iki graph’ın publish validator’dan geçmesini, dört atama türünü, beş aksiyonu, toplam 10 instance’ı, send-back denemesini, lider görevini ve ikinci seed çalıştırmasının veri çoğaltmamasını doğrular.
+
 ## Sözleşme ve Negatif Kontroller
 
 - Aynı toplulukta aynı workflow adıyla ikinci tanım oluşturma temiz, lokalize hata döndürmelidir; yarım draft oluşmamalıdır.
@@ -108,7 +150,7 @@ Bildirim okundu/okunmadı değişikliği audit üretmez. Kaynak iş olayı audit
 
 `Three_sportif_demo_workflows_complete_both_http_outcomes_with_their_real_candidates` üç hızlı Sportif Faaliyetler akışını gerçek login, process start, claim, task formu ve action endpointleri üzerinden hem Onay hem Ret çıkışında tamamlar. Böylece takım, takım+rol ve yalnız takım sorumlusu atamaları aynı tekrarlanabilir demo setinde sınanır.
 
-Güncel doğrulama tabanı 231 backend ve 60 frontend testidir. Servis/unit
+Güncel doğrulama tabanı 237 backend ve 70 frontend testidir. Servis/unit
 testleri ayrıca cookie-only browser transport, bir dakikalık access-session
 expiry, remembered refresh recovery, cookie logout, gateway, SendBack, Complete,
 Escalate, takım sorumlusu kilidi, eşzamanlı claim, version pinning, transaction
