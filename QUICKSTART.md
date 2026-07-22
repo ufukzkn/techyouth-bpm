@@ -65,6 +65,9 @@ Local SQLite stack herhangi bir `.env` veya secret istemez:
 ```powershell
 docker compose -f compose.cloud.yaml down
 docker compose up -d --build
+
+# API hazir mi?
+powershell -ExecutionPolicy Bypass -File scripts/smoke-local-compose.ps1
 ```
 
 - Uygulama: `http://localhost:3000`

@@ -49,13 +49,22 @@ copying counts that become stale.
 - Task/history/transfer tests: claimed-candidate hiding, actor-only history,
   completion snapshots, team-member detail authorization, atomic community
   movement and session/team invalidation.
+- `TaskAccessPolicyTests` and `TaskManageAllIntegrationTests`: one shared policy
+  for list visibility, DTO action flags, claim and action; community-scoped
+  manager override; live role/team/permission changes; and protection against
+  taking over another user's claim.
 - Contract/performance regression: normalized OpenAPI path+verb snapshot,
   `MultipleCollectionIncludeWarning` as an error and bounded query counts over
   250 users, 500 audit entries and 180 process/task records. Opaque-session
   regression verifies that a repeated validation performs zero SQL commands and
-  logout invalidates the cached result.
+  logout invalidates the cached result. Task list projection is limited to two
+  SQL commands and excludes the form graph; the selected task detail loads that
+  graph separately. SQLite query-plan assertions verify the measured workflow
+  indexes are actually selected.
 - Seed/migration tests: deterministic showcase workflows, idempotency, preservation
-  of user-created records and SQLite/PostgreSQL schema compatibility.
+  of user-created records and SQLite/PostgreSQL schema compatibility. The three
+  quick Sportif Faaliyetler workflows also complete both HTTP outcomes with
+  their real team, role and team-lead candidates.
 
 ## Security Acceptance Matrix
 
@@ -80,8 +89,9 @@ copying counts that become stale.
 - Workflow tests protect graph conversion, draft state, SLA representation and
   publish-validation helpers.
 - Production build verifies App Router boundaries and route-level imports.
-- Playwright runs four real-server scenarios for session reload/logout, direct
-  route authorization, form/workflow publication/start and team-role claim.
+- Playwright runs six real-server scenarios for session reload/logout, direct
+  route authorization, form/workflow publication/start, team-role claim, rapid
+  task-filter races and deferred Form Designer canvas loading.
 - Responsive geometry, drag/drop precision, focus, full-screen canvas and
   real-device touch still require manual acceptance.
 
@@ -110,15 +120,16 @@ Docker and direct startup commands are in [QUICKSTART.md](../QUICKSTART.md).
 
 ## Latest Verified Baseline
 
-On 21 July 2026:
+On 22 July 2026:
 
-- Backend: **215/215** tests passed.
-- Frontend: **57/57** tests passed.
-- Playwright: **4/4** real-server scenarios passed.
+- Backend: **231/231** tests passed.
+- Frontend: **60/60** tests passed.
+- Playwright: **6/6** real-server scenarios passed.
 - Frontend production build passed.
 - ESLint passed without errors or warnings.
-- Local/cloud Compose configuration, API/web image builds and PostgreSQL
-  migration smoke are part of the full GitHub Actions gate.
+- Local/cloud Compose configuration, API/web image builds, old SQLite volume
+  ownership repair and PostgreSQL migration smoke passed locally and remain
+  part of the full GitHub Actions gate.
 - The locally built images were also inspected as non-root: API runs as `app`,
   web runs as `nextjs`.
 
