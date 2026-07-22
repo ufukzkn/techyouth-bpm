@@ -1247,6 +1247,14 @@ button.team-member-task-count:focus-visible {
   background: var(--surface);
 }
 
+.team-person-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: max-content;
+}
+
 .team-person-avatar {
   border-radius: 50%;
   font-size: 13px;
@@ -1274,11 +1282,20 @@ button.team-member-task-count:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
+  min-width: max-content;
+  padding-left: 2px;
 }
 
 .team-person-actions .text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
   font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .danger-text-button {
@@ -1307,6 +1324,26 @@ button.team-member-task-count:focus-visible {
 
 .team-people-skeleton .team-person-row > div .skeleton-block:first-child { width: 48%; }
 .team-people-skeleton .team-person-row > div .skeleton-block:last-child { width: 76%; min-height: 12px; }
+
+@media (max-width: 680px) {
+  .team-person-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .team-person-meta {
+    grid-column: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .team-person-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    padding: 9px 0 0;
+    border-top: 1px solid var(--border);
+  }
+}
 
 .access-confirm-grid {
   display: grid;
