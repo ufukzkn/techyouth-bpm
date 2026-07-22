@@ -480,6 +480,7 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
                 .Include(u => u.CommunityMemberships)
                 .ThenInclude(m => m.CommunityRole)
                 .ThenInclude(r => r!.Permissions)
+                .AsSplitQuery()
                 .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
                 
             if (user is null || user.Status != UserStatus.Active || !user.CommunityMemberships.Any(m => m.IsActive && m.CommunityId == communityId))

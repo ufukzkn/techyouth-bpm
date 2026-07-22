@@ -240,7 +240,7 @@ public class ProcessDefinitionServiceTests
             formVersionId);
 
         Assert.False(result.IsSuccess);
-        Assert.Contains(result.Errors, error => error.Contains("active team lead", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Errors, error => error.Contains("aktif ve işlem", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
