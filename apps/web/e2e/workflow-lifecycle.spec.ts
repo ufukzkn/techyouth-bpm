@@ -164,13 +164,13 @@ test("task view slider stays mounted while rapid filters resolve", async ({ page
   const viewSelector = page.getByRole("radiogroup", { name: "İş görünümü" });
   await expect(viewSelector).toBeVisible();
 
-  await viewSelector.getByText("Geçmiş işlerim", { exact: true }).click();
+  await viewSelector.getByText("Geçmiş", { exact: true }).click();
   await viewSelector.getByText("Aktif", { exact: true }).click();
-  await viewSelector.getByText("Geçmiş işlerim", { exact: true }).click();
+  await viewSelector.getByText("Geçmiş", { exact: true }).click();
 
   await expect(viewSelector).toBeVisible();
   await expect(page).toHaveURL(/\/tasks\?view=history/);
-  await expect(page.getByLabel("Geçmiş işlerim", { exact: true })).toBeChecked();
+  await expect(page.getByLabel("Geçmiş", { exact: true })).toBeChecked();
   await expect(page.locator(".process-list-load-error")).toHaveCount(0);
 });
 
@@ -228,16 +228,24 @@ test("dashboard pending label and explanation follow the task scope", async ({ p
   await loginThroughUi(page, "sport.admin", "sport123");
   await page.goto("/dashboard");
 
-  const pendingLegend = page.getByRole("button", { name: /Topluluktaki bekleyen işler/ });
-  await expect(pendingLegend).toBeVisible();
-  await pendingLegend.hover();
-  await expect(page.getByText("Topluluğunuzda görüntüleyip yönetebildiğiniz açık işleri gösterir.")).toBeVisible();
+  const personalLegend = page.getByRole("button", { name: /Benim ve takımlarımın bekleyen işleri/ });
+  await expect(personalLegend).toBeVisible();
+  await personalLegend.hover();
+  await expect(page.getByText("Size veya üyesi olduğunuz takımlara açılan bekleyen işleri gösterir.")).toBeVisible();
+
+  const scopeSelector = page.getByRole("radiogroup", { name: "Süreç görünüm kapsamı" });
+  await scopeSelector.getByText("Topluluk", { exact: true }).click();
+  const communityLegend = page.getByRole("button", { name: /Topluluktaki bekleyen işler/ });
+  await expect(communityLegend).toBeVisible();
+  await communityLegend.hover();
+  await expect(page.getByText("Seçili topluluk kapsamındaki açık işleri gösterir.")).toBeVisible();
 });
 
 test("team member workload opens directly beneath the selected teammate", async ({ page }) => {
   await loginThroughUi(page, "sport.scout", "sport123");
   await page.goto("/teams");
 
+  await page.locator(".my-team-option").filter({ hasText: "Scout Ekibi" }).click();
   const workloadButton = page.locator("button.team-member-task-count").first();
   await expect(workloadButton).toBeVisible();
   const memberBlock = workloadButton.locator("xpath=ancestor::div[contains(concat(' ', normalize-space(@class), ' '), ' team-roster-member-block ')]");
