@@ -82,7 +82,9 @@ export function WorkflowWorkspaceView() {
         .sort((left, right) => left.label.localeCompare(right.label, language === "tr" ? "tr-TR" : "en-US") || right.version - left.version),
       teams: (teams?.items ?? []).map((team) => ({ id: team.id, label: team.name, description: team.description })),
       people: (people?.items ?? []).map((person) => ({ id: person.id, label: person.displayName, description: person.username })),
-      communityRoles: communityRoles.map((role) => ({ id: role.id, label: role.name, description: role.description })),
+      communityRoles: communityRoles
+        .filter((role) => role.permissions.includes("Tasks.Act"))
+        .map((role) => ({ id: role.id, label: role.name, description: role.description })),
     };
     setLookups(nextLookups);
     return nextLookups;
