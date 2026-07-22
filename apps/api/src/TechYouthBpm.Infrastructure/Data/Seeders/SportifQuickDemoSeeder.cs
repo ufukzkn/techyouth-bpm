@@ -354,10 +354,11 @@ internal static class SportifQuickDemoSeeder
             }
 
             var startVersionId = Forms.Single(form => form.FormId == workflow.StartFormId).VersionId;
-            definition.Versions.Add(new ProcessDefinitionVersion
+            var version = new ProcessDefinitionVersion
             {
                 Id = workflow.VersionId,
                 ProcessDefinitionId = definition.Id,
+                ProcessDefinition = definition,
                 VersionNumber = definition.Versions.Count == 0 ? 1 : definition.Versions.Max(version => version.VersionNumber) + 1,
                 Status = DefinitionVersionStatus.Published,
                 FormDefinitionVersionId = startVersionId,
@@ -366,7 +367,11 @@ internal static class SportifQuickDemoSeeder
                 CreatedAt = now.AddDays(-8),
                 PublishedByUserId = SportDemoAdminId,
                 PublishedAt = now.AddDays(-8)
-            });
+            };
+
+            // Existing definitions need an explicit Added state because deterministic GUIDs
+            // otherwise make EF treat the new version as an update to an existing row.
+            db.ProcessDefinitionVersions.Add(version);
         }
 
         if (db.ChangeTracker.HasChanges())

@@ -510,6 +510,50 @@ public class DatabaseSeederTests
     }
 
     [Fact]
+    public async Task SeedAsync_Adds_Missing_Quick_Workflow_Versions_To_Existing_Definitions()
+    {
+        await using var db = TestDbFactory.Create();
+        await DatabaseSeeder.SeedAsync(db, seedMockData: false);
+
+        var communityId = await db.Communities
+            .Where(community => community.Name == "Sportif Faaliyetler")
+            .Select(community => community.Id)
+            .SingleAsync();
+        var ownerId = await db.Users
+            .Where(user => user.Role == Role.SuperAdmin)
+            .Select(user => user.Id)
+            .SingleAsync();
+        var existingDefinitionIds = new[]
+        {
+            Guid.Parse("16161616-0000-0000-0000-000000000001"),
+            Guid.Parse("16161616-0000-0000-0000-000000000002"),
+            Guid.Parse("16161616-0000-0000-0000-000000000003")
+        };
+
+        db.ProcessDefinitions.AddRange(existingDefinitionIds.Select((id, index) => new ProcessDefinition
+        {
+            Id = id,
+            CommunityId = communityId,
+            Name = $"Legacy quick workflow {index + 1}",
+            Description = "Existing definition without a published quick-demo version.",
+            CreatedByUserId = ownerId,
+            CreatedAt = DateTime.UtcNow.AddDays(-10)
+        }));
+        await db.SaveChangesAsync();
+
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        var expectedVersionIds = new[]
+        {
+            Guid.Parse("16161616-2000-0000-0000-000000000001"),
+            Guid.Parse("16161616-2000-0000-0000-000000000002"),
+            Guid.Parse("16161616-2000-0000-0000-000000000003")
+        };
+        Assert.Equal(3, await db.ProcessDefinitionVersions.CountAsync(version =>
+            expectedVersionIds.Contains(version.Id)));
+    }
+
+    [Fact]
     public async Task SeedAsync_Upgrades_Only_Known_Sportif_Legacy_Role_References()
     {
         await using var db = TestDbFactory.Create();
