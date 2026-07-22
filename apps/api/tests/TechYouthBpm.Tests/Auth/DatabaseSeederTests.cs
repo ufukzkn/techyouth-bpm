@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Processes;
 using TechYouthBpm.Application.Workflow;
 using TechYouthBpm.Domain.Entities;
@@ -62,7 +63,7 @@ public class DatabaseSeederTests
                 .Where(membership => membership.CommunityId == community.Id && membership.IsActive)
                 .ToList();
 
-            Assert.Equal(8, memberships.Count);
+            Assert.Equal(community.Name == "Sportif Faaliyetler" ? 15 : 8, memberships.Count);
             Assert.Contains(
                 memberships,
                 membership => db.CommunityRoles.Any(role => role.Id == membership.CommunityRoleId && role.TemplateKey == "unassigned"));
@@ -88,7 +89,7 @@ public class DatabaseSeederTests
                 .Where(membership => membership.CommunityId == community.Id && membership.IsActive)
                 .ToList();
 
-            Assert.Equal(8, activeMemberships.Count);
+            Assert.Equal(community.Name == "Sportif Faaliyetler" ? 15 : 8, activeMemberships.Count);
         }
     }
 
@@ -360,5 +361,130 @@ public class DatabaseSeederTests
         Assert.True(await db.ProcessTasks.AnyAsync(task =>
             task.ProcessInstance!.CommunityId == logisticsCommunityId
             && task.CandidateCommunityRoleId == replacementRoleId));
+    }
+
+    [Fact]
+    public async Task SeedAsync_Adds_Idempotent_Sportif_Quick_Workflow_Fixtures_Without_Removing_User_Data()
+    {
+        await using var db = TestDbFactory.Create();
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        var community = await db.Communities.SingleAsync(item => item.Name == "Sportif Faaliyetler");
+        var demoUsers = await db.Users
+            .Where(user => user.Username.StartsWith("sport."))
+            .OrderBy(user => user.Username)
+            .ToListAsync();
+        Assert.Equal(
+            ["sport.admin", "sport.approver", "sport.finance", "sport.operations", "sport.scout", "sport.starter", "sport.viewer"],
+            demoUsers.Select(user => user.Username));
+
+        var memberships = await db.UserCommunityMemberships
+            .Include(item => item.CommunityRole)
+            .Where(item => demoUsers.Select(user => user.Id).Contains(item.UserId) && item.IsActive)
+            .ToListAsync();
+        Assert.All(memberships, membership => Assert.Equal(community.Id, membership.CommunityId));
+        Assert.Contains(memberships, membership => membership.CommunityRole!.Name == "Scout Sorumlusu");
+        Assert.Contains(memberships, membership => membership.CommunityRole!.Name == "Teknik Onay Sorumlusu");
+        Assert.Contains(memberships, membership => membership.CommunityRole!.Name == "Mali Onay Sorumlusu");
+        Assert.Contains(memberships, membership => membership.CommunityRole!.TemplateKey == "read-only");
+
+        var leads = await db.TeamMemberships
+            .Where(item => demoUsers.Select(user => user.Id).Contains(item.UserId) && item.IsActive && item.IsLead)
+            .ToListAsync();
+        Assert.Contains(leads, item => item.UserId == demoUsers.Single(user => user.Username == "sport.scout").Id);
+        Assert.Contains(leads, item => item.UserId == demoUsers.Single(user => user.Username == "sport.approver").Id);
+        Assert.Contains(leads, item => item.UserId == demoUsers.Single(user => user.Username == "sport.finance").Id);
+        Assert.Contains(leads, item => item.UserId == demoUsers.Single(user => user.Username == "sport.operations").Id);
+
+        var definitions = await db.ProcessDefinitions
+            .Include(item => item.Versions)
+            .Where(item => item.Name.StartsWith("Hizli "))
+            .ToListAsync();
+        Assert.Equal(3, definitions.Count);
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(new JsonStringEnumConverter());
+        var graphs = definitions.ToDictionary(
+            definition => definition.Name,
+            definition => JsonSerializer.Deserialize<ProcessGraphDto>(definition.Versions.Single().GraphJson, options)!);
+        Assert.Equal(TaskAssignmentType.Team, graphs["Hizli Scout Incelemesi"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).Assignment!.Type);
+        Assert.Equal(TaskAssignmentType.TeamAndCommunityRole, graphs["Hizli Teknik Onay"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).Assignment!.Type);
+        Assert.True(graphs["Hizli Lider Onayi"].Nodes.Single(node => node.Type == ProcessNodeType.UserTask).RequiresTeamLead);
+        var validator = new ProcessGraphValidator(db);
+        foreach (var definition in definitions)
+        {
+            var version = definition.Versions.Single();
+            var validation = await validator.ValidateForPublishAsync(
+                graphs[definition.Name],
+                definition.CommunityId,
+                version.FormDefinitionVersionId);
+            Assert.True(validation.IsSuccess, string.Join(" | ", validation.Errors));
+        }
+
+        var quickVersionIds = definitions.SelectMany(definition => definition.Versions).Select(version => version.Id).ToArray();
+        var fixtures = await db.ProcessInstances
+            .Where(process => process.ProcessDefinitionVersionId.HasValue && quickVersionIds.Contains(process.ProcessDefinitionVersionId.Value))
+            .AsSplitQuery()
+            .Include(process => process.Tasks)
+            .Include(process => process.StepExecutions)
+            .Include(process => process.AuditLogs)
+            .ToListAsync();
+        Assert.Equal(12, fixtures.Count);
+        Assert.Equal(6, fixtures.SelectMany(process => process.Tasks).Count(task => task.Status is ProcessTaskStatus.Open or ProcessTaskStatus.Claimed));
+        Assert.Equal(6, fixtures.SelectMany(process => process.Tasks).Count(task => task.Status == ProcessTaskStatus.Completed));
+        Assert.All(fixtures, process => Assert.NotEmpty(process.StepExecutions));
+        Assert.All(fixtures, process => Assert.NotEmpty(process.AuditLogs));
+
+        var candidateIdsByWorkflow = new Dictionary<string, Guid>
+        {
+            ["Hizli Scout Incelemesi"] = demoUsers.Single(user => user.Username == "sport.scout").Id,
+            ["Hizli Teknik Onay"] = demoUsers.Single(user => user.Username == "sport.approver").Id,
+            ["Hizli Lider Onayi"] = demoUsers.Single(user => user.Username == "sport.finance").Id
+        };
+        var workflowsByVersion = definitions
+            .SelectMany(definition => definition.Versions.Select(version => new { version.Id, definition.Name }))
+            .ToDictionary(item => item.Id, item => item.Name);
+        foreach (var task in fixtures.SelectMany(process => process.Tasks).Where(task => task.Status is ProcessTaskStatus.Open or ProcessTaskStatus.Claimed))
+        {
+            var process = fixtures.Single(item => item.Id == task.ProcessInstanceId);
+            var candidateId = candidateIdsByWorkflow[workflowsByVersion[process.ProcessDefinitionVersionId!.Value]];
+            var candidateMembership = await db.UserCommunityMemberships.SingleAsync(item =>
+                item.UserId == candidateId && item.CommunityId == community.Id && item.IsActive);
+            Assert.True(await db.CommunityRolePermissions.AnyAsync(item =>
+                item.CommunityRoleId == candidateMembership.CommunityRoleId
+                && item.Permission == PermissionNames.TasksAct));
+            if (task.CandidateTeamId.HasValue)
+            {
+                var teamMembership = await db.TeamMemberships.SingleAsync(item =>
+                    item.UserId == candidateId && item.TeamId == task.CandidateTeamId.Value && item.IsActive);
+                if (task.RequiresTeamLead)
+                {
+                    Assert.True(teamMembership.IsLead);
+                }
+            }
+            if (task.CandidateCommunityRoleId.HasValue)
+            {
+                Assert.Equal(task.CandidateCommunityRoleId, candidateMembership.CommunityRoleId);
+            }
+        }
+
+        var userCreatedId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            Id = userCreatedId,
+            Username = "preserved-user",
+            DisplayName = "Preserved User",
+            Email = "preserved-user@example.test",
+            Password = "test-hash",
+            Role = Role.User,
+            Status = UserStatus.Active,
+            IsEmailVerified = true
+        });
+        await db.SaveChangesAsync();
+
+        await DatabaseSeeder.SeedAsync(db, seedMockData: true);
+
+        Assert.True(await db.Users.AnyAsync(user => user.Id == userCreatedId));
+        Assert.Equal(12, await db.ProcessInstances.CountAsync(process =>
+            process.ProcessDefinitionVersionId.HasValue && quickVersionIds.Contains(process.ProcessDefinitionVersionId.Value)));
     }
 }

@@ -16,6 +16,7 @@ public static class DatabaseSeeder
         if (seedMockData)
         {
             await ProcessInstanceDataSeeder.SeedAsync(db, cancellationToken);
+            await SportifQuickDemoSeeder.SeedAsync(db, cancellationToken);
         }
     }
 }
