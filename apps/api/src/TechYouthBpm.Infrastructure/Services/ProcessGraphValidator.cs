@@ -474,14 +474,22 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
     {
         var assignment = node.Assignment!;
 
-        if (assignment.UserId is { } userId
-            && !await db.Users.AnyAsync(user =>
-                user.Id == userId
-                && user.Status == UserStatus.Active
-                && user.CommunityMemberships.Any(membership => membership.IsActive && membership.CommunityId == communityId),
-                cancellationToken))
+        if (assignment.UserId is { } userId)
         {
-            errors.Add($"Assignment user '{userId}' for task '{node.Key}' is not active in the process community.");
+            var user = await db.Users
+                .Include(u => u.CommunityMemberships)
+                .ThenInclude(m => m.CommunityRole)
+                .ThenInclude(r => r!.Permissions)
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+                
+            if (user is null || user.Status != UserStatus.Active || !user.CommunityMemberships.Any(m => m.IsActive && m.CommunityId == communityId))
+            {
+                errors.Add($"Assignment user '{userId}' for task '{node.Key}' is not active in the process community.");
+            }
+            else if (!user.CommunityMemberships.Any(m => m.IsActive && m.CommunityId == communityId && m.CommunityRole!.Permissions.Any(p => p.Permission == PermissionNames.TasksAct)))
+            {
+                errors.Add($"'{node.Key}' görevine atanan kullanıcının işlem ({PermissionNames.TasksAct}) yetkisi bulunmuyor.");
+            }
         }
 
         if (assignment.TeamId is { } teamId
@@ -510,7 +518,7 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
                     && membership.CommunityRole.Permissions.Any(permission => permission.Permission == PermissionNames.TasksAct)),
                 cancellationToken))
         {
-            errors.Add($"Assignment team '{requiredLeadTeamId}' for task '{node.Key}' needs an active team lead with Tasks.Act permission.");
+            errors.Add($"'{node.Key}' görevine atanan takımın aktif ve işlem ({PermissionNames.TasksAct}) yetkisine sahip bir sorumlusu bulunmuyor.");
         }
 
         if (assignment.CommunityRoleId is { } roleId)
@@ -524,7 +532,7 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
             }
             else if (!role.Permissions.Any(permission => permission.Permission == PermissionNames.TasksAct))
             {
-                errors.Add($"Assignment role '{roleId}' for task '{node.Key}' does not grant {PermissionNames.TasksAct}.");
+                errors.Add($"'{node.Key}' görevine atanan topluluk rolü işlem ({PermissionNames.TasksAct}) yetkisine sahip değil.");
             }
         }
     }
