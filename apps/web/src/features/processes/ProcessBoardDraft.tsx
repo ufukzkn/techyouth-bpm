@@ -57,8 +57,9 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const requestedStatus = searchParams.get("status");
   const initialProcessStatus = isProcessStatus(requestedStatus) ? requestedStatus : "all";
   const requestedTaskView = searchParams.get("view");
-  const taskView: NonNullable<TaskListParams["view"]> = requestedTaskView === "history" ? "history" : "active";
+  const urlTaskView: NonNullable<TaskListParams["view"]> = requestedTaskView === "history" ? "history" : "active";
   const [processStatus, setProcessStatus] = useState<ProcessStatus | "all">(initialProcessStatus);
+  const [taskView, setTaskView] = useState<NonNullable<TaskListParams["view"]>>(urlTaskView);
   const [processSortBy, setProcessSortBy] = useState<NonNullable<ProcessListParams["sortBy"]>>("startedAt");
   const [processSortDirection, setProcessSortDirection] = useState<"asc" | "desc">("desc");
   const [taskPriority, setTaskPriority] = useState<TaskPriority | "all">("all");
@@ -149,10 +150,11 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     params.set("view", nextView);
     params.delete("taskId");
     prepareTaskQueryTransition({ page: 1, view: nextView });
+    setTaskView(nextView);
     setTaskPage(1);
     setSelectedTaskId("");
     setDetail(null);
-    router.replace(`/tasks?${params.toString()}`);
+    window.history.replaceState(window.history.state, "", `/tasks?${params.toString()}`);
   }
 
   function changeProcessStatus(nextStatus: ProcessStatus | "all") {

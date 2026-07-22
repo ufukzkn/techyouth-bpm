@@ -204,16 +204,15 @@ public class ProcessAndTaskPagingTests
     }
 
     [Fact]
-    public async Task ManageAll_History_Returns_All_Completed_Tasks_In_Own_Community()
+    public async Task ManageAll_History_Returns_Only_The_Current_Actors_Completed_Tasks()
     {
         await using var db = TestDbFactory.Create();
         var admin = TestDbFactory.SeedUser(db, Role.Admin, "history-manage-all");
-        var firstActor = TestDbFactory.SeedUser(db, Role.Approver, "history-actor-one");
         var secondActor = TestDbFactory.SeedUser(db, Role.Approver, "history-actor-two");
         var first = TestDbFactory.SeedOpenApproverTask(db, admin).Task;
         var second = TestDbFactory.SeedOpenApproverTask(db, admin).Task;
         first.Status = ProcessTaskStatus.Completed;
-        first.CompletedByUserId = firstActor.Id;
+        first.CompletedByUserId = admin.Id;
         first.CompletedAt = DateTime.UtcNow.AddMinutes(-2);
         second.Status = ProcessTaskStatus.Completed;
         second.CompletedByUserId = secondActor.Id;
@@ -224,8 +223,8 @@ public class ProcessAndTaskPagingTests
             new TaskListRequest(View: "history", PageSize: 10),
             TestDbFactory.CommunityAdminDto(admin));
 
-        Assert.Equal(2, result.TotalCount);
+        Assert.Equal(1, result.TotalCount);
         Assert.Contains(result.Items, item => item.Id == first.Id);
-        Assert.Contains(result.Items, item => item.Id == second.Id);
+        Assert.DoesNotContain(result.Items, item => item.Id == second.Id);
     }
 }

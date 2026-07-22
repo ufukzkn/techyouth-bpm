@@ -74,6 +74,27 @@ public class TaskAccessPolicyTests
     }
 
     [Fact]
+    public void Normal_Team_Member_Sees_Lead_Task_But_Cannot_Claim_It()
+    {
+        var communityId = Guid.NewGuid();
+        var targetTeamId = Guid.NewGuid();
+        var targetRoleId = Guid.NewGuid();
+        var task = CandidateTask(communityId, targetTeamId, targetRoleId, requiresTeamLead: true);
+        var user = User(
+            communityId,
+            targetRoleId,
+            [PermissionNames.TasksView, PermissionNames.TasksAct],
+            [new UserTeamDto(targetTeamId, "Target team", false)]);
+
+        var access = policy.Evaluate(task, user);
+
+        Assert.True(policy.CanSee(task, user));
+        Assert.False(access.CanAct);
+        Assert.False(access.CanClaim);
+        Assert.Equal(TaskActionDenialReasonCodes.TeamLeadRequired, access.ClaimDenialReasonCode);
+    }
+
+    [Fact]
     public void Normal_User_Must_Match_Target_Role_And_Community()
     {
         var communityId = Guid.NewGuid();

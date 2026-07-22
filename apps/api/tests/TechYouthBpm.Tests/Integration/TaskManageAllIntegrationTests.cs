@@ -114,6 +114,52 @@ public class TaskManageAllIntegrationTests
         Assert.Equal(0, count);
     }
 
+    [Fact]
+    public async Task ManageAll_History_Returns_Only_Tasks_Completed_By_The_Current_User()
+    {
+        using var factory = new ApiWebApplicationFactory();
+        using var client = factory.CreateApiClient();
+        var (session, _) = await IntegrationTestHttp.LoginAsync(client, "fatih.terim", "imparator123");
+        var taskIds = await factory.ExecuteDbAsync(async db =>
+        {
+            var adminId = await db.Users
+                .Where(user => user.Username == "fatih.terim")
+                .Select(user => user.Id)
+                .SingleAsync();
+            var otherUserId = await db.Users
+                .Where(user => user.Username == "approver")
+                .Select(user => user.Id)
+                .SingleAsync();
+            var membership = await db.UserCommunityMemberships
+                .Where(item => item.UserId == adminId && item.IsActive)
+                .SingleAsync();
+            var tasks = await db.ProcessTasks
+                .Include(task => task.ProcessInstance)
+                .Where(task => task.ProcessInstance!.CommunityId == membership.CommunityId)
+                .Take(2)
+                .ToListAsync();
+            Assert.Equal(2, tasks.Count);
+
+            tasks[0].Status = ProcessTaskStatus.Completed;
+            tasks[0].CompletedByUserId = adminId;
+            tasks[0].CompletedAt = DateTime.UtcNow;
+            tasks[1].Status = ProcessTaskStatus.Completed;
+            tasks[1].CompletedByUserId = otherUserId;
+            tasks[1].CompletedAt = DateTime.UtcNow.AddMinutes(-1);
+            await db.SaveChangesAsync();
+            return (OwnTaskId: tasks[0].Id, OtherTaskId: tasks[1].Id);
+        });
+
+        using var request = IntegrationTestHttp.BearerRequest(HttpMethod.Get, "/api/tasks/my?view=history", session.Token);
+        using var response = await client.SendAsync(request);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.True(response.IsSuccessStatusCode, content);
+        var items = JsonSerializer.Deserialize<JsonElement>(content).GetProperty("items");
+
+        Assert.Contains(items.EnumerateArray(), item => item.GetProperty("id").GetGuid() == taskIds.OwnTaskId);
+        Assert.DoesNotContain(items.EnumerateArray(), item => item.GetProperty("id").GetGuid() == taskIds.OtherTaskId);
+    }
+
     private static async Task<int> GetTaskCountAsync(HttpClient client, string token, Guid taskId)
     {
         using var request = IntegrationTestHttp.BearerRequest(

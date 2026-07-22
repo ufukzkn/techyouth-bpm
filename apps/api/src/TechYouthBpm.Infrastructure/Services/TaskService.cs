@@ -61,10 +61,12 @@ public class TaskService(
             : baseQuery.Where(task =>
                 task.Status == ProcessTaskStatus.Open
                 || task.Status == ProcessTaskStatus.Claimed);
-        var query = workflowVisibilityService.ApplyTaskScope(
-            statusQuery,
-            user,
-            WorkflowVisibilityScope.Personal);
+        var query = isHistory
+            ? statusQuery.Where(task => task.CompletedByUserId == user.Id)
+            : workflowVisibilityService.ApplyTaskScope(
+                statusQuery,
+                user,
+                WorkflowVisibilityScope.Personal);
 
         if (request.Priority is { } priority)
         {
