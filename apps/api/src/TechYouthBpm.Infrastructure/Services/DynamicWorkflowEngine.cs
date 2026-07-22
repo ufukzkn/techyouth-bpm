@@ -239,8 +239,8 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
                 Id = Guid.NewGuid(),
                 UserId = candidateId,
                 Type = "Task.Assigned",
-                Title = "Yeni gorev atandi",
-                Message = $"{node.Title} gorevi aksiyonunuzu bekliyor.",
+                Title = "Yeni görev atandı",
+                Message = $"{node.Title} görevi aksiyonunuzu bekliyor.",
                 EntityType = "ProcessTask",
                 EntityId = task.Id.ToString(),
                 CreatedAt = now

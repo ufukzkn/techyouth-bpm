@@ -94,6 +94,7 @@ export function DashboardView({
   const inProgressCount = summary?.inProgressProcessCount ?? 0;
   const completedCount = summary?.completedProcessCount ?? 0;
   const teamQueueCount = summary?.teamQueueCount ?? 0;
+  const showTeamQueue = scope === "personal" && Boolean(user.communityId);
   const recentOpenTasks = summary?.recentOpenTasks ?? [];
   const recentProcesses = summary?.recentProcesses ?? [];
   const chartTotal = openTaskCount + inProgressCount + completedCount;
@@ -230,7 +231,7 @@ export function DashboardView({
       ) : null}
 
       <section className="dashboard-focus-grid">
-        <article className="dashboard-chart-card dashboard-chart-card-prominent">
+        <article className={`dashboard-chart-card dashboard-chart-card-prominent${showTeamQueue ? "" : " without-team-queue"}`}>
           <div className="dashboard-chart-copy">
             <span className="eyebrow">{t("dashboard.distributionEyebrow")}</span>
             <h3>{t("dashboard.distributionTitle")}</h3>
@@ -292,7 +293,7 @@ export function DashboardView({
               ) : null}
             </div>
           </div>
-          {scope === "personal" && user.communityId ? (
+          {showTeamQueue ? (
             <p className="dashboard-team-queue">
               <Network size={15} />
               <span>{language === "tr" ? "Takım kuyruğu" : "Team queue"}</span>

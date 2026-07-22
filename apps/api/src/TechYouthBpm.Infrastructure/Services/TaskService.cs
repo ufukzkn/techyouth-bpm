@@ -734,8 +734,8 @@ public class TaskService(
             Id = Guid.NewGuid(),
             UserId = process.StartedByUserId,
             Type = $"Process.{process.Status}",
-            Title = "Surec durumunuz guncellendi",
-            Message = $"Baslattiginiz surec {process.Status} durumuna gecti.",
+            Title = "Süreç durumunuz güncellendi",
+            Message = $"Başlattığınız süreç {process.Status} durumuna geçti.",
             EntityType = "ProcessInstance",
             EntityId = process.Id.ToString(),
             CreatedAt = DateTime.UtcNow
@@ -754,8 +754,8 @@ public class TaskService(
             Id = Guid.NewGuid(),
             UserId = process.StartedByUserId,
             Type = "Process.Advanced",
-            Title = "Sureciniz yeni bir adima gecti",
-            Message = $"Baslattiginiz surec '{process.CurrentNodeKey}' adiminda ilerliyor.",
+            Title = "Süreciniz yeni bir adıma geçti",
+            Message = $"Başlattığınız süreç '{process.CurrentNodeKey}' adımında ilerliyor.",
             EntityType = "ProcessInstance",
             EntityId = process.Id.ToString(),
             CreatedAt = DateTime.UtcNow

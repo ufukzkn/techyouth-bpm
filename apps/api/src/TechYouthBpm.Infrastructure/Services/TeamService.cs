@@ -552,8 +552,8 @@ public class TeamService(
         await notificationService.CreateAsync(new CreateNotificationRequest(
             user.Id,
             "Team.MembershipAdded",
-            "Takim uyeliginiz guncellendi",
-            $"{team.Name} takimina eklendiniz.",
+            "Takım üyeliğiniz güncellendi",
+            $"{team.Name} takımına eklendiniz.",
             "Team",
             team.Id.ToString()), cancellationToken);
         await auditService.LogAsync(currentUser, "Team.MemberAdded", "User", user.Id.ToString(), $"User '{user.Username}' was added to team '{team.Name}'.", cancellationToken);
@@ -596,10 +596,10 @@ public class TeamService(
             await notificationService.CreateAsync(new CreateNotificationRequest(
                 membership.UserId,
                 "Team.LeadershipUpdated",
-                "Takim sorumlulugunuz guncellendi",
+                "Takım sorumluluğunuz güncellendi",
                 membership.IsLead
-                    ? $"{membership.Team.Name} takimi icin sorumlu olarak belirlendiniz."
-                    : $"{membership.Team.Name} takimi icin sorumlu goreviniz kaldirildi.",
+                    ? $"{membership.Team.Name} takımı için sorumlu olarak belirlendiniz."
+                    : $"{membership.Team.Name} takımı için sorumlu göreviniz kaldırıldı.",
                 "Team",
                 membership.TeamId.ToString()), cancellationToken);
         }
@@ -638,8 +638,8 @@ public class TeamService(
         await notificationService.CreateAsync(new CreateNotificationRequest(
             membership.UserId,
             "Team.MembershipRemoved",
-            "Takim uyeliginiz guncellendi",
-            $"{membership.Team.Name} takimindaki uyeliginiz kaldirildi.",
+            "Takım üyeliğiniz güncellendi",
+            $"{membership.Team.Name} takımındaki üyeliğiniz kaldırıldı.",
             "Team",
             membership.TeamId.ToString()), cancellationToken);
         await auditService.LogAsync(currentUser, "Team.MemberRemoved", "User", membership.UserId.ToString(), $"User '{membership.User.Username}' was removed from team '{membership.Team.Name}'.", cancellationToken);

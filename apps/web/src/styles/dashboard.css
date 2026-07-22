@@ -203,6 +203,10 @@
   gap: 14px;
 }
 
+.dashboard-chart-card-prominent.without-team-queue .dashboard-chart-body {
+  margin-top: -5px;
+}
+
 .dashboard-team-queue {
   width: fit-content;
   display: inline-flex;

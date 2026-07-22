@@ -222,7 +222,7 @@ public class DashboardServiceTests
     }
 
     [Fact]
-    public async Task Personal_Summary_Counts_The_Whole_Team_Queue_Without_Leaking_It_As_My_Work()
+    public async Task Personal_Summary_Does_Not_Count_A_Teammates_Claimed_Task_As_Available_Work()
     {
         await using var db = TestDbFactory.Create();
         var member = TestDbFactory.SeedUser(db, Role.Approver, "queue-member");
@@ -251,6 +251,58 @@ public class DashboardServiceTests
         var summary = await new DashboardService(db).GetSummaryAsync(user);
 
         Assert.Equal(0, summary.OpenTaskCount);
-        Assert.Equal(1, summary.TeamQueueCount);
+        Assert.Equal(0, summary.TeamQueueCount);
+    }
+
+    [Fact]
+    public async Task Community_Admin_Personal_Summary_Focuses_On_Their_Teams_While_Community_Summary_Remains_Global()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.User, "dashboard-community-admin");
+        var starter = TestDbFactory.SeedUser(db, Role.User, "dashboard-team-starter");
+        var ownTeamId = Guid.NewGuid();
+        var otherTeamId = Guid.NewGuid();
+        db.Teams.AddRange(
+            new Team
+            {
+                Id = ownTeamId,
+                CommunityId = TestDbFactory.CommunityId,
+                Name = "Admin Team",
+                NormalizedName = "ADMIN TEAM",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new Team
+            {
+                Id = otherTeamId,
+                CommunityId = TestDbFactory.CommunityId,
+                Name = "Other Team",
+                NormalizedName = "OTHER TEAM",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+        var ownTeamWork = TestDbFactory.SeedOpenApproverTask(db, starter);
+        ownTeamWork.Task.AssignmentType = TaskAssignmentType.Team;
+        ownTeamWork.Task.CandidateTeamId = ownTeamId;
+        var otherTeamWork = TestDbFactory.SeedOpenApproverTask(db, starter);
+        otherTeamWork.Task.AssignmentType = TaskAssignmentType.Team;
+        otherTeamWork.Task.CandidateTeamId = otherTeamId;
+        await db.SaveChangesAsync();
+
+        var user = TestDbFactory.CommunityAdminDto(admin) with
+        {
+            Teams = [new UserTeamDto(ownTeamId, "Admin Team", true)]
+        };
+        var service = new DashboardService(db);
+
+        var personal = await service.GetSummaryAsync(user, WorkflowVisibilityScope.Personal);
+        var community = await service.GetSummaryAsync(user, WorkflowVisibilityScope.Community);
+
+        Assert.Equal(1, personal.OpenTaskCount);
+        Assert.Equal(1, personal.TeamQueueCount);
+        Assert.Equal(1, personal.InProgressProcessCount);
+        Assert.Equal(2, community.OpenTaskCount);
+        Assert.Equal(2, community.InProgressProcessCount);
+        Assert.Null(community.TeamQueueCount);
     }
 }
