@@ -110,8 +110,8 @@ public class DynamicWorkflowRuntimeTests
                 taskId = task.Id;
                 Assert.NotNull(task.ClaimVersion);
                 claimVersion = task.ClaimVersion.Value;
-                firstCandidate = TestDbFactory.ToDto(first);
-                secondCandidate = TestDbFactory.ToDto(second);
+                firstCandidate = WithTeam(first, team, isLead: false);
+                secondCandidate = WithTeam(second, team, isLead: false);
             }
 
             await using var firstDb = new AppDbContext(options);
@@ -225,7 +225,7 @@ public class DynamicWorkflowRuntimeTests
         var claimed = await taskService.ClaimAsync(
             openTask.Id,
             new ClaimTaskRequest(openTask.ClaimVersion),
-            TestDbFactory.ToDto(approver));
+            WithTeam(approver, team, isLead: false));
 
         Assert.True(claimed.IsSuccess, string.Join(" | ", claimed.Errors));
         Assert.Equal(ProcessTaskStatus.Claimed, claimed.Value!.Status);
@@ -235,7 +235,7 @@ public class DynamicWorkflowRuntimeTests
         var completed = await taskService.ExecuteActionAsync(
             openTask.Id,
             new TaskActionRequest(WorkflowAction.Approve, "Approved."),
-            TestDbFactory.ToDto(approver));
+            WithTeam(approver, team, isLead: false));
 
         Assert.True(completed.IsSuccess, string.Join(" | ", completed.Errors));
         Assert.Equal(ProcessStatus.Completed, completed.Value!.Status);
@@ -303,7 +303,7 @@ public class DynamicWorkflowRuntimeTests
             new TaskActionRequest(WorkflowAction.Approve, "Should be blocked"),
             memberDto);
         Assert.False(memberAction.IsSuccess);
-        Assert.Contains(memberAction.Errors, error => error == "This action can only be performed by a team lead. Contact your team lead.");
+        Assert.Contains(memberAction.Errors, error => error == "Task is claimed by another user.");
 
         var completed = await taskService.ExecuteActionAsync(
             task.Id,

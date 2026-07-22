@@ -23,7 +23,7 @@ internal static class CommunityRoleTemplates
         new(
             CommunityAdmin,
             "Topluluk Admin",
-            "Topluluktaki kullanici, rol, form, surec, task ve audit akisini yonetir.",
+            "Topluluktaki kullanici, rol, form, surec, tum tasklar ve audit akisini yonetir.",
             PermissionNames.All),
         new(
             FormDesigner,

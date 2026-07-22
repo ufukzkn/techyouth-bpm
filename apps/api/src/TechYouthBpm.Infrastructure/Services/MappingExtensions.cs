@@ -8,6 +8,8 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 internal static class MappingExtensions
 {
+    private static readonly TaskAccessPolicy TaskPolicy = new();
+
     public static UserDto ToDto(this User user)
     {
         var membership = ActiveMembership(user);
@@ -163,7 +165,7 @@ internal static class MappingExtensions
 
     public static ProcessTaskDto ToDto(this ProcessTask task, UserDto? currentUser = null)
     {
-        var access = ResolveTaskAccess(task, currentUser);
+        var access = TaskPolicy.Evaluate(task, currentUser);
 
         return new(
             task.Id,
@@ -267,7 +269,8 @@ internal static class MappingExtensions
                 activeTask?.ClaimedByUserId,
                 activeTask?.ClaimedByUser?.DisplayName ?? string.Empty,
                 activeStep?.EnteredAt ?? activeTask!.CreatedAt,
-                activeTask?.DueAt);
+                activeTask?.DueAt,
+                activeTask?.RequiresTeamLead ?? false);
 
         return new(
             process.Id,
@@ -345,110 +348,4 @@ internal static class MappingExtensions
     private static UserCommunityMembership? ActiveMembership(User user) =>
         user.CommunityMemberships.FirstOrDefault(membership => membership.IsActive);
 
-    private static TaskAccess ResolveTaskAccess(ProcessTask task, UserDto? currentUser)
-    {
-        if (currentUser is null)
-        {
-            return new TaskAccess(true, false, null, null);
-        }
-
-        if (task.Status is ProcessTaskStatus.Completed or ProcessTaskStatus.Cancelled)
-        {
-            return new TaskAccess(
-                false,
-                false,
-                TaskActionDenialReasonCodes.TaskClosed,
-                TaskActionDenialReasonCodes.TaskClosed);
-        }
-
-        if (!currentUser.IsSuperAdmin()
-            && task.ProcessInstance?.CommunityId is { } communityId
-            && currentUser.CommunityId != communityId)
-        {
-            return new TaskAccess(
-                false,
-                false,
-                TaskActionDenialReasonCodes.CommunityMismatch,
-                TaskActionDenialReasonCodes.CommunityMismatch);
-        }
-
-        if (!currentUser.IsSuperAdmin() && !currentUser.HasPermission(task.RequiredPermission))
-        {
-            return new TaskAccess(
-                false,
-                false,
-                TaskActionDenialReasonCodes.PermissionRequired,
-                TaskActionDenialReasonCodes.PermissionRequired);
-        }
-
-        if (!TaskAssignmentResolver.IsCandidatePool(task.AssignmentType))
-        {
-            var directlyAssigned = task.AssignmentType is null
-                || currentUser.IsSuperAdmin()
-                || task.AssignedUserId == currentUser.Id;
-            return directlyAssigned
-                ? new TaskAccess(true, false, null, null)
-                : new TaskAccess(
-                    false,
-                    false,
-                    TaskActionDenialReasonCodes.AssignedToAnotherUser,
-                    TaskActionDenialReasonCodes.AssignedToAnotherUser);
-        }
-
-        var teams = currentUser.Teams ?? [];
-        if (!currentUser.IsSuperAdmin()
-            && task.AssignmentType is TaskAssignmentType.Team or TaskAssignmentType.TeamAndCommunityRole
-            && (task.CandidateTeamId is not { } teamId || teams.All(team => team.Id != teamId)))
-        {
-            return new TaskAccess(
-                false,
-                false,
-                TaskActionDenialReasonCodes.TeamMembershipRequired,
-                TaskActionDenialReasonCodes.TeamMembershipRequired);
-        }
-
-        if (!currentUser.IsSuperAdmin()
-            && task.AssignmentType is TaskAssignmentType.CommunityRole or TaskAssignmentType.TeamAndCommunityRole
-            && task.CandidateCommunityRoleId != currentUser.CommunityRoleId)
-        {
-            return new TaskAccess(
-                false,
-                false,
-                TaskActionDenialReasonCodes.CommunityRoleRequired,
-                TaskActionDenialReasonCodes.CommunityRoleRequired);
-        }
-
-        if (!currentUser.IsSuperAdmin()
-            && task.RequiresTeamLead
-            && (task.CandidateTeamId is not { } leadTeamId
-                || teams.All(team => team.Id != leadTeamId || !team.IsLead)))
-        {
-            return new TaskAccess(
-                false,
-                false,
-                TaskActionDenialReasonCodes.TeamLeadRequired,
-                TaskActionDenialReasonCodes.TeamLeadRequired);
-        }
-
-        if (task.ClaimedByUserId is { } claimantId)
-        {
-            return claimantId == currentUser.Id || currentUser.IsSuperAdmin()
-                ? new TaskAccess(true, false, null, null)
-                : new TaskAccess(
-                    false,
-                    false,
-                    TaskActionDenialReasonCodes.ClaimedByAnotherUser,
-                    TaskActionDenialReasonCodes.ClaimedByAnotherUser);
-        }
-
-        return currentUser.IsSuperAdmin()
-            ? new TaskAccess(true, true, null, null)
-            : new TaskAccess(false, true, null, null);
-    }
-
-    private sealed record TaskAccess(
-        bool CanAct,
-        bool CanClaim,
-        string? ActionDenialReasonCode,
-        string? ClaimDenialReasonCode);
 }

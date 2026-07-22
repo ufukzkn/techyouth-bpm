@@ -81,6 +81,29 @@ public class WorkflowRoleAndActionIntegrationTests
 
         var candidateTasks = await GetTasksAsync(client, scoutReviewer.Token, scoutTaskId);
         Assert.Equal(1, candidateTasks.GetProperty("totalCount").GetInt32());
+        var candidateTask = candidateTasks.GetProperty("items").EnumerateArray().Single();
+        Assert.True(!candidateTask.TryGetProperty("taskForm", out var summaryTaskForm)
+            || summaryTaskForm.ValueKind == JsonValueKind.Null);
+
+        using (var taskDetailRequest = IntegrationTestHttp.BearerRequest(
+                   HttpMethod.Get,
+                   $"/api/tasks/{scoutTaskId}",
+                   scoutReviewer.Token))
+        {
+            using var taskDetailResponse = await client.SendAsync(taskDetailRequest);
+            Assert.True(taskDetailResponse.IsSuccessStatusCode, await taskDetailResponse.Content.ReadAsStringAsync());
+            var taskDetail = await ReadJsonAsync(taskDetailResponse);
+            Assert.True(taskDetail.GetProperty("taskForm").GetProperty("pages").GetArrayLength() > 0);
+        }
+
+        using (var hiddenTaskDetailRequest = IntegrationTestHttp.BearerRequest(
+                   HttpMethod.Get,
+                   $"/api/tasks/{scoutTaskId}",
+                   wrongRole.Token))
+        {
+            using var hiddenTaskDetailResponse = await client.SendAsync(hiddenTaskDetailRequest);
+            Assert.Equal(HttpStatusCode.NotFound, hiddenTaskDetailResponse.StatusCode);
+        }
 
         await ClaimAsync(client, scoutReviewer.Token, scoutTaskId);
         using (var invalidTaskForm = IntegrationTestHttp.BearerRequest(

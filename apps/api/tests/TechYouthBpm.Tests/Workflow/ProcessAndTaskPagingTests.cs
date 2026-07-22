@@ -87,6 +87,54 @@ public class ProcessAndTaskPagingTests
     }
 
     [Fact]
+    public async Task Process_List_Projects_Current_And_Last_Completed_Step_Context()
+    {
+        await using var db = TestDbFactory.Create();
+        var starter = TestDbFactory.SeedUser(db, Role.Admin, "process-context-starter");
+        var (process, task) = TestDbFactory.SeedOpenApproverTask(db, starter);
+        task.NodeKey = "technicalReview";
+        task.Title = "Teknik İnceleme";
+        task.AssignmentType = TaskAssignmentType.CommunityRole;
+        task.CandidateCommunityRoleId = TestDbFactory.ApproverCommunityRoleId;
+        task.DueAt = DateTime.UtcNow.AddHours(4);
+        db.ProcessStepExecutions.Add(new()
+        {
+            Id = Guid.NewGuid(),
+            ProcessInstanceId = process.Id,
+            NodeKey = "scoutReview",
+            NodeTitle = "Scout İncelemesi",
+            NodeType = ProcessNodeType.UserTask,
+            Attempt = 1,
+            Status = ProcessStepStatus.Completed,
+            EnteredAt = DateTime.UtcNow.AddMinutes(-20),
+            CompletedAt = DateTime.UtcNow.AddMinutes(-10),
+            CompletedByUserId = starter.Id,
+            Action = WorkflowAction.Approve
+        });
+        await db.SaveChangesAsync();
+
+        var service = new ProcessService(
+            db,
+            new FormService(db),
+            new ProcessStateMachine(),
+            new SystemAuditService(db));
+
+        var summary = Assert.Single((await service.ListAsync(
+            new ProcessListRequest(PageSize: 10),
+            TestDbFactory.CommunityAdminDto(starter))).Items);
+
+        Assert.NotNull(summary.CurrentStep);
+        Assert.Equal("Teknik İnceleme", summary.CurrentStep!.Title);
+        Assert.Equal(TaskAssignmentType.CommunityRole, summary.CurrentStep.AssignmentType);
+        Assert.Equal("Onay Sorumlusu", summary.CurrentStep.CommunityRoleName);
+        Assert.Equal(task.DueAt, summary.CurrentStep.DueAt);
+        Assert.NotNull(summary.LastCompletedStep);
+        Assert.Equal("Scout İncelemesi", summary.LastCompletedStep!.Title);
+        Assert.Equal(starter.DisplayName, summary.LastCompletedStep.CompletedByUserDisplayName);
+        Assert.Equal(WorkflowAction.Approve, summary.LastCompletedStep.Action);
+    }
+
+    [Fact]
     public async Task Task_List_Filters_Exact_Task_Without_Loading_An_Unrelated_Process()
     {
         await using var db = TestDbFactory.Create();
@@ -153,5 +201,31 @@ public class ProcessAndTaskPagingTests
         Assert.Equal(WorkflowAction.Approve, item.CompletedAction);
         Assert.Equal("Bütçe uygun.", item.CompletionNote);
         Assert.Equal(currentUser.DisplayName, item.CompletedByUserDisplayName);
+    }
+
+    [Fact]
+    public async Task ManageAll_History_Returns_All_Completed_Tasks_In_Own_Community()
+    {
+        await using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "history-manage-all");
+        var firstActor = TestDbFactory.SeedUser(db, Role.Approver, "history-actor-one");
+        var secondActor = TestDbFactory.SeedUser(db, Role.Approver, "history-actor-two");
+        var first = TestDbFactory.SeedOpenApproverTask(db, admin).Task;
+        var second = TestDbFactory.SeedOpenApproverTask(db, admin).Task;
+        first.Status = ProcessTaskStatus.Completed;
+        first.CompletedByUserId = firstActor.Id;
+        first.CompletedAt = DateTime.UtcNow.AddMinutes(-2);
+        second.Status = ProcessTaskStatus.Completed;
+        second.CompletedByUserId = secondActor.Id;
+        second.CompletedAt = DateTime.UtcNow.AddMinutes(-1);
+        await db.SaveChangesAsync();
+
+        var result = await new TaskService(db, new ProcessStateMachine()).ListMyTasksAsync(
+            new TaskListRequest(View: "history", PageSize: 10),
+            TestDbFactory.CommunityAdminDto(admin));
+
+        Assert.Equal(2, result.TotalCount);
+        Assert.Contains(result.Items, item => item.Id == first.Id);
+        Assert.Contains(result.Items, item => item.Id == second.Id);
     }
 }

@@ -69,6 +69,7 @@ public sealed class OpenApiContractIntegrationTests
         "POST /api/processes/start/version",
         "DELETE /api/tasks/{id}/claim",
         "GET /api/tasks/my",
+        "GET /api/tasks/{id}",
         "POST /api/tasks/{id}/actions",
         "POST /api/tasks/{id}/claim",
         "POST /api/tasks/{id}/release",

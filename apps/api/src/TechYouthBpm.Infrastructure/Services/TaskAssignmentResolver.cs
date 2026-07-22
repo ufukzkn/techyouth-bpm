@@ -9,77 +9,8 @@ namespace TechYouthBpm.Infrastructure.Services;
 
 internal sealed class TaskAssignmentResolver(AppDbContext db)
 {
-    public const string TeamLeadRequiredError = "This action can only be performed by a team lead. Contact your team lead.";
-
     public static bool IsCandidatePool(TaskAssignmentType? assignmentType) =>
-        assignmentType is TaskAssignmentType.Team
-            or TaskAssignmentType.CommunityRole
-            or TaskAssignmentType.TeamAndCommunityRole;
-
-    public async Task<bool> CanSeeAsync(ProcessTask task, UserDto user, CancellationToken cancellationToken)
-    {
-        if (user.IsSuperAdmin())
-        {
-            return true;
-        }
-
-        if (task.AssignmentType is null)
-        {
-            return task.ProcessInstance?.CommunityId == user.CommunityId
-                && user.HasPermission(task.RequiredPermission);
-        }
-
-        if (!IsCandidatePool(task.AssignmentType))
-        {
-            return task.AssignedUserId == user.Id
-                && await IsActiveInCommunityAsync(user.Id, task.ProcessInstance!.CommunityId, cancellationToken);
-        }
-
-        return await IsEligibleCandidateAsync(task, user.Id, cancellationToken, enforceTeamLead: false);
-    }
-
-    public async Task<bool> CanExecuteAsync(ProcessTask task, UserDto user, CancellationToken cancellationToken)
-    {
-        if (user.IsSuperAdmin())
-        {
-            return true;
-        }
-
-        if (task.AssignmentType is null)
-        {
-            return task.ProcessInstance?.CommunityId == user.CommunityId
-                && user.HasPermission(task.RequiredPermission);
-        }
-
-        if (!IsCandidatePool(task.AssignmentType))
-        {
-            return task.AssignedUserId == user.Id
-                && await IsActiveInCommunityAsync(user.Id, task.ProcessInstance!.CommunityId, cancellationToken);
-        }
-
-        return task.ClaimedByUserId == user.Id
-            && await IsEligibleCandidateAsync(task, user.Id, cancellationToken);
-    }
-
-    public Task<bool> IsEligibleCandidateAsync(
-        ProcessTask task,
-        Guid userId,
-        CancellationToken cancellationToken,
-        bool enforceTeamLead = true)
-    {
-        if (!IsCandidatePool(task.AssignmentType) || task.ProcessInstance is null)
-        {
-            return Task.FromResult(false);
-        }
-
-        return CandidateQuery(
-                task.ProcessInstance.CommunityId,
-                task.AssignmentType!.Value,
-                task.CandidateTeamId,
-                task.CandidateCommunityRoleId,
-                enforceTeamLead && task.RequiresTeamLead)
-            .AnyAsync(user => user.Id == userId, cancellationToken);
-    }
+        TaskAccessPolicy.IsCandidatePool(assignmentType);
 
     public async Task<IReadOnlyList<Guid>> ResolveCandidateUserIdsAsync(
         Guid communityId,

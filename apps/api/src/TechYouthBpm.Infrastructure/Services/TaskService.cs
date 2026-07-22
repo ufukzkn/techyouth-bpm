@@ -16,10 +16,11 @@ public class TaskService(
     AppDbContext db,
     ProcessStateMachine stateMachine,
     ISystemAuditService auditService,
-    IWorkflowVisibilityService workflowVisibilityService) : ITaskService
+    IWorkflowVisibilityService workflowVisibilityService,
+    TaskAccessPolicy taskAccessPolicy) : ITaskService
 {
     public TaskService(AppDbContext db, ProcessStateMachine stateMachine)
-        : this(db, stateMachine, new SystemAuditService(db), new WorkflowVisibilityService())
+        : this(db, stateMachine, new SystemAuditService(db), new WorkflowVisibilityService(), new TaskAccessPolicy())
     {
     }
 
@@ -27,7 +28,7 @@ public class TaskService(
         AppDbContext db,
         ProcessStateMachine stateMachine,
         ISystemAuditService auditService)
-        : this(db, stateMachine, auditService, new WorkflowVisibilityService())
+        : this(db, stateMachine, auditService, new WorkflowVisibilityService(), new TaskAccessPolicy())
     {
     }
 
@@ -46,24 +47,24 @@ public class TaskService(
     {
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
-        if (!user.HasPermission(PermissionNames.TasksView))
+        if (!user.HasPermission(PermissionNames.TasksView)
+            && !user.HasPermission(PermissionNames.TasksManageAll))
         {
             return new PagedResult<ProcessTaskDto>([], page, pageSize, 0);
         }
 
         var view = request.View?.Trim().ToLowerInvariant();
         var isHistory = view == "history";
-        var baseQuery = TaskQuery().AsNoTracking();
-        var query = isHistory
-            ? baseQuery.Where(task =>
-                task.Status == ProcessTaskStatus.Completed
-                && task.CompletedByUserId == user.Id)
-            : workflowVisibilityService.ApplyTaskScope(
-                baseQuery.Where(task =>
-                    task.Status == ProcessTaskStatus.Open
-                    || task.Status == ProcessTaskStatus.Claimed),
-                user,
-                WorkflowVisibilityScope.Personal);
+        var baseQuery = db.ProcessTasks.AsNoTracking();
+        var statusQuery = isHistory
+            ? baseQuery.Where(task => task.Status == ProcessTaskStatus.Completed)
+            : baseQuery.Where(task =>
+                task.Status == ProcessTaskStatus.Open
+                || task.Status == ProcessTaskStatus.Claimed);
+        var query = workflowVisibilityService.ApplyTaskScope(
+            statusQuery,
+            user,
+            WorkflowVisibilityScope.Personal);
 
         if (request.Priority is { } priority)
         {
@@ -80,9 +81,75 @@ public class TaskService(
         var tasks = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(task => new TaskListProjection
+            {
+                Id = task.Id,
+                ProcessInstanceId = task.ProcessInstanceId,
+                CommunityId = task.ProcessInstance!.CommunityId,
+                AssignedCommunityRoleId = task.AssignedCommunityRoleId,
+                AssignedCommunityRoleName = task.AssignedCommunityRole != null ? task.AssignedCommunityRole.Name : string.Empty,
+                RequiredPermission = task.RequiredPermission,
+                Status = task.Status,
+                AvailableActionsJson = task.AvailableActionsJson,
+                CreatedAt = task.CreatedAt,
+                CompletedAt = task.CompletedAt,
+                NodeKey = task.NodeKey,
+                Attempt = task.Attempt,
+                Title = task.Title,
+                Priority = task.Priority,
+                AssignmentType = task.AssignmentType,
+                AssignedUserId = task.AssignedUserId,
+                CandidateTeamId = task.CandidateTeamId,
+                CandidateCommunityRoleId = task.CandidateCommunityRoleId,
+                ClaimedByUserId = task.ClaimedByUserId,
+                ClaimedAt = task.ClaimedAt,
+                ClaimVersion = task.ClaimVersion,
+                FormDefinitionVersionId = task.FormDefinitionVersionId,
+                DueAt = task.DueAt,
+                WorkflowName = task.ProcessInstance.ProcessDefinitionVersion != null
+                    ? task.ProcessInstance.ProcessDefinitionVersion.ProcessDefinition!.Name
+                    : string.Empty,
+                FormName = task.FormDefinitionVersion != null
+                    ? task.FormDefinitionVersion.FormDefinition!.Name
+                    : task.ProcessInstance.FormDefinition!.Name,
+                CommunityName = task.ProcessInstance.Community!.Name,
+                RequiresTeamLead = task.RequiresTeamLead,
+                AssignedUserDisplayName = task.AssignedUser != null ? task.AssignedUser.DisplayName : string.Empty,
+                CandidateTeamName = task.CandidateTeam != null ? task.CandidateTeam.Name : string.Empty,
+                CandidateCommunityRoleName = task.CandidateCommunityRole != null ? task.CandidateCommunityRole.Name : string.Empty,
+                ClaimedByUserDisplayName = task.ClaimedByUser != null ? task.ClaimedByUser.DisplayName : string.Empty,
+                CompletedByUserId = task.CompletedByUserId,
+                CompletedByUserDisplayName = task.CompletedByUser != null ? task.CompletedByUser.DisplayName : string.Empty,
+                CompletedAction = task.CompletedAction,
+                CompletionNote = task.CompletionNote,
+            })
             .ToListAsync(cancellationToken);
 
-        return new PagedResult<ProcessTaskDto>(tasks.Select(task => task.ToDto(user)).ToArray(), page, pageSize, totalCount);
+        return new PagedResult<ProcessTaskDto>(
+            tasks.Select(task => task.ToDto(user, taskAccessPolicy)).ToArray(),
+            page,
+            pageSize,
+            totalCount);
+    }
+
+    public async Task<ProcessTaskDto?> GetAsync(
+        Guid taskId,
+        UserDto user,
+        CancellationToken cancellationToken = default)
+    {
+        if (!user.HasPermission(PermissionNames.TasksView)
+            && !user.HasPermission(PermissionNames.TasksManageAll)
+            && !user.IsSuperAdmin())
+        {
+            return null;
+        }
+
+        var task = await TaskQuery()
+            .AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == taskId, cancellationToken);
+        return task is not null && taskAccessPolicy.CanSee(task, user)
+            ? task.ToDto(user)
+            : null;
     }
 
     private static IOrderedQueryable<ProcessTask> ApplyTaskOrdering(
@@ -126,7 +193,7 @@ public class TaskService(
             return Result<ProcessTaskDto>.Failure("Task was not found.");
         }
 
-        if (!TaskAssignmentResolver.IsCandidatePool(task.AssignmentType))
+        if (!TaskAccessPolicy.IsCandidatePool(task.AssignmentType))
         {
             return Result<ProcessTaskDto>.Failure("Directly assigned tasks do not require a claim.");
         }
@@ -141,19 +208,10 @@ public class TaskService(
             return Result<ProcessTaskDto>.Failure("Task claim changed. Refresh and try again.");
         }
 
-        var assignmentResolver = new TaskAssignmentResolver(db);
-        if (task.RequiresTeamLead
-            && !user.IsSuperAdmin()
-            && await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken, enforceTeamLead: false)
-            && !await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken))
+        var claimAccess = taskAccessPolicy.Evaluate(task, user);
+        if (!claimAccess.CanClaim)
         {
-            return Result<ProcessTaskDto>.Failure(TaskAssignmentResolver.TeamLeadRequiredError);
-        }
-
-        if (!await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken)
-            && !user.IsSuperAdmin())
-        {
-            return Result<ProcessTaskDto>.Failure("Current user is not an eligible task candidate.");
+            return Result<ProcessTaskDto>.Failure(TaskAccessPolicy.ErrorFor(claimAccess));
         }
 
         try
@@ -193,7 +251,7 @@ public class TaskService(
             return Result<ProcessTaskDto>.Failure("Task was not found.");
         }
 
-        if (!TaskAssignmentResolver.IsCandidatePool(task.AssignmentType))
+        if (!TaskAccessPolicy.IsCandidatePool(task.AssignmentType))
         {
             return Result<ProcessTaskDto>.Failure("Directly assigned tasks do not have a claim to release.");
         }
@@ -262,18 +320,10 @@ public class TaskService(
             return Result<ProcessDetailDto>.Failure("The task community is not active.");
         }
 
-        var assignmentResolver = new TaskAssignmentResolver(db);
-        if (task.RequiresTeamLead
-            && !user.IsSuperAdmin()
-            && await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken, enforceTeamLead: false)
-            && !await assignmentResolver.IsEligibleCandidateAsync(task, user.Id, cancellationToken))
+        var actionAccess = taskAccessPolicy.Evaluate(task, user);
+        if (!actionAccess.CanAct)
         {
-            return Result<ProcessDetailDto>.Failure(TaskAssignmentResolver.TeamLeadRequiredError);
-        }
-
-        if (!await assignmentResolver.CanExecuteAsync(task, user, cancellationToken))
-        {
-            return Result<ProcessDetailDto>.Failure("Current user cannot execute this task.");
+            return Result<ProcessDetailDto>.Failure(TaskAccessPolicy.ErrorFor(actionAccess));
         }
 
         var availableActions = JsonHelpers.Deserialize<IReadOnlyList<WorkflowAction>>(task.AvailableActionsJson, []);
@@ -505,6 +555,106 @@ public class TaskService(
             .ThenInclude(page => page.Fields)
             .ThenInclude(field => field.ValidationRules)
             .AsSplitQuery();
+
+    private sealed class TaskListProjection
+    {
+        public Guid Id { get; init; }
+        public Guid ProcessInstanceId { get; init; }
+        public Guid CommunityId { get; init; }
+        public Guid? AssignedCommunityRoleId { get; init; }
+        public string AssignedCommunityRoleName { get; init; } = string.Empty;
+        public string RequiredPermission { get; init; } = string.Empty;
+        public ProcessTaskStatus Status { get; init; }
+        public string AvailableActionsJson { get; init; } = "[]";
+        public DateTime CreatedAt { get; init; }
+        public DateTime? CompletedAt { get; init; }
+        public string NodeKey { get; init; } = string.Empty;
+        public int Attempt { get; init; }
+        public string Title { get; init; } = string.Empty;
+        public TaskPriority Priority { get; init; }
+        public TaskAssignmentType? AssignmentType { get; init; }
+        public Guid? AssignedUserId { get; init; }
+        public Guid? CandidateTeamId { get; init; }
+        public Guid? CandidateCommunityRoleId { get; init; }
+        public Guid? ClaimedByUserId { get; init; }
+        public DateTime? ClaimedAt { get; init; }
+        public Guid ClaimVersion { get; init; }
+        public Guid? FormDefinitionVersionId { get; init; }
+        public DateTime? DueAt { get; init; }
+        public string WorkflowName { get; init; } = string.Empty;
+        public string FormName { get; init; } = string.Empty;
+        public string CommunityName { get; init; } = string.Empty;
+        public bool RequiresTeamLead { get; init; }
+        public string AssignedUserDisplayName { get; init; } = string.Empty;
+        public string CandidateTeamName { get; init; } = string.Empty;
+        public string CandidateCommunityRoleName { get; init; } = string.Empty;
+        public string ClaimedByUserDisplayName { get; init; } = string.Empty;
+        public Guid? CompletedByUserId { get; init; }
+        public string CompletedByUserDisplayName { get; init; } = string.Empty;
+        public WorkflowAction? CompletedAction { get; init; }
+        public string CompletionNote { get; init; } = string.Empty;
+
+        public ProcessTaskDto ToDto(UserDto user, TaskAccessPolicy policy)
+        {
+            var access = policy.Evaluate(new ProcessTask
+            {
+                Id = Id,
+                ProcessInstanceId = ProcessInstanceId,
+                ProcessInstance = new ProcessInstance { CommunityId = CommunityId },
+                AssignedCommunityRoleId = AssignedCommunityRoleId,
+                RequiredPermission = RequiredPermission,
+                Status = Status,
+                AssignmentType = AssignmentType,
+                AssignedUserId = AssignedUserId,
+                CandidateTeamId = CandidateTeamId,
+                CandidateCommunityRoleId = CandidateCommunityRoleId,
+                ClaimedByUserId = ClaimedByUserId,
+                RequiresTeamLead = RequiresTeamLead,
+                CompletedByUserId = CompletedByUserId,
+            }, user);
+
+            return new ProcessTaskDto(
+                Id,
+                ProcessInstanceId,
+                AssignedCommunityRoleId,
+                AssignedCommunityRoleName,
+                RequiredPermission,
+                Status,
+                JsonHelpers.Deserialize<IReadOnlyList<WorkflowAction>>(AvailableActionsJson, []),
+                CreatedAt,
+                CompletedAt,
+                NodeKey,
+                Attempt,
+                Title,
+                Priority,
+                AssignmentType,
+                AssignedUserId,
+                CandidateTeamId,
+                CandidateCommunityRoleId,
+                ClaimedByUserId,
+                ClaimedAt,
+                ClaimVersion,
+                FormDefinitionVersionId,
+                null,
+                DueAt,
+                WorkflowName,
+                FormName,
+                CommunityName,
+                RequiresTeamLead,
+                access.CanAct,
+                access.ActionDenialReasonCode,
+                AssignedUserDisplayName,
+                CandidateTeamName,
+                CandidateCommunityRoleName,
+                ClaimedByUserDisplayName,
+                CompletedByUserId,
+                CompletedByUserDisplayName,
+                CompletedAction,
+                CompletionNote,
+                access.CanClaim,
+                access.ClaimDenialReasonCode);
+        }
+    }
 
     private IQueryable<ProcessTask> TaskExecutionQuery() =>
         db.ProcessTasks

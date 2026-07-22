@@ -19,6 +19,7 @@ public static class PermissionNames
     public const string WorkflowsPublish = "Workflows.Publish";
     public const string TasksView = "Tasks.View";
     public const string TasksAct = "Tasks.Act";
+    public const string TasksManageAll = "Tasks.ManageAll";
     public const string AuditView = "Audit.View";
 
     public static readonly IReadOnlyList<string> All =
@@ -40,6 +41,7 @@ public static class PermissionNames
         WorkflowsPublish,
         TasksView,
         TasksAct,
+        TasksManageAll,
         AuditView
     ];
 }

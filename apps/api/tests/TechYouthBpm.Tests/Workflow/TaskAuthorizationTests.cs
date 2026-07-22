@@ -58,6 +58,49 @@ public class TaskAuthorizationTests
     }
 
     [Fact]
+    public async Task ManageAll_Can_Execute_Unclaimed_Task_Assigned_To_Another_User()
+    {
+        using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "manage-all-admin");
+        var assignedUser = TestDbFactory.SeedUser(db, Role.Approver, "direct-assignee");
+        var (_, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
+        task.AssignmentType = TaskAssignmentType.SpecificUser;
+        task.AssignedUserId = assignedUser.Id;
+        await db.SaveChangesAsync();
+
+        var result = await new TaskService(db, new ProcessStateMachine()).ExecuteActionAsync(
+            task.Id,
+            new TaskActionRequest(WorkflowAction.Approve, "Community admin approved."),
+            TestDbFactory.CommunityAdminDto(admin));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        Assert.Equal(ProcessStatus.Completed, result.Value!.Status);
+    }
+
+    [Fact]
+    public async Task ManageAll_Can_Claim_Candidate_Task_Without_Target_Role_Or_Team()
+    {
+        using var db = TestDbFactory.Create();
+        var admin = TestDbFactory.SeedUser(db, Role.Admin, "manage-all-claim-admin");
+        var (_, task) = TestDbFactory.SeedOpenApproverTask(db, admin);
+        var team = DynamicWorkflowTestBuilder.SeedTeam(db, "Restricted claim team");
+        task.AssignmentType = TaskAssignmentType.TeamAndCommunityRole;
+        task.CandidateTeamId = team.Id;
+        task.CandidateCommunityRoleId = TestDbFactory.ApproverCommunityRoleId;
+        task.RequiresTeamLead = true;
+        await db.SaveChangesAsync();
+
+        var result = await new TaskService(db, new ProcessStateMachine()).ClaimAsync(
+            task.Id,
+            new ClaimTaskRequest(task.ClaimVersion),
+            TestDbFactory.CommunityAdminDto(admin));
+
+        Assert.True(result.IsSuccess, string.Join(" | ", result.Errors));
+        Assert.Equal(ProcessTaskStatus.Claimed, result.Value!.Status);
+        Assert.Equal(admin.Id, result.Value.ClaimedByUserId);
+    }
+
+    [Fact]
     public async Task Closed_Task_Returns_Already_Closed_Error()
     {
         using var db = TestDbFactory.Create();

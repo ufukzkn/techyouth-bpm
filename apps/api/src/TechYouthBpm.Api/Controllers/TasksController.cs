@@ -22,6 +22,19 @@ public class TasksController(
         return Ok(await taskService.ListMyTasksAsync(request, user, cancellationToken));
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+
+        var task = await taskService.GetAsync(id, user, cancellationToken);
+        return task is null ? NotFound(new { errors = new[] { "Task was not found." } }) : Ok(task);
+    }
+
     [HttpPost("{id:guid}/actions")]
     public async Task<IActionResult> Execute(Guid id, TaskActionRequest request, CancellationToken cancellationToken)
     {
