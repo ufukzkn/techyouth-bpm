@@ -4,6 +4,7 @@ import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, GitBranc
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
+import { resolvePendingTaskCopy } from "@/features/app-shell/dashboardScope";
 import type { ViewId } from "@/features/app-shell/navigation";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { getNotificationTarget } from "@/features/notifications/notificationNavigation";
@@ -96,14 +97,16 @@ export function DashboardView({
   const recentOpenTasks = summary?.recentOpenTasks ?? [];
   const recentProcesses = summary?.recentProcesses ?? [];
   const chartTotal = openTaskCount + inProgressCount + completedCount;
+  const managesAllTasks = user.role === "SuperAdmin" || user.permissions.includes("Tasks.ManageAll");
+  const pendingCopy = resolvePendingTaskCopy(scope, user.role === "SuperAdmin", managesAllTasks);
   const chartSegments = useMemo(() => {
     const circumference = 2 * Math.PI * 44;
     const total = Math.max(1, chartTotal);
     let offset = 0;
     return [
-      { key: "open", label: t("dashboard.pendingTasks"), value: openTaskCount, className: "chart-segment-open", viewId: "tasks" as ViewId },
-      { key: "progress", label: t("dashboard.inProgress"), value: inProgressCount, className: "chart-segment-progress", viewId: "processes" as ViewId },
-      { key: "completed", label: t("dashboard.completed"), value: completedCount, className: "chart-segment-completed", viewId: "processes" as ViewId },
+      { key: "open", label: t(pendingCopy.labelKey), description: t(pendingCopy.descriptionKey), value: openTaskCount, className: "chart-segment-open", viewId: "tasks" as ViewId },
+      { key: "progress", label: t("dashboard.inProgress"), description: t("dashboard.inProgressDescription"), value: inProgressCount, className: "chart-segment-progress", viewId: "processes" as ViewId },
+      { key: "completed", label: t("dashboard.completed"), description: t("dashboard.completedDescription"), value: completedCount, className: "chart-segment-completed", viewId: "processes" as ViewId },
     ].map((segment) => {
       const length = (segment.value / total) * circumference;
       const result = {
@@ -115,10 +118,11 @@ export function DashboardView({
       offset += length;
       return result;
     });
-  }, [chartTotal, completedCount, inProgressCount, openTaskCount, t]);
+  }, [chartTotal, completedCount, inProgressCount, openTaskCount, pendingCopy.descriptionKey, pendingCopy.labelKey, t]);
   const canOpen = useCallback((viewId: ViewId) => visibleViewIds.includes(viewId), [visibleViewIds]);
   const shouldShowMetricLoader = status === "loading" && !summary;
   const activeChartSegment = chartSegments.find((segment) => segment.key === hoveredChartSegment);
+  const chartExplanation = activeChartSegment?.description ?? t("dashboard.distributionDescription");
   const currentAccessLabel = user.communityRoleName || (user.role === "SuperAdmin" ? "SuperAdmin" : "Atanmadı");
   const normalizedCommunityRole = user.communityRoleName.trim().toLocaleLowerCase("tr-TR");
   const hasUnassignedCommunityRole = user.role !== "SuperAdmin"
@@ -230,12 +234,18 @@ export function DashboardView({
           <div className="dashboard-chart-copy">
             <span className="eyebrow">{t("dashboard.distributionEyebrow")}</span>
             <h3>{t("dashboard.distributionTitle")}</h3>
+          </div>
+          <div className="dashboard-chart-body">
             <div className="chart-legend dashboard-metric-legend">
               {chartSegments.map((segment) => (
                 <button
-                  disabled={segment.key === "open" ? scope !== "personal" || !canOpen("tasks") : !canOpen("processes")}
+                  aria-disabled={segment.key === "open" ? scope !== "personal" || !canOpen("tasks") : !canOpen("processes")}
                   key={segment.key}
                   onClick={() => openChartSegment(segment.key)}
+                  onBlur={() => setHoveredChartSegment(null)}
+                  onFocus={() => setHoveredChartSegment(segment.key)}
+                  onMouseEnter={() => setHoveredChartSegment(segment.key)}
+                  onMouseLeave={() => setHoveredChartSegment(null)}
                   type="button"
                 >
                   <span><i className={`legend-${segment.key}`} /> {segment.label}</span>
@@ -243,52 +253,53 @@ export function DashboardView({
                 </button>
               ))}
             </div>
-            {scope === "personal" && user.communityId ? (
-              <p className="dashboard-team-queue">
-                <Network size={15} />
-                <span>{language === "tr" ? "Takım kuyruğu" : "Team queue"}</span>
-                {shouldShowMetricLoader ? <InlineValueLoader label={t("common.loading")} /> : <strong>{teamQueueCount}</strong>}
-              </p>
-            ) : null}
-          </div>
-          <div
-            className={shouldShowMetricLoader ? "dashboard-donut is-loading" : "dashboard-donut"}
-            aria-label={activeChartSegment ? `${activeChartSegment.label}: %${activeChartSegment.percentage}` : t("dashboard.distributionTitle")}
-          >
-            <svg className="dashboard-donut-svg" role="img" viewBox="0 0 112 112">
-              <circle className="chart-track" cx="56" cy="56" r="44" />
-              {!shouldShowMetricLoader ? chartSegments.map((segment) => (
-                <circle
-                  aria-label={`${segment.label}: %${segment.percentage}`}
-                  className={segment.className}
-                  cx="56"
-                  cy="56"
-                  data-active={activeChartSegment ? activeChartSegment.key === segment.key : undefined}
-                  key={segment.key}
-                  onBlur={() => { setHoveredChartSegment(null); setChartTooltipPosition(null); }}
-                  onFocus={() => setHoveredChartSegment(segment.key)}
-                  onMouseEnter={() => setHoveredChartSegment(segment.key)}
-                  onMouseLeave={() => { setHoveredChartSegment(null); setChartTooltipPosition(null); }}
-                  onMouseMove={(event) => {
-                    const bounds = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
-                    if (bounds) setChartTooltipPosition({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
-                  }}
-                  r="44"
-                  strokeDasharray={segment.dashArray}
-                  strokeDashoffset={segment.dashOffset}
-                  tabIndex={0}
-                />
-              )) : null}
-            </svg>
-            <span className="dashboard-donut-value" aria-live="polite">
-              {shouldShowMetricLoader ? <InlineValueLoader label={t("common.loading")} /> : activeChartSegment?.value ?? chartTotal}
-            </span>
-            {activeChartSegment && chartTooltipPosition ? (
-              <span className="chart-hover-tooltip" role="tooltip" style={{ left: chartTooltipPosition.x, top: chartTooltipPosition.y }}>
-                %{activeChartSegment.percentage}
+            <div
+              className={shouldShowMetricLoader ? "dashboard-donut is-loading" : "dashboard-donut"}
+              aria-label={activeChartSegment ? `${activeChartSegment.label}: %${activeChartSegment.percentage}` : t("dashboard.distributionTitle")}
+            >
+              <svg className="dashboard-donut-svg" role="img" viewBox="0 0 112 112">
+                <circle className="chart-track" cx="56" cy="56" r="44" />
+                {!shouldShowMetricLoader ? chartSegments.map((segment) => (
+                  <circle
+                    aria-label={`${segment.label}: %${segment.percentage}`}
+                    className={segment.className}
+                    cx="56"
+                    cy="56"
+                    data-active={activeChartSegment ? activeChartSegment.key === segment.key : undefined}
+                    key={segment.key}
+                    onBlur={() => { setHoveredChartSegment(null); setChartTooltipPosition(null); }}
+                    onFocus={() => setHoveredChartSegment(segment.key)}
+                    onMouseEnter={() => setHoveredChartSegment(segment.key)}
+                    onMouseLeave={() => { setHoveredChartSegment(null); setChartTooltipPosition(null); }}
+                    onMouseMove={(event) => {
+                      const bounds = event.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                      if (bounds) setChartTooltipPosition({ x: event.clientX - bounds.left, y: event.clientY - bounds.top });
+                    }}
+                    r="44"
+                    strokeDasharray={segment.dashArray}
+                    strokeDashoffset={segment.dashOffset}
+                    tabIndex={0}
+                  />
+                )) : null}
+              </svg>
+              <span className="dashboard-donut-value" aria-live="polite">
+                {shouldShowMetricLoader ? <InlineValueLoader label={t("common.loading")} /> : activeChartSegment?.value ?? chartTotal}
               </span>
-            ) : null}
+              {activeChartSegment && chartTooltipPosition ? (
+                <span className="chart-hover-tooltip" role="tooltip" style={{ left: chartTooltipPosition.x, top: chartTooltipPosition.y }}>
+                  %{activeChartSegment.percentage}
+                </span>
+              ) : null}
+            </div>
           </div>
+          {scope === "personal" && user.communityId ? (
+            <p className="dashboard-team-queue">
+              <Network size={15} />
+              <span>{language === "tr" ? "Takım kuyruğu" : "Team queue"}</span>
+              {shouldShowMetricLoader ? <InlineValueLoader label={t("common.loading")} /> : <strong>{teamQueueCount}</strong>}
+            </p>
+          ) : null}
+          <p className="dashboard-chart-explanation" aria-live="polite">{chartExplanation}</p>
         </article>
 
         <article className="dashboard-work-card dashboard-priority-card">

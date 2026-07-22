@@ -137,6 +137,6 @@ export function permissionLabel(permission: PermissionName) {
     "Tasks.View": "İşleri görür",
     "Tasks.Act": "İş aksiyonu alır",
     "Tasks.ManageAll": "Topluluktaki tüm işleri yönetir",
-    "Audit.View": "Geçmişi görür",
+    "Audit.View": "Sistem loglarını görür",
   }[permission];
 }

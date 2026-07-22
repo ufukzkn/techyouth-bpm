@@ -1066,11 +1066,18 @@ button.team-member-task-count:focus-visible {
   gap: 6px;
 }
 
+.user-team-membership-row .stacked-summary {
+  justify-items: start;
+  align-items: start;
+}
+
 .team-lead-label {
-  justify-content: center;
+  justify-content: flex-start;
+  width: fit-content;
+  margin: 0;
   color: var(--orange);
   font-weight: 750;
-  line-height: 1;
+  line-height: 1.2;
   vertical-align: middle;
 }
 

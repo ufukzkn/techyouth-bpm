@@ -304,6 +304,17 @@
   position: relative;
 }
 
+.tasks-shortcut-button {
+  color: var(--primary-strong);
+}
+
+.tasks-shortcut-button:hover,
+.tasks-shortcut-button:focus-visible {
+  color: var(--primary-strong);
+  border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
 .notification-badge {
   position: absolute;
   top: -4px;
