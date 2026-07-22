@@ -477,16 +477,26 @@ public class ProcessGraphValidator(AppDbContext db) : IProcessGraphValidator
         if (assignment.UserId is { } userId)
         {
             var user = await db.Users
-                .Include(u => u.CommunityMemberships)
-                .ThenInclude(m => m.CommunityRole)
-                .ThenInclude(r => r!.Permissions)
-                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+                .Where(candidate => candidate.Id == userId)
+                .Select(candidate => new
+                {
+                    candidate.Status,
+                    IsCommunityMember = candidate.CommunityMemberships.Any(membership =>
+                        membership.IsActive && membership.CommunityId == communityId),
+                    CanActOnTasks = candidate.CommunityMemberships.Any(membership =>
+                        membership.IsActive
+                        && membership.CommunityId == communityId
+                        && membership.CommunityRole != null
+                        && membership.CommunityRole.Permissions.Any(permission =>
+                            permission.Permission == PermissionNames.TasksAct))
+                })
+                .FirstOrDefaultAsync(cancellationToken);
                 
-            if (user is null || user.Status != UserStatus.Active || !user.CommunityMemberships.Any(m => m.IsActive && m.CommunityId == communityId))
+            if (user is null || user.Status != UserStatus.Active || !user.IsCommunityMember)
             {
                 errors.Add($"Assignment user '{userId}' for task '{node.Key}' is not active in the process community.");
             }
-            else if (!user.CommunityMemberships.Any(m => m.IsActive && m.CommunityId == communityId && m.CommunityRole!.Permissions.Any(p => p.Permission == PermissionNames.TasksAct)))
+            else if (!user.CanActOnTasks)
             {
                 errors.Add($"'{node.Key}' görevine atanan kullanıcının işlem ({PermissionNames.TasksAct}) yetkisi bulunmuyor.");
             }

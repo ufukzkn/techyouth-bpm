@@ -240,7 +240,9 @@ public class ProcessDefinitionServiceTests
             formVersionId);
 
         Assert.False(result.IsSuccess);
-        Assert.Contains(result.Errors, error => error.Contains("active team lead", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.Errors, error =>
+            error.Contains(PermissionNames.TasksAct, StringComparison.Ordinal)
+            && error.Contains("sorumlusu bulunmuyor", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
