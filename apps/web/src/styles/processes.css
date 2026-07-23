@@ -1259,6 +1259,10 @@
   font-weight: 750;
 }
 
+.task-due-date.is-unset {
+  color: var(--muted);
+}
+
 .task-item {
   transition: border-color var(--motion-fast), background var(--motion-fast), box-shadow var(--motion-fast);
 }

@@ -472,7 +472,13 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 onPriorityChange={(value) => { prepareTaskQueryTransition({ page: 1, priority: value }); setTaskPriority(value); setTaskPage(1); }}
                 onReleaseTask={(taskId, claimVersion) => void updateTaskClaim(taskId, "release", claimVersion)}
                 onSelectTask={(task) => void selectTask(task)}
-                onSortByChange={(value) => { prepareTaskQueryTransition({ page: 1, sortBy: value }); setTaskSortBy(value); setTaskPage(1); }}
+                onSortByChange={(value) => {
+                  const direction = value === "newest" || value === "priority" ? "desc" : "asc";
+                  prepareTaskQueryTransition({ page: 1, sortBy: value, sortDirection: direction });
+                  setTaskSortBy(value);
+                  setTaskSortDirection(direction);
+                  setTaskPage(1);
+                }}
                 onSortDirectionChange={(value) => { prepareTaskQueryTransition({ page: 1, sortDirection: value }); setTaskSortDirection(value); setTaskPage(1); }}
                 priorityFilter={taskPriority}
                 result={visibleTaskResult}

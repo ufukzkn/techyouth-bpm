@@ -214,7 +214,11 @@ export function MyTasksView({
                         <small className={isOverdue ? "task-due-date is-overdue" : "task-due-date"}>
                           <Clock3 size={13} /> {isOverdue ? (isTr ? "Gecikti" : "Overdue") : (isTr ? "Son tarih" : "Due")} · {formatApiDateTime(task.dueAt, language)}
                         </small>
-                      ) : null}
+                      ) : (
+                        <small className="task-due-date is-unset">
+                          <Clock3 size={13} /> {isTr ? "Son tarih belirlenmedi" : "No deadline set"}
+                        </small>
+                      )}
                       {taskView === "history" ? <TaskCompletionContext language={language} task={task} /> : null}
                     </div>
                   </button>
