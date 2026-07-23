@@ -231,9 +231,11 @@
 }
 
 .settings-panel {
+  width: 100%;
   display: grid;
   gap: 16px;
   max-width: 1180px;
+  margin-inline: auto;
 }
 
 .settings-grid {
