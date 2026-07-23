@@ -105,6 +105,11 @@ sınırlarıdır:
 - Public production deployment, Sentry/Seq/Datadog entegrasyonu ve yayınlanmış
   kısa demo videosu henüz yoktur.
 
+Bu tercihler proje kapsamı gereği bilinçlidir: hazır bir BPM motorunu veya
+kurumsal sistemi bağlamak yerine dinamik form, yetkilendirme ve iş akışı
+mantığının ekip tarafından geliştirilip gösterilmesi hedeflendiği için özel
+.NET workflow runtime kullanılmış, Camunda ve ERP bağımlılıkları eklenmemiştir.
+
 ## Geliştirilen Ek Özellikler
 
 - Topluluk, davet kodu, custom role, işlem bazlı permission ve SuperAdmin
