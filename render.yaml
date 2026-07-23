@@ -1,5 +1,27 @@
 services:
   - type: web
+    name: techyouth-bpm-web
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: master
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: .
+    healthCheckPath: /login
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: /backend
+      - key: API_PROXY_TARGET
+        value: https://techyouth-bpm-api.onrender.com
+
+  - type: web
     name: techyouth-bpm-api
     runtime: docker
     plan: free

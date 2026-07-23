@@ -6,7 +6,9 @@ RUN npm ci
 FROM node:24-alpine AS build
 WORKDIR /app
 ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:5291
+ARG API_PROXY_TARGET
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV API_PROXY_TARGET=$API_PROXY_TARGET
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY apps/web ./
 RUN npm run build
