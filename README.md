@@ -9,6 +9,8 @@ izlemeyi sağlar.
 **Hızlı demo:** En zahmetsiz ve önerilen çalışma yolu **Docker + SQLite**'tır.
 Tek komut akışı için [Hızlı Kurulum](#hızlı-kurulum) bölümüne bakın.
 
+**Canlı demo:** [https://techyouth-bpm.vercel.app](https://techyouth-bpm.vercel.app)
+
 ## Proje ve Repo Yapısı
 
 | Yol | Sorumluluk |
@@ -105,8 +107,8 @@ sınırlarıdır:
   henüz yoktur. Typed exclusive gateway, `DueAt` ve manuel `Escalate` vardır.
 - BPMN XML import/export ve Camunda deployment yapılmaz.
 - Harici ERP/kurumsal servis entegrasyonu yapılmaz.
-- Public production deployment, Sentry/Seq/Datadog entegrasyonu ve yayınlanmış
-  kısa demo videosu henüz yoktur.
+- Sentry/Seq/Datadog entegrasyonu ve yayınlanmış kısa demo videosu henüz
+  yoktur.
 
 Bu tercihler proje kapsamı gereği bilinçlidir: hazır bir BPM motorunu veya
 kurumsal sistemi bağlamak yerine dinamik form, yetkilendirme ve iş akışı
@@ -279,6 +281,8 @@ adımları bir sonraki bölümdedir.
 | `.env.example` | Cloud Compose için secretsiz PostgreSQL şablonu |
 | `.env.neon.local` | Gerçek cloud DB bilgileri; gitignored |
 | `apps/web/.env.local` | Frontend API adresi override'ı; gitignored |
+| `apps/web/vercel.json` | Canlı frontend için Vercel Next.js framework ayarı |
+| `render.yaml` | Canlı Render API servisi ve secretsiz runtime ayarları |
 | .NET user-secrets | Native API çalıştırmada PostgreSQL/SMTP secret'ları |
 
 Önemli auth varsayılanları:
@@ -404,6 +408,8 @@ Yalnız temel hesaplarla başlamak için:
 | Swagger / OpenAPI | `http://localhost:5291/swagger` |
 | API liveness | `http://localhost:5291/health/live` |
 | API readiness | `http://localhost:5291/health/ready` |
+| Public canlı demo | [https://techyouth-bpm.vercel.app](https://techyouth-bpm.vercel.app) |
+| Canlı API readiness | [https://techyouth-bpm-api.onrender.com/health/ready](https://techyouth-bpm-api.onrender.com/health/ready) |
 
 Örnek hesaplar:
 
@@ -468,7 +474,14 @@ dosyasıdır.
 
 ## Canlı Demo ve Video Durumu
 
-- Public canlı demo adresi: **Henüz yok**
+- Public canlı demo:
+  [https://techyouth-bpm.vercel.app](https://techyouth-bpm.vercel.app)
+- Canlı mimari: **Vercel Next.js frontend → Render .NET API → Neon
+  PostgreSQL**.
+- Vercel, `/backend/*` isteklerini Render API'ye yönlendirir; browser cookie ve
+  CSRF akışı aynı frontend origin'i üzerinden yürür.
+- Render Blueprint yalnız API servisini yönetir; yinelenen ikinci bir frontend
+  servisi çalıştırılmaz.
 - Kısa demo videosu: **Henüz yok**
 - Uygulama terminal veya Docker seçenekleriyle localde tam demo veriyle
   çalıştırılabilir.
