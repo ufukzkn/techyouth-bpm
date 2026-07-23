@@ -1,18 +1,26 @@
 # TechYouth BPM Wizard
 
-TechYouth School 2. dönem proje gereksinimleri için hazırlanan full-stack,
-dinamik form ve BPM iş akışı uygulamasıdır.
+TechYouth School 2. dönem proje gereksinimleri için geliştirilen full-stack,
+dinamik form ve BPM iş akışı uygulamasıdır. Platform; topluluk, rol ve takım
+sınırları içinde form tasarlamayı, görsel akış yayınlamayı, süreç başlatmayı,
+işleri aday havuzundan üstlenmeyi ve bütün hareketleri denetlenebilir biçimde
+izlemeyi sağlar.
 
-- `apps/web`: Next.js + TypeScript frontend
-- `apps/api`: .NET 8 Web API backend
+## Proje ve Repo Yapısı
 
-Form alanı/sayfa sıralaması `@dnd-kit`, görsel iş akışı tuvali
-`@xyflow/react` kullanır. API, sürümlenmiş tanımları EF Core ile saklayan özel
-bir typed .NET workflow runtime çalıştırır. Camunda ve Kissflow ürün referansıdır;
-runtime bağımlılığı değildir.
+| Yol | Sorumluluk |
+| --- | --- |
+| `apps/web` | Next.js, React ve TypeScript frontend |
+| `apps/api/src/TechYouthBpm.Api` | HTTP, cookie, CSRF, middleware ve controller katmanı |
+| `apps/api/src/TechYouthBpm.Application` | DTO'lar, servis kontratları ve use-case sınırları |
+| `apps/api/src/TechYouthBpm.Domain` | Entity ve enum'lar |
+| `apps/api/src/TechYouthBpm.Infrastructure` | EF Core, auth, e-posta, workflow runtime ve seed implementasyonları |
+| `apps/api/tests/TechYouthBpm.Tests` | Unit, servis ve HTTP entegrasyon testleri |
+| `scripts` | Local, Neon, Docker smoke ve yardımcı çalıştırma scriptleri |
+| `docs` | Gereksinim, mimari, API, senaryo, sunum ve kalite belgeleri |
 
-Hızlı kurulum için [QUICKSTART.md](QUICKSTART.md), doküman haritası için
-[docs/README.md](docs/README.md), sunum hazırlığı için
+Hızlı başvuru için [QUICKSTART.md](QUICKSTART.md), doküman haritası için
+[docs/README.md](docs/README.md), sunuma hazırlanmak için
 [docs/23-presentation-study-guide.md](docs/23-presentation-study-guide.md)
 kullanılabilir.
 
@@ -20,31 +28,34 @@ kullanılabilir.
 
 | Alan | Teknoloji | Sürüm |
 | --- | --- | --- |
-| Frontend | Next.js / React / TypeScript | `16.2.9` / `19.2.4` / `5.x` |
+| Frontend | Next.js / React / TypeScript | `16.2.9` / `19.2.4` / `5.9.3` |
 | Global state | Zustand | `5.0.14` |
-| Form drag/drop | `@dnd-kit/core` / `sortable` | `6.3.1` / `10.0.0` |
+| Form drag/drop | `@dnd-kit/core` / `@dnd-kit/sortable` | `6.3.1` / `10.0.0` |
 | Workflow canvas | `@xyflow/react` | `12.11.2` |
-| UI ikonları | Lucide React | `1.21.0` |
+| UI ikonları | Lucide React | `1.24.0` |
 | Backend | ASP.NET Core / .NET | `8.0` |
 | ORM ve sağlayıcılar | EF Core SQLite / Npgsql PostgreSQL | `8.0.11` |
-| Veritabanı | SQLite / Neon PostgreSQL | local dosya / `18.4` |
+| Veritabanı | SQLite / Neon PostgreSQL | Local dosya / doğrulanmış ekip ortamı `18.4` |
 | Backend test | xUnit / WebApplicationFactory | `2.5.3` / `8.0.11` |
 | Frontend test | Vitest / Playwright | `3.2.7` / `1.61.1` |
-| Çalıştırma ve CI | Docker Compose / GitHub Actions | Compose v2 / Node `24`, .NET `8` |
+| CI uyumluluk ortamı | Node / .NET / PostgreSQL | `24` / `8` / `16` |
 
-Kesin npm bağımlılıkları [apps/web/package-lock.json](apps/web/package-lock.json),
-.NET paketleri ilgili `.csproj` dosyalarında sabitlenmiştir.
+Kesin JavaScript bağımlılıkları
+[apps/web/package-lock.json](apps/web/package-lock.json), .NET paketleri ilgili
+`.csproj` dosyaları ve CI sürümleri `.github/workflows` altındaki iş akışları
+tarafından sabitlenir. Neon `18.4` ekibin doğrulanmış cloud ortamıdır;
+PostgreSQL `16` ise CI uyumluluk ortamıdır.
 
 ## Kurulması Gereken Araçlar
 
-| Araç | Önerilen sürüm | Zorunluluk |
-| --- | --- | --- |
-| Git | `2.x` | Zorunlu |
-| Node.js | `24.x` (minimum `20.x`) | Zorunlu |
-| npm | `11.x` (minimum `10.x`) | Zorunlu |
-| .NET SDK | `8.x` | Zorunlu |
-| Docker Desktop | Güncel, Compose v2 | Yalnız Docker akışı için |
-| PostgreSQL | Neon `18.4`; CI uyumluluk testi `16` | Opsiyonel; SQLite local demo için gerekmez |
+Seçtiğiniz çalışma yöntemine göre araç ihtiyacı değişir:
+
+| Yöntem | Gerekli araçlar |
+| --- | --- |
+| Terminal + SQLite | Git `2.x`, .NET SDK `8.x`, Node.js `24.x` (minimum `20.x`), npm `11.x` (minimum `10.x`) |
+| Docker + SQLite | Git `2.x`, güncel Docker Desktop ve Docker Compose v2 |
+| Docker + PostgreSQL/Neon | Git `2.x`, Docker Desktop, Compose v2 ve erişilebilir bir PostgreSQL veritabanı |
+| Native PostgreSQL | Terminal araçlarına ek olarak erişilebilir PostgreSQL/Neon; local PostgreSQL kurulumu zorunlu değildir |
 
 Sürüm kontrolü:
 
@@ -54,54 +65,133 @@ node --version
 npm --version
 dotnet --version
 docker --version
+docker compose version
 ```
 
 ## Tamamlanan Gereksinimler
 
-- Next.js tabanlı çok ekranlı, responsive ve authenticated workspace.
-- Login, global session/user state, rol ve permission tabanlı gezinme.
-- Dinamik form tasarlama, yayınlama, sürümleme ve çok adımlı form çalıştırma.
-- Input, textarea, number, email, select, radio, checkbox, date ve dosya
-  metadata alanları; required, tip ve bağımlı validasyon.
-- Loading, success, error durumları ve taşmayan/kopyalanabilen JSON çıktısı.
-- .NET 8 REST API, Swagger/OpenAPI, opaque session, HttpOnly cookie, CSRF,
-  refresh rotation/reuse tespiti ve merkezi session revoke.
-- EF Core migrations, SQLite ve PostgreSQL/Neon sağlayıcı desteği.
-- Formdan süreç başlatma, ilk/sonraki task üretimi, claim/release ve
+- Next.js tabanlı responsive, authenticated ve rol bazlı workspace.
+- Login, kayıt, onay, parola kurtarma, oturum listeleme ve merkezi revoke.
+- Global session/user state ve permission tabanlı route/navigation kontrolü.
+- Dinamik form tasarlama, çok adımlı form, alan sıralama, yayınlama, arşivleme
+  ve immutable form sürümleri.
+- Text, textarea, number, email, select, radio, checkbox, date ve dosya
+  metadata alanları; zorunlu, tip ve bağımlı validasyon.
+- Loading, success ve error durumları ile taşmayan/kopyalanabilen JSON görünümü.
+- .NET 8 REST API, Swagger/OpenAPI, EF Core migrations ve deterministic seed.
+- SQLite ile PostgreSQL/Neon sağlayıcı desteği.
+- Görsel workflow graph, gateway koşulları, form-adım bağlama ve sürüm pinning.
+- Kişi, takım, rol ve takım+rol adaylığı; claim/release ve
   Approve/Reject/Complete/SendBack/Escalate aksiyonları.
-- Backend doğrulamalı, sürümlenmiş görsel workflow graph ve koşullu gateway.
-- Sistem audit kayıtları, süreç adım geçmişi, transaction ve otomatik testler.
-- PDF’deki zorunlu kapsamın ve bonus maddelerin ayrıntılı eşlemesi:
-  [docs/00-requirements-from-pdf.md](docs/00-requirements-from-pdf.md).
+- Task form doğrulaması, SLA/DueAt, süreç adım geçmişi ve transaction sınırları.
+- Sistem audit kayıtları, bildirim merkezi, gelen kutusu ve rol/topluluk scope'u.
+- Backend, frontend ve Playwright testleri ile GitHub Actions kalite kapıları.
+
+PDF gereksinimlerinin zorunlu ve bonus karşılıkları ayrıntılı olarak
+[docs/00-requirements-from-pdf.md](docs/00-requirements-from-pdf.md) içinde
+izlenir. Zorunlu kapsamda bilinen bir açık bulunmamaktadır.
 
 ## Tamamlanmayan Gereksinimler ve Bilinçli Sınırlar
 
-PDF’nin zorunlu maddelerinde bilinen bir eksik yoktur. Aşağıdakiler zorunlu
-kapsam dışındaki production/genişleme maddeleridir:
+Aşağıdakiler zorunlu gereksinim eksiği değil, bilinçli ürün veya production
+sınırlarıdır:
 
-- Dosya alanı binary yüklemez; yalnız güvenli dosya metadata’sı saklar. Object
+- Dosya alanı binary içeriği yüklemez; güvenli dosya metadata'sı saklar. Object
   storage, MIME/içerik taraması ve signed URL sonraki aşamadır.
-- Parallel gateway, zamanlayıcıyla otomatik SLA eskalasyonu, service task ve
-  BPMN XML import/export henüz yoktur. `DueAt`, manuel `Escalate` ve typed
-  exclusive gateway desteklenir.
-- Camunda deployment veya harici ERP entegrasyonu yapılmaz; özel .NET runtime
-  kullanılır.
-- Public production deployment, harici Sentry/Seq/Datadog entegrasyonu ve
-  yayınlanmış kısa demo videosu henüz yoktur.
+- Parallel gateway, zamanlayıcıyla otomatik SLA eskalasyonu ve service task
+  henüz yoktur. Typed exclusive gateway, `DueAt` ve manuel `Escalate` vardır.
+- BPMN XML import/export ve Camunda deployment yapılmaz.
+- Harici ERP/kurumsal servis entegrasyonu yapılmaz.
+- Public production deployment, Sentry/Seq/Datadog entegrasyonu ve yayınlanmış
+  kısa demo videosu henüz yoktur.
 
 ## Geliştirilen Ek Özellikler
 
-- Topluluk, custom role, permission, çoklu takım üyeliği ve takım sorumlusu.
-- Kişi, takım, rol ve takım+rol aday havuzuna task atama.
-- Sürükle-bırak workflow tasarımı, swimlane, form-step binding ve immutable
-  yayınlanmış sürümler.
-- Kişisel/topluluk/global dashboard kapsamı, bildirim merkezi ve gelen kutusu.
-- TR/EN, light/dark tema, mobil form paleti ve erişilebilir alternatif kontroller.
-- Kategorili audit araması, correlation ID, RFC 7807 ProblemDetails ve
-  `/health/live` ile `/health/ready`.
-- SQLite/Neon Docker stack’leri ve GitHub Actions kalite kapıları.
+- Topluluk, davet kodu, custom role, işlem bazlı permission ve SuperAdmin
+  yönetimi.
+- Çoklu takım üyeliği, takım sorumlusu ve sanal `Takımsız` görünümü.
+- Camunda/Kissflow esintili sürükle-bırak workflow tasarımcısı ve swimlane.
+- Kişisel/topluluk/global dashboard kapsamı ve role göre çalışma özeti.
+- Kategorili audit araması, süreç timeline'ı ve yapılandırılmış bildirim akışı.
+- TR/EN dil desteği, light/dark tema ve mobil alan paleti.
+- RFC 7807 ProblemDetails, correlation ID, health endpointleri ve non-root
+  Docker image'ları.
+- SQLite ve cloud PostgreSQL için ayrı Docker Compose uygulamaları.
 
-## Hızlı Kurulum ve Çalıştırma
+## Mimari ve Yöntemsel Kararlar
+
+### Katmanlı Mimari
+
+- **API:** HTTP sözleşmesi, cookie/CSRF davranışı, middleware ve controller
+  sınırıdır. İş kuralını controller içine taşımaz.
+- **Application:** DTO'ları, servis kontratlarını ve uygulama use-case
+  sınırlarını tanımlar. Infrastructure ayrıntılarına bağımlı değildir.
+- **Domain:** Kullanıcı, topluluk, takım, form, workflow, süreç ve task
+  entity/enum'larını barındırır.
+- **Infrastructure:** EF Core erişimi, kimlik doğrulama, e-posta gönderimi,
+  özel workflow runtime ve idempotent seed işlemlerini uygular.
+
+Generic Repository eklenmemiştir. EF Core `DbContext/DbSet` zaten repository ve
+unit-of-work sorumluluklarını sağlar; ikinci bir genel katman sorgu gücünü
+gizleyip gerçek bir iş sınırı üretmeden kod miktarını artıracaktı. Servisler iş
+kurallarını ve transaction sınırlarını, `AppDbContext` ise veri erişimini
+yönetir.
+
+### Opaque Session, Cookie, Bearer ve CSRF
+
+Bu uygulama **JWT kullanmaz**. Sunucu tahmin edilemez, anlam taşımayan bir
+opaque token üretir ve veritabanında token'ın kendisini değil hash'ini saklar.
+`Bearer` burada token biçimini değil, HTTP ile nasıl taşındığını ifade eder.
+
+- Normal tarayıcı girişi `POST /api/auth/browser-login` kullanır. Access ve
+  refresh token yalnız `HttpOnly` cookie'de tutulur; JSON response'a,
+  Zustand'a veya `localStorage`'a girmez.
+- Sayfa yenilendiğinde oturum `GET /api/auth/me` ile toparlanır.
+- Swagger veya harici API istemcisi `POST /api/auth/login` üzerinden opaque
+  access token alabilir ve `Authorization: Bearer <opaque-token>` gönderir.
+- Beni hatırla seçildiğinde hashed refresh token üretilir. Refresh sırasında
+  token rotate edilir; eski refresh token tekrar kullanılırsa ilgili session
+  zinciri revoke edilir.
+- Cookie tabanlı mutation isteklerinde okunabilir CSRF cookie değeri
+  `X-CSRF-Token` header'ıyla geri gönderilmelidir. CSRF token kimlik doğrulama
+  yetkisi taşımaz.
+- Parolalar PBKDF2 hash olarak saklanır. Logout, parola değişimi ve yönetim
+  aksiyonları ilgili session'ları revoke edebilir.
+- Rol, permission, takım ve topluluk kontrolleri backend'de canlı kullanıcı
+  bağlamıyla yeniden değerlendirilir. Kısa session cache'i desteklenen güvenlik
+  ve üyelik mutasyonlarında geçersiz kılınır.
+
+Bu tercih, merkezi revoke, refresh reuse tespiti ve rol/yetki değişikliğinin
+sonraki isteğe yansıması için bilinçlidir.
+
+### Form ve Workflow Motoru
+
+- Form ve workflow tanımları sürümlenir; yayınlanmış sürümler immutable'dır.
+- Process instance başladığı workflow sürümüne, başlangıç ve task adımları da
+  ilgili form sürümüne pin edilir.
+- Workflow, `schemaVersion` taşıyan typed JSON graph olarak saklanır.
+- Assignment hedefi belirli kullanıcı, takım, community role veya takım+rol
+  olabilir. Aday kullanıcı görevi claim eder; claim ve aksiyonlar backend
+  tarafından tekrar yetkilendirilir.
+- Start, task, gateway ve end geçişleri özel .NET runtime tarafından transaction
+  içinde yürütülür. Task, step execution, bildirim ve audit kayıtlarından biri
+  hata verirse işlem rollback edilir.
+- Camunda ve Kissflow modelleme/ürün deneyimi için referanstır; uygulamanın
+  gerçek motoru harici Camunda kurulumu değil, bu repodaki .NET runtime'dır.
+
+### Audit ve Teknik Log Ayrımı
+
+- `SystemAuditLog`, login, rol değişimi, takım üyeliği, form/workflow yayınlama,
+  process başlatma ve task aksiyonu gibi **iş hareketlerini** saklar.
+- `ILogger`, request süresi, correlation ID, operasyonel uyarı ve beklenmeyen
+  hata gibi **teknik teşhis** bilgisini üretir.
+- Hassas token, cookie, parola ve form payload'u teknik loglara yazılmaz.
+- Beklenmeyen API hataları production stack trace'i sızdırmadan RFC 7807
+  `ProblemDetails` ve güvenli `traceId` döndürür.
+
+## Hızlı Kurulum
+
+Önce repoyu alın:
 
 ```powershell
 git clone https://github.com/ufukzkn/techyouth-bpm.git
@@ -125,71 +215,186 @@ npm ci --prefix apps/web
 .\scripts\run-web-local.ps1
 ```
 
+Local SQLite için `.env`, PostgreSQL kurulumu veya secret gerekmez.
+
 ### Seçenek B: Docker ile SQLite
 
-Bu seçenek .NET SDK veya Node.js kurulumu istemez; güncel Docker Desktop
-yeterlidir. Local stack herhangi bir `.env` veya secret gerektirmez.
+Bu yöntem .NET SDK ve Node.js kurulumu istemez:
 
 ```powershell
 # Aynı portları kullanan cloud stack açıksa kapat
 docker compose -f compose.cloud.yaml down
 
-# API, web ve kalıcı SQLite volume'unu oluşturup başlat
 docker compose up -d --build
-
-# API, migration, seed ve temel login kontrolü
 powershell -ExecutionPolicy Bypass -File scripts/smoke-local-compose.ps1
 ```
 
-Stack’i kapatmak için `docker compose down`, SQLite verisini de silerek temiz
-başlamak için `docker compose down -v` kullanılır. İlk image build’i paketleri
-indireceği için internet bağlantısı gerekir.
+Stack'i kapatmak için `docker compose down`, SQLite volume'unu da silerek temiz
+başlamak için `docker compose down -v` kullanılır.
 
-### Seçenek C: Docker ile Neon PostgreSQL
+### Seçenek C: Docker ile PostgreSQL/Neon
 
-Bu seçenek aynı API ve web image’larını çalıştırır, fakat SQLite volume yerine
-uzaktaki Neon PostgreSQL veritabanına bağlanır. Önce secretsiz şablonu
-gitignored yerel dosyaya kopyalayıp gerçek Neon bilgileriyle doldurun:
+Önce secretsiz şablonu gitignored yerel dosyaya kopyalayın ve kendi bağlantı
+bilginizle doldurun:
 
 ```powershell
 Copy-Item .env.example .env.neon.local
 notepad .env.neon.local
 ```
 
-Ardından aynı portları kullanan local stack’i kapatıp cloud stack’i başlatın:
+Ardından local stack'i kapatıp cloud stack'i başlatın:
 
 ```powershell
 docker compose down
 docker compose -f compose.cloud.yaml up -d --build
-
-# Container ve API readiness kontrolü
 docker compose -f compose.cloud.yaml ps
+
 Invoke-WebRequest http://localhost:5291/health/ready -UseBasicParsing |
   Select-Object StatusCode
 ```
 
-API başlangıçta Neon üzerinde migration ve idempotent seed çalıştırır. Bu
-nedenle connection string’i yalnız veri oluşturulmasını kabul ettiğiniz bir
-Neon branch/database için kullanın. `.env.neon.local` kesinlikle commitlenmez.
+Buradaki **cloud**, yalnız veritabanının uzakta olduğunu ifade eder. Web ve API
+bilgisayarınızdaki container'larda çalışır. Ayrıntılı bağlantı ve güvenlik
+adımları bir sonraki bölümdedir.
 
-Cloud stack’i kapatmak için:
+## Konfigürasyon Bilgileri ve Kendi Cloud Veritabanınız
 
-```powershell
-docker compose -f compose.cloud.yaml down
+### Konfigürasyon Kaynakları
+
+| Dosya / yöntem | Kullanım |
+| --- | --- |
+| `apps/api/src/TechYouthBpm.Api/appsettings.json` | Secretsiz local varsayılanlar |
+| `apps/api/src/TechYouthBpm.Api/appsettings.example.json` | PostgreSQL, auth, CORS ve SMTP örnek şeması |
+| `.env.example` | Cloud Compose için secretsiz PostgreSQL şablonu |
+| `.env.neon.local` | Gerçek cloud DB bilgileri; gitignored |
+| `apps/web/.env.local` | Frontend API adresi override'ı; gitignored |
+| .NET user-secrets | Native API çalıştırmada PostgreSQL/SMTP secret'ları |
+
+Önemli auth varsayılanları:
+
+| Anahtar | Varsayılan | Amaç |
+| --- | --- | --- |
+| `Auth:SessionDurationMinutes` | `120` | Normal access session süresi |
+| `Auth:SessionCacheSeconds` | `15` | Çözülmüş kullanıcı/yetki bağlamının kısa cache süresi; `0` kapatır |
+| `Auth:RememberMeDurationMinutes` | `43200` | Beni hatırla süresi |
+| `Auth:RefreshTokenDurationMinutes` | `43200` | Refresh token süresi |
+| `Auth:PasswordResetMinutes` | `30` | Parola sıfırlama token süresi |
+| `Auth:MaxFailedLoginAttempts` | `5` | Geçici kilit öncesi başarısız giriş sayısı |
+| `Auth:LockoutMinutes` | `10` | Hesap kilidi süresi |
+| `Auth:EmailVerificationMinutes` | `1440` | E-posta doğrulama kodu süresi |
+| `Auth:EmailVerificationResendCooldownMinutes` | `5` | Yeniden kod gönderme bekleme süresi |
+| `Auth:RateLimitPermitLimit` | `10` | Auth rate-limit kotası |
+| `Auth:RateLimitWindowMinutes` | `1` | Auth rate-limit penceresi |
+
+### Kendi PostgreSQL veya Neon Veritabanınızı Bağlama
+
+Cloud akışı ekipteki mevcut Neon secret'ına bağlı değildir. Schema
+oluşturma/değiştirme yetkisine sahip istediğiniz PostgreSQL sunucusunu, Neon
+projesini veya Neon branch'ini kullanabilirsiniz.
+
+1. `.env.example` dosyasını `.env.neon.local` olarak kopyalayın.
+2. `Database__Provider=PostgreSql` değerini koruyun.
+3. `ConnectionStrings__DefaultConnection` değerini kendi host, port, database,
+   username ve password bilginizle doldurun.
+4. SSL gerektiren cloud servislerinde `SSL Mode=Require` kullanın.
+5. `docker compose -f compose.cloud.yaml up -d --build` komutunu çalıştırın.
+
+Örnek `.env.neon.local` biçimi:
+
+```text
+Database__Provider=PostgreSql
+ConnectionStrings__DefaultConnection=Host=your-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true;Channel Binding=Require
+Seed__MockData=true
 ```
 
-Buradaki “cloud”, veritabanının Neon’da olduğunu ifade eder; web ve API hâlâ
-bilgisayarınızdaki Docker container’larında ve aşağıdaki localhost adreslerinde
-çalışır.
+> API başlangıçta migration ve idempotent seed işlemini seçtiğiniz veritabanına
+> uygular. Bağlantıyı yalnız şema ve demo veri oluşturulmasını kabul ettiğiniz
+> bir database/branch için kullanın.
+
+Gerçek connection string hiçbir zaman Git'e eklenmemelidir.
+`.env.neon.local`, `.gitignore` tarafından dışlanır.
+
+Native API için geçici PowerShell environment variable alternatifi:
+
+```powershell
+$env:Database__Provider = "PostgreSql"
+$env:ConnectionStrings__DefaultConnection = "Host=your-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true"
+dotnet run --project apps/api/src/TechYouthBpm.Api --urls http://localhost:5291
+```
+
+.NET user-secrets alternatifi:
+
+```powershell
+Push-Location apps/api/src/TechYouthBpm.Api
+dotnet user-secrets set "Database:Provider" "PostgreSql"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=your-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true"
+Pop-Location
+dotnet run --project apps/api/src/TechYouthBpm.Api --urls http://localhost:5291
+```
+
+Repo kökündeki `.env.neon.local` dosyasını okuyup aynı ayarları hazırlayan script
+alternatifi:
+
+```powershell
+.\scripts\run-api-neon.ps1 -Url http://localhost:5291
+```
+
+API ve frontend farklı origin'lerde yayınlanacaksa üç ayar birlikte
+güncellenmelidir:
+
+- Frontend build-time API adresi: `NEXT_PUBLIC_API_BASE_URL`
+- Backend izinli origin listesi: `Cors:AllowedOrigins`
+- E-posta doğrulama/parola sıfırlama link tabanı: `Frontend:BaseUrl`
+
+Credentials ile wildcard CORS kabul edilmez. Production connection string ve
+SMTP değerleri environment variable veya secret manager üzerinden verilmelidir.
+
+## Veritabanı Migration ve Seed Data
+
+- Migration dosyaları
+  `apps/api/src/TechYouthBpm.Infrastructure/Data/Migrations` altındadır.
+- API açılışında `Database.MigrateAsync` çalışır; ardından deterministic ve
+  idempotent seed uygulanır.
+- SQLite ve PostgreSQL aynı `AppDbContext` modelini ve migration geçmişini
+  kullanır.
+- Seed; örnek kullanıcılar, beş topluluk, roller, takımlar, form/workflow
+  sürümleri, süreçler, tasklar, bildirimler ve audit kayıtları oluşturur.
+- `Transfer Aksiyon Laboratuvarı` ve `Operasyon Aksiyon Laboratuvarı`, task
+  aksiyonları ve farklı assignment biçimleri için tekrarlanabilir demo sağlar.
+- Seed yeniden çalıştırıldığında seed-owned veriyi çoğaltmaz ve kullanıcıların
+  oluşturduğu kayıtları korur.
+
+Migration'ı elle uygulamak:
+
+```powershell
+dotnet tool restore
+dotnet tool run dotnet-ef database update `
+  --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj `
+  --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj
+```
+
+SQLite verisini sıfırlayıp migration ve seed'i yeniden çalıştırmak:
+
+```powershell
+.\scripts\run-api-local.ps1 -ResetDb -Force
+```
+
+Yalnız temel hesaplarla başlamak için:
+
+```powershell
+.\scripts\run-api-local.ps1 -ResetDb -Force -SkipMockData
+```
+
+## Erişim Adresleri ve Örnek Hesaplar
 
 | Servis | Adres |
 | --- | --- |
 | Web uygulaması | `http://localhost:3000` |
-| Swagger | `http://localhost:5291/swagger` |
+| Swagger / OpenAPI | `http://localhost:5291/swagger` |
 | API liveness | `http://localhost:5291/health/live` |
 | API readiness | `http://localhost:5291/health/ready` |
 
-## Örnek Kullanıcı Hesapları
+Örnek hesaplar:
 
 | Kullanıcı | Parola | Amaç |
 | --- | --- | --- |
@@ -204,113 +409,104 @@ bilgisayarınızdaki Docker container’larında ve aşağıdaki localhost adres
 | `sport.operations` | `sport123` | Transfer operasyon |
 | `sport.viewer` | `sport123` | Salt okunur gözlemci |
 
-## Konfigürasyon Bilgileri
+Yeni kayıt `PendingApproval` durumunda başlar. Yetkili Topluluk Admin yalnız
+kendi topluluğundaki, SuperAdmin ise global kapsamdaki kullanıcıları
+onaylayabilir. Admin tarafından geçici parolayla oluşturulan hesap
+`MustChangePassword=true` başlar.
 
-| Dosya / yöntem | Kullanım |
-| --- | --- |
-| `apps/api/src/TechYouthBpm.Api/appsettings.json` | Güvenli local varsayılanlar |
-| `apps/api/src/TechYouthBpm.Api/appsettings.example.json` | PostgreSQL, auth ve SMTP örnek şeması |
-| `.env.example` | Neon cloud Compose için secretsiz şablon |
-| `.env.neon.local` | Gerçek Neon bilgileri; gitignored |
-| `apps/web/.env.local` | `NEXT_PUBLIC_API_BASE_URL` override; gitignored |
-| .NET user-secrets | SMTP/Neon gibi lokal secret’lar |
+## Test ve Kalite Kontrolleri
 
-Secret, token ve gerçek connection string commitlenmemelidir. Local SQLite
-çalıştırması `.env` istemez. Cloud kullanımında `.env.example`,
-`.env.neon.local` adıyla kopyalanıp gerçek değerlerle doldurulur.
-
-## Veritabanı Migration ve Seed Data
-
-- API açılışında `Database.MigrateAsync` ile bekleyen EF Core migration’ları
-  uygulanır, ardından deterministik/idempotent seed çalışır.
-- Migration dosyaları
-  `apps/api/src/TechYouthBpm.Infrastructure/Data/Migrations` altındadır.
-- Varsayılan provider SQLite’tır; PostgreSQL/Neon aynı DbContext ve migration
-  geçmişini kullanır.
-- Seed; örnek kullanıcılar, beş topluluk, roller, takımlar, form/workflow
-  sürümleri, süreçler, tasklar, bildirimler ve audit kayıtları oluşturur.
-- `Transfer Aksiyon Laboratuvarı` ve `Operasyon Aksiyon Laboratuvarı`, tüm task
-  aksiyonlarını ve dört atama biçimini örnekleyen toplam 10 süreç içerir.
-
-Migration’ı elle uygulamak:
+Backend:
 
 ```powershell
-dotnet tool restore
-dotnet tool run dotnet-ef database update `
-  --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj `
-  --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj
+dotnet test apps/api/TechYouthBpm.slnx
 ```
 
-SQLite verisini sıfırlayıp seed’i yeniden çalıştırmak:
+Frontend:
 
 ```powershell
-.\scripts\run-api-local.ps1 -ResetDb -Force
+npm --prefix apps/web run test
+npm --prefix apps/web run lint
+npm --prefix apps/web run build
+npm --prefix apps/web run test:e2e
 ```
 
-## Canlı Demo ve Demo Videosu
+Playwright izole SQLite veritabanı hazırlayıp API ve web sunucularını kendisi
+başlatır. Cookie session, route koruması, form/workflow yayınlama, process
+başlatma, claim/action ve community/role sınırlarını gerçek tarayıcıyla
+doğrular.
+
+PostgreSQL migration smoke testi normal test koşusunda dış servise bağlanmaz.
+İsteğe bağlı çalıştırma:
+
+```powershell
+$env:TECHYOUTH_TEST_POSTGRES_CONNECTION = "<postgresql-connection-string>"
+dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj `
+  --filter "FullyQualifiedName~PostgreSql_Startup_Applies_Migrations"
+Remove-Item Env:TECHYOUTH_TEST_POSTGRES_CONNECTION
+```
+
+Test benzersiz geçici schema oluşturur, migration/seed/login/form smoke akışını
+çalıştırır ve yalnız o schema'yı siler. Paylaşılan demo tablolarına dokunmaz.
+
+GitHub Actions deployment yapmaz. Her push'ta temel build/test/lint kontrolleri;
+`master` veya manuel doğrulamada Playwright, PostgreSQL ve Docker kalite
+kapıları çalışır. Güncel test sayıları ve kapsamın tek kaynağı
+[docs/24-testing-and-quality-gates.md](docs/24-testing-and-quality-gates.md)
+dosyasıdır.
+
+## Canlı Demo ve Video Durumu
 
 - Public canlı demo adresi: **Henüz yok**
 - Kısa demo videosu: **Henüz yok**
-- Uygulama local veya Docker ile yukarıdaki adreslerde çalıştırılabilir.
+- Uygulama terminal veya Docker seçenekleriyle localde tam demo veriyle
+  çalıştırılabilir.
 
-## Environment
+## Troubleshooting ve Ayrıntılı Dokümanlar
 
-Frontend varsayilan olarak API'yi su adreste bekler:
+Yaygın kontroller:
 
-```bash
-http://localhost:5291
-```
+- Login çalışmıyorsa önce `http://localhost:5291/health/ready` ve Swagger'ı
+  kontrol edin.
+- Web API'ye erişemiyorsa frontend API adresinin API portuyla eşleştiğini
+  doğrulayın.
+- Docker web ayakta, API kapalıysa `docker compose logs api` çıktısını ve
+  readiness durumunu inceleyin.
+- Eski SQLite volume'u schema/seed ile uyuşmuyorsa `docker compose down -v`
+  sonrasında stack'i yeniden kurun.
+- Native SQLite schema'sını temizlemek için
+  [Veritabanı Migration ve Seed Data](#veritabanı-migration-ve-seed-data)
+  bölümündeki reset akışını kullanın.
+- `3000` veya `5291` doluysa ilgili prosesi kapatın ya da scriptlerde farklı
+  port seçin.
 
-Farkli API adresi kullanmak icin `apps/web/.env.local` dosyasi olusturulabilir:
+Doküman haritası:
 
-```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:5291
-```
+- [Dokümantasyon rehberi](docs/README.md)
+- [PDF gereksinim matrisi](docs/00-requirements-from-pdf.md)
+- [Katmanlı mimari](docs/02-architecture.md)
+- [API ve servis sözleşmeleri](docs/04-api-and-services.md)
+- [Local veritabanı ve seed](docs/08-local-database.md)
+- [Docker ve deployment sınırları](docs/17-docker-and-deployment.md)
+- [Dinamik workflow ve takım mimarisi](docs/18-dynamic-workflow-and-team-architecture.md)
+- [Workflow uçtan uca senaryoları](docs/22-workflow-end-to-end-test-scenarios.md)
+- [Sunum çalışma rehberi](docs/23-presentation-study-guide.md)
+- [Test ve kalite kapıları](docs/24-testing-and-quality-gates.md)
 
-`.env.local` dosyalari git'e eklenmez.
+## Opsiyonel Entegrasyonlar
 
-Backend varsayilan olarak SQLite kullanir:
+### E-posta Provider'ları
 
-```json
-{
-  "Database": {
-    "Provider": "Sqlite"
-  },
-  "Auth": {
-    "SessionDurationMinutes": 120,
-    "SessionCacheSeconds": 15,
-    "RememberMeDurationMinutes": 43200,
-    "RefreshTokenDurationMinutes": 43200,
-    "PasswordResetMinutes": 30,
-    "MaxFailedLoginAttempts": 5,
-    "LockoutMinutes": 10,
-    "EmailVerificationMinutes": 1440,
-    "EmailVerificationResendCooldownMinutes": 5,
-    "RateLimitPermitLimit": 10,
-    "RateLimitWindowMinutes": 1
-  },
-  "ConnectionStrings": {
-    "DefaultConnection": "Data Source=techyouth-bpm.db"
-  }
-}
-```
+Varsayılan `Email:Provider=Demo` dış SMTP gerektirmez; doğrulama kodunu local
+demo akışında görünür kılar. Gerçek gönderim için `Smtp` veya `Mailtrap`,
+allowlist ve sandbox yönlendirmesi için `Routing` kullanılabilir.
 
-`Auth:SessionDurationMinutes` normal oturum suresini dakika cinsinden belirler ve su anda 120 dakikadir. `Auth:SessionCacheSeconds` opaque session icin cozulmus kullanici/yetki DTO'sunun kisa omurlu memory-cache suresidir; `0` cache'i kapatir, desteklenen guvenlik ve uyelik mutasyonlari ilgili kaydi aninda gecersiz kilar. `Auth:RememberMeDurationMinutes` ve `Auth:RefreshTokenDurationMinutes` beni-hatirla/refresh-token akisi icin kullanilir ve su anda 30 gunluk sureye ayarlidir. `Auth:PasswordResetMinutes` sifre sifirlama token gecerliligini belirler. `Auth:MaxFailedLoginAttempts` ve `Auth:LockoutMinutes` yanlis giris denemelerinden sonra gecici hesap kilitlemeyi belirler. `Auth:EmailVerificationMinutes` e-posta dogrulama kodu gecerliligini, `Auth:EmailVerificationResendCooldownMinutes` yeniden kod gonderme bekleme suresini belirler. `Auth:RateLimitPermitLimit` ve `Auth:RateLimitWindowMinutes` login/register/verification/reset endpointlerini sinirlar.
+Mailtrap Email Sending ve Sandbox örneği:
 
-Auth modeli JWT degildir; backend opaque session token uretir ve yalniz hash'ini veritabaninda saklar. Normal web istemcisi token dondurmeyen `/api/auth/browser-login` endpointini kullanir: access/refresh token JSON body'ye veya Zustand/localStorage'a girmez, HttpOnly cookie'de kalir. Mutation istekleri okunabilir ancak kimlik dogrulama yetkisi tasimayan CSRF cookie'sini `X-CSRF-Token` header'i olarak geri yollar. Sayfa yenilenince oturum `/api/auth/me` ile toparlanir; access suresi dolmus ve beni-hatirla aktifse `/api/auth/refresh` cookie'leri sessizce rotate eder ve response body'de sir dondurmez. Swagger ve acik API istemcileri `/api/auth/login` ile Bearer token response'u almaya devam eder.
-
-`Beni hatirla` secilirse hashed rotating refresh token uretilir; refresh reuse tespitinde aktif oturumlar revoke edilir. Kullanici sifreleri PBKDF2 hash olarak tutulur; logout ve oturum kapatma islemleri session'i veritabaninda revoke eder. Register olan hesaplar `PendingApproval` baslar, Admin onayi olmadan login olamaz.
-
-Sifre sifirlama e-postalarindaki link `Frontend:BaseUrl` ayarindan uretilir. Local varsayilan `http://localhost:3000` degeridir; farkli web portu kullanilirsa scriptlerde `-FrontendBaseUrl` verilebilir.
-
-Email verification varsayilan olarak `Demo` provider ile calisir. Bu modda OTP hashlenerek veritabanina yazilir ve demo kod UI'da gorunur. Kodlar varsayilan olarak 24 saat gecerlidir ve yeniden kod gonderme icin 5 dakikalik cooldown uygulanir. `Routing` provider kullanildiginda once guvenli allowlist'e bagli canli SMTP denenir; allowlist disindaki kullanicilar Mailtrap Sandbox'a yonlendirilir. Sandbox mail gercek Gmail/Outlook inbox'ina degil, Mailtrap Sandbox inbox'ina gider.
-
-Mailtrap kurulumunda takip edilecek ayarlar:
-
-```bash
-cd apps/api/src/TechYouthBpm.Api
+```powershell
+Set-Location apps/api/src/TechYouthBpm.Api
 dotnet user-secrets set "Email:Provider" "Routing"
-dotnet user-secrets set "Email:FromAddress" "no-reply@techyouth.local"
+dotnet user-secrets set "Email:FromAddress" "no-reply@your-domain.test"
 dotnet user-secrets set "Email:FromName" "TechYouth BPM"
 dotnet user-secrets set "Email:Smtp:Host" "live.smtp.mailtrap.io"
 dotnet user-secrets set "Email:Smtp:Port" "587"
@@ -319,269 +515,40 @@ dotnet user-secrets set "Email:Smtp:Password" "your-mailtrap-live-token"
 dotnet user-secrets set "Email:Smtp:EnableSsl" "true"
 dotnet user-secrets set "Email:AllowedRecipients" "your-test-email@example.com"
 dotnet user-secrets set "Email:AllowedUsernames" "your-test-username"
-dotnet user-secrets set "Email:Sandbox:FromAddress" "sandbox@techyouth.local"
+dotnet user-secrets set "Email:Sandbox:FromAddress" "sandbox@your-domain.test"
 dotnet user-secrets set "Email:Sandbox:FromName" "TechYouth BPM Sandbox"
 dotnet user-secrets set "Email:Sandbox:Smtp:Host" "sandbox.smtp.mailtrap.io"
 dotnet user-secrets set "Email:Sandbox:Smtp:Port" "2525"
-dotnet user-secrets set "Email:Sandbox:Smtp:Username" "your-mailtrap-sandbox-username"
-dotnet user-secrets set "Email:Sandbox:Smtp:Password" "your-mailtrap-sandbox-password"
+dotnet user-secrets set "Email:Sandbox:Smtp:Username" "your-sandbox-username"
+dotnet user-secrets set "Email:Sandbox:Smtp:Password" "your-sandbox-password"
 dotnet user-secrets set "Email:Sandbox:Smtp:EnableSsl" "true"
 ```
 
-Mailtrap Sandbox kullaniliyorsa `Email:Sandbox:*` degerleri Mailtrap projesindeki Sandbox inbox `SMTP` sekmesinden kopyalanir. Email Sending kullaniliyorsa canli SMTP icin Mailtrap'in verdigi host/token `Email:Smtp:*` key'lerine yazilir. Gercek username/password/token degerleri repo'ya commit edilmez.
-
-Gercek inbox'a test maili gondermek icin Mailtrap Email Sending tarafinda sending domain dogrulanmis olmalidir. Mailtrap'in SMTP orneklerinde gercek gonderim icin host genellikle `live.smtp.mailtrap.io`, port `587`, username `api`, password ise API token degeridir. Gercek teslim testinde guvenlik icin allowlist kullan:
-
-```bash
-dotnet user-secrets set "Email:Smtp:Host" "live.smtp.mailtrap.io"
-dotnet user-secrets set "Email:Smtp:Port" "587"
-dotnet user-secrets set "Email:Smtp:Username" "api"
-dotnet user-secrets set "Email:Smtp:Password" "your-mailtrap-api-token"
-dotnet user-secrets set "Email:AllowedRecipients" "your-email@example.com"
-dotnet user-secrets set "Email:AllowedUsernames" "your-username"
-```
-
-Bu allowlist doluyken SMTP sender sadece belirtilen kullanici ve alici icin mail gonderir. Diger kullanicilar icin backend SMTP gonderimini reddeder.
-
-Takimla ortak PostgreSQL/Neon veritabani kullanmak icin provider ve connection string gizli olarak verilmelidir. Gercek connection string repo'ya commit edilmez.
-
-PowerShell ile gecici environment variable:
-
-```powershell
-$env:Database__Provider="PostgreSql"
-$env:ConnectionStrings__DefaultConnection="Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true"
-```
-
-.NET user secrets ile kalici lokal ayar:
-
-```bash
-cd apps/api/src/TechYouthBpm.Api
-dotnet user-secrets set "Database:Provider" "PostgreSql"
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true"
-```
-
-Ornek format icin `apps/api/src/TechYouthBpm.Api/appsettings.example.json` dosyasi incelenebilir.
-
-Neon icin repo kokunde gitignored `.env.neon.local` dosyasi olusturulabilir:
-
-```text
-Database__Provider=PostgreSql
-ConnectionStrings__DefaultConnection=Host=your-neon-host;Port=5432;Database=your-database;Username=your-user;Password=your-password;SSL Mode=Require;Trust Server Certificate=true;Channel Binding=Require
-Seed__MockData=true
-```
-
-Neon baglantisi ayri bir portta denenmek istenirse:
-
-```powershell
-./scripts/run-api-neon.ps1 -Url http://localhost:5292
-```
-
-Script API'yi calistirdigin terminalde foreground olarak baslatir. API'yi durdurmak icin ayni terminalde `Ctrl+C` kullan.
-
-SQLite API ayni anda aciksa build dosyalari kilitlenebilir. Bu durumda mevcut build ile Neon'u baslatmak icin:
-
-```powershell
-./scripts/run-api-neon.ps1 -Url http://localhost:5292 -NoBuild
-```
-
-## Run Locally
-
-Iki ayri terminal kullanmak en temiz yoldur.
-
-Terminal 1 - API:
-
-```powershell
-./scripts/run-api-local.ps1
-```
-
-Script API'yi calistirdigin terminalde foreground olarak baslatir. API'yi durdurmak icin ayni terminalde `Ctrl+C` kullan.
-
-Script varsayilan olarak 120 dakikalik normal session kullanir. Timeout testini hizlandirmak icin:
-
-```powershell
-./scripts/run-api-local.ps1 -SessionDurationMinutes 1
-```
-
-API ayaga kalkinca Swagger acilir:
-
-```bash
-http://localhost:5291/swagger
-```
-
-Ilk calistirmada API, secili veritabani uzerinde EF Core migration'larini uygular, sonra demo kullanicilari ve mock BPM verisini seed eder. SQLite dosyasi localde olusur; PostgreSQL/Neon modunda tablolar secili uzak veritabaninda migration ile olusturulur.
-
-SQLite ile local demo veritabanini sifirlamak icin:
-
-```powershell
-./scripts/run-api-local.ps1 -ResetDb
-```
-
-Migration oncesi `EnsureCreated` ile olusmus eski SQLite dosyalari migration history icermeyebilir. Boyle durumlarda local test icin reset onerilir:
-
-```powershell
-./scripts/run-api-local.ps1 -ResetDb -Force
-```
-
-Sadece kullanicilarla baslamak ve mock surec/form verisini kapatmak icin:
-
-```powershell
-./scripts/run-api-local.ps1 -ResetDb -Force -SkipMockData
-```
-
-Local veritabani akisi ve sema ozeti icin `docs/08-local-database.md` dosyasina bak.
-
-Terminal 2 - Web:
-
-```powershell
-./scripts/run-web-local.ps1
-```
-
-Web uygulamasi:
-
-```bash
-http://localhost:3000
-```
-
-Ana workspace route'lari:
-
-- `http://localhost:3000/dashboard`
-- `http://localhost:3000/forms`
-- `http://localhost:3000/runner`
-- `http://localhost:3000/workflows`
-- `http://localhost:3000/processes`
-- `http://localhost:3000/tasks`
-- `http://localhost:3000/inbox`
-- `http://localhost:3000/management`
-- `http://localhost:3000/management/teams`
-- `http://localhost:3000/teams` (kullanicinin kendi takimlari ve salt-okunur takim arkadaslari)
-- `http://localhost:3000/logs`
-- `http://localhost:3000/settings`
-
-EF Core migration komutlari:
-
-```powershell
-dotnet tool restore
-dotnet tool run dotnet-ef database update --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj
-```
-
-## Docker
-
-Docker Desktop'ta iki ayri Compose uygulamasi kullanilir. `eczacibasi-local`, SQLite ile hizli local demo ortamidir. `eczacibasi-cloud`, gitignored `.env.neon.local` dosyasindaki Neon ayarlariyla uzak PostgreSQL'e baglanir. Ikisi ayni `3000` web ve `5291` API portlarini kullandigi icin ayni anda acilmamalidir.
-
-```powershell
-# SQLite local stack: cloud stack aciksa once kapatilir
-docker compose -f compose.cloud.yaml down
-docker compose up -d --build
-
-# Neon cloud stack: local stack aciksa once kapatilir
-docker compose down
-docker compose -f compose.cloud.yaml up -d --build
-```
-
-- Web: `http://localhost:3000`
-- API / Swagger: `http://localhost:5291/swagger`
-- Local stack'te DB, `sqlite-data` volume icinde tutulur.
-- Cloud stack'te schema ve mock veri Neon uzerinde API baslangicinda EF Core migration + seed ile olusur.
-
-Yalnizca containerlari olusturup Docker Desktop'tan baslatmak icin localde `docker compose create --build --force-recreate`, cloudda `docker compose -f compose.cloud.yaml create --build --force-recreate` kullanilir. Containerlari kapatmak icin local stack'te `docker compose down`, cloud stack'te `docker compose -f compose.cloud.yaml down` kullanilir. Local SQLite volume'unu sifirlamak icin `docker compose down -v` kullanilir. Neon veya SMTP secret'lari compose dosyasina yazilmaz. Ayrintili akis [docs/17-docker-and-deployment.md](docs/17-docker-and-deployment.md) dosyasindadir.
-
-## Stop Local Servers
-
-Normal terminalde calistirildiysa ilgili terminalde `Ctrl + C` yeterlidir.
-
-Port uzerinden kapatmak gerekirse PowerShell:
-
-```powershell
-Get-NetTCPConnection -LocalPort 5291,3000 | ForEach-Object {
-  Stop-Process -Id $_.OwningProcess -Force
-}
-```
-
-## Validation
-
-Backend testleri:
-
-```bash
-dotnet test apps/api/TechYouthBpm.slnx
-```
-
-Test paketi servis testlerini SQLite uzerinde, HTTP guvenlik ve yetki senaryolarini ise gecici SQLite dosyalari kullanan `WebApplicationFactory` hostu uzerinde calistirir. Cookie/CSRF, Bearer, refresh rotation/reuse, rate limit, personal/community/global workflow scope, Swagger, workflow publish, version-pinned process start, task formu, SLA/deadline ve server-side process/task pagination davranislari dogrulanir. Claim concurrency testi iki stale DbContext snapshot'inin ayni gorevi alamadigini kanitlar. Gercek transfer demo zinciri; bagimli form validasyonu, dosya metadata'si, takim+rol adayligi, claim/release, eksik task formu reddi, approve/reject, step output, bildirim ve iki seviyeli audit kaydini ayni HTTP senaryosunda kontrol eder. Mevcut bir session ile rol veya takim uyeligi degistiginde sonraki istegin yeni yetkiyi DB'den yeniden hesapladigi da entegrasyon testiyle guvence altindadir.
-
-Neon/PostgreSQL migration smoke testi varsayilan kosuda dis servise baglanmaz. Opt-in calistirmak icin baglanti bilgisini yalniz mevcut terminal oturumunda tanimla:
-
-```powershell
-$env:TECHYOUTH_TEST_POSTGRES_CONNECTION = "<postgresql-connection-string>"
-dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj --filter "FullyQualifiedName~PostgreSql_Startup_Applies_Migrations"
-Remove-Item Env:TECHYOUTH_TEST_POSTGRES_CONNECTION
-```
-
-Test benzersiz gecici bir PostgreSQL schema olusturur, migrations + seed + login/form smoke akisini calistirir ve schema'yi sonunda siler. Paylasilan demo tablolarina dokunmaz.
-
-Frontend store testleri, lint ve production build:
-
-```bash
-cd apps/web
-npm run test
-npm run lint
-npm run build
-npm run test:e2e
-```
-
-Playwright komutu izole SQLite veritabanı hazırlayıp API ve web sunucularını
-kendisi başlatır. Cookie session, route koruması, form/workflow yayınlama, süreç
-başlatma ve takım+rol claim sınırını gerçek tarayıcıda doğrular.
-
-API çalışırken operasyon kontrolleri:
-
-- `http://localhost:5291/health/live`
-- `http://localhost:5291/health/ready`
-
-Her push için temel; `master`/manuel koşu için Playwright, PostgreSQL ve Docker
-kalite kapıları GitHub Actions altında tanımlıdır. CI deployment yapmaz. Güncel
-test sayıları ve kapsamın tek kaynağı
-[docs/24-testing-and-quality-gates.md](docs/24-testing-and-quality-gates.md)
-dosyasıdır.
-
-## Demo Kullanıcı Davranışları
-
-Hesaplar ve parolalar [Örnek Kullanıcı Hesapları](#örnek-kullanıcı-hesapları)
-bölümünde tek tabloda listelenmiştir.
-
-Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullanicilarla local fallback devreye girer; boylece UI gelistirmesi backend olmadan da devam edebilir.
-
-Yeni kullanici kaydi login ekranindaki `Kaydol` modundan yapilir. Kayit `PendingApproval` durumunda olusur. SuperAdmin veya yetkili Topluluk Admin, `Yonetim` ekranindan kendi kapsamina uygun kullaniciyi `Active` yapabilir, community role atayabilir, gecici sifreyle yeni kullanici olusturabilir ve izinli oturumlari gorebilir/kapatabilir. Admin-created kullanicilar `MustChangePassword=true` baslar; normal workspace'e girmeden once zorunlu sifre degistirme ekranindan gecmek zorundadir. Manuel sifre secilmezse backend guclu bir gecici sifre uretir ve mail provider `Mailtrap`/`Smtp` ise kullaniciya e-posta ile gonderir. SuperAdmin, is akisi gecmisi olmayan test kullanicilarini silebilir; process/form/task/audit gecmisi olan kullanicilar icin backend silmeyi reddeder. `Ayarlar` ekraninda profil guncelleme, sifre degistirme, email verification OTP akisi, aktif oturumlar, tek oturum kapatma ve tum cihazlardan cikis akisi denenebilir.
-
-Admin kullanicisi `Loglar` ekraninda sistem gecmisini arayabilir. Loglar varsayilan olarak toplu dokulmez; kisi, surec, entity veya aksiyon aramasi ile server-side paginated sonuc ve ilgili kronolojik gecmis gorulur. Bu liste register, login/logout, rol/status degisikligi, form create/update, process start ve task approve/reject gibi kritik aksiyonlari kullanici, entity ve zaman bilgisiyle takip eder. Surec detay ekranindaki audit timeline ise ilgili surecin state history bilgisini gosterir; sureci baslatan kullanici kendi surec gecmisini, Admin/Approver ise gorebildigi sureclerin gecmisini inceleyebilir.
-
-Local SQLite demo DB; bes toplulukta yayinlanmis workflow'lar, bagli start/task formlari ve topluluk basina bes graph-uyumlu surec senaryosuyla gelir. Acik tasklarda gecikmis, yaklasan ve ileri tarihli deadline ornekleri; tamamlanan/reddedilen/geri gonderilen akislarda form ciktisi, step execution, audit ve bildirim zinciri bulunur. Eski `Legacy Basic Approval` uyumlulugu ve dort swimlane'li kosullu `Transfer Talep Akisi` korunur. Takim seed'i bes topluluga dagilmis 16 takim, lider, coklu takim uyesi ve sanal `Takimsiz` sorgusunda gorunecek kullanicilari birlikte icerir. Detaylar icin `docs/08-local-database.md` dosyasina bak.
-
-## Current Demo Flow
-
-1. Login ol.
-2. Role gore menu ve dashboard'u gor.
-3. Admin kullanicisiyle seeded formlari ve dashboard metriklerini incele.
-4. Form tasarimi ekraninda kayitli bir formu sec, alan modelini duzenle ve guncelle.
-5. Form surumunu taslak olarak kaydet, yayinla, arsivle ve eski surumun degismedigini incele.
-6. `/workflows` ekraninda Start, User Task, Gateway, End ve Team Swimlane dugumleriyle bir akis ciz; form/takim/rol baglayip yayinla.
-7. Form runner'da yayinlanmis formu ve uyumlu workflow'u secip version-pinned surec baslat.
-8. `Islerim` ekraninda aday havuzundaki task'i uzerine al; task formunu doldurup approve/reject/complete/send-back akisini dene.
-9. Surec detayinda node, attempt, tamamlayan kullanici, task form ciktisi ve audit zincirini incele.
-10. Bildirim popover'inda son bes kaydi, `Gelen Kutusu` ekraninda arama/filtre/pagination ve okundu durumunu dene.
-11. `Yonetim > Takimlar` ekraninda topluluk takimlarini, uyeleri, adaylari, lider degisimini ve sanal `Takimsiz` listesini dene.
-12. Normal bir takim uyesiyle `/teams` ekranini ac; yalnizca kendi takimlarini ve e-posta icermeyen takim arkadasi listesini gorebildigini dogrula.
-
-## Troubleshooting
-
-- API login calismiyorsa once `http://localhost:5291/swagger` adresini kontrol et.
-- Web login API'ye ulasamiyorsa `NEXT_PUBLIC_API_BASE_URL` degerinin API portuyla ayni oldugunu kontrol et.
-- Port doluysa ilgili process'i kapat veya farkli port kullan.
-- Frontend paket hatalarinda `apps/web/node_modules` silinip `npm install` tekrar calistirilabilir.
-
-## Documentation
-
-- [Dokumantasyon rehberi](docs/README.md): konu sahipligi ve okuma sirasi.
-- [PDF gereksinim matrisi](docs/00-requirements-from-pdf.md): zorunlu ve bonus kapsam.
-- [Mimari](docs/02-architecture.md): katmanlar ve genisleme sinirlari.
-- [API ve servisler](docs/04-api-and-services.md): HTTP ve servis sozlesmeleri.
-- [Test ve kalite kapilari](docs/24-testing-and-quality-gates.md): kapsam, komutlar ve guncel kanit.
-- [Sunum calisma rehberi](docs/23-presentation-study-guide.md): teknoloji, karar ve savunma Q&A.
+Mailtrap Sandbox bilgileri Sandbox inbox'ın `SMTP` sekmesinden; canlı token ise
+Email Sending ayarlarından alınır. Gerçek inbox gönderimi için sending domain
+doğrulanmalıdır.
+
+Gmail SMTP alternatifi aynı `Email:Smtp:*` anahtarlarını kullanır:
+
+- Host: `smtp.gmail.com`
+- Port: `587`
+- Username: Gmail hesabı
+- Password: Google uygulama parolası
+- SSL: `true`
+
+`Email:AllowedRecipients` ve `Email:AllowedUsernames`, yanlış alıcıya gerçek
+e-posta gönderme riskini sınırlar. Doğrulama ve parola sıfırlama linkleri
+`Frontend:BaseUrl` üzerinden üretilir. Hiçbir SMTP parolası veya token Git'e
+eklenmemelidir.
+
+### Gelişmiş PostgreSQL ve Observability
+
+Opt-in PostgreSQL smoke testi yukarıdaki geçici schema yaklaşımıyla kendi
+PostgreSQL/Neon ortamınızda çalıştırılabilir. Production'da migration yetkisi
+olmayan ayrı runtime kullanıcısı tercih edilecekse migration deployment
+aşamasında ayrıca uygulanmalıdır.
+
+Sentry, Seq, Datadog ve OpenTelemetry şu anda entegre değildir. Uygulama
+`ILogger`, JSON production logları, correlation ID, health ve ProblemDetails
+altyapısını sağlar; harici telemetry hedefi gerçek hosting ortamı seçildiğinde
+eklenmelidir.
