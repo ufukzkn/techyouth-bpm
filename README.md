@@ -106,6 +106,11 @@ kapsam dışındaki production/genişleme maddeleridir:
 ```powershell
 git clone https://github.com/ufukzkn/techyouth-bpm.git
 cd techyouth-bpm
+```
+
+### Seçenek A: Terminal ile SQLite
+
+```powershell
 dotnet restore apps/api/TechYouthBpm.slnx
 npm ci --prefix apps/web
 ```
@@ -119,6 +124,26 @@ npm ci --prefix apps/web
 # Terminal 2
 .\scripts\run-web-local.ps1
 ```
+
+### Seçenek B: Docker ile SQLite
+
+Bu seçenek .NET SDK veya Node.js kurulumu istemez; güncel Docker Desktop
+yeterlidir. Local stack herhangi bir `.env` veya secret gerektirmez.
+
+```powershell
+# Aynı portları kullanan cloud stack açıksa kapat
+docker compose -f compose.cloud.yaml down
+
+# API, web ve kalıcı SQLite volume'unu oluşturup başlat
+docker compose up -d --build
+
+# API, migration, seed ve temel login kontrolü
+powershell -ExecutionPolicy Bypass -File scripts/smoke-local-compose.ps1
+```
+
+Stack’i kapatmak için `docker compose down`, SQLite verisini de silerek temiz
+başlamak için `docker compose down -v` kullanılır. İlk image build’i paketleri
+indireceği için internet bağlantısı gerekir.
 
 | Servis | Adres |
 | --- | --- |
