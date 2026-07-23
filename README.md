@@ -6,6 +6,9 @@ sınırları içinde form tasarlamayı, görsel akış yayınlamayı, süreç ba
 işleri aday havuzundan üstlenmeyi ve bütün hareketleri denetlenebilir biçimde
 izlemeyi sağlar.
 
+**Hızlı demo:** En zahmetsiz ve önerilen çalışma yolu **Docker + SQLite**'tır.
+Tek komut akışı için [Hızlı Kurulum](#hızlı-kurulum) bölümüne bakın.
+
 ## Proje ve Repo Yapısı
 
 | Yol | Sorumluluk |
@@ -203,7 +206,25 @@ git clone https://github.com/ufukzkn/techyouth-bpm.git
 cd techyouth-bpm
 ```
 
-### Seçenek A: Terminal ile SQLite
+> **Önerilen ve en zahmetsiz demo yolu: Docker + SQLite.** Yalnız güncel
+> Docker Desktop gerektirir; `.env`, secret, Node.js, .NET SDK veya harici
+> veritabanı kurulumu istemeden API, web, migration ve demo seed verisini
+> birlikte hazırlar.
+
+### Seçenek A: Docker ile SQLite (Önerilen)
+
+```powershell
+# Aynı portları kullanan cloud stack açıksa kapat
+docker compose -f compose.cloud.yaml down
+
+docker compose up -d --build
+powershell -ExecutionPolicy Bypass -File scripts/smoke-local-compose.ps1
+```
+
+Stack'i kapatmak için `docker compose down`, SQLite volume'unu da silerek temiz
+başlamak için `docker compose down -v` kullanılır.
+
+### Seçenek B: Terminal ile SQLite
 
 ```powershell
 dotnet restore apps/api/TechYouthBpm.slnx
@@ -221,21 +242,6 @@ npm ci --prefix apps/web
 ```
 
 Local SQLite için `.env`, PostgreSQL kurulumu veya secret gerekmez.
-
-### Seçenek B: Docker ile SQLite
-
-Bu yöntem .NET SDK ve Node.js kurulumu istemez:
-
-```powershell
-# Aynı portları kullanan cloud stack açıksa kapat
-docker compose -f compose.cloud.yaml down
-
-docker compose up -d --build
-powershell -ExecutionPolicy Bypass -File scripts/smoke-local-compose.ps1
-```
-
-Stack'i kapatmak için `docker compose down`, SQLite volume'unu da silerek temiz
-başlamak için `docker compose down -v` kullanılır.
 
 ### Seçenek C: Docker ile PostgreSQL/Neon
 
