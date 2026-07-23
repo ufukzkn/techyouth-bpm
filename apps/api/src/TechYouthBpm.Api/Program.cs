@@ -94,8 +94,11 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddConfiguredWebCors(builder.Configuration);
+builder.Services.AddConfiguredForwardedProto(builder.Configuration);
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())
 {

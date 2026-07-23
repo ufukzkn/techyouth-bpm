@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Api.Configuration;
 
 namespace TechYouthBpm.Tests.Integration;
@@ -72,5 +74,46 @@ public sealed class SecurityConfigurationIntegrationTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.True(response.Headers.Contains("Strict-Transport-Security"));
+    }
+
+    [Fact]
+    public async Task Trusted_forwarded_proto_marks_browser_session_cookies_secure()
+    {
+        using var factory = new ApiWebApplicationFactory(
+            configurationOverrides: new Dictionary<string, string?>
+            {
+                ["Proxy:TrustForwardedProto"] = "true",
+            },
+            environment: "Production");
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("http://api.techyouth.test"),
+            HandleCookies = false,
+            AllowAutoRedirect = false,
+        });
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/browser-login")
+        {
+            Content = JsonContent.Create(new LoginRequest("admin", "admin123", RememberMe: true)),
+        };
+        request.Headers.Add("X-Forwarded-Proto", "https");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var setCookieHeaders = response.Headers.GetValues("Set-Cookie").ToArray();
+        Assert.True(setCookieHeaders.Any(value =>
+            value.StartsWith("techyouth_access=", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("secure", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("httponly", StringComparison.OrdinalIgnoreCase)),
+            string.Join(Environment.NewLine, setCookieHeaders));
+        Assert.True(setCookieHeaders.Any(value =>
+            value.StartsWith("techyouth_refresh=", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("secure", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("httponly", StringComparison.OrdinalIgnoreCase)),
+            string.Join(Environment.NewLine, setCookieHeaders));
+        Assert.True(setCookieHeaders.Any(value =>
+            value.StartsWith("techyouth_csrf=", StringComparison.OrdinalIgnoreCase)
+            && value.Contains("secure", StringComparison.OrdinalIgnoreCase)),
+            string.Join(Environment.NewLine, setCookieHeaders));
     }
 }

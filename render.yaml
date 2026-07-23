@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: techyouth-bpm-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: master
+    autoDeployTrigger: checksPass
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: Proxy__TrustForwardedProto
+        value: "true"
+      - key: Database__Provider
+        value: PostgreSql
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
+      - key: Seed__MockData
+        value: "true"
+      - key: Frontend__BaseUrl
+        sync: false
+      - key: Cors__AllowedOrigins__0
+        sync: false
+      - key: Email__Provider
+        value: Demo
