@@ -27,7 +27,7 @@ kullanılabilir.
 | UI ikonları | Lucide React | `1.21.0` |
 | Backend | ASP.NET Core / .NET | `8.0` |
 | ORM ve sağlayıcılar | EF Core SQLite / Npgsql PostgreSQL | `8.0.11` |
-| Veritabanı | SQLite / PostgreSQL | local dosya / `16` |
+| Veritabanı | SQLite / Neon PostgreSQL | local dosya / `18.4` |
 | Backend test | xUnit / WebApplicationFactory | `2.5.3` / `8.0.11` |
 | Frontend test | Vitest / Playwright | `3.2.7` / `1.61.1` |
 | Çalıştırma ve CI | Docker Compose / GitHub Actions | Compose v2 / Node `24`, .NET `8` |
@@ -44,7 +44,7 @@ Kesin npm bağımlılıkları [apps/web/package-lock.json](apps/web/package-lock
 | npm | `11.x` (minimum `10.x`) | Zorunlu |
 | .NET SDK | `8.x` | Zorunlu |
 | Docker Desktop | Güncel, Compose v2 | Yalnız Docker akışı için |
-| PostgreSQL | `16` | Opsiyonel; SQLite local demo için gerekmez |
+| PostgreSQL | Neon `18.4`; CI uyumluluk testi `16` | Opsiyonel; SQLite local demo için gerekmez |
 
 Sürüm kontrolü:
 
