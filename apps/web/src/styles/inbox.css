@@ -1,8 +1,11 @@
 .inbox-view {
+  width: 100%;
+  max-width: 1180px;
   min-height: max(620px, calc(100dvh - 128px));
   display: grid;
   align-content: start;
   gap: 18px;
+  margin-inline: auto;
 }
 
 .inbox-header {

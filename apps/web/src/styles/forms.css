@@ -11,8 +11,8 @@
 }
 
 .content-designer-wide {
-  left: 0;
-  width: min(1628px, calc(100% - 32px));
+  left: calc(var(--sidebar-width) / -2);
+  width: min(1628px, calc(100vw - (var(--workspace-safe-inset) * 2)));
 }
 
 main:has(> .workspace-route-content > .runner-section) {

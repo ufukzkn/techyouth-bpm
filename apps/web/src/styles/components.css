@@ -190,8 +190,11 @@
 }
 
 .process-section {
+  width: 100%;
   display: grid;
   gap: 18px;
+  max-width: 1180px;
+  margin-inline: auto;
   padding-top: 8px;
   position: relative;
 }

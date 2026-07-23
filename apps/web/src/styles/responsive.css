@@ -5,6 +5,11 @@
     left: 0;
     width: calc(100% - 32px);
   }
+
+  .content-designer-wide {
+    left: 0;
+    width: calc(100% - 32px);
+  }
 }
 
 @media (min-width: 1520px) and (max-width: 1599px) {
@@ -17,6 +22,7 @@
   }
 
   .content-designer-wide {
+    left: 0;
     width: min(1628px, calc(100% - 24px));
   }
 }

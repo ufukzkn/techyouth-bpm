@@ -1,7 +1,10 @@
 .workflow-workspace-view {
+  width: 100%;
+  max-width: 1400px;
   min-width: 0;
   display: grid;
   gap: 16px;
+  margin-inline: auto;
 }
 
 .workflow-workspace-heading {
