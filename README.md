@@ -145,6 +145,43 @@ Stack’i kapatmak için `docker compose down`, SQLite verisini de silerek temiz
 başlamak için `docker compose down -v` kullanılır. İlk image build’i paketleri
 indireceği için internet bağlantısı gerekir.
 
+### Seçenek C: Docker ile Neon PostgreSQL
+
+Bu seçenek aynı API ve web image’larını çalıştırır, fakat SQLite volume yerine
+uzaktaki Neon PostgreSQL veritabanına bağlanır. Önce secretsiz şablonu
+gitignored yerel dosyaya kopyalayıp gerçek Neon bilgileriyle doldurun:
+
+```powershell
+Copy-Item .env.example .env.neon.local
+notepad .env.neon.local
+```
+
+Ardından aynı portları kullanan local stack’i kapatıp cloud stack’i başlatın:
+
+```powershell
+docker compose down
+docker compose -f compose.cloud.yaml up -d --build
+
+# Container ve API readiness kontrolü
+docker compose -f compose.cloud.yaml ps
+Invoke-WebRequest http://localhost:5291/health/ready -UseBasicParsing |
+  Select-Object StatusCode
+```
+
+API başlangıçta Neon üzerinde migration ve idempotent seed çalıştırır. Bu
+nedenle connection string’i yalnız veri oluşturulmasını kabul ettiğiniz bir
+Neon branch/database için kullanın. `.env.neon.local` kesinlikle commitlenmez.
+
+Cloud stack’i kapatmak için:
+
+```powershell
+docker compose -f compose.cloud.yaml down
+```
+
+Buradaki “cloud”, veritabanının Neon’da olduğunu ifade eder; web ve API hâlâ
+bilgisayarınızdaki Docker container’larında ve aşağıdaki localhost adreslerinde
+çalışır.
+
 | Servis | Adres |
 | --- | --- |
 | Web uygulaması | `http://localhost:3000` |
