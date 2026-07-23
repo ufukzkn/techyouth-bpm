@@ -1,50 +1,195 @@
 # TechYouth BPM Wizard
 
-TechYouth School 2. donem proje gereksinimleri icin hazirlanan full-stack BPM wizard uygulamasi.
-
-Bu repo iki ana uygulamadan olusur:
+TechYouth School 2. dönem proje gereksinimleri için hazırlanan full-stack,
+dinamik form ve BPM iş akışı uygulamasıdır.
 
 - `apps/web`: Next.js + TypeScript frontend
 - `apps/api`: .NET 8 Web API backend
 
-Form field/page ordering uses `@dnd-kit`; the visual workflow canvas uses `@xyflow/react`. The API runs a custom typed .NET workflow runtime and persists versioned definitions with EF Core. Camunda/Kissflow are product references, not runtime dependencies.
+Form alanı/sayfa sıralaması `@dnd-kit`, görsel iş akışı tuvali
+`@xyflow/react` kullanır. API, sürümlenmiş tanımları EF Core ile saklayan özel
+bir typed .NET workflow runtime çalıştırır. Camunda ve Kissflow ürün referansıdır;
+runtime bağımlılığı değildir.
 
-Dokumantasyon `docs/` altindadir. Tekrarsiz konu sahipligi ve onerilen okuma sirasi [docs/README.md](docs/README.md) dosyasinda tanimlidir.
+Hızlı kurulum için [QUICKSTART.md](QUICKSTART.md), doküman haritası için
+[docs/README.md](docs/README.md), sunum hazırlığı için
+[docs/23-presentation-study-guide.md](docs/23-presentation-study-guide.md)
+kullanılabilir.
 
-Hizli kurulum icin [QUICKSTART.md](QUICKSTART.md), sunuma hazirlanmak icin [docs/23-presentation-study-guide.md](docs/23-presentation-study-guide.md) dosyasini kullanin.
+## Kullanılan Teknolojiler ve Sürümler
 
-## Requirements
+| Alan | Teknoloji | Sürüm |
+| --- | --- | --- |
+| Frontend | Next.js / React / TypeScript | `16.2.9` / `19.2.4` / `5.x` |
+| Global state | Zustand | `5.0.14` |
+| Form drag/drop | `@dnd-kit/core` / `sortable` | `6.3.1` / `10.0.0` |
+| Workflow canvas | `@xyflow/react` | `12.11.2` |
+| UI ikonları | Lucide React | `1.21.0` |
+| Backend | ASP.NET Core / .NET | `8.0` |
+| ORM ve sağlayıcılar | EF Core SQLite / Npgsql PostgreSQL | `8.0.11` |
+| Veritabanı | SQLite / PostgreSQL | local dosya / `16` |
+| Backend test | xUnit / WebApplicationFactory | `2.5.3` / `8.0.11` |
+| Frontend test | Vitest / Playwright | `3.2.7` / `1.61.1` |
+| Çalıştırma ve CI | Docker Compose / GitHub Actions | Compose v2 / Node `24`, .NET `8` |
 
-- Git
-- Node.js 20 veya ustu
-- npm 10 veya ustu
-- .NET SDK 8 veya ustu
-- PostgreSQL opsiyoneldir; ortak takim veritabani icin Neon gibi hosted PostgreSQL kullanilabilir.
+Kesin npm bağımlılıkları [apps/web/package-lock.json](apps/web/package-lock.json),
+.NET paketleri ilgili `.csproj` dosyalarında sabitlenmiştir.
 
-Kontrol komutlari:
+## Kurulması Gereken Araçlar
 
-```bash
+| Araç | Önerilen sürüm | Zorunluluk |
+| --- | --- | --- |
+| Git | `2.x` | Zorunlu |
+| Node.js | `24.x` (minimum `20.x`) | Zorunlu |
+| npm | `11.x` (minimum `10.x`) | Zorunlu |
+| .NET SDK | `8.x` | Zorunlu |
+| Docker Desktop | Güncel, Compose v2 | Yalnız Docker akışı için |
+| PostgreSQL | `16` | Opsiyonel; SQLite local demo için gerekmez |
+
+Sürüm kontrolü:
+
+```powershell
+git --version
 node --version
 npm --version
 dotnet --version
-git --version
+docker --version
 ```
 
-## Install
+## Tamamlanan Gereksinimler
 
-Repository klonlandiktan sonra frontend paketleri kurulmalidir:
+- Next.js tabanlı çok ekranlı, responsive ve authenticated workspace.
+- Login, global session/user state, rol ve permission tabanlı gezinme.
+- Dinamik form tasarlama, yayınlama, sürümleme ve çok adımlı form çalıştırma.
+- Input, textarea, number, email, select, radio, checkbox, date ve dosya
+  metadata alanları; required, tip ve bağımlı validasyon.
+- Loading, success, error durumları ve taşmayan/kopyalanabilen JSON çıktısı.
+- .NET 8 REST API, Swagger/OpenAPI, opaque session, HttpOnly cookie, CSRF,
+  refresh rotation/reuse tespiti ve merkezi session revoke.
+- EF Core migrations, SQLite ve PostgreSQL/Neon sağlayıcı desteği.
+- Formdan süreç başlatma, ilk/sonraki task üretimi, claim/release ve
+  Approve/Reject/Complete/SendBack/Escalate aksiyonları.
+- Backend doğrulamalı, sürümlenmiş görsel workflow graph ve koşullu gateway.
+- Sistem audit kayıtları, süreç adım geçmişi, transaction ve otomatik testler.
+- PDF’deki zorunlu kapsamın ve bonus maddelerin ayrıntılı eşlemesi:
+  [docs/00-requirements-from-pdf.md](docs/00-requirements-from-pdf.md).
 
-```bash
-cd apps/web
-npm install
+## Tamamlanmayan Gereksinimler ve Bilinçli Sınırlar
+
+PDF’nin zorunlu maddelerinde bilinen bir eksik yoktur. Aşağıdakiler zorunlu
+kapsam dışındaki production/genişleme maddeleridir:
+
+- Dosya alanı binary yüklemez; yalnız güvenli dosya metadata’sı saklar. Object
+  storage, MIME/içerik taraması ve signed URL sonraki aşamadır.
+- Parallel gateway, zamanlayıcıyla otomatik SLA eskalasyonu, service task ve
+  BPMN XML import/export henüz yoktur. `DueAt`, manuel `Escalate` ve typed
+  exclusive gateway desteklenir.
+- Camunda deployment veya harici ERP entegrasyonu yapılmaz; özel .NET runtime
+  kullanılır.
+- Public production deployment, harici Sentry/Seq/Datadog entegrasyonu ve
+  yayınlanmış kısa demo videosu henüz yoktur.
+
+## Geliştirilen Ek Özellikler
+
+- Topluluk, custom role, permission, çoklu takım üyeliği ve takım sorumlusu.
+- Kişi, takım, rol ve takım+rol aday havuzuna task atama.
+- Sürükle-bırak workflow tasarımı, swimlane, form-step binding ve immutable
+  yayınlanmış sürümler.
+- Kişisel/topluluk/global dashboard kapsamı, bildirim merkezi ve gelen kutusu.
+- TR/EN, light/dark tema, mobil form paleti ve erişilebilir alternatif kontroller.
+- Kategorili audit araması, correlation ID, RFC 7807 ProblemDetails ve
+  `/health/live` ile `/health/ready`.
+- SQLite/Neon Docker stack’leri ve GitHub Actions kalite kapıları.
+
+## Hızlı Kurulum ve Çalıştırma
+
+```powershell
+git clone https://github.com/ufukzkn/techyouth-bpm.git
+cd techyouth-bpm
+dotnet restore apps/api/TechYouthBpm.slnx
+npm ci --prefix apps/web
 ```
 
-Backend paketleri .NET restore ile yuklenir:
+İki terminal açın:
 
-```bash
-cd apps/api
-dotnet restore TechYouthBpm.slnx
+```powershell
+# Terminal 1
+.\scripts\run-api-local.ps1
+
+# Terminal 2
+.\scripts\run-web-local.ps1
 ```
+
+| Servis | Adres |
+| --- | --- |
+| Web uygulaması | `http://localhost:3000` |
+| Swagger | `http://localhost:5291/swagger` |
+| API liveness | `http://localhost:5291/health/live` |
+| API readiness | `http://localhost:5291/health/ready` |
+
+## Örnek Kullanıcı Hesapları
+
+| Kullanıcı | Parola | Amaç |
+| --- | --- | --- |
+| `admin` | `admin123` | Global SuperAdmin |
+| `user` | `user123` | Temel süreç başlatıcı |
+| `approver` | `approver123` | Temel onay sorumlusu |
+| `sport.admin` | `sport123` | Sportif Faaliyetler Topluluk Admin |
+| `sport.starter` | `sport123` | Süreç başlatma |
+| `sport.scout` | `sport123` | Scout takımı sorumlusu |
+| `sport.approver` | `sport123` | Teknik onay |
+| `sport.finance` | `sport123` | Mali İşler takım sorumlusu |
+| `sport.operations` | `sport123` | Transfer operasyon |
+| `sport.viewer` | `sport123` | Salt okunur gözlemci |
+
+## Konfigürasyon Bilgileri
+
+| Dosya / yöntem | Kullanım |
+| --- | --- |
+| `apps/api/src/TechYouthBpm.Api/appsettings.json` | Güvenli local varsayılanlar |
+| `apps/api/src/TechYouthBpm.Api/appsettings.example.json` | PostgreSQL, auth ve SMTP örnek şeması |
+| `.env.example` | Neon cloud Compose için secretsiz şablon |
+| `.env.neon.local` | Gerçek Neon bilgileri; gitignored |
+| `apps/web/.env.local` | `NEXT_PUBLIC_API_BASE_URL` override; gitignored |
+| .NET user-secrets | SMTP/Neon gibi lokal secret’lar |
+
+Secret, token ve gerçek connection string commitlenmemelidir. Local SQLite
+çalıştırması `.env` istemez. Cloud kullanımında `.env.example`,
+`.env.neon.local` adıyla kopyalanıp gerçek değerlerle doldurulur.
+
+## Veritabanı Migration ve Seed Data
+
+- API açılışında `Database.MigrateAsync` ile bekleyen EF Core migration’ları
+  uygulanır, ardından deterministik/idempotent seed çalışır.
+- Migration dosyaları
+  `apps/api/src/TechYouthBpm.Infrastructure/Data/Migrations` altındadır.
+- Varsayılan provider SQLite’tır; PostgreSQL/Neon aynı DbContext ve migration
+  geçmişini kullanır.
+- Seed; örnek kullanıcılar, beş topluluk, roller, takımlar, form/workflow
+  sürümleri, süreçler, tasklar, bildirimler ve audit kayıtları oluşturur.
+- `Transfer Aksiyon Laboratuvarı` ve `Operasyon Aksiyon Laboratuvarı`, tüm task
+  aksiyonlarını ve dört atama biçimini örnekleyen toplam 10 süreç içerir.
+
+Migration’ı elle uygulamak:
+
+```powershell
+dotnet tool restore
+dotnet tool run dotnet-ef database update `
+  --project apps/api/src/TechYouthBpm.Infrastructure/TechYouthBpm.Infrastructure.csproj `
+  --startup-project apps/api/src/TechYouthBpm.Api/TechYouthBpm.Api.csproj
+```
+
+SQLite verisini sıfırlayıp seed’i yeniden çalıştırmak:
+
+```powershell
+.\scripts\run-api-local.ps1 -ResetDb -Force
+```
+
+## Canlı Demo ve Demo Videosu
+
+- Public canlı demo adresi: **Henüz yok**
+- Kısa demo videosu: **Henüz yok**
+- Uygulama local veya Docker ile yukarıdaki adreslerde çalıştırılabilir.
 
 ## Environment
 
@@ -335,13 +480,10 @@ test sayıları ve kapsamın tek kaynağı
 [docs/24-testing-and-quality-gates.md](docs/24-testing-and-quality-gates.md)
 dosyasıdır.
 
-## Demo Users
+## Demo Kullanıcı Davranışları
 
-| Username | Password | Platform role | Community role |
-| --- | --- | --- | --- |
-| `admin` | `admin123` | SuperAdmin | Global |
-| `user` | `user123` | User | Surec Baslatici |
-| `approver` | `approver123` | User | Onay Sorumlusu |
+Hesaplar ve parolalar [Örnek Kullanıcı Hesapları](#örnek-kullanıcı-hesapları)
+bölümünde tek tabloda listelenmiştir.
 
 Frontend once gercek API'ye login istegi atar. API calismiyorsa ayni demo kullanicilarla local fallback devreye girer; boylece UI gelistirmesi backend olmadan da devam edebilir.
 
