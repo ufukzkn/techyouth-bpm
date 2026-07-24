@@ -1,0 +1,41 @@
+namespace TechYouthBpm.Application.Audit;
+
+public record CommunityDeletionArchiveDto(
+    Guid Id,
+    Guid OriginalCommunityId,
+    string CommunityName,
+    Guid DeletedByUserId,
+    string DeletedByUsername,
+    string DeletedByDisplayName,
+    string Reason,
+    DateTime DeletedAt,
+    int UserCount,
+    int PreservedUserCount,
+    int CommunityRoleCount,
+    int TeamCount,
+    int FormCount,
+    int WorkflowCount,
+    int ProcessCount,
+    int TaskCount,
+    int NotificationCount,
+    int SystemAuditCount,
+    int ProcessStepCount);
+
+public record ArchivedAuditEventDto(
+    Guid Id,
+    Guid? OriginalEventId,
+    string Source,
+    string Category,
+    string Action,
+    string EntityType,
+    string? EntityId,
+    Guid? ActorUserId,
+    string ActorDisplayName,
+    string ActorUsername,
+    string? EntityDisplayName,
+    string? EntityUsername,
+    string Description,
+    string NodeTitle,
+    string TeamName,
+    string CommunityRoleName,
+    DateTime OccurredAt);

@@ -14,6 +14,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMembership> TeamMemberships => Set<TeamMembership>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<CommunityDeletionArchive> CommunityDeletionArchives => Set<CommunityDeletionArchive>();
+    public DbSet<ArchivedAuditEvent> ArchivedAuditEvents => Set<ArchivedAuditEvent>();
     public DbSet<UserSession> UserSessions => Set<UserSession>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<FormDefinition> FormDefinitions => Set<FormDefinition>();
@@ -122,8 +124,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(notification => notification.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Notification>()
+            .HasOne(notification => notification.Community)
+            .WithMany()
+            .HasForeignKey(notification => notification.CommunityId)
+            .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Notification>().HasIndex(notification => new { notification.UserId, notification.ReadAt, notification.CreatedAt });
         modelBuilder.Entity<Notification>().HasIndex(notification => new { notification.UserId, notification.CreatedAt });
+        modelBuilder.Entity<Notification>().HasIndex(notification => new { notification.CommunityId, notification.CreatedAt });
         modelBuilder.Entity<Notification>().HasIndex(notification => new
         {
             notification.UserId,
@@ -345,6 +353,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<SystemAuditLog>()
             .Property(log => log.Category)
             .HasMaxLength(32);
+
+        modelBuilder.Entity<CommunityDeletionArchive>()
+            .HasIndex(archive => archive.DeletedAt);
+        modelBuilder.Entity<CommunityDeletionArchive>()
+            .HasIndex(archive => archive.OriginalCommunityId);
+        modelBuilder.Entity<CommunityDeletionArchive>()
+            .HasMany(archive => archive.Events)
+            .WithOne(auditEvent => auditEvent.CommunityDeletionArchive)
+            .HasForeignKey(auditEvent => auditEvent.CommunityDeletionArchiveId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ArchivedAuditEvent>()
+            .HasIndex(auditEvent => new
+            {
+                auditEvent.CommunityDeletionArchiveId,
+                auditEvent.Category,
+                auditEvent.OccurredAt
+            });
+        modelBuilder.Entity<ArchivedAuditEvent>()
+            .Property(auditEvent => auditEvent.Category)
+            .HasMaxLength(32);
+        modelBuilder.Entity<ArchivedAuditEvent>()
+            .Property(auditEvent => auditEvent.Source)
+            .HasMaxLength(24);
     }
 
     private void ConfigureSqliteGuidConversion(ModelBuilder modelBuilder)
