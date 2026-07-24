@@ -42,6 +42,8 @@ type ProcessListViewProps = {
   onSortByChange: (value: NonNullable<ProcessListParams["sortBy"]>) => void;
   onSortDirectionChange: (value: "asc" | "desc") => void;
   onStatusChange: (value: StatusFilter) => void;
+  pageSize: number;
+  onPageSizeChange: (size: number) => void;
 };
 
 const filterOptions: { value: StatusFilter; labelKey: TranslationKey }[] = [
@@ -68,6 +70,8 @@ export function ProcessListView({
   onSortByChange,
   onSortDirectionChange,
   onStatusChange,
+  pageSize,
+  onPageSizeChange,
 }: ProcessListViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const isTr = language === "tr";
@@ -149,6 +153,14 @@ export function ProcessListView({
               <option value="priority">{isTr ? "Öncelik" : "Priority"}</option>
               <option value="startedAt">{isTr ? "Başlangıç tarihi" : "Start date"}</option>
               <option value="status">{isTr ? "Durum" : "Status"}</option>
+            </select>
+          </label>
+          <label>
+            <span>{isTr ? "Kayıt sayısı" : "Per page"}</span>
+            <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
             </select>
           </label>
           <button

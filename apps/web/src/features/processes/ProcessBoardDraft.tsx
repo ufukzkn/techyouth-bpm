@@ -140,6 +140,14 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     setProcessPage(boundedPage);
   }
 
+  function changeProcessPageSize(nextPageSize: number) {
+    prepareProcessQueryTransition({ page: 1, pageSize: nextPageSize });
+    setProcessPageSize(nextPageSize);
+    setProcessPage(1);
+    setSelectedProcessId("");
+    setDetail(null);
+  }
+
   function changeTaskPage(nextPage: number) {
     const boundedPage = Math.max(1, Math.min(totalPages, nextPage));
     prepareTaskQueryTransition({ page: boundedPage });
@@ -466,6 +474,8 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 sortBy={processSortBy}
                 sortDirection={processSortDirection}
                 statusFilter={processStatus}
+                pageSize={processPageSize}
+                onPageSizeChange={changeProcessPageSize}
               />
             ) : null}
 
