@@ -293,7 +293,7 @@
   border: 1px solid color-mix(in srgb, var(--primary) 60%, var(--border));
   border-radius: 6px;
   color: #fff;
-  background: var(--foreground);
+  background: var(--navy);
   box-shadow: var(--shadow);
   font-size: 12px;
   font-weight: 800;
