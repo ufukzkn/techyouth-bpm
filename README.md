@@ -504,9 +504,14 @@ Yaygın kontroller:
 - `3000` veya `5291` doluysa ilgili prosesi kapatın ya da scriptlerde farklı
   port seçin.
 
+**Menüleri, ekranları ve arayüzdeki temel butonların ne yaptığını daha ayrıntılı
+incelemek için [Türkçe Arayüz Kullanım Rehberi'ne](docs/25-user-interface-guide.md)
+bakabilirsiniz.**
+
 Doküman haritası:
 
 - [Dokümantasyon rehberi](docs/README.md)
+- [Türkçe arayüz kullanım rehberi](docs/25-user-interface-guide.md)
 - [PDF gereksinim matrisi](docs/00-requirements-from-pdf.md)
 - [Katmanlı mimari](docs/02-architecture.md)
 - [API ve servis sözleşmeleri](docs/04-api-and-services.md)

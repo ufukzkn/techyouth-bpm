@@ -11,6 +11,7 @@ implementation history without letting them become competing specifications.
 3. [API and service contracts](04-api-and-services.md)
 4. [Test strategy and quality gates](24-testing-and-quality-gates.md)
 5. [Presentation study guide](23-presentation-study-guide.md)
+6. [Turkish user interface guide](25-user-interface-guide.md)
 
 For setup commands, use the repository-level [Quick Start](../QUICKSTART.md).
 
@@ -32,6 +33,7 @@ For setup commands, use the repository-level [Quick Start](../QUICKSTART.md).
 | Deployment | [17](17-docker-and-deployment.md) | Local/cloud Compose behavior and secrets |
 | Workflow architecture | [18](18-dynamic-workflow-and-team-architecture.md) | Product model, teams, runtime policy and ownership |
 | UI/UX system | [19](19-ui-ux-system.md) | Tokens, loading, feedback, motion and responsive rules |
+| User interface guide | [25](25-user-interface-guide.md) | Turkish menu, screen and action usage guide |
 | Workflow graph contract | [20](20-dynamic-workflow-contract.md) | Versioned graph, form binding, task and HTTP contracts |
 | Manual workflow acceptance | [22](22-workflow-end-to-end-test-scenarios.md) | Cross-role demo and negative scenarios |
 | Automated quality | [24](24-testing-and-quality-gates.md) | Test layers, commands, evidence and remaining gaps |
@@ -74,3 +76,5 @@ a canonical document, the canonical document and current code win.
    dependency or ownership boundary changes.
 7. Never place credentials, local absolute paths or private connection strings
    in tracked documentation.
+8. Update document 25 whenever a menu label, route, permission boundary or
+   user-facing action changes.
