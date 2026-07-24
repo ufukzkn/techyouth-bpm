@@ -17,6 +17,10 @@ anlatılan bir sekme hesabınızda görünmüyorsa ilgili yetkiniz bulunmuyor ol
 - **Çıkış:** API oturumunu kapatır ve giriş ekranına yönlendirir.
 - **Mobil menü:** Dar ekranlarda sol menüyü açar ve kapatır.
 
+Telefon görünümünde oturum kalkanı, kullanıcı adı ve rol tek bir kompakt kimlik
+alanında gösterilir. Bildirim zili görünür kalır; İşlerim, dil, tema ve çıkış
+aksiyonları **Diğer işlemler** menüsünde toplanır.
+
 ## Sol Menü Haritası
 
 | Menü | Route | Amaç |

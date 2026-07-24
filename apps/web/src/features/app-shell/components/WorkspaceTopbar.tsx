@@ -4,6 +4,7 @@ import { ListTodo, LogOut, Menu } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { LanguageToggleButton } from "@/features/app-shell/LanguageToggleButton";
+import { MobileTopbarActionsMenu } from "@/features/app-shell/components/MobileTopbarActionsMenu";
 import { NotificationMenu } from "@/features/app-shell/components/NotificationMenu";
 import { SessionStatusButton } from "@/features/app-shell/SessionStatusButton";
 import { formatSessionExpiry } from "@/features/app-shell/sessionFormatters";
@@ -44,6 +45,7 @@ export function WorkspaceTopbar({
   const router = useRouter();
   const [isSessionDetailsOpen, setIsSessionDetailsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isMobileActionsOpen, setIsMobileActionsOpen] = useState(false);
   const {
     previewItems,
     unreadCount,
@@ -60,6 +62,7 @@ export function WorkspaceTopbar({
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
+  const closeMobileActions = useCallback(() => setIsMobileActionsOpen(false), []);
 
   const loadNotifications = useCallback(async (source: "initial" | "poll" | "visibility" | "popover") => {
     if (!token || token.startsWith("demo-")) {
@@ -156,7 +159,12 @@ export function WorkspaceTopbar({
         aria-controls="workspace-navigation"
         aria-expanded={isMobileNavOpen}
         aria-label={t("common.menuOpen")}
-        onClick={onToggleMobileNav}
+        onClick={() => {
+          setIsSessionDetailsOpen(false);
+          setIsNotificationsOpen(false);
+          closeMobileActions();
+          onToggleMobileNav();
+        }}
       >
         <Menu size={18} />
       </button>
@@ -168,6 +176,7 @@ export function WorkspaceTopbar({
             onToggle={() => {
               setIsSessionDetailsOpen((isOpen) => !isOpen);
               setIsNotificationsOpen(false);
+              setIsMobileActionsOpen(false);
             }}
           />
           {isSessionDetailsOpen ? (
@@ -221,6 +230,7 @@ export function WorkspaceTopbar({
           onToggle={() => {
             setIsNotificationsOpen((isOpen) => !isOpen);
             setIsSessionDetailsOpen(false);
+            setIsMobileActionsOpen(false);
           }}
         />
         <LanguageToggleButton language={language} label={t("common.language")} onToggle={onToggleLanguage} />
@@ -228,6 +238,22 @@ export function WorkspaceTopbar({
         <button className="icon-button logout-button" onClick={onLogout} aria-label={t("common.logout")} title={t("common.logout")}>
           <LogOut size={18} />
         </button>
+        <MobileTopbarActionsMenu
+          canAccessTasks={canAccessTasks}
+          isOpen={isMobileActionsOpen}
+          language={language}
+          onClose={closeMobileActions}
+          onLogout={onLogout}
+          onOpenTasks={() => router.push("/tasks?view=active")}
+          onToggle={() => {
+            setIsMobileActionsOpen((isOpen) => !isOpen);
+            setIsSessionDetailsOpen(false);
+            setIsNotificationsOpen(false);
+          }}
+          onToggleLanguage={onToggleLanguage}
+          onToggleTheme={onToggleTheme}
+          theme={theme}
+        />
       </div>
       <NotificationLiveToasts
         onDismiss={dismissLiveToast}

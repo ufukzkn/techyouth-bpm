@@ -65,6 +65,11 @@ Screen migrations to these contracts are incremental. Do not rewrite every featu
 
 ## Responsive Rules
 
+- At `540px` and below, the topbar keeps identity and notifications visible
+  while secondary actions move into an accessible overflow menu. The session
+  trigger remains part of the identity cluster, and mobile popovers stay within
+  the viewport.
+
 - Desktop navigation remains fixed; tablet/mobile navigation uses the existing drawer.
 - Related routes use reusable sidebar disclosures. `Formlar` owns designer/runner and `Yonetim` owns users/communities; route permissions still decide which children exist.
 - Desktop sidebar width is `236px`; the `1520px`-`1599px` scaled-desktop band uses `232px` so navigation remains readable without becoming optically dominant on 1920x1080 displays using 125% system scaling.

@@ -237,6 +237,86 @@
 }
 
 @media (max-width: 540px) {
+  .topbar {
+    min-height: 68px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 10px 10px 10px 68px;
+  }
+
+  .topbar-user {
+    min-width: 0;
+    grid-template:
+      "session identity" auto
+      "session role" auto
+      / auto minmax(0, 1fr);
+    column-gap: 9px;
+    row-gap: 1px;
+  }
+
+  .compact-session-menu {
+    grid-area: session;
+    align-self: center;
+  }
+
+  .topbar-identity {
+    grid-area: identity;
+    min-width: 0;
+  }
+
+  .topbar-identity .eyebrow {
+    display: none;
+  }
+
+  .topbar-identity strong {
+    width: 100%;
+    max-width: none;
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .role-pill {
+    grid-area: role;
+    max-width: 100%;
+    justify-self: start;
+    overflow: hidden;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--primary-strong);
+    background: transparent;
+    font-size: 11px;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    gap: 6px;
+  }
+
+  .topbar-actions > .tasks-shortcut-button,
+  .topbar-actions > .language-toggle-button,
+  .topbar-actions > .theme-toggle-button,
+  .topbar-actions > .logout-button {
+    display: none;
+  }
+
+  .mobile-actions-menu {
+    display: block;
+  }
+
+  .compact-session-menu .session-popover,
+  .notification-popover {
+    position: fixed;
+    top: 74px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 88px);
+    overflow-y: auto;
+  }
+
   .team-list-card {
     grid-template-columns: auto minmax(0, 1fr);
   }
