@@ -11,6 +11,7 @@
   --primary: #f47b20;
   --primary-strong: #d95f05;
   --primary-soft: #fff0e3;
+  --accent-foreground: #ffffff;
   --orange: #d97706;
   --chart-track: #b8c2d0;
   --chart-pending: #8795a8;
@@ -52,6 +53,7 @@
   --primary: #ff9138;
   --primary-strong: #ffad6b;
   --primary-soft: #3a281f;
+  --accent-foreground: #0d1422;
   --orange: #f59e0b;
   --chart-track: #4a5870;
   --chart-pending: #aeb9c9;

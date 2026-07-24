@@ -263,7 +263,7 @@ input[type="checkbox"] {
   min-height: var(--control-height-md);
   gap: 8px;
   padding: 0 18px;
-  color: #fff;
+  color: var(--accent-foreground);
   background: var(--primary);
   font-weight: 700;
 }
