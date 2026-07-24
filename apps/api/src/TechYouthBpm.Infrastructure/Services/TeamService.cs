@@ -555,7 +555,8 @@ public class TeamService(
             "Takım üyeliğiniz güncellendi",
             $"{team.Name} takımına eklendiniz.",
             "Team",
-            team.Id.ToString()), cancellationToken);
+            team.Id.ToString(),
+            team.CommunityId), cancellationToken);
         await auditService.LogAsync(currentUser, "Team.MemberAdded", "User", user.Id.ToString(), $"User '{user.Username}' was added to team '{team.Name}'.", cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
@@ -601,7 +602,8 @@ public class TeamService(
                     ? $"{membership.Team.Name} takımı için sorumlu olarak belirlendiniz."
                     : $"{membership.Team.Name} takımı için sorumlu göreviniz kaldırıldı.",
                 "Team",
-                membership.TeamId.ToString()), cancellationToken);
+                membership.TeamId.ToString(),
+                membership.Team.CommunityId), cancellationToken);
         }
         await auditService.LogAsync(currentUser, "Team.MemberUpdated", "User", membership.UserId.ToString(), $"User '{membership.User.Username}' lead state in team '{membership.Team.Name}' changed from {wasLead} to {membership.IsLead}.", cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -641,7 +643,8 @@ public class TeamService(
             "Takım üyeliğiniz güncellendi",
             $"{membership.Team.Name} takımındaki üyeliğiniz kaldırıldı.",
             "Team",
-            membership.TeamId.ToString()), cancellationToken);
+            membership.TeamId.ToString(),
+            membership.Team.CommunityId), cancellationToken);
         await auditService.LogAsync(currentUser, "Team.MemberRemoved", "User", membership.UserId.ToString(), $"User '{membership.User.Username}' was removed from team '{membership.Team.Name}'.", cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Result.Success();

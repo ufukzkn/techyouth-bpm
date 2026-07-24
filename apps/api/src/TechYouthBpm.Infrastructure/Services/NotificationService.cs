@@ -91,6 +91,7 @@ public class NotificationService(AppDbContext db) : INotificationService
         db.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
+            CommunityId = request.CommunityId,
             UserId = request.UserId,
             Type = request.Type.Trim(),
             Title = request.Title.Trim(),

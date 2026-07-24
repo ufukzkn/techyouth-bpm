@@ -810,6 +810,7 @@ internal static class DemoWorkflowSeeder
             {
                 Id = StableGuid($"demo-notification:{process.Id}:task:{openTask.Id}"),
                 UserId = recipientId,
+                CommunityId = spec.CommunityId,
                 Type = "Task.Assigned",
                 Title = "Yeni gorev atandi",
                 Message = $"{openTask.Title} gorevi aksiyonunuzu bekliyor.",
@@ -826,6 +827,7 @@ internal static class DemoWorkflowSeeder
             {
                 Id = StableGuid($"demo-notification:{process.Id}:outcome"),
                 UserId = process.StartedByUserId,
+                CommunityId = spec.CommunityId,
                 Type = isCompleted ? "Process.Completed" : "Process.Rejected",
                 Title = isCompleted ? "Surec tamamlandi" : "Surec reddedildi",
                 Message = $"{spec.Name} sonucu guncellendi.",

@@ -713,6 +713,7 @@ internal static class SportifQuickDemoSeeder
             {
                 Id = StableGuid($"sportif-quick-notification:{workflow.Key}:{scenario}:task"),
                 UserId = workflow.EligibleUserId,
+                CommunityId = SportCommunityId,
                 Type = "Task.Assigned",
                 Title = "Yeni demo gorevi",
                 Message = $"{workflow.TaskTitle} gorevi aksiyonunuzu bekliyor.",
@@ -727,6 +728,7 @@ internal static class SportifQuickDemoSeeder
             {
                 Id = StableGuid($"sportif-quick-notification:{workflow.Key}:{scenario}:outcome"),
                 UserId = SportDemoStarterId,
+                CommunityId = SportCommunityId,
                 Type = scenario == Scenario.Rejected ? "Process.Rejected" : "Process.Completed",
                 Title = scenario == Scenario.Rejected ? "Demo sureci reddedildi" : "Demo sureci tamamlandi",
                 Message = $"{workflow.Name} sonucu kaydedildi.",

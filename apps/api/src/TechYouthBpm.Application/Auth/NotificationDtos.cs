@@ -35,4 +35,5 @@ public record CreateNotificationRequest(
     string Title,
     string Message,
     string? EntityType = null,
-    string? EntityId = null);
+    string? EntityId = null,
+    Guid? CommunityId = null);

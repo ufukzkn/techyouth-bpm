@@ -78,6 +78,7 @@ internal sealed class UserAdministrationService(
         db.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
+            CommunityId = user.CommunityMemberships.FirstOrDefault(membership => membership.IsActive)?.CommunityId,
             UserId = user.Id,
             Type = "User.PasswordReset",
             Title = "Sifreniz sifirlandi",
@@ -526,6 +527,7 @@ internal sealed class UserAdministrationService(
         db.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
+            CommunityId = request.TargetCommunityId,
             UserId = user.Id,
             Type = "User.CommunityTransferred",
             Title = "Topluluk bilginiz guncellendi",

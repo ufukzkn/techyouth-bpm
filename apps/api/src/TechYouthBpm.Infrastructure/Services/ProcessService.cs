@@ -429,6 +429,7 @@ public class ProcessService(
             db.Notifications.Add(new Notification
             {
                 Id = Guid.NewGuid(),
+                CommunityId = communityId,
                 UserId = userId,
                 Type = "Task.Assigned",
                 Title = "Yeni onay görevi",

@@ -237,6 +237,7 @@ internal sealed class DynamicWorkflowEngine(AppDbContext db)
             db.Notifications.Add(new Notification
             {
                 Id = Guid.NewGuid(),
+                CommunityId = process.CommunityId,
                 UserId = candidateId,
                 Type = "Task.Assigned",
                 Title = "Yeni görev atandı",

@@ -1118,6 +1118,7 @@ internal static class ProcessInstanceDataSeeder
             {
                 Id = Guid.Parse("dddddddd-0000-0000-0000-000000000001"),
                 UserId = ApproverId,
+                CommunityId = SportCommunityId,
                 Type = "Task.Assigned",
                 Title = "Onay bekleyen is atandi",
                 Message = "Transfer Talep Formu icin yeni bir onay aksiyonu bekliyor.",
@@ -1129,6 +1130,7 @@ internal static class ProcessInstanceDataSeeder
             {
                 Id = Guid.Parse("dddddddd-0000-0000-0000-000000000002"),
                 UserId = UserId,
+                CommunityId = SportCommunityId,
                 Type = "Process.Completed",
                 Title = "Sureciniz tamamlandi",
                 Message = "Baslattiginiz transfer talebi onaylandi.",
@@ -1141,6 +1143,7 @@ internal static class ProcessInstanceDataSeeder
             {
                 Id = Guid.Parse("dddddddd-0000-0000-0000-000000000003"),
                 UserId = FatihTerimId,
+                CommunityId = SportCommunityId,
                 Type = "User.AccessUpdated",
                 Title = "Topluluk yetkiniz guncellendi",
                 Message = "Sportif Faaliyetler toplulugunda admin yetkiniz aktif.",
@@ -1152,6 +1155,7 @@ internal static class ProcessInstanceDataSeeder
             {
                 Id = Guid.Parse("dddddddd-0000-0000-0000-000000000004"),
                 UserId = SenolGunesId,
+                CommunityId = HumanResourcesCommunityId,
                 Type = "Task.Assigned",
                 Title = "Izin talebi onay bekliyor",
                 Message = "Arda Guler'in uzaktan calisma talebi icin aksiyon alinmasi gerekiyor.",
@@ -1163,6 +1167,7 @@ internal static class ProcessInstanceDataSeeder
             {
                 Id = Guid.Parse("dddddddd-0000-0000-0000-000000000005"),
                 UserId = AliKocId,
+                CommunityId = ProcurementCommunityId,
                 Type = "Process.Completed",
                 Title = "Satin alma sureci tamamlandi",
                 Message = "Yazilim talebi butce siniri icinde onaylandi.",
