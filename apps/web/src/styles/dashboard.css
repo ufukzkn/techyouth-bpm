@@ -430,6 +430,7 @@
 
 .dashboard-priority-card {
   min-height: 208px;
+  border-top: 3px solid var(--focus-blue);
 }
 
 .dashboard-notification-card {
