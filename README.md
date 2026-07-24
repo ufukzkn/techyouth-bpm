@@ -82,6 +82,12 @@ docker compose version
   ve immutable form sürümleri.
 - Text, textarea, number, email, select, radio, checkbox, date ve dosya
   metadata alanları; zorunlu, tip ve bağımlı validasyon.
+- Field key normalizasyonu, duplicate key kontrolü, boş option/duplicate option
+  engelleme ve RequiredWhen bağımlı validasyon kuralları.
+- File Upload form alanı; form tasarımcısı, veri girişi, doğrulama ve JSON payload
+  metadata gösterimiyle desteklenir.
+- Sağ alan paleti ile form alanı ekleme; palette üzerinden sürükle-bırak, 
+  ekleme konumu önizlemesi ve mevcut alanlar arasında sıralama.
 - Loading, success ve error durumları ile taşmayan/kopyalanabilen JSON görünümü.
 - .NET 8 REST API, Swagger/OpenAPI, EF Core migrations ve deterministic seed.
 - SQLite ile PostgreSQL/Neon sağlayıcı desteği.
@@ -101,8 +107,11 @@ izlenir. Zorunlu kapsamda bilinen bir açık bulunmamaktadır.
 Aşağıdakiler zorunlu gereksinim eksiği değil, bilinçli ürün veya production
 sınırlarıdır:
 
-- Dosya alanı binary içeriği yüklemez; güvenli dosya metadata'sı saklar. Object
-  storage, MIME/içerik taraması ve signed URL sonraki aşamadır.
+- File Upload alanı bu sürümde gerçek binary dosya yükleme/saklama yapmaz.
+  Form akışında seçilen dosya; ad, boyut, MIME tipi ve benzeri güvenli metadata
+  bilgileriyle temsil edilir. Object storage, dosya içeriği taraması, signed URL,
+  indirme/yetkilendirme ve kalıcı attachment ilişkisi production aşaması için
+  bilinçli olarak kapsam dışında bırakıldı.
 - Parallel gateway, zamanlayıcıyla otomatik SLA eskalasyonu ve service task
   henüz yoktur. Typed exclusive gateway, `DueAt` ve manuel `Escalate` vardır.
 - BPMN XML import/export ve Camunda deployment yapılmaz.
@@ -177,6 +186,11 @@ sonraki isteğe yansıması için bilinçlidir.
 ### Form ve Workflow Motoru
 
 - Form ve workflow tanımları sürümlenir; yayınlanmış sürümler immutable'dır.
+- Form Designer, çok sayfalı form tasarımı, alan paleti, alan sıralama,
+  taslak/yayın/arşiv akışı ve JSON preview üzerinden form definition üretir.
+  Form Runner ise yayınlanmış form sürümünü kullanarak dinamik veri girişi,
+  sayfa bazlı ilerleme, submit öncesi validasyon ve process start payload
+  akışını çalıştırır.
 - Process instance başladığı workflow sürümüne, başlangıç ve task adımları da
   ilgili form sürümüne pin edilir.
 - Workflow, `schemaVersion` taşıyan typed JSON graph olarak saklanır.
