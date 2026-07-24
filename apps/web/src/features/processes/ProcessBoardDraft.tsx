@@ -39,7 +39,6 @@ type ProcessBoardDraftProps = {
 
 type BoardStatus = "loading" | "refreshing" | "idle" | "acting" | "error";
 
-const pageSize = 10;
 const minimumRefreshDelayMs = 500;
 const emptyProcessItems: ProcessSummary[] = [];
 export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
@@ -53,7 +52,9 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const [processResult, setProcessResult] = useState<PagedResult<ProcessSummary> | null>(null);
   const [taskResult, setTaskResult] = useState<PagedResult<ProcessTask> | null>(null);
   const [processPage, setProcessPage] = useState(1);
+  const [processPageSize, setProcessPageSize] = useState(10);
   const [taskPage, setTaskPage] = useState(1);
+  const [taskPageSize, setTaskPageSize] = useState(5);
   const requestedStatus = searchParams.get("status");
   const initialProcessStatus = isProcessStatus(requestedStatus) ? requestedStatus : "all";
   const requestedTaskView = searchParams.get("view");
@@ -82,7 +83,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
 
   const processParams: ProcessListParams = {
     page: processPage,
-    pageSize,
+    pageSize: processPageSize,
     status: processStatus,
     scope: processScope,
     sortBy: processSortBy,
@@ -90,7 +91,7 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   };
   const taskParams: TaskListParams = {
     page: taskPage,
-    pageSize,
+    pageSize: taskPageSize,
     priority: taskPriority,
     sortBy: taskSortBy,
     sortDirection: taskSortDirection,
@@ -143,6 +144,14 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
     const boundedPage = Math.max(1, Math.min(totalPages, nextPage));
     prepareTaskQueryTransition({ page: boundedPage });
     setTaskPage(boundedPage);
+  }
+
+  function changeTaskPageSize(nextPageSize: number) {
+    prepareTaskQueryTransition({ page: 1, pageSize: nextPageSize });
+    setTaskPageSize(nextPageSize);
+    setTaskPage(1);
+    setSelectedTaskId("");
+    setDetail(null);
   }
 
   function changeTaskView(nextView: NonNullable<TaskListParams["view"]>) {
@@ -385,9 +394,10 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
   const isListLoading = mode === "tasks"
     ? taskListState === "loading" || taskListState === "refreshing"
     : status === "loading" || status === "refreshing";
-  const totalPages = Math.max(1, Math.ceil((activeResult?.totalCount ?? 0) / pageSize));
-  const visibleProcessResult = processResult ?? { items: emptyProcessItems, page: processPage, pageSize, totalCount: 0 };
-  const visibleTaskResult = taskResult ?? { items: [], page: taskPage, pageSize, totalCount: 0 };
+  const activePageSize = mode === "processes" ? processPageSize : taskPageSize;
+  const totalPages = Math.max(1, Math.ceil((activeResult?.totalCount ?? 0) / activePageSize));
+  const visibleProcessResult = processResult ?? { items: emptyProcessItems, page: processPage, pageSize: processPageSize, totalCount: 0 };
+  const visibleTaskResult = taskResult ?? { items: [], page: taskPage, pageSize: taskPageSize, totalCount: 0 };
 
   return (
     <section className="process-section">
@@ -492,6 +502,8 @@ export function ProcessBoardDraft({ mode }: ProcessBoardDraftProps) {
                 onRetry={() => void refreshData({ force: true })}
                 taskView={taskView}
                 onTaskViewChange={changeTaskView}
+                pageSize={taskPageSize}
+                onPageSizeChange={changeTaskPageSize}
               />
             ) : null}
 

@@ -63,6 +63,8 @@ type MyTasksViewProps = {
   onLoadTaskDetail: (taskId: string) => Promise<ProcessTask | null>;
   onTaskViewChange: (view: NonNullable<TaskListParams["view"]>) => void;
   onRetry: () => void;
+  pageSize: number;
+  onPageSizeChange: (size: number) => void;
 };
 
 const priorities: Array<TaskPriority | "all"> = ["all", "Critical", "High", "Normal", "Low"];
@@ -93,6 +95,8 @@ export function MyTasksView({
   onLoadTaskDetail,
   onTaskViewChange,
   onRetry,
+  pageSize,
+  onPageSizeChange,
 }: MyTasksViewProps) {
   const t = (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values);
   const isTr = language === "tr";
@@ -171,6 +175,14 @@ export function MyTasksView({
               <option value="priority">{isTr ? "Öncelik" : "Priority"}</option>
               <option value="newest">{isTr ? "En yeni" : "Newest"}</option>
               <option value="oldest">{isTr ? "En eski" : "Oldest"}</option>
+            </select>
+          </label>
+          <label>
+            <span>{isTr ? "Kayıt sayısı" : "Per page"}</span>
+            <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
             </select>
           </label>
           <button
