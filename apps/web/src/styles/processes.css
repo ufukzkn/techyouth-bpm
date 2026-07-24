@@ -446,7 +446,8 @@
 }
 
 .success-button,
-.danger-button {
+.danger-button,
+.escalate-button {
   min-height: 36px;
   display: inline-flex;
   align-items: center;
@@ -471,6 +472,7 @@
 
 .success-button:hover,
 .danger-button:hover,
+.escalate-button:hover,
 .secondary-button:hover {
   transform: translateY(-1px);
 }
@@ -482,6 +484,11 @@
 .danger-button {
   color: #ffffff;
   background: #b42318;
+}
+
+.escalate-button {
+  color: #ffffff;
+  background: var(--orange);
 }
 
 .audit-card {
@@ -876,7 +883,8 @@
 .primary-button,
 .secondary-button,
 .success-button,
-.danger-button {
+.danger-button,
+.escalate-button {
   max-width: 100%;
   white-space: nowrap;
 }
