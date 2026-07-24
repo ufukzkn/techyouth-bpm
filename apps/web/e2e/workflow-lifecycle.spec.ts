@@ -198,6 +198,7 @@ test("community admin and finance lead can claim the open finance lead task", as
   const verifyClaimAndRelease = async (username: string) => {
     await loginThroughUi(page, username, "sport123");
     await page.goto("/tasks?view=active");
+    await page.locator("select").last().selectOption("20");
 
     const claimableTask = page.locator(".task-item")
       .filter({ hasText: "Mali Lider Onayı" })
