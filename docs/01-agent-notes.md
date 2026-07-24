@@ -59,6 +59,12 @@ subject ownership map is in the [Documentation Guide](README.md).
   affected keys after mutations or explicit refresh.
 - Every destructive or privilege-changing action requires explicit confirmation
   and backend authorization.
+- Permanent community deletion is a separate SuperAdmin-only operation, never a
+  stronger spelling of deactivation. It requires an inactive community, an
+  impact preview, exact-name confirmation, current password and a reason.
+- Community purge and its safe audit archive must commit in one transaction.
+  Archive snapshots may retain actor/action/team/role/timestamp context, but
+  never e-mail, IP, user-agent, form payload, task note or raw metadata.
 - Treat candidate-task `CanClaim` and post-claim `CanAct` as separate states.
   Never infer a team-lead denial solely from `CanAct=false` before claim.
 - Keep technical workflow node keys out of normal cards. Show the node title,
@@ -78,6 +84,8 @@ subject ownership map is in the [Documentation Guide](README.md).
   Redis without changing auth services. `Auth:SessionCacheSeconds=0` disables
   caching for strict integration tests.
 - Apply migrations before deterministic/idempotent seed data.
+- New notifications must carry `CommunityId` when an event has a community
+  scope. This lets lifecycle operations remove only the intended workspace data.
 
 ## Verification And Documentation
 

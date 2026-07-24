@@ -96,6 +96,8 @@ docker compose version
   Approve/Reject/Complete/SendBack/Escalate aksiyonları.
 - Task form doğrulaması, SLA/DueAt, süreç adım geçmişi ve transaction sınırları.
 - Sistem audit kayıtları, bildirim merkezi, gelen kutusu ve rol/topluluk scope'u.
+- SuperAdmin kontrollü topluluk purge akışı ve hassas veri içermeyen, salt-okunur
+  audit arşivi.
 - Backend, frontend ve Playwright testleri ile GitHub Actions kalite kapıları.
 
 PDF gereksinimlerinin zorunlu ve bonus karşılıkları ayrıntılı olarak
@@ -476,6 +478,10 @@ dotnet test apps/api/tests/TechYouthBpm.Tests/TechYouthBpm.Tests.csproj `
   --filter "FullyQualifiedName~PostgreSql_Startup_Applies_Migrations"
 Remove-Item Env:TECHYOUTH_TEST_POSTGRES_CONNECTION
 ```
+
+Neon bağlantısı pooler host'u içeriyorsa smoke testi migration için aynı
+projenin direct host'unu kullanır, benzersiz geçici schema oluşturur ve test
+sonunda siler. Ortak demo schema'sına veri yazılmaz.
 
 Test benzersiz geçici schema oluşturur, migration/seed/login/form smoke akışını
 çalıştırır ve yalnız o schema'yı siler. Paylaşılan demo tablolarına dokunmaz.
