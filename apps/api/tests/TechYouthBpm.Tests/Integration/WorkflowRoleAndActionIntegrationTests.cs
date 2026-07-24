@@ -238,6 +238,8 @@ public class WorkflowRoleAndActionIntegrationTests
         Assert.Contains("Task.Released", persisted.SystemAuditActions);
         Assert.Contains("Task.Approve", persisted.SystemAuditActions);
         Assert.Contains("Task.Reject", persisted.SystemAuditActions);
+        Assert.Contains("Process.Advanced", persisted.SystemAuditActions);
+        Assert.Contains("Process.Rejected", persisted.SystemAuditActions);
         Assert.Contains("Task.Assigned", persisted.NotificationTypes);
         Assert.Contains("Process.Advanced", persisted.NotificationTypes);
         Assert.Contains("Process.Rejected", persisted.NotificationTypes);
