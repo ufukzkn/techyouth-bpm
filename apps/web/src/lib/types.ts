@@ -445,6 +445,48 @@ export type SystemAuditCategoryCounts = {
   tasks: number;
 };
 
+export type CommunityDeletionArchive = {
+  id: string;
+  originalCommunityId: string;
+  communityName: string;
+  deletedByUserId: string;
+  deletedByUsername: string;
+  deletedByDisplayName: string;
+  reason: string;
+  deletedAt: string;
+  userCount: number;
+  preservedUserCount: number;
+  communityRoleCount: number;
+  teamCount: number;
+  formCount: number;
+  workflowCount: number;
+  processCount: number;
+  taskCount: number;
+  notificationCount: number;
+  systemAuditCount: number;
+  processStepCount: number;
+};
+
+export type ArchivedAuditEvent = {
+  id: string;
+  originalEventId?: string | null;
+  source: "system" | "process";
+  category: SystemAuditLog["category"];
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  actorUserId?: string | null;
+  actorDisplayName: string;
+  actorUsername: string;
+  entityDisplayName?: string | null;
+  entityUsername?: string | null;
+  description: string;
+  nodeTitle: string;
+  teamName: string;
+  communityRoleName: string;
+  occurredAt: string;
+};
+
 export type ProcessSummary = {
   id: string;
   formDefinitionId: string;
@@ -622,6 +664,37 @@ export type CommunitySummary = {
   communityId: string;
   memberCount: number;
   roleCounts: CommunityRoleCount[];
+};
+
+export type CommunityDeletionImpact = {
+  communityId: string;
+  communityName: string;
+  isActive: boolean;
+  userCount: number;
+  preservedUserCount: number;
+  communityRoleCount: number;
+  teamCount: number;
+  formCount: number;
+  workflowCount: number;
+  processCount: number;
+  taskCount: number;
+  notificationCount: number;
+  systemAuditCount: number;
+  processStepCount: number;
+};
+
+export type PurgeCommunityRequest = {
+  confirmationName: string;
+  currentPassword: string;
+  reason: string;
+};
+
+export type CommunityPurgeResult = {
+  archiveId: string;
+  originalCommunityId: string;
+  communityName: string;
+  deletedAt: string;
+  impact: CommunityDeletionImpact;
 };
 
 export type Team = {
