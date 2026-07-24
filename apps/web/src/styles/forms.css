@@ -1187,7 +1187,7 @@ main:has(> .workspace-route-content > .runner-section) {
 
 .designer-version-actions .designer-version-icon-action:first-child {
   border-color: color-mix(in srgb, var(--primary) 72%, var(--border));
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--primary);
   box-shadow: 0 7px 16px color-mix(in srgb, var(--primary) 20%, transparent);
 }
@@ -1223,7 +1223,7 @@ main:has(> .workspace-route-content > .runner-section) {
 .designer-version-actions .designer-version-icon-action:first-child:hover:not(:disabled),
 .designer-version-actions .designer-version-icon-action:first-child:focus-visible {
   border-color: var(--primary-strong);
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--primary-strong);
 }
 
@@ -1367,7 +1367,7 @@ main:has(> .workspace-route-content > .runner-section) {
     justify-content: center;
     border: 1px solid color-mix(in srgb, var(--primary) 76%, #ffffff);
     border-radius: 999px;
-    color: var(--accent-foreground);
+    color: #ffffff;
     background: var(--primary);
     box-shadow: 0 8px 20px rgba(24, 36, 58, 0.22);
     cursor: grab;
@@ -1565,7 +1565,7 @@ main:has(> .workspace-route-content > .runner-section) {
     justify-content: center;
     border: 1px solid color-mix(in srgb, var(--primary) 76%, #ffffff);
     border-radius: 999px;
-    color: var(--accent-foreground);
+    color: #ffffff;
     background: var(--primary);
     box-shadow: 0 14px 32px rgba(24, 36, 58, 0.28);
     cursor: grab;

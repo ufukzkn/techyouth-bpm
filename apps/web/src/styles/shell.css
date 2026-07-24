@@ -327,7 +327,7 @@
   padding: 0 5px;
   border: 2px solid var(--surface);
   border-radius: 999px;
-  color: var(--accent-foreground);
+  color: #fff;
   background: var(--orange);
   font-size: 11px;
   font-weight: 900;

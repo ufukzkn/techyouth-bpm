@@ -22,7 +22,7 @@
 
 .ui-icon-button-danger:hover,
 .ui-icon-button-danger:focus-visible {
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--danger);
 }
 
@@ -785,7 +785,7 @@
 }
 
 .sliding-segmented-item input[type="radio"]:checked + .sliding-segmented-option {
-  color: var(--accent-foreground);
+  color: #ffffff;
 }
 
 .sliding-segmented-item input[type="radio"]:focus-visible + .sliding-segmented-option {

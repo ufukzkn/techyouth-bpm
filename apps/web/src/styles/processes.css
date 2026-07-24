@@ -232,26 +232,6 @@
   background: #ffe1df;
 }
 
-[data-theme="dark"] .status-pending {
-  color: #b8d2ff;
-  background: #243754;
-}
-
-[data-theme="dark"] .status-inprogress {
-  color: #ffc27d;
-  background: #3b2c1f;
-}
-
-[data-theme="dark"] .status-completed {
-  color: #8be2b3;
-  background: #1b3b2f;
-}
-
-[data-theme="dark"] .status-rejected {
-  color: #ffaaa3;
-  background: #442728;
-}
-
 .detail-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -479,7 +459,7 @@
 }
 
 .success-button {
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--teal);
 }
 
@@ -724,7 +704,7 @@
 }
 
 .runner-step-complete .runner-step-index {
-  color: var(--accent-foreground);
+  color: #ffffff;
   border-color: var(--teal);
   background: var(--teal);
 }
@@ -1002,7 +982,7 @@
 
 .filter-chip.active {
   border-color: var(--primary);
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--primary);
 }
 
@@ -1057,18 +1037,18 @@
 }
 
 .audit-node-approve .audit-node {
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--teal);
 }
 
 .audit-node-reject .audit-node {
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--danger);
 }
 
 .audit-node-send-back .audit-node,
 .audit-node-escalate .audit-node {
-  color: var(--accent-foreground);
+  color: #ffffff;
   background: var(--orange);
 }
 
