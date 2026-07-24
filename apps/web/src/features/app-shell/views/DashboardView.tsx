@@ -232,9 +232,9 @@ export function DashboardView({
 
       <section className="dashboard-focus-grid">
         <article className={`dashboard-chart-card dashboard-chart-card-prominent${showTeamQueue ? "" : " without-team-queue"}`}>
+          <span className="dashboard-heading-icon" aria-hidden="true"><ChartPie size={18} /></span>
           <div className="dashboard-card-heading">
             <div className="dashboard-heading-copy">
-              <span className="dashboard-heading-icon" aria-hidden="true"><ChartPie size={18} /></span>
               <div className="dashboard-chart-copy">
                 <span className="eyebrow">{t("dashboard.distributionEyebrow")}</span>
                 <h3>{t("dashboard.distributionTitle")}</h3>
@@ -309,14 +309,11 @@ export function DashboardView({
         </article>
 
         <article className="dashboard-work-card dashboard-priority-card">
+          <span className="dashboard-heading-icon" aria-hidden="true"><Focus size={18} /></span>
           <div className="dashboard-card-heading">
             <div className="dashboard-heading-copy">
-              <span className="dashboard-heading-icon" aria-hidden="true"><Focus size={18} /></span>
               <div><span className="eyebrow">{t(focusEyebrowKey)}</span><h3>{t(focusTitleKey)}</h3></div>
             </div>
-            <button className="dashboard-heading-action" onClick={() => router.push(showTaskFocus ? "/tasks?view=active" : `/processes?scope=${scope}`)} type="button">
-              {t("dashboard.viewAll")} <ArrowRight size={15} />
-            </button>
           </div>
           {status === "loading" && !summary ? <DashboardListSkeleton /> : showTaskFocus && recentOpenTasks.length > 0 ? (
             <div className="dashboard-activity-list">
@@ -345,13 +342,16 @@ export function DashboardView({
               title={t(showTaskFocus ? "dashboard.priorityEmptyTitle" : "dashboard.recentEmptyTitle")}
             />
           )}
+          <button className="dashboard-heading-action" onClick={() => router.push(showTaskFocus ? "/tasks?view=active" : `/processes?scope=${scope}`)} type="button">
+            {t("dashboard.viewAll")} <ArrowRight size={15} />
+          </button>
         </article>
       </section>
 
       <section className="dashboard-work-card dashboard-notification-card">
+        <span className="dashboard-heading-icon" aria-hidden="true"><Activity size={18} /></span>
         <div className="dashboard-card-heading">
           <div className="dashboard-heading-copy">
-            <span className="dashboard-heading-icon" aria-hidden="true"><Activity size={18} /></span>
             <div>
               <span className="eyebrow">{t("dashboard.activityEyebrow")}</span>
               <h3>
@@ -360,9 +360,6 @@ export function DashboardView({
               </h3>
             </div>
           </div>
-          <button className="dashboard-heading-action" onClick={() => onNavigate("inbox")} type="button">
-            {t("dashboard.viewAll")} <ArrowRight size={15} />
-          </button>
         </div>
         {notificationsLoading && !previewItems.length ? <DashboardListSkeleton /> : previewItems.length > 0 ? (
           <div className="dashboard-activity-list dashboard-notification-list">
@@ -377,6 +374,9 @@ export function DashboardView({
         ) : (
           <EmptyState description={t("inbox.emptyDescription")} icon={<Bell size={20} />} title={t("inbox.emptyTitle")} />
         )}
+        <button className="dashboard-heading-action" onClick={() => onNavigate("inbox")} type="button">
+          {t("dashboard.viewAll")} <ArrowRight size={15} />
+        </button>
       </section>
     </div>
   );

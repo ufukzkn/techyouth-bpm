@@ -173,6 +173,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
+  position: relative;
 }
 
 .dashboard-chart-card {
@@ -425,6 +426,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
+  position: relative;
 }
 
 .dashboard-priority-card {
@@ -460,9 +462,11 @@
 }
 
 .dashboard-heading-icon {
+  position: absolute;
+  top: 16px;
+  right: 16px;
   width: 34px;
   height: 34px;
-  flex: 0 0 34px;
   display: grid;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
@@ -496,6 +500,7 @@
   min-height: 32px;
   display: inline-flex;
   align-items: center;
+  justify-self: end;
   gap: 5px;
   padding: 0 8px;
   border: 0;
