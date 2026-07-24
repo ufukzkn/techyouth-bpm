@@ -190,7 +190,6 @@
   min-width: 0;
   display: grid;
   align-content: start;
-  gap: 10px;
 }
 
 .dashboard-chart-copy h3 {
