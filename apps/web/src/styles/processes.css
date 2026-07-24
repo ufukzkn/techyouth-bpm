@@ -368,6 +368,13 @@
   min-width: 0;
 }
 
+.task-actions .secondary-button,
+.action-dialog-actions .secondary-button {
+  min-height: 36px;
+  padding: 0 14px;
+  gap: 7px;
+}
+
 .task-assignment-context {
   display: flex;
   flex-wrap: wrap;
