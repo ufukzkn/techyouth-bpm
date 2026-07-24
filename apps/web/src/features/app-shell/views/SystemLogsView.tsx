@@ -103,7 +103,7 @@ export function SystemLogsView({ activeUser, language, token }: { activeUser: Us
         return;
       }
       if (isArchiveMode && !selectedArchiveId) {
-        setCategoryCounts(emptyAuditCounts());
+        setCategoryCounts({ all: 0, identity: 0, access: 0, forms: 0, processes: 0, tasks: 0 });
         return;
       }
 
