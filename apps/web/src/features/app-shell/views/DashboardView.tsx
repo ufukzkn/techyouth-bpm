@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bell, CircleCheckBig, Clock3, FilePlay, FilePlus2, GitBranch, ListTodo, Network, Workflow } from "lucide-react";
+import { Activity, ArrowRight, Bell, ChartPie, CircleCheckBig, Clock3, FilePlay, FilePlus2, Focus, GitBranch, ListTodo, Network, Workflow } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { InlineValueLoader } from "@/features/app-shell/components/AsyncState";
@@ -232,9 +232,14 @@ export function DashboardView({
 
       <section className="dashboard-focus-grid">
         <article className={`dashboard-chart-card dashboard-chart-card-prominent${showTeamQueue ? "" : " without-team-queue"}`}>
-          <div className="dashboard-chart-copy">
-            <span className="eyebrow">{t("dashboard.distributionEyebrow")}</span>
-            <h3>{t("dashboard.distributionTitle")}</h3>
+          <div className="dashboard-card-heading">
+            <div className="dashboard-heading-copy">
+              <span className="dashboard-heading-icon" aria-hidden="true"><ChartPie size={18} /></span>
+              <div className="dashboard-chart-copy">
+                <span className="eyebrow">{t("dashboard.distributionEyebrow")}</span>
+                <h3>{t("dashboard.distributionTitle")}</h3>
+              </div>
+            </div>
           </div>
           <div className="dashboard-chart-body">
             <div className="chart-legend dashboard-metric-legend">
@@ -305,7 +310,10 @@ export function DashboardView({
 
         <article className="dashboard-work-card dashboard-priority-card">
           <div className="dashboard-card-heading">
-            <div><span className="eyebrow">{t(focusEyebrowKey)}</span><h3>{t(focusTitleKey)}</h3></div>
+            <div className="dashboard-heading-copy">
+              <span className="dashboard-heading-icon" aria-hidden="true"><Focus size={18} /></span>
+              <div><span className="eyebrow">{t(focusEyebrowKey)}</span><h3>{t(focusTitleKey)}</h3></div>
+            </div>
             <button className="dashboard-heading-action" onClick={() => router.push(showTaskFocus ? "/tasks?view=active" : `/processes?scope=${scope}`)} type="button">
               {t("dashboard.viewAll")} <ArrowRight size={15} />
             </button>
@@ -342,12 +350,15 @@ export function DashboardView({
 
       <section className="dashboard-work-card dashboard-notification-card">
         <div className="dashboard-card-heading">
-          <div>
-            <span className="eyebrow">{t("dashboard.activityEyebrow")}</span>
-            <h3>
-              {t("dashboard.activityTitle")}
-              {isPreviewRefreshing ? <span aria-label={t("common.refreshing")} className="dashboard-heading-refresh button-spinner" role="status" /> : null}
-            </h3>
+          <div className="dashboard-heading-copy">
+            <span className="dashboard-heading-icon" aria-hidden="true"><Activity size={18} /></span>
+            <div>
+              <span className="eyebrow">{t("dashboard.activityEyebrow")}</span>
+              <h3>
+                {t("dashboard.activityTitle")}
+                {isPreviewRefreshing ? <span aria-label={t("common.refreshing")} className="dashboard-heading-refresh button-spinner" role="status" /> : null}
+              </h3>
+            </div>
           </div>
           <button className="dashboard-heading-action" onClick={() => onNavigate("inbox")} type="button">
             {t("dashboard.viewAll")} <ArrowRight size={15} />

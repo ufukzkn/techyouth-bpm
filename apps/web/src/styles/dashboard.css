@@ -452,6 +452,29 @@
   gap: 12px;
 }
 
+.dashboard-heading-copy {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-heading-icon {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--primary) 32%, var(--border));
+  border-radius: 7px;
+  color: var(--primary-strong);
+  background: color-mix(in srgb, var(--primary) 8%, var(--surface));
+}
+
+.dashboard-heading-copy > div {
+  min-width: 0;
+}
+
 .dashboard-card-heading h3 {
   display: inline-flex;
   align-items: center;
