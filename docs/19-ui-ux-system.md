@@ -45,6 +45,15 @@ Do not place a new feature at the bottom of an unrelated file. Preserve the impo
 
 Screen migrations to these contracts are incremental. Do not rewrite every feature merely to replace an existing stable button in one commit.
 
+Permanent deletion uses a stronger two-stage danger-zone pattern: first show
+the server-calculated impact, then require exact-name confirmation, current
+password and a reason. Keep its feedback inside the danger card. It must not
+reuse a one-click deactivate confirmation or appear for non-SuperAdmin users.
+
+Live and deleted-community logs share the same category/search/sort/pagination
+surface through a compact `Aktif | Arsiv` segmented control. Archive selection
+must be explicit, and live/archive count caches must never overwrite each other.
+
 ## Loading And Feedback
 
 - First load: show a matching skeleton.

@@ -3,6 +3,8 @@ namespace TechYouthBpm.Domain.Entities;
 public class Notification
 {
     public Guid Id { get; set; }
+    public Guid? CommunityId { get; set; }
+    public Community? Community { get; set; }
     public Guid UserId { get; set; }
     public User? User { get; set; }
     public string Type { get; set; } = string.Empty;

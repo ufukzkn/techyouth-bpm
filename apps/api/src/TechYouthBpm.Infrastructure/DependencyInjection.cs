@@ -77,7 +77,9 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<ITaskService, TaskService>();
         services.AddScoped<ISystemAuditService, SystemAuditService>();
+        services.AddScoped<IAuditArchiveService, AuditArchiveService>();
         services.AddScoped<ICommunityService, CommunityService>();
+        services.AddScoped<ICommunityDeletionService, CommunityDeletionService>();
         services.AddScoped<ICommunityRoleService>(provider =>
             (ICommunityRoleService)provider.GetRequiredService<ICommunityService>());
         services.AddScoped<INotificationService, NotificationService>();

@@ -373,6 +373,7 @@ internal static class WorkflowActionDemoSeeder
             {
                 Id = StableGuid($"action-lab:notification:{workflow.Key}:{scenario}"),
                 UserId = activeTask.Value.Task.PerformerId,
+                CommunityId = SportCommunityId,
                 Type = "Task.Assigned",
                 Title = "Yeni aksiyon demo görevi",
                 Message = $"{activeTask.Value.Task.Title} görevi aksiyonunuzu bekliyor.",
@@ -390,6 +391,7 @@ internal static class WorkflowActionDemoSeeder
             {
                 Id = StableGuid($"action-lab:notification:{workflow.Key}:{scenario}"),
                 UserId = SportDemoStarterId,
+                CommunityId = SportCommunityId,
                 Type = terminalStatus == ProcessStatus.Completed ? "Process.Completed" : "Process.Rejected",
                 Title = terminalStatus == ProcessStatus.Completed ? "Aksiyon demo süreci tamamlandı" : "Aksiyon demo süreci reddedildi",
                 Message = $"{workflow.Name} için {scenario} senaryosu sonuçlandı.",

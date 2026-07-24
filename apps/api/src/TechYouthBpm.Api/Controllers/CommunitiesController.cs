@@ -8,6 +8,7 @@ namespace TechYouthBpm.Api.Controllers;
 [Route("api/communities")]
 public class CommunitiesController(
     ICommunityService communityService,
+    ICommunityDeletionService communityDeletionService,
     ICommunityRoleService communityRoleService,
     IUserAdministrationService userAdministrationService,
     IAuthenticationService authenticationService) : ApiControllerBase(authenticationService)
@@ -74,6 +75,47 @@ public class CommunitiesController(
         }
 
         var result = await communityService.GetSummaryAsync(communityId, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpGet("{communityId:guid}/deletion-impact")]
+    public async Task<IActionResult> DeletionImpact(Guid communityId, CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+        if (!user.IsSuperAdmin())
+        {
+            return ForbiddenProblem(["Only SuperAdmin users can inspect permanent community deletion."]);
+        }
+
+        var result = await communityDeletionService.GetImpactAsync(communityId, user, cancellationToken);
+        return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
+    }
+
+    [HttpPost("{communityId:guid}/purge")]
+    public async Task<IActionResult> Purge(
+        Guid communityId,
+        PurgeCommunityRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await CurrentUserAsync(cancellationToken);
+        if (user is null)
+        {
+            return UnauthorizedProblem();
+        }
+        if (!user.IsSuperAdmin())
+        {
+            return ForbiddenProblem(["Only SuperAdmin users can permanently delete communities."]);
+        }
+
+        var result = await communityDeletionService.PurgeAsync(
+            communityId,
+            request,
+            user,
+            cancellationToken);
         return result.IsSuccess ? Ok(result.Value) : ValidationProblem(result.Errors);
     }
 

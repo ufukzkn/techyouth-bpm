@@ -52,9 +52,20 @@ This separation keeps status rules small while allowing new workflow shapes with
 - Gateway conditions may use only start data or outputs produced by earlier tasks, and condition value/operator types must match the selected form field.
 - `SendBack` preserves completed execution history while clearing invalidated downstream variables before creating the next task attempt.
 - Process, task, notification and audit writes share an EF Core transaction.
+- A task decision writes two distinct business facts: the task action remains
+  in the `Tasks` audit category, while its process outcome is recorded as
+  `Process.Advanced`, `Process.SentBack`, `Process.Completed` or
+  `Process.Rejected` in `Processes`. Automatic gateway hops are not emitted as
+  noisy standalone events.
 - A missing candidate or downstream failure rolls the entire operation back.
 - Automatic routing has a 100-hop limit to stop accidental infinite loops.
 - Dashboard, process-list and task-list reads do not create audit entries. Start, claim, release, action, publish and team-membership mutations remain auditable.
 - `Islerim > Gecmis Islerim` contains tasks completed by the signed-in user. Overdue but still-open work remains in the active list; community-wide history is inspected from process history and system audit.
 
 Invalid lifecycle transitions, unavailable actions, invalid graph edges and unauthorized claims are rejected by the backend. This is the central code-review point for BPM correctness.
+
+When a community is permanently deleted, operational process/task rows are
+removed. A safe timeline projection from `ProcessStepExecution` is copied into
+the SuperAdmin-only deletion archive first. It preserves who performed which
+step, the team/role snapshot and time, but deliberately excludes form answers,
+task notes and raw JSON.

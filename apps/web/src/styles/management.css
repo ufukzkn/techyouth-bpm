@@ -1390,6 +1390,68 @@ button.team-member-task-count:focus-visible {
   gap: 12px;
 }
 
+.audit-archive-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--orange) 30%, var(--border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--orange) 5%, var(--surface));
+}
+
+.audit-archive-context .filter-select-field {
+  min-width: min(360px, 100%);
+}
+
+.audit-archive-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.audit-archive-summary strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-archive-summary span {
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.audit-archive-summary small {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .audit-archive-context,
+  .audit-archive-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .audit-archive-summary {
+    gap: 5px;
+  }
+
+  .audit-archive-summary span {
+    padding-left: 0;
+    border-left: 0;
+  }
+}
+
 .system-audit-skeleton .system-audit-content,
 .system-audit-skeleton .system-audit-meta {
   display: grid;
@@ -1473,6 +1535,102 @@ button.team-member-task-count:focus-visible {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.community-danger-zone {
+  border-color: color-mix(in srgb, var(--danger) 36%, var(--border));
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+}
+
+.community-danger-zone .section-toolbar svg,
+.community-danger-zone .eyebrow {
+  color: var(--danger);
+}
+
+.community-danger-zone > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.community-danger-zone > small {
+  color: var(--danger);
+  font-weight: 750;
+}
+
+.community-danger-actions {
+  justify-content: flex-end;
+}
+
+.community-purge-dialog {
+  width: min(640px, calc(100vw - 32px));
+}
+
+.community-purge-warning {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-radius: 7px;
+  color: color-mix(in srgb, var(--danger) 85%, var(--foreground));
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.community-purge-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.community-purge-impact-grid > span {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-muted);
+}
+
+.community-purge-impact-grid svg {
+  color: var(--danger);
+}
+
+.community-purge-impact-grid small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.community-purge-impact-grid strong {
+  font-size: 16px;
+}
+
+.community-purge-form {
+  gap: 12px;
+}
+
+.community-purge-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.community-purge-form textarea {
+  resize: vertical;
+}
+
+@media (max-width: 680px) {
+  .community-purge-impact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .status-line-success {

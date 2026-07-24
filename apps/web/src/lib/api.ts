@@ -38,9 +38,14 @@ import type {
   StartProcessRequest,
   SystemAuditCategoryCounts,
   SystemAuditLog,
+  ArchivedAuditEvent,
+  CommunityDeletionArchive,
+  CommunityDeletionImpact,
+  CommunityPurgeResult,
   TaskActionRequest,
   UpdateProfileRequest,
   UpdateCommunityRequest,
+  PurgeCommunityRequest,
   User,
   UserAdmin,
   UserSession,
@@ -398,6 +403,16 @@ export const api = {
   getCommunitySummary(token: string, communityId: string) {
     return request<CommunitySummary>(`/api/communities/${communityId}/summary`, { token });
   },
+  getCommunityDeletionImpact(token: string, communityId: string) {
+    return request<CommunityDeletionImpact>(`/api/communities/${communityId}/deletion-impact`, { token });
+  },
+  purgeCommunity(token: string, communityId: string, payload: PurgeCommunityRequest) {
+    return request<CommunityPurgeResult>(`/api/communities/${communityId}/purge`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
   listRoleTemplates(token: string) {
     return request<RoleTemplate[]>("/api/communities/role-templates", { token });
   },
@@ -578,6 +593,29 @@ export const api = {
     }
 
     return request<SystemAuditCategoryCounts>(`/api/audit/system/counts${search.size ? `?${search}` : ""}`, { token });
+  },
+  listAuditArchives(token: string) {
+    return request<CommunityDeletionArchive[]>("/api/audit/archives", { token });
+  },
+  listArchivedAuditLogs(
+    token: string,
+    archiveId: string,
+    params: { query?: string; category?: string; page?: number; pageSize?: number; sortBy?: "createdAt" | "action" | "actor"; sortDirection?: "asc" | "desc" } = {},
+  ) {
+    const search = new URLSearchParams();
+    if (params.query) search.set("query", params.query);
+    if (params.category && params.category !== "all") search.set("category", params.category);
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    if (params.sortBy) search.set("sortBy", params.sortBy);
+    if (params.sortDirection) search.set("sortDirection", params.sortDirection);
+    return request<PagedResult<ArchivedAuditEvent>>(
+      `/api/audit/archives/${archiveId}/logs${search.size ? `?${search}` : ""}`,
+      { token },
+    );
+  },
+  listArchivedAuditCounts(token: string, archiveId: string) {
+    return request<SystemAuditCategoryCounts>(`/api/audit/archives/${archiveId}/counts`, { token });
   },
   getDashboardSummary(token: string, scope: "personal" | "community" | "global" = "personal") {
     const search = new URLSearchParams({ scope });

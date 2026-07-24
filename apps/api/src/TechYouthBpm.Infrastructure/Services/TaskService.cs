@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using TechYouthBpm.Application.Audit;
 using TechYouthBpm.Application.Auth;
 using TechYouthBpm.Application.Common;
 using TechYouthBpm.Application.Processes;
@@ -377,6 +378,8 @@ public class TaskService(
             process.ProcessDefinitionVersion!.GraphJson,
             new ProcessGraphDto("", [], []));
         var previousStatus = process.Status;
+        var previousNodeKey = task.NodeKey;
+        var previousNodeTitle = task.Title;
         var now = DateTime.UtcNow;
 
         try
@@ -440,6 +443,19 @@ public class TaskService(
                 "ProcessTask",
                 task.Id.ToString(),
                 $"Task action '{request.Action}' continued process '{process.Id}' from node '{task.NodeKey}'.",
+                new SystemAuditContext(
+                    process.CommunityId,
+                    new { processId = process.Id, nodeKey = task.NodeKey, action = request.Action.ToString() },
+                    SystemAuditCategories.Tasks),
+                cancellationToken);
+            await LogProcessTransitionAsync(
+                process,
+                user,
+                request.Action,
+                previousStatus,
+                previousNodeKey,
+                previousNodeTitle,
+                graph,
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -524,6 +540,27 @@ public class TaskService(
                 "ProcessTask",
                 task.Id.ToString(),
                 $"Task action '{request.Action}' moved process '{process.Id}' from {previousStatus} to {transition.Value}.",
+                new SystemAuditContext(
+                    process.CommunityId,
+                    new { processId = process.Id, action = request.Action.ToString() },
+                    SystemAuditCategories.Tasks),
+                cancellationToken);
+            await auditService.LogAsync(
+                user,
+                ProcessTransitionAction(request.Action, process.Status),
+                "ProcessInstance",
+                process.Id.ToString(),
+                $"Process '{process.Id}' moved from {previousStatus} to {process.Status} after {request.Action}.",
+                new SystemAuditContext(
+                    process.CommunityId,
+                    new
+                    {
+                        processId = process.Id,
+                        previousStatus = previousStatus.ToString(),
+                        nextStatus = process.Status.ToString(),
+                        action = request.Action.ToString()
+                    },
+                    SystemAuditCategories.Processes),
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -533,6 +570,56 @@ public class TaskService(
         }
 
         return Result<ProcessDetailDto>.Success(await LoadProcessDetailAsync(process.Id, user, cancellationToken));
+    }
+
+    private async Task LogProcessTransitionAsync(
+        ProcessInstance process,
+        UserDto user,
+        WorkflowAction action,
+        ProcessStatus previousStatus,
+        string previousNodeKey,
+        string previousNodeTitle,
+        ProcessGraphDto graph,
+        CancellationToken cancellationToken)
+    {
+        var nextNode = graph.Nodes.FirstOrDefault(node => node.Key == process.CurrentNodeKey);
+        var nextNodeTitle = nextNode?.Title ?? process.CurrentNodeKey;
+        await auditService.LogAsync(
+            user,
+            ProcessTransitionAction(action, process.Status),
+            "ProcessInstance",
+            process.Id.ToString(),
+            $"Process '{process.Id}' moved from '{previousNodeTitle}' to '{nextNodeTitle}' after {action}.",
+            new SystemAuditContext(
+                process.CommunityId,
+                new
+                {
+                    processId = process.Id,
+                    previousNodeKey,
+                    previousNodeTitle,
+                    nextNodeKey = process.CurrentNodeKey,
+                    nextNodeTitle,
+                    previousStatus = previousStatus.ToString(),
+                    nextStatus = process.Status.ToString(),
+                    action = action.ToString()
+                },
+                SystemAuditCategories.Processes),
+            cancellationToken);
+    }
+
+    private static string ProcessTransitionAction(WorkflowAction action, ProcessStatus status)
+    {
+        if (status == ProcessStatus.Completed)
+        {
+            return "Process.Completed";
+        }
+        if (status == ProcessStatus.Rejected)
+        {
+            return "Process.Rejected";
+        }
+        return action == WorkflowAction.SendBack
+            ? "Process.SentBack"
+            : "Process.Advanced";
     }
 
     private IQueryable<ProcessTask> TaskQuery() =>
@@ -732,6 +819,7 @@ public class TaskService(
         db.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
+            CommunityId = process.CommunityId,
             UserId = process.StartedByUserId,
             Type = $"Process.{process.Status}",
             Title = "Süreç durumunuz güncellendi",
@@ -752,6 +840,7 @@ public class TaskService(
         db.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
+            CommunityId = process.CommunityId,
             UserId = process.StartedByUserId,
             Type = "Process.Advanced",
             Title = "Süreciniz yeni bir adıma geçti",

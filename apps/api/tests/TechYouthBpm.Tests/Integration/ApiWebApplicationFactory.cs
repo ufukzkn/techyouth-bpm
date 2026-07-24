@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Data.Common;
 using TechYouthBpm.Infrastructure.Data;
 
 namespace TechYouthBpm.Tests.Integration;
@@ -62,6 +63,10 @@ internal sealed class ApiWebApplicationFactory(
                 if (databaseProvider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase)
                     || databaseProvider.Equals("Postgres", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (!string.IsNullOrWhiteSpace(databaseSchema))
+                    {
+                        options.AddInterceptors(new PostgreSqlSchemaInterceptor(databaseSchema));
+                    }
                     options.UseNpgsql(DatabaseConnectionString, providerOptions =>
                     {
                         if (!string.IsNullOrWhiteSpace(databaseSchema))
@@ -109,5 +114,18 @@ internal sealed class ApiWebApplicationFactory(
         {
             File.Delete(databasePath);
         }
+    }
+}
+
+internal sealed class PostgreSqlSchemaInterceptor(string schemaName) : DbConnectionInterceptor
+{
+    public override async Task ConnectionOpenedAsync(
+        DbConnection connection,
+        ConnectionEndEventData eventData,
+        CancellationToken cancellationToken = default)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"SET search_path TO \"{schemaName}\"";
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }

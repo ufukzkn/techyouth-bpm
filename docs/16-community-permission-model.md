@@ -57,6 +57,10 @@ The frontend receives the active user's community and permissions from `UserDto`
 - Community management is separate from user management. It owns community metadata, invite code, active status, custom roles and role-distribution counts.
 - A custom role can be updated or removed. Role removal requires a replacement role and moves active memberships in one transaction. System roles, notably `Atanmadi`, are protected.
 - A deactivated community revokes member sessions and blocks member login plus new workflow writes. SuperAdmin retains management access to reactivate it; historical data remains available.
+- Permanent deletion is available only to SuperAdmin and only after
+  deactivation. It cannot be invoked by a community permission or inferred from
+  a hidden navigation item. The API rechecks role, password, exact name, reason
+  and inactive status.
 - Team reads and writes stay inside the active community unless the actor is SuperAdmin. Cross-community membership is rejected, and changing a user's community deactivates old team memberships.
 - `Takimsiz` is a virtual view of active approved users without active team membership. It is not a role, team row or valid workflow target.
 
@@ -98,6 +102,19 @@ The registration code is intentionally simple in v1. It blocks random public reg
 
 SuperAdmin can edit every community setting. A Topluluk Admin can toggle only its own community's active status through a confirmation step; name, description and invite code remain platform-managed. Deactivation revokes normal member sessions and blocks their new workflow writes. The acting Topluluk Admin retains only its scoped management session so it can reactivate the community.
 
+Deactivation is reversible and preserves all operational data. Permanent purge
+is deliberately separate: target-scoped users, memberships, sessions,
+notifications, teams, roles, forms, workflows, processes and tasks are removed
+atomically. An account with another community link or historical reference is
+kept, but its target membership is removed and its sessions are revoked. Before
+deletion, safe system/process timeline snapshots are written to a read-only,
+SuperAdmin-only archive in the same transaction.
+
 ## Test Guarantees
 
 Service tests protect the important boundaries: registration assigns the supplied community's `Atanmadi` role, invalid invite codes persist nothing, existing users cannot become `SuperAdmin`, and only a current SuperAdmin can create a new SuperAdmin account. Community admins cannot read roles, teams or memberships across another community. Custom-role deletion moves active memberships to its replacement role. Team tests cover multi-team membership, virtual unassigned users, lead-without-permission, audit/notification writes and membership cleanup after a community move. Notification reads are user-scoped, and community-scoped audit/task actions are blocked when access or the community is not valid.
+
+Purge integration tests additionally prove non-SuperAdmin and CSRF rejection,
+inactive/name/password/reason validation, cross-community isolation, preserved
+accounts, safe archive access and full rollback when the database rejects a
+delete.

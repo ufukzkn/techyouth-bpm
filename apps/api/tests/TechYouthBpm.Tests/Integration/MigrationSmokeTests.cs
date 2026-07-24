@@ -37,14 +37,15 @@ public class MigrationSmokeTests
             return;
         }
 
+        var directConnectionString = UseDirectNeonConnection(baseConnectionString);
         var schemaName = $"techyouth_smoke_{Guid.NewGuid():N}";
-        await CreateSchemaAsync(baseConnectionString, schemaName);
+        await CreateSchemaAsync(directConnectionString, schemaName);
 
         try
         {
-            var builder = new NpgsqlConnectionStringBuilder(baseConnectionString)
+            var builder = new NpgsqlConnectionStringBuilder(directConnectionString)
             {
-                SearchPath = schemaName
+                SearchPath = null
             };
             using var factory = new ApiWebApplicationFactory(
                 databaseProvider: "PostgreSql",
@@ -95,8 +96,16 @@ public class MigrationSmokeTests
         }
         finally
         {
-            await DropSchemaAsync(baseConnectionString, schemaName);
+            await DropSchemaAsync(directConnectionString, schemaName);
         }
+    }
+
+    private static string UseDirectNeonConnection(string connectionString)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        var host = builder.Host ?? throw new InvalidOperationException("PostgreSQL host is missing.");
+        builder.Host = host.Replace("-pooler", string.Empty, StringComparison.OrdinalIgnoreCase);
+        return builder.ConnectionString;
     }
 
     private static async Task CreateSchemaAsync(string connectionString, string schemaName)

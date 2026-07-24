@@ -5,8 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActionFeedback, InlineValueLoader } from "@/features/app-shell/components/AsyncState";
 import { WorkspaceToast } from "@/features/app-shell/components/WorkspaceToast";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
+import { CommunityDangerZone } from "@/features/management/CommunityDangerZone";
 import { api } from "@/lib/api";
-import type { Community, CommunityRole, CommunitySummary, Language, PermissionName, RoleTemplate, User } from "@/lib/types";
+import type { Community, CommunityPurgeResult, CommunityRole, CommunitySummary, Language, PermissionName, RoleTemplate, User } from "@/lib/types";
 import {
   CommunityCardSkeleton,
   CommunityRolePanelSkeleton,
@@ -363,6 +364,22 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
     }));
   }
 
+  function handleCommunityPurged(result: CommunityPurgeResult) {
+    communitySummaryCache.delete(result.originalCommunityId);
+    const remainingCommunities = communities.filter((item) => item.id !== result.originalCommunityId);
+    const nextCommunity = remainingCommunities[0] ?? null;
+    setCommunities(remainingCommunities);
+    setSelectedCommunityId(nextCommunity?.id ?? null);
+    setSummary(null);
+    setRoles([]);
+    setSelectedRoleId(null);
+    setTemplateSourceKey("custom");
+    setRoleDraft({ name: "", description: "", templateKey: "custom", permissions: [] });
+    if (nextCommunity) {
+      void loadCommunity(nextCommunity.id);
+    }
+  }
+
   const activeRoleCount = summary?.roleCounts.find((role) => role.communityRoleId === selectedRoleId)?.userCount ?? 0;
 
   return (
@@ -447,6 +464,14 @@ export function ManagementCommunitiesView({ activeUser, language, token }: { act
             ) : null}
             <ActionFeedback feedback={codeFeedback ?? (!isSuperAdmin ? communityFeedback : null)} />
           </section>
+          {isSuperAdmin && selectedCommunity && token ? (
+            <CommunityDangerZone
+              community={selectedCommunity}
+              language={language}
+              onPurged={handleCommunityPurged}
+              token={token}
+            />
+          ) : null}
         </div>
 
         <section className="identity-section community-role-panel">

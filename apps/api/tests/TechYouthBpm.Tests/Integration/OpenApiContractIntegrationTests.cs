@@ -7,6 +7,9 @@ public sealed class OpenApiContractIntegrationTests
 {
     private static readonly string[] ExpectedOperations =
     [
+        "GET /api/audit/archives",
+        "GET /api/audit/archives/{archiveId}/counts",
+        "GET /api/audit/archives/{archiveId}/logs",
         "GET /api/audit/system",
         "GET /api/audit/system/counts",
         "DELETE /api/auth/sessions/{sessionId}",
@@ -27,6 +30,7 @@ public sealed class OpenApiContractIntegrationTests
         "POST /api/auth/reset-password",
         "GET /api/communities",
         "GET /api/communities/role-templates",
+        "GET /api/communities/{communityId}/deletion-impact",
         "GET /api/communities/{communityId}/roles",
         "GET /api/communities/{communityId}/summary",
         "GET /api/communities/{communityId}/users",
@@ -35,6 +39,7 @@ public sealed class OpenApiContractIntegrationTests
         "PATCH /api/communities/{communityId}/roles/{roleId}",
         "PATCH /api/communities/{communityId}/users/{userId}/membership",
         "POST /api/communities",
+        "POST /api/communities/{communityId}/purge",
         "POST /api/communities/{communityId}/roles",
         "POST /api/communities/{communityId}/users",
         "DELETE /api/communities/{communityId}/roles/{roleId}",

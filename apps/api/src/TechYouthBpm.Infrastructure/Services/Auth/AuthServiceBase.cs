@@ -645,9 +645,16 @@ internal abstract class AuthServiceBase
         string? entityId,
         CancellationToken cancellationToken)
     {
+        var communityId = await db.UserCommunityMemberships
+            .AsNoTracking()
+            .Where(membership => membership.UserId == userId && membership.IsActive)
+            .Select(membership => (Guid?)membership.CommunityId)
+            .SingleOrDefaultAsync(cancellationToken);
+
         db.Notifications.Add(new Notification
         {
             Id = Guid.NewGuid(),
+            CommunityId = communityId,
             UserId = userId,
             Type = type,
             Title = title,
@@ -683,6 +690,7 @@ internal abstract class AuthServiceBase
             db.Notifications.Add(new Notification
             {
                 Id = Guid.NewGuid(),
+                CommunityId = communityId,
                 UserId = managerId,
                 Type = type,
                 Title = title,

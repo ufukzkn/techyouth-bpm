@@ -12,6 +12,7 @@ TestResults/
 *.db-shm
 *.db-wal
 .e2e/
+.playwright-cli/
 playwright-report/
 test-results/
 

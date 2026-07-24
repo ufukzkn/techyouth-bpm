@@ -117,15 +117,21 @@ dotnet test apps/api/TechYouthBpm.slnx
 Remove-Item Env:TECHYOUTH_TEST_POSTGRES_CONNECTION
 ```
 
+When the supplied Neon URL uses the `-pooler` host, the test derives the matching
+direct host for migration isolation. It creates a unique temporary schema,
+forces every EF test connection into that schema, and drops it afterward; the
+shared demo schema is not modified.
+
 Docker and direct startup commands are in [QUICKSTART.md](../QUICKSTART.md).
 
 ## Latest Verified Baseline
 
-On 22 July 2026:
+On 24 July 2026:
 
-- Backend: **231/231** tests passed.
-- Frontend: **60/60** tests passed.
-- Playwright: **8/8** real-server scenarios passed.
+- Backend: **243/243** tests passed.
+- Frontend: **70/70** tests passed.
+- PostgreSQL/Neon temporary-schema migration smoke passed.
+- Playwright: **8/8** real-server scenarios last passed on 22 July 2026.
 - Frontend production build passed.
 - ESLint passed without errors or warnings.
 - Local/cloud Compose configuration, API/web image builds, old SQLite volume

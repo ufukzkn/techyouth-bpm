@@ -173,6 +173,19 @@ record token, cookie, password, e-mail or form payloads.
   - Creates a user directly inside the community.
 - `PATCH /api/communities/{communityId}/users/{userId}/membership`
   - Changes a user's community role or active membership state.
+- `GET /api/communities/{communityId}/deletion-impact`
+  - SuperAdmin-only preview of user, role, team, form, workflow, process, task,
+    notification, audit and process-step counts affected by permanent deletion.
+- `POST /api/communities/{communityId}/purge`
+  - Permanently deletes only an inactive community.
+  - Requires the exact community name, current SuperAdmin password and a
+    10-500 character reason. Cookie clients must also pass CSRF validation;
+    Swagger Bearer clients retain the normal bearer behavior.
+  - Creates the safe archive and deletes community-scoped operational data in
+    one transaction. A failure rolls back both sides.
+  - Accounts referenced by another community/history are preserved with the
+    target membership removed; target-only accounts are deleted and all target
+    sessions are revoked.
 
 `UserDto` now includes `communityId`, `communityName`, `communityRoleId`, `communityRoleName` and `permissions`. The frontend uses these fields for route visibility, but services still enforce permission checks on the backend.
 
@@ -202,6 +215,17 @@ Notifications are created for events such as pending registration, assigned task
 - `GET /api/audit/system/counts`
   - Admin-only category counts for the log cards.
   - Supports `query`, so the category cards can show count totals without loading the full audit table into the browser.
+- `GET /api/audit/archives`
+  - SuperAdmin-only list of deleted-community archives and impact totals.
+- `GET /api/audit/archives/{archiveId}/logs`
+  - Uses the same category, search, sort and server pagination contract as live
+    system audit, but reads immutable archived events.
+- `GET /api/audit/archives/{archiveId}/counts`
+  - Returns category counts for one archive without loading all events.
+
+Archived audit retains actor, action, entity identifier, step, team, role and
+timestamp snapshots. It excludes e-mail, IP, user-agent, form answers, task
+notes and raw metadata. The active and archived count caches are separate.
 
 Process-specific history is still returned from `GET /api/processes/{id}` as `auditLogs`. Admins and approvers can inspect visible process history; a normal user can inspect the history of processes they started. This satisfies the PDF expectation that actions such as start/approve/reject are tied back to the user who performed them.
 
@@ -306,6 +330,9 @@ Graph JSON is data, not executable JavaScript. Gateway conditions use typed fiel
   - Runs a published action such as approve, reject, complete, escalate or send-back with note and optional task-form data.
   - Rechecks claim ownership, candidate eligibility, available action and task-form validation.
   - Advances the graph to the next task/gateway/end and stores step, notification and audit changes in one transaction.
+  - Keeps `Task.<action>` in the Tasks category and emits one meaningful process
+    outcome (`Process.Advanced`, `Process.SentBack`, `Process.Completed` or
+    `Process.Rejected`) in the Processes category.
   - The frontend validates the embedded task form for immediate feedback; the backend validates the submitted `formData` again before persisting it under `steps.<nodeKey>`.
 
 ## Swagger Usage
@@ -325,7 +352,11 @@ Controllers should stay thin. Services own decisions:
 - `ISessionService`: logout, session listing and revoke operations.
 - `IUserAdministrationService`: paged user search, user creation, access changes, deletion and admin password reset.
 - `ICommunityService`: community metadata, lifecycle, invite code and summary operations.
+- `ICommunityDeletionService`: SuperAdmin purge validation, impact analysis,
+  safe archive projection and the atomic deletion boundary.
 - `ICommunityRoleService`: role templates and community-role CRUD.
+- `IAuditArchiveService`: immutable SuperAdmin-only archive list, filtered event
+  pages and category counts.
 - `OtpService`: six-digit email verification code generation, hashed OTP storage and expiry/code validation.
 - `IEmailSender` implementations:
   - `DemoEmailSender`: no external dependency; exposes the generated OTP for local demo and no-ops admin temporary-password emails.

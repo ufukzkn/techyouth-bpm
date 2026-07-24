@@ -1,4 +1,5 @@
 import {
+  Archive,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -24,7 +25,7 @@ import { formatSessionExpiry } from "@/features/app-shell/sessionFormatters";
 import { localizeApiError } from "@/features/i18n/apiErrorMessages";
 import { translate, type TranslationKey } from "@/features/i18n/translations";
 import { api } from "@/lib/api";
-import type { Language, SystemAuditLog } from "@/lib/types";
+import type { ArchivedAuditEvent, CommunityDeletionArchive, Language, SystemAuditLog, User } from "@/lib/types";
 import { SlidingSegmentedControl } from "@/features/ui/SlidingSegmentedControl";
 
 const minimumRefreshDelayMs = 500;
@@ -37,12 +38,16 @@ const auditCategoryIcons: Record<AuditCategory, LucideIcon> = {
   tasks: ListChecks,
 };
 
-export function SystemLogsView({ language, token }: { language: Language; token: string | null }) {
+export function SystemLogsView({ activeUser, language, token }: { activeUser: User; language: Language; token: string | null }) {
   const t = useCallback(
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
   const [logs, setLogs] = useState<SystemAuditLog[]>([]);
+  const [auditMode, setAuditMode] = useState<"active" | "archive">("active");
+  const [archives, setArchives] = useState<CommunityDeletionArchive[]>([]);
+  const [selectedArchiveId, setSelectedArchiveId] = useState("");
+  const [isArchiveListLoading, setIsArchiveListLoading] = useState(false);
   const [totalLogs, setTotalLogs] = useState(0);
   const [categoryCounts, setCategoryCounts] = useState<Record<AuditCategory, number | null>>({
     all: null,
@@ -65,14 +70,44 @@ export function SystemLogsView({ language, token }: { language: Language; token:
   const trimmedQuery = searchQuery.trim().toLowerCase();
   const auditCountCache = useRef(new Map<string, Record<AuditCategory, number>>());
   const shouldQueryLogs = trimmedQuery.length >= 2 || selectedCategory !== "all";
+  const selectedArchive = archives.find((archive) => archive.id === selectedArchiveId) ?? null;
+  const isArchiveMode = auditMode === "archive";
+
+  const loadArchives = useCallback(async () => {
+    if (!token || token.startsWith("demo-") || activeUser.role !== "SuperAdmin") {
+      return;
+    }
+
+    setIsArchiveListLoading(true);
+    try {
+      const result = await api.listAuditArchives(token);
+      setArchives(result);
+      setSelectedArchiveId((current) =>
+        current && result.some((archive) => archive.id === current)
+          ? current
+          : result[0]?.id ?? "",
+      );
+    } catch (error) {
+      setToast({
+        kind: "error",
+        text: localizeApiError(error, language, "Silinen topluluk arşivleri yüklenemedi."),
+      });
+    } finally {
+      setIsArchiveListLoading(false);
+    }
+  }, [activeUser.role, language, token]);
 
   const loadAuditCounts = useCallback(
     async (options: { force?: boolean } = {}) => {
       if (!token || token.startsWith("demo-")) {
         return;
       }
+      if (isArchiveMode && !selectedArchiveId) {
+        setCategoryCounts(emptyAuditCounts());
+        return;
+      }
 
-      const cacheKey = "global";
+      const cacheKey = isArchiveMode ? `archive:${selectedArchiveId}` : "active:global";
       const cachedCounts = options.force ? undefined : auditCountCache.current.get(cacheKey);
       if (cachedCounts) {
         setCategoryCounts(cachedCounts);
@@ -80,7 +115,9 @@ export function SystemLogsView({ language, token }: { language: Language; token:
       }
 
       try {
-        const counts = await api.listSystemAuditCounts(token);
+        const counts = isArchiveMode
+          ? await api.listArchivedAuditCounts(token, selectedArchiveId)
+          : await api.listSystemAuditCounts(token);
         const nextCounts = {
           all: counts.all,
           identity: counts.identity,
@@ -104,8 +141,15 @@ export function SystemLogsView({ language, token }: { language: Language; token:
         }
       }
     },
-    [token],
+    [isArchiveMode, selectedArchiveId, token],
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadArchives();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadArchives]);
 
   useEffect(() => {
     if (!toast) {
@@ -146,15 +190,22 @@ export function SystemLogsView({ language, token }: { language: Language; token:
       }
 
       try {
-        const auditResult = await api.listSystemAuditLogs(token, {
+        const requestParams = {
           query,
           category: selectedCategory,
           page,
           pageSize,
           sortBy,
           sortDirection,
-        });
-        setLogs(auditResult.items ?? []);
+        };
+        const auditResult = isArchiveMode
+          ? await api.listArchivedAuditLogs(token, selectedArchiveId, requestParams)
+          : await api.listSystemAuditLogs(token, requestParams);
+        setLogs(
+          isArchiveMode
+            ? (auditResult.items as ArchivedAuditEvent[]).map((item) => archivedEventToSystemLog(item, selectedArchive))
+            : (auditResult.items as SystemAuditLog[] ?? []),
+        );
         setTotalLogs(auditResult.totalCount ?? 0);
         if (options.manual) {
           void loadAuditCounts({ force: true });
@@ -176,13 +227,25 @@ export function SystemLogsView({ language, token }: { language: Language; token:
         }
       }
     },
-    [language, loadAuditCounts, page, pageSize, searchQuery, selectedCategory, shouldQueryLogs, sortBy, sortDirection, t, token],
+    [isArchiveMode, language, loadAuditCounts, page, pageSize, searchQuery, selectedArchive, selectedArchiveId, selectedCategory, shouldQueryLogs, sortBy, sortDirection, t, token],
   );
 
   function refreshLogs() {
     auditCountCache.current.clear();
+    if (isArchiveMode) {
+      void loadArchives();
+    }
     void loadLogs({ manual: true });
     void loadAuditCounts({ force: true });
+  }
+
+  function changeAuditMode(mode: "active" | "archive") {
+    setAuditMode(mode);
+    setLogs([]);
+    setTotalLogs(0);
+    setSelectedHistory(null);
+    setPage(1);
+    setCategoryCounts(emptyAuditCounts());
   }
 
   useEffect(() => {
@@ -247,6 +310,18 @@ export function SystemLogsView({ language, token }: { language: Language; token:
         </div>
         <div className="section-heading-actions">
           <p>{t("logs.description")}</p>
+          {activeUser.role === "SuperAdmin" ? (
+            <SlidingSegmentedControl
+              ariaLabel={language === "tr" ? "Log kaynağı" : "Log source"}
+              name="audit-source"
+              onChange={changeAuditMode}
+              options={[
+                { value: "active", label: language === "tr" ? "Aktif" : "Active" },
+                { value: "archive", label: language === "tr" ? "Arşiv" : "Archive" },
+              ]}
+              value={auditMode}
+            />
+          ) : null}
           <button
             className="secondary-button refresh-button"
             disabled={isRefreshing}
@@ -260,6 +335,39 @@ export function SystemLogsView({ language, token }: { language: Language; token:
       </div>
 
       <section className="identity-section">
+        {isArchiveMode ? (
+          <div className="audit-archive-context">
+            <label className="filter-select-field compact-filter-field">
+              <Archive size={16} />
+              <select
+                disabled={isArchiveListLoading || !archives.length}
+                onChange={(event) => {
+                  setSelectedArchiveId(event.target.value);
+                  setPage(1);
+                  setSelectedHistory(null);
+                  setCategoryCounts(emptyAuditCounts());
+                }}
+                value={selectedArchiveId}
+              >
+                {!archives.length ? <option value="">Silinen topluluk arşivi yok</option> : null}
+                {archives.map((archive) => (
+                  <option key={archive.id} value={archive.id}>
+                    {archive.communityName} · {formatSessionExpiry(archive.deletedAt, language)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedArchive ? (
+              <div className="audit-archive-summary">
+                <strong>{selectedArchive.communityName}</strong>
+                <span>{selectedArchive.userCount} kullanıcı</span>
+                <span>{selectedArchive.processCount} süreç</span>
+                <span>{selectedArchive.taskCount} iş</span>
+                <small>{selectedArchive.deletedByDisplayName} tarafından silindi</small>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="audit-category-grid">
           {auditCategories.map((category) => {
             const CategoryIcon = auditCategoryIcons[category];
@@ -408,4 +516,36 @@ function SystemAuditSkeleton() {
 function waitForMinimumDelay(startedAt: number, minimumDelayMs: number) {
   const remainingMs = minimumDelayMs - (Date.now() - startedAt);
   return remainingMs > 0 ? new Promise((resolve) => window.setTimeout(resolve, remainingMs)) : Promise.resolve();
+}
+
+function emptyAuditCounts(): Record<AuditCategory, null> {
+  return {
+    all: null,
+    identity: null,
+    access: null,
+    forms: null,
+    processes: null,
+    tasks: null,
+  };
+}
+
+function archivedEventToSystemLog(
+  event: ArchivedAuditEvent,
+  archive: CommunityDeletionArchive | null,
+): SystemAuditLog {
+  return {
+    id: event.id,
+    actorUserId: event.actorUserId,
+    communityId: archive?.originalCommunityId,
+    actorDisplayName: event.actorDisplayName,
+    actorUsername: event.actorUsername,
+    category: event.category,
+    action: event.action,
+    entityType: event.entityType,
+    entityId: event.entityId,
+    description: event.description,
+    createdAt: event.occurredAt,
+    entityDisplayName: event.entityDisplayName,
+    entityUsername: event.entityUsername,
+  };
 }
